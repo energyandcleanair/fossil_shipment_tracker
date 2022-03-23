@@ -1,11 +1,15 @@
-from sqlalchemy import Column, String, DateTime, Numeric
+from sqlalchemy import Column, String, DateTime, Numeric, BigInteger
 from sqlalchemy import UniqueConstraint, ForeignKey
-
+from geoalchemy2 import Geometry
 
 from base.db import Base
+
 from . import DB_TABLE_PORTCALL
 from . import DB_TABLE_DEPARTURE
 from . import DB_TABLE_ARRIVAL
+from . import DB_TABLE_SHIP
+from . import DB_TABLE_PORT
+from . import DB_TABLE_TERMINAL
 
 
 class Ship(Base):
@@ -15,27 +19,48 @@ class Ship(Base):
     type = Column(Numeric)
     dwt = Column(Numeric) # in tonnes
     martinetraffic_id = Column(String)
-    pass
+
+    __tablename__ = DB_TABLE_SHIP
 
 
 class Port(Base):
-    pass
+    unlocode = Column(String, unique=True, primary_key=True)
+    name = Column(String)
+    iso2 = Column(String)
+    geometry = Column(Geometry('POINT', srid=4326))
+
+    __tablename__ = DB_TABLE_PORT
 
 
-class Berth(Base):
-    pass
+class Terminal(Base):
+    id = Column(String, unique=True, primary_key=True)
+    port_id = Column(String, ForeignKey(DB_TABLE_PORT + '.id'))
+    name = Column(String)
+    commodity = Column(String)
+
+    __tablename__ = DB_TABLE_TERMINAL
 
 
 class Departure(Base):
-    method_id = Column(String)
-    port_id = Column(String, ForeignKey(DB_TABLE_DEPARTURE + '.id'))
-    pass
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    port_id = Column(String, ForeignKey(DB_TABLE_PORT + '.id'))
+    ship_mmsi = Column(String, ForeignKey(DB_TABLE_SHIP + '.mmsi'))
+    date_utc = Column(DateTime(timezone=False))
+    method_id = Column(String) # Method through which we detected the departure
+    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'))
+
+    __tablename__ = DB_TABLE_DEPARTURE
+
+    __table_args__ = (UniqueConstraint('port_id', 'ship_mmsi', 'date_utc', name='unique_departure'),
+                      )
 
 
 class Arrival(Base):
-    departure_id = Column(String, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"))
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"))
     method_id = Column(String)
-    pass
+
+    __tablename__ = DB_TABLE_ARRIVAL
 
 
 class PortCall(Base):
@@ -54,19 +79,14 @@ class PortCall(Base):
     "PORT_NAME": "AMSTERDAM",
     "UNLOCODE": "NLAMS"
     """
-
-    MMSI = Column(String)
-    SHIPNAME = Column(String)
-    SHIP_ID = Column(String)
-    TIMESTAMP_LT = Column(DateTime(timezone=False))
-    TIMESTAMP_UTC = Column(DateTime(timezone=False))
-    MOVE_TYPE = Column(String)
-    TYPE_NAME = Column(String)  # iso2
-    PORT_ID = Column(String)
-    PORT_NAME = Column(String)
-    UNLOCODE = Column(String)
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_mmsi = Column(String, ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
+    date_lt = Column(DateTime(timezone=False))
+    date_utc = Column(DateTime(timezone=False))
+    move_type = Column(String)
+    type_name = Column(String)  # iso2
+    port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode', onupdate="CASCADE"))
 
     __tablename__ = DB_TABLE_PORTCALL
-
-    __table_args__ = (UniqueConstraint('MMSI', 'TIMESTAMP_LT', name='unique_portcall'),
+    __table_args__ = (UniqueConstraint('mmsi', 'date_lt', name='unique_portcall'),
                       )

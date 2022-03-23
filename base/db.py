@@ -8,6 +8,7 @@ from base.env import get_env
 
 environment = get_env('ENVIRONMENT', 'development').lower() # development, production, test
 connections = {
+    'test': get_env('DB_URL_TEST', default=None),
     'development': get_env('DB_URL_DEVELOPMENT', default=None),
     'production': get_env('DB_URL_PRODUCTION', default=None)
 }
@@ -33,6 +34,9 @@ Base = declarative_base()
 Base.query = session.query_property()
 
 
-def init_db():
-    from models import *
+def init_db(drop_first=False):
+    import models
+    if drop_first:
+        Base.metadata.drop_all(bind=engine)
+
     Base.metadata.create_all(bind=engine)

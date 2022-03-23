@@ -4,7 +4,7 @@ import os
 from decouple import config
 from google.cloud import secretmanager
 
-from logger import logger
+from base.logger import logger
 
 project_id = config('PROJECT_ID')
 
