@@ -4,9 +4,23 @@ from werkzeug.exceptions import HTTPException
 from flask import Flask
 from flask import jsonify
 from flask_cors import CORS
-from routes import routes
+from .routes import routes
+from engine import portcall
+import traceback
 
 app = Flask(__name__)
+
+@app.route('/hello')
+def hello_world():
+    try:
+        return portcall.update()
+    except Exception as e:
+        traceback.print_exc()
+        print(e)
+        raise e
+        
+    return 
+
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.register_blueprint(routes, url_prefix='/')
 CORS(app,

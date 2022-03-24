@@ -11,15 +11,15 @@ from . import DB_TABLE_SHIP
 from . import DB_TABLE_PORT
 from . import DB_TABLE_TERMINAL
 
-
 class Ship(Base):
     mmsi = Column(String, unique=True, primary_key=True)
     name = Column(String)
     imo = Column(String)
-    type = Column(Numeric)
+    type = Column(String)
     dwt = Column(Numeric) # in tonnes
     martinetraffic_id = Column(String)
 
+    __table_args__ = {'extend_existing': True}
     __tablename__ = DB_TABLE_SHIP
 
 
@@ -29,21 +29,24 @@ class Port(Base):
     iso2 = Column(String)
     geometry = Column(Geometry('POINT', srid=4326))
 
+
+    __table_args__ = {'extend_existing': True}
     __tablename__ = DB_TABLE_PORT
 
 
 class Terminal(Base):
     id = Column(String, unique=True, primary_key=True)
-    port_id = Column(String, ForeignKey(DB_TABLE_PORT + '.id'))
+    port_id = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
     name = Column(String)
     commodity = Column(String)
 
+    __table_args__ = {'extend_existing': True}
     __tablename__ = DB_TABLE_TERMINAL
 
 
 class Departure(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    port_id = Column(String, ForeignKey(DB_TABLE_PORT + '.id'))
+    port_id = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
     ship_mmsi = Column(String, ForeignKey(DB_TABLE_SHIP + '.mmsi'))
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String) # Method through which we detected the departure
@@ -51,7 +54,7 @@ class Departure(Base):
 
     __tablename__ = DB_TABLE_DEPARTURE
 
-    __table_args__ = (UniqueConstraint('port_id', 'ship_mmsi', 'date_utc', name='unique_departure'),
+    __table_args__ = (UniqueConstraint('port_id', 'ship_mmsi', 'date_utc', name='unique_departure'),{'extend_existing':True}
                       )
 
 
@@ -60,6 +63,7 @@ class Arrival(Base):
     departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"))
     method_id = Column(String)
 
+    __table_args__ = {'extend_existing': True}
     __tablename__ = DB_TABLE_ARRIVAL
 
 
@@ -88,5 +92,5 @@ class PortCall(Base):
     port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode', onupdate="CASCADE"))
 
     __tablename__ = DB_TABLE_PORTCALL
-    __table_args__ = (UniqueConstraint('mmsi', 'date_lt', name='unique_portcall'),
+    __table_args__ = (UniqueConstraint('ship_mmsi', 'date_lt', name='unique_portcall'),{'extend_existing':True}
                       )
