@@ -4,9 +4,9 @@ from base.db import session
 from models import PortCall, Departure
 
 
-def update_from_marinetraffic():
+def update():
 
-    # Look for dangling PortCalls
+    # Look for PortCalls without associated departure
     subquery = session.query(Departure.portcall_id)
     dangling_portcalls = PortCall.query.filter(~PortCall.id.in_(subquery)).all()
 

@@ -1,16 +1,30 @@
-from models import PortCall
+import pandas as pd
+
+from base.db import engine, session
+from models import DB_TABLE_PORTCALL
+from engine import ship
 
 
-def initial_fill():
+def fill():
     """
     Fill PortCall table with manually downloaded data (from MarimeTraffic interface)
-    Files are in assets/marinetraffic
+    Original files are in assets/marinetraffic
     :return:
     """
-    #TODO
+    portcalls_df = pd.read_csv("assets/portcalls.csv")
+    portcalls_df["move_type"] = portcalls_df.move_type.str.lower()
+    portcalls_df = portcalls_df[["ship_mmsi", "ship_imo", "port_unlocode", "move_type",
+                                 "date_utc", "terminal_id", "berth_id"]]
+    portcall_imos = portcalls_df.ship_imo.unique()
 
+    # First ensure ships are in our database
+    ship.fill(imos=portcall_imos)
+
+    # Upload portcalls
+    portcalls_df.to_sql(DB_TABLE_PORTCALL, con=engine, if_exists="append")
+
+    #TODO Upsert portcalls instead
     return
-
 
 
 def update():

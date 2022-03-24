@@ -1,37 +1,32 @@
 import pandas as pd
-import fiona
+import fiona #required to prevent circular import
+import pyproj
+
 import geopandas as gpd
+from base.db import engine
 
 from models import DB_TABLE_PORT
+
+import os
+os.environ["PROJ_LIB"]
+pyproj.datadir.get_data_dir()
+
+
 def fill():
     """
-    Fill port data from assets
+    Fill port data from prepared file
     :return:
     """
-    # Take ports from UM directly
-    ports_df = pd.read_csv("https://raw.githubusercontent.com/datasets/un-locode/master/data/code-list.csv")
-    ports_df["unlocode"] = ports_df.Country + ports_df.Location
+    # Was originally created in another repo: https://github.com/energyandcleanair/shipment_tracking
+    ports_df = pd.read_csv("assets/ports.csv")
+    if not "check_arrival" in ports_df.columns:
+        ports_df["check_arrival"] = False
 
-    def coords_to_lonlat(c):
-        # c="5554N 03749E"
-        try:
-            lon = (float(c[6:9]) + float(c[9:11]) / 60) * (-1 if c[11]=='W' else 1)
-            lat = (float(c[0:2]) + float(c[2:4]) / 60 ) * (-1 if c[4]=='S' else 1)
-            return lon, lat
-        except TypeError:
-            return None, None
+    ports_gdf = gpd.GeoDataFrame(ports_df, geometry=gpd.points_from_xy(ports_df.lon, ports_df.lat), crs="EPSG:4326")
+    ports_gdf = ports_gdf[["unlocode", "name", "iso2", "check_departure", "check_arrival", "geometry"]]
+    ports_gdf.to_postgis(DB_TABLE_PORT, con=engine, if_exists="append")
 
-    ports_df[["lon", "lat"]] = ports_df.Coordinates.apply(coords_to_lonlat)
-    ports_df.rename(columns={"Country": "iso2", "Name": "name"}, inplace=True)
-    ports_df = gpd.GeoDataFrame(ports_df, geometry=gpd.points_from_xy(ports_df.lon, ports_df.lat))
-    ports_df.to_sql(DB_TABLE_PORT,  con=engine)
-
-
-
-
-
-
-
-
+    #TODO Make an upsert version that would update existing table if ports (pkey="unlocode") already exist
+    # Can use something like this: https://stackoverflow.com/questions/55187884/insert-into-postgresql-table-from-pandas-with-on-conflict-update
     return
 
