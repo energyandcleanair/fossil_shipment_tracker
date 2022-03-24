@@ -13,6 +13,7 @@ from . import DB_TABLE_SHIP
 from . import DB_TABLE_PORT
 from . import DB_TABLE_TERMINAL
 from . import DB_TABLE_BERTH
+from . import DB_TABLE_POSITION
 
 
 class Ship(Base):
@@ -143,4 +144,13 @@ class PortCall(Base):
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
 
     __tablename__ = DB_TABLE_PORTCALL
-    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', name='unique_portcall'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
+
+
+class Position(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    date_utc = Column(DateTime(timezone=False))  # Departure time for departure, Arrival time for arrival
+    geometry = Column(Geometry('POINT', srid=4326))
+
+    __tablename__ = DB_TABLE_POSITION

@@ -6,17 +6,20 @@ from base.logger import logger
 from models import Ship
 
 
+def load_cache(f):
+    try:
+        with open(f) as json_file:
+            return json.load(json_file)
+    except json.decoder.JSONDecodeError:
+        return []
+
+
 class Datalastic:
 
     api_base = 'https://api.datalastic.com/api/v0/'
     api_key = None
-    cache_file_ship = 'cache/datalastic/ships.json'
+    cache_file_ship = load_cache('cache/datalastic/ships.json')
 
-    try:
-        with open(cache_file_ship) as json_file:
-            cache_ships = json.load(json_file)
-    except json.decoder.JSONDecodeError as e:
-        cache_ships = []
 
     @classmethod
     def get_ship_cached(cls, imo):
@@ -24,7 +27,6 @@ class Datalastic:
             return next(x for x in cls.cache_ships if str(x["imo"]) == str(imo))
         except StopIteration:
             return None
-
 
     @classmethod
     def cache_ship(cls, response_data):
@@ -36,7 +38,6 @@ class Datalastic:
         cls.cache_ships.append(response_data)
         with open(cls.cache_file_ship, 'w') as outfile:
             json.dump(cls.cache_ships, outfile)
-
 
     @classmethod
     def get_ship(cls, imo, query_if_not_in_cache=True):

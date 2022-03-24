@@ -1,8 +1,9 @@
 import pandas as pd
 
-from base.db import engine, session
+from base.db_utils import upsert
 from models import DB_TABLE_PORTCALL
 from engine import ship
+from engine import port
 
 
 def fill():
@@ -15,15 +16,19 @@ def fill():
     portcalls_df["move_type"] = portcalls_df.move_type.str.lower()
     portcalls_df = portcalls_df[["ship_mmsi", "ship_imo", "port_unlocode", "move_type",
                                  "date_utc", "terminal_id", "berth_id"]]
+    portcalls_df = portcalls_df.drop_duplicates(subset=["ship_imo", "move_type", "date_utc"])
     portcall_imos = portcalls_df.ship_imo.unique()
+
 
     # First ensure ships are in our database
     ship.fill(imos=portcall_imos)
 
-    # Upload portcalls
-    portcalls_df.to_sql(DB_TABLE_PORTCALL, con=engine, if_exists="append")
+    # Ensure ports are loaded in database
+    if port.count() == 0:
+        port.fill()
 
-    #TODO Upsert portcalls instead
+    # Upsert portcalls
+    upsert(df=portcalls_df, table=DB_TABLE_PORTCALL, constraint_name="unique_portcall")
     return
 
 
