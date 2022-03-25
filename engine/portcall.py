@@ -4,21 +4,25 @@ from base.db_utils import upsert
 from models import DB_TABLE_PORTCALL
 from engine import ship
 from engine import port
+from engine import departure
 
 
-def fill():
+def fill(limit=None):
     """
     Fill PortCall table with manually downloaded data (from MarimeTraffic interface)
     Original files are in assets/marinetraffic
+    :param limit: limit numbers of portcalls for debuging to be faster
     :return:
     """
     portcalls_df = pd.read_csv("assets/portcalls.csv")
+    if limit:
+        portcalls_df = portcalls_df.iloc[0:limit]
+
     portcalls_df["move_type"] = portcalls_df.move_type.str.lower()
     portcalls_df = portcalls_df[["ship_mmsi", "ship_imo", "port_unlocode", "move_type",
-                                 "date_utc", "terminal_id", "berth_id"]]
+                                 "load_status", "port_operation", "date_utc", "terminal_id", "berth_id"]]
     portcalls_df = portcalls_df.drop_duplicates(subset=["ship_imo", "move_type", "date_utc"])
     portcall_imos = portcalls_df.ship_imo.unique()
-
 
     # First ensure ships are in our database
     ship.fill(imos=portcall_imos)
@@ -32,11 +36,14 @@ def fill():
     return
 
 
-def update():
+
+def update_ports():
     """
     Fill port calls for ports of interest, for dates not yet queried in database
     :return:
     """
+
+
     #TODO
     # - query MarineTraffic for portcalls at ports of interest (assets/departure_port_of_interest.csv)
     # - upsert in db
@@ -49,10 +56,3 @@ def update():
 
 
 
-def get(date_from=None):
-    """
-
-    :param date_from:
-    :return: Pandas dataframe of portcalls
-    """
-    return

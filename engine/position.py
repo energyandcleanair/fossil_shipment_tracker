@@ -7,12 +7,12 @@ from models import Departure
 def update_all():
 
     # Get latest position or latest departure
-    dangling_imos = departure.get_dangling_imos()
+    dangling_imo_dates = departure.get_dangling_imo_dates()
 
     # For each
 
 
 def update(imo):
+    return
 
 
-    Departure

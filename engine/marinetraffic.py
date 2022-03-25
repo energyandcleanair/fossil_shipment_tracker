@@ -1,9 +1,10 @@
 import requests
 import json
+import datetime as dt
 
 from base.logger import logger
 from base.env import get_env
-from models import Ship
+from models import Ship, PortCall
 
 
 class Marinetraffic:
@@ -11,6 +12,7 @@ class Marinetraffic:
     api_base = 'https://services.marinetraffic.com/api/'
     api_key = None
     cache_file_ship = 'cache/marinetraffic/ships.json'
+    cache_file_port = 'cache/marinetraffic/ships.json'
 
     try:
         with open(cache_file_ship) as json_file:
@@ -41,8 +43,7 @@ class Marinetraffic:
     @classmethod
     def get_ship(cls, imo):
 
-        if not cls.api_key:
-            cls.api_key = get_env("KEY_MARINETRAFFIC")
+        api_key = get_env("KEY_MARINETRAFFIC_VD02")
 
         # First look in cache to save query credits
         response_data = cls.get_ship_cached(imo)
@@ -90,3 +91,73 @@ class Marinetraffic:
         }
 
         return Ship(**data)
+
+    @classmethod
+    def get_arrival_portcalls_between_dates(cls, imo, date_from, date_to):
+        api_key = get_env("KEY_MARINETRAFFIC_EV01")
+
+        params = {
+            'v': 1,
+            'protocol': 'jsono',
+            'imo': imo,
+            'msgtype': 'extended',
+            'movetype': 0, # Receive arrivals only
+            'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
+            'todate': date_to.strftime("%Y-%m-%d %H:%M"),
+            'exclude_intransit': 1
+        }
+
+        method = 'portcalls/'
+        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
+        if api_result.status_code != 200:
+            logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, api_result))
+            return None
+        response_data = api_result.json()
+
+        if not response_data:
+            return []
+
+        portcalls = []
+        for r in response_data:
+            data = {
+                "ship_mmsi": r["MMSI"],
+                "ship_imo": imo,
+                "date_utc": r["TIMESTAMP_UTC"],
+                "port_unlocode": r["UNLOCODE"],
+                "load_status": r.get("LOAD_STATUS"),
+                "move_type": r["MOVE_TYPE"],
+                "port_operation": r.get("PORT_OPERATION"),
+                "others": {"marinetraffic": r}
+            }
+            portcalls.append(PortCall(**data))
+
+
+        return portcalls
+
+
+
+
+    @classmethod
+    def get_first_arrival_portcall(cls, imo, date_from, filter=None):
+        delta_time = dt.timedelta(hours=12)
+        ncredits = 0
+        credit_per_record = 4
+
+        portcalls = []
+        while not portcalls and date_from < dt.datetime.utcnow():
+            portcalls = cls.get_arrival_portcalls_between_dates(imo=imo, date_from=date_from, date_to=date_from + delta_time)
+            ncredits += len(portcalls * credit_per_record)
+            if filter:
+                portcalls = [x for x in portcalls if filter(x)]
+            date_from += delta_time
+
+        print("%d credits used" % (ncredits,))
+        if not portcalls:
+            # No arrival portcall arrived yet
+            return None
+
+        # Sort by date in the unlikely case
+        # there are several calls within this delta
+        portcalls.sort(key=lambda x: x.date_utc)
+        portcall = portcalls[0]
+        return portcall

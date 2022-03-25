@@ -1,9 +1,10 @@
 import requests
 import json
 
+from base.utils import latlon_to_point
 from base.env import get_env
 from base.logger import logger
-from models import Ship
+from models import Ship, Position
 
 
 def load_cache(f):
@@ -18,7 +19,7 @@ class Datalastic:
 
     api_base = 'https://api.datalastic.com/api/v0/'
     api_key = None
-    cache_file_ship = load_cache('cache/datalastic/ships.json')
+    cache_ships = load_cache('cache/datalastic/ships.json')
 
 
     @classmethod
@@ -80,3 +81,32 @@ class Datalastic:
         }
 
         return Ship(**data)
+
+    @classmethod
+    def get_position(cls, imo, date_from):
+
+        if not cls.api_key:
+            cls.api_key = get_env("KEY_DATALASTIC")
+
+        params = {
+            'api-key': cls.api_key,
+            'imo': imo,
+            'from': date_from.strftime("%Y-%m-%d")
+        }
+        method = 'vessel_history'
+        api_result = requests.get(Datalastic.api_base + method, params)
+        if api_result.status_code != 200:
+            logger.warning("Datalastic: Failed to query vessel position %s: %s" % (imo, api_result))
+            return None
+        response_data = api_result.json()["data"]
+        cls.cache_ship(response_data)
+
+        data = {
+            "geometry": latlon_to_point(lat=response_data["lat"], lon=response_data["lat"]),
+            "ship_imo": imo,
+            "status": response_data["navigation_status"],
+            "speed": response_data["speed"],
+            "date_utc": response_data["last_position_UTC"]
+        }
+
+        return Position(**data)

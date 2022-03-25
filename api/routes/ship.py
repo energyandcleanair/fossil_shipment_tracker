@@ -9,11 +9,12 @@ from flask_restx import Resource, reqparse
 
 
 @routes_api.route('/ship', strict_slashes=False)
-class VoyageResource(Resource):
+class ShipResource(Resource):
 
     parser = reqparse.RequestParser()
-    parser.add_argument('location', help='location id of measurement (can be station or city)', required=False, action='split')
-    parser.add_argument('city', type=str, help='ids of cities', required=False, action='split')
+    parser.add_argument('imo', required=False, action='split')
+    parser.add_argument('format', type=str, help='format of returned results (json or csv)',
+                        required=False, default="json")
 
     @routes_api.expect(parser)
     def get(self):

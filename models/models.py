@@ -5,6 +5,7 @@ from sqlalchemy import UniqueConstraint, ForeignKey
 from geoalchemy2 import Geometry
 
 from base.db import Base
+from base.logger import logger
 
 from . import DB_TABLE_PORTCALL
 from . import DB_TABLE_DEPARTURE
@@ -14,6 +15,7 @@ from . import DB_TABLE_PORT
 from . import DB_TABLE_TERMINAL
 from . import DB_TABLE_BERTH
 from . import DB_TABLE_POSITION
+from . import DB_TABLE_FLOW
 
 
 class Ship(Base):
@@ -30,6 +32,11 @@ class Ship(Base):
     liquid_gas = Column(Numeric)
     liquid_oil = Column(Numeric)
     others = Column(JSONB)
+
+    # Estimated commodity, quantity etc
+    commodity = Column(String)
+    quantity = Column(Numeric)
+    unit = Column(String)
 
     __tablename__ = DB_TABLE_SHIP
 
@@ -70,7 +77,7 @@ class Terminal(Base):
 
 class Berth(Base):
     id = Column(String, unique=True, primary_key=True)
-    port_unlocode = Column(String, ForeignKey(DB_TABLE_TERMINAL + '.id'))
+    port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
     name = Column(String)
     commodity = Column(String)
 
@@ -94,57 +101,19 @@ class Departure(Base):
 class Arrival(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"))
+    date_utc = Column(DateTime(timezone=False))
     method_id = Column(String)
+    port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
 
     __tablename__ = DB_TABLE_ARRIVAL
 
 
-class PortCall(Base):
-    """
-    Copied from MarineTraffic. Could also be Berth call
-    Example of returned data:
-
-
-    "SHIP_ID": "5567750",
-    "MMSI": "237710500",
-    "IMO": "0",
-    "DOCK_TIMESTAMP_LT": "2020-10-20T06:22:00.000Z",
-    "DOCK_TIMESTAMP_UTC": "2020-10-20T03:22:00.000Z",
-    "DOCK_TIMESTAMP_OFFSET": "3.000000",
-    "UNDOCK_TIMESTAMP_LT": "2020-10-20T06:45:00.000Z",
-    "UNDOCK_TIMESTAMP_UTC": "2020-10-20T03:45:00.000Z",
-    "UNDOCK_TIMESTAMP_OFFSET": "3.000000",
-    "SHIPNAME": "PILOT BOAT PY56",
-    "TYPE_NAME": "Pilot Vessel",
-    "DWT": null,
-    "GRT": null,
-    "FLAG": "GR",
-    "YEAR_BUILT": null,
-    "BERTH_ID": "6",
-    "BERTH_NAME": "Container Terminal",
-    "TERMINAL_ID": "978",
-    "TERMINAL_NAME": "Container Terminal",
-    "PORT_ID": "1",
-    "PORT_NAME": "PIRAEUS",
-    "UNLOCODE": "GRPIR",
-    "COUNTRY_CODE": "GR",
-    "DESTINATION_ID": "1",
-    "DESTINATION": "PIRAEUS"
-    """
-
+class Flow(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    ship_mmsi = Column(String) #, ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
-    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
-    date_utc = Column(DateTime(timezone=False)) # Departure time for departure, Arrival time for arrival
-    move_type = Column(String) # "departure" or "arrival"
-    port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode', onupdate="CASCADE"))
+    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"))
+    arrival_id = Column(BigInteger, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"))
 
-    # Optional
-    terminal_id = Column(String, ForeignKey(DB_TABLE_TERMINAL + '.id', onupdate="CASCADE"))
-    berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
-
-    __tablename__ = DB_TABLE_PORTCALL
-    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
+    __tablename__ = DB_TABLE_FLOW
 
 
 class Position(Base):
@@ -154,3 +123,102 @@ class Position(Base):
     geometry = Column(Geometry('POINT', srid=4326))
 
     __tablename__ = DB_TABLE_POSITION
+
+
+# MarineTraffic only
+class PortCall(Base):
+    """
+    Copied from MarineTraffic. Could also be Berth call
+    Example of returned data:
+
+   {
+        "MMSI": "244770588",
+        "SHIPNAME": "PIETERNELLA",
+        "SHIP_ID": "3351323",
+        "TIMESTAMP_LT": "2020-10-20T12:15:00.000Z",
+        "TIMESTAMP_UTC": "2020-10-20T10:15:00.000Z",
+        "MOVE_TYPE": "0",
+        "TYPE_NAME": "Inland, Unknown",
+        "PORT_ID": "1766",
+        "PORT_NAME": "AMSTERDAM",
+        "UNLOCODE": "NLAMS",
+        "DRAUGHT": "59",
+        "LOAD_STATUS": "0",
+        "PORT_OPERATION": "0",
+        "INTRANSIT": "0",
+        "DISTANCE_TRAVELLED": "0",
+        "VOYAGE_SPEED_AVG": null,
+        "VOYAGE_SPEED_MAX": null,
+        "VOYAGE_IDLE_TIME_MINS": null,
+        "ELAPSED_NOANCH": "672",
+        "DISTANCE_LEG": null,
+        "COMFLEET_GROUPEDTYPE": "DRY BREAKBULK",
+        "SHIPCLASS": null
+    }
+    """
+
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_mmsi = Column(String) #, ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    date_utc = Column(DateTime(timezone=False)) # Departure time for departure, Arrival time for arrival
+    port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode', onupdate="CASCADE"))
+
+    load_status = Column(String)  # (0 : N/A, 1 : In Ballast, 2 : Partially Laden, 3 : Fully Laden)
+    move_type = Column(String)  # "1": "departure", "0":"arrival"
+    port_operation = Column(String) # (0: N / A, 1: load, 2: discharge, 3: both, 4: none)
+
+
+    # Optional
+    terminal_id = Column(String, ForeignKey(DB_TABLE_TERMINAL + '.id', onupdate="CASCADE"))
+    berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
+
+    # To store the whole repsonse in case we missed something
+    others = Column(JSONB)
+
+    __tablename__ = DB_TABLE_PORTCALL
+    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
+
+    @validates('load_status')
+    def validate_load_status(self, key, load_status):
+        corr = {
+            "0": "na",
+            "1": "in_ballast",
+            "2": "partially_laden",
+            "3": "fully_laden",
+        }
+        if load_status is None:
+            return None
+
+        if not load_status in corr.keys():
+            logger.warning("Unknown load status: %s" % (load_status,))
+        return corr.get(load_status, load_status)
+
+    @validates('move_type')
+    def validate_move_type(self, key, move_type):
+        corr = {
+            "0": "arrival",
+            "1": "departure"
+        }
+        if move_type is None:
+            return None
+
+        if not move_type in corr.keys():
+            logger.warning("Unknown move type: %s" % (move_type,))
+        return corr.get(move_type, move_type)
+
+    @validates('port_operation')
+    def validate_port_operation(self, key, port_operation):
+        corr = {
+            "0": "na",
+            "1": "load",
+            "2": "discharge",
+            "3": "both",
+            "4": None
+        }
+        if port_operation is None:
+            return None
+
+        if not port_operation in corr.keys():
+            logger.warning("Unknown port_operation: %s" % (port_operation,))
+        return corr.get(port_operation, port_operation)
+

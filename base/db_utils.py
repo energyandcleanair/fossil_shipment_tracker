@@ -31,11 +31,13 @@ def get_upsert_method(constraint_name):
 
 def upsert(df, table, constraint_name):
     if isinstance(df, gpd.GeoDataFrame):
+        #TODO upsert not yet supported. Not sure what's the best way to proceed
+        # It will fail if constraint is violated
+        # A way would be to first remove db records violating the constraint
         df.to_postgis(table,
                       con=engine,
                       if_exists="append",
-                      index=False,
-                      method=get_upsert_method(constraint_name))
+                      index=False)
 
     elif isinstance(df, pd.DataFrame):
         df.to_sql(table,
