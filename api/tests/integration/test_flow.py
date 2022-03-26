@@ -8,9 +8,10 @@ def test_flow(app):
 
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
-        params = {}
+        params = {"format": "json"}
         response = test_client.get('/flow?'+ urllib.parse.urlencode(params))
         assert response.status_code == 200
-        data = response.json["data"]
+        data = response.json
         assert len(data) > 0
+        assert all([x['arrival_date_utc'] > x['departure_date_utc'] for x in data])
 

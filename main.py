@@ -9,9 +9,10 @@ def init():
     init_db(drop_first=False)
     # portcall.fill()
     # departure.update()
-    arrival.update()
+    arrival.update(min_dwt=150000)
     flow.update()
     return
+
 
 if __name__ == "__main__":
     init()

@@ -59,7 +59,7 @@ class FlowResource(Resource):
                 response=flows_df.to_csv(index=False),
                 mimetype="text/csv",
                 headers={"Content-disposition":
-                             "attachment; filename=measurements.csv"})
+                             "attachment; filename=flows.csv"})
 
         if format == "json":
             import json

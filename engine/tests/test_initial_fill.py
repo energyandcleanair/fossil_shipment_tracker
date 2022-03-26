@@ -17,10 +17,10 @@ from engine import flow
 #     return
 #
 #
-# def test_arrival(test_db):
-#     arrival.update(limit=3)
-#     return
-#
+def test_arrival(test_db):
+    arrival.update(limit=3)
+    return
+
 
 def test_flow(test_db):
     flow.update()

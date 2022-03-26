@@ -1,10 +1,14 @@
 import pandas as pd
+import datetime as dt
 
+from base.db import session
 from base.db_utils import upsert
 from models import DB_TABLE_PORTCALL
 from engine import ship
 from engine import port
-from engine import departure
+from engine.marinetraffic import Marinetraffic
+
+from models import PortCall
 
 
 def fill(limit=None):
@@ -36,6 +40,38 @@ def fill(limit=None):
     return
 
 
+def get_first_arrival_portcall(imo, date_from, filter=None):
+
+    # First look in DB
+    cached_portcalls = PortCall.query.filter(PortCall.ship_imo==imo, PortCall.date_utc >= date_from).all()
+    filtered_cached_portcalls = None
+
+    if filter is not None:
+        filtered_cached_portcalls = [x for x in cached_portcalls if filter(x)]
+    else:
+        filtered_cached_portcalls = cached_portcalls
+
+    if filtered_cached_portcalls:
+        # We found a matching portcall in db
+        filtered_cached_portcalls.sort(key=lambda x: x.date_utc)
+        return filtered_cached_portcalls[0]
+
+
+    # If not, query MarineTraffic
+    # But do so only after the last cached portcall to avoid additional costs
+    if cached_portcalls:
+        date_from = max([x.date_utc for x in cached_portcalls]) + dt.timedelta(minutes=1)
+
+    filtered_portcall, portcalls = Marinetraffic.get_first_arrival_portcall(imo=imo,
+                                                        date_from=date_from,
+                                                        filter=filter)
+
+    # Store them in db so that we won't query them
+    for portcall in portcalls:
+        session.add(portcall)
+    session.commit()
+
+    return filtered_portcall
 
 def update_ports():
     """

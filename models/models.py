@@ -178,6 +178,13 @@ class PortCall(Base):
     __tablename__ = DB_TABLE_PORTCALL
     __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
 
+
+    @validates('port_unlocode')
+    def validate_port_unlocode(self, key, port_unlocode):
+        if port_unlocode == "":
+            port_unlocode = None
+        return port_unlocode
+
     @validates('load_status')
     def validate_load_status(self, key, load_status):
         corr = {

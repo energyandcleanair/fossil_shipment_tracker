@@ -2,7 +2,7 @@ import os
 import pytest
 
 
-os.environ["ENVIRONMENT"] = "test"
+os.environ["ENVIRONMENT"] = "development"
 
 
 @pytest.fixture

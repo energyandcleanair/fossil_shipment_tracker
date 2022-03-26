@@ -2,12 +2,16 @@
 from base.db import session
 from base.db_utils import upsert
 
-from models import PortCall, Departure, Arrival
+from models import PortCall, Departure, Arrival, Ship
 
 
-def get_dangling_departures():
+def get_dangling_departures(min_dwt=None):
     subquery = session.query(Arrival.departure_id)
-    return Departure.query.filter(~Departure.id.in_(subquery)).all()
+    query = session.query(Departure).filter(~Departure.id.in_(subquery))
+    if min_dwt is not None:
+        query = query.join(Ship).filter(Ship.dwt >= min_dwt)
+
+    return query.all()
 
 
 def get_dangling_imos():
