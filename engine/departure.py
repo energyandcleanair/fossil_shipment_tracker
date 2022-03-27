@@ -51,15 +51,3 @@ def update():
         }
         session.add(Departure(**departure_data))
     session.commit()
-
-
-
-
-
-
-
-
-
-
-def update_from_datalastic():
-    pass
