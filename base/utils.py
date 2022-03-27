@@ -1,5 +1,20 @@
 from shapely import geometry
+import datetime as dt
 
 
 def latlon_to_point(lat, lon, wkt=True):
     return "SRID=4326;" + geometry.Point(float(lon), lat).wkt
+
+
+def to_datetime(d):
+    if isinstance(d, str):
+        return dt.datetime.strptime(d, "%Y-%m-%d")
+    if isinstance(d, dt.datetime):
+        return d
+    if isinstance(d, dt.date):
+        return dt.combine(d, dt.datetime.min.time())
+    if d is None:
+        return None
+
+    raise TypeError("d is not a date or datetime")
+

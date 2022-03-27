@@ -13,11 +13,12 @@ from sqlalchemy.orm import aliased
 
 
 @routes_api.route('/v0/voyage', strict_slashes=False)
-class FlowResource(Resource):
+class VoyageResource(Resource):
 
     parser = reqparse.RequestParser()
-    parser.add_argument('date_from', help='start date (format 2020-01-15)', required=False)
-    parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
+    parser.add_argument('date_from', help='start date for arrival (format 2020-01-15)',
+                        default="2022-01-01", required=False)
+    parser.add_argument('date_to', type=str, help='end date for arrival (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
@@ -25,7 +26,7 @@ class FlowResource(Resource):
     @routes_api.expect(parser)
     def get(self):
 
-        params = FlowResource.parser.parse_args()
+        params = VoyageResource.parser.parse_args()
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         format = params.get("format")
@@ -92,7 +93,7 @@ class FlowResource(Resource):
             import json
 
             return Response(
-                response=json.dumps({"data":flows_rich}, cls=JsonEncoder),
+                response=json.dumps({"data": flows_rich}, cls=JsonEncoder),
                 status=200,
                 mimetype='application/json')
 

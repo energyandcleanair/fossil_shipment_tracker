@@ -7,6 +7,7 @@ from base.db import session
 from base.logger import logger
 from base.env import get_env
 from base.models import Ship, PortCall
+from base.utils import to_datetime
 
 from engine import ship
 
@@ -134,6 +135,9 @@ class Marinetraffic:
 
     @classmethod
     def get_departure_portcalls_between_dates(cls, unlocode, date_from, date_to):
+        date_from = to_datetime(date_from)
+        date_to = to_datetime(date_to)
+
         api_key = get_env("KEY_MARINETRAFFIC_EV01")
 
         params = {
@@ -225,7 +229,7 @@ class Marinetraffic:
         return PortCall(**data)
 
     @classmethod
-    def get_first_departure_portcall(cls, unlocode, date_from, filter=None):
+    def get_first_departure_portcall(cls, unlocode, date_from, date_to=dt.datetime.utcnow(), filter=None):
         """
         The function returns collects departure portcalls until it finds one matching
         filter (or until it finds one if filter is None).
@@ -237,13 +241,15 @@ class Marinetraffic:
         :param filter:
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
+        date_from = to_datetime(date_from)
+        date_to = to_datetime(date_to)
         delta_time = dt.timedelta(hours=24)
         ncredits = 0
         credit_per_record = 4
 
         portcalls = []
         filtered_portcalls = []
-        while not filtered_portcalls and date_from < dt.datetime.utcnow():
+        while not filtered_portcalls and date_from < date_to:
             period_portcalls = cls.get_departure_portcalls_between_dates(unlocode=unlocode,
                                                                          date_from=date_from,
                                                                          date_to=date_from + delta_time)

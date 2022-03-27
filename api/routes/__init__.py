@@ -4,7 +4,7 @@ from flask_restx import Api
 routes = Blueprint('routes', __name__)
 routes_api = Api(routes)
 
-from .flow import *
 from .ship import *
+from .port import *
 from .voyage import *
 

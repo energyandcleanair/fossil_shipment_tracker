@@ -95,7 +95,9 @@ def get_first_arrival_portcall(imo, date_from, filter=None):
     return filtered_portcall
 
 
-def update_departures(date_from=dt.date(2021, 11, 1), force_rebuild=False):
+def update_departures(date_from=dt.date(2021, 11, 1),
+                      date_to=dt.date.today() + dt.timedelta(days=1),
+                      force_rebuild=False):
     """
     If force rebuild, we ignore cache port calls. Should only be used if we suspect
     we missed some port calls (e.g. in the initial fill using manually downloaded data)
@@ -119,11 +121,12 @@ def update_departures(date_from=dt.date(2021, 11, 1), force_rebuild=False):
         if not force_rebuild:
             filtered_portcall, portcalls = Marinetraffic.get_first_departure_portcall(unlocode=port.unlocode,
                                                                                       date_from=date_from,
+                                                                                      date_to=date_to,
                                                                                       filter=None)
         else:
             portcalls = Marinetraffic.get_departure_portcalls_between_dates(unlocode=port.unlocode,
                                                                          date_from=date_from,
-                                                                         date_to=dt.datetime.now())
+                                                                         date_to=date_to)
 
         # Store them in db so that we won't query them
         for portcall in portcalls:
