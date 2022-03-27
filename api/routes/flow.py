@@ -42,6 +42,7 @@ class FlowResource(Resource):
                                     Arrival.port_unlocode,
                                     ArrivalPort.iso2,
                                     Ship.imo,
+                                    Ship.mmsi,
                                     Ship.type,
                                     Ship.subtype,
                                     Ship.commodity,
@@ -51,7 +52,13 @@ class FlowResource(Resource):
              .join(DeparturePort, Departure.port_unlocode == DeparturePort.unlocode)
              .join(Arrival, Departure.id == Arrival.departure_id)
              .join(ArrivalPort, Arrival.port_unlocode == ArrivalPort.unlocode)
-             .join(Ship, Departure.ship_imo == Ship.imo)).all()
+             .join(Ship, Departure.ship_imo == Ship.imo))\
+
+        if date_from is not None:
+            flows_rich = flows_rich.filter(Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
+
+        if date_to is not None:
+            flows_rich = flows_rich.filter(Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
 
         columns = ["id",
                    "departure_date_utc",
@@ -60,14 +67,18 @@ class FlowResource(Resource):
                    "arrival_date_utc",
                    "arrival_unlocode",
                    "arrival_iso2",
-                   "ship_imo", "ship_type", "ship_subtype", "commodity",
-                   "quantity", "unit"]
+                   "ship_imo",
+                   "ship_mmsi",
+                   "ship_type",
+                   "ship_subtype",
+                   "commodity",
+                   "quantity",
+                   "unit"]
 
         def row_to_dict(row):
             return dict(zip(columns, row))
 
         flows_rich = [row_to_dict(x) for x in flows_rich]
-
 
         if format == "csv":
             flows_df = pd.DataFrame(flows_rich)

@@ -5,5 +5,6 @@ routes = Blueprint('routes', __name__)
 routes_api = Api(routes)
 
 from .flow import *
-
+from .ship import *
+from .voyage import *
 

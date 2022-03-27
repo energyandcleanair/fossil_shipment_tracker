@@ -6,6 +6,11 @@ from timeit import default_timer as timer
 from http import HTTPStatus
 from flask import Response
 from flask_restx import Resource, reqparse
+from base.models import Ship
+from base.encoder import JsonEncoder
+from base.db import session
+
+import pandas as pd
 
 
 @routes_api.route('/v0/ship', strict_slashes=False)
@@ -19,39 +24,26 @@ class ShipResource(Resource):
     @routes_api.expect(parser)
     def get(self):
 
-        params = VoyageResource.parser.parse_args()
-        location_id = params.get("location")
-        city_id = params.get("city")
-        city_name = params.get("city_name")
+        params = ShipResource.parser.parse_args()
+        imo = params.get("imo")
 
-        if format == "json":
-            end_processing = timer()
-            start_todict = timer()
-            meas = meas_df.to_dict(orient="records")
-            end_todict = timer()
+        query = Ship.query
+        if imo is not None:
+            query = query.filter(Ship.imo == imo)
 
-            performance = {
-                "query": round(end_query - start_query, 2),
-                "processing": round(end_processing - start_processing, 2),
-                "todict": round(end_todict - start_todict, 2)
-            }
-
-            resp = json.dumps({"data": meas,
-                               "performance": performance},
-                              cls=JsonEncoder)
-
-            return Response(response=resp,
-                            status=200,
-                            mimetype='application/json')
+        ships_df = pd.read_sql(query.statement, session.bind)
 
         if format == "csv":
             return Response(
-                response=meas_df.to_csv(),
+                response=ships_df.to_csv(index=False),
                 mimetype="text/csv",
                 headers={"Content-disposition":
-                             "attachment; filename=measurements.csv"})
+                             "attachment; filename=flows.csv"})
 
-        return Response(response="Unknown format. Should be either csv or json",
-                        status=HTTPStatus.BAD_REQUEST,
-                        mimetype='application/json')
+        if format == "json":
+            import json
 
+            return Response(
+                response=json.dumps({"data": ships_df.to_dict(orient="records")}, cls=JsonEncoder),
+                status=200,
+                mimetype='application/json')
