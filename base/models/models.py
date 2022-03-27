@@ -105,6 +105,8 @@ class Arrival(Base):
     method_id = Column(String)
     port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
 
+    # Optional
+    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'))
     __tablename__ = DB_TABLE_ARRIVAL
 
 

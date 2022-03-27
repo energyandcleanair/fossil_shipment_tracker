@@ -1,13 +1,10 @@
 import pandas as pd
-import fiona #required to prevent circular import
-import pyproj
 import geopandas as gpd
 
-from base.db import engine
 from base.db import session
 from base.db_utils import upsert
-from models import Port
-from models import DB_TABLE_PORT
+from base.models import Port
+from base.models import DB_TABLE_PORT
 
 
 def count():

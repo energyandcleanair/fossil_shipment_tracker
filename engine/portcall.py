@@ -1,14 +1,17 @@
 import pandas as pd
 import datetime as dt
+import sqlalchemy
+from tqdm import tqdm
 
+from base.logger import logger
 from base.db import session
 from base.db_utils import upsert
-from models import DB_TABLE_PORTCALL
+from base.models import DB_TABLE_PORTCALL
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
 
-from models import PortCall
+from base.models import PortCall, Port
 
 
 def fill(limit=None):
@@ -43,7 +46,9 @@ def fill(limit=None):
 def get_first_arrival_portcall(imo, date_from, filter=None):
 
     # First look in DB
-    cached_portcalls = PortCall.query.filter(PortCall.ship_imo==imo, PortCall.date_utc >= date_from).all()
+    cached_portcalls = PortCall.query.filter(PortCall.ship_imo == imo,
+                                             PortCall.date_utc >= date_from,
+                                             PortCall.move_type == "arrival").all()
     filtered_cached_portcalls = None
 
     if filter is not None:
@@ -66,12 +71,80 @@ def get_first_arrival_portcall(imo, date_from, filter=None):
                                                         date_from=date_from,
                                                         filter=filter)
 
-    # Store them in db so that we won't query them
+    # Store them in db so that we won't query them again
     for portcall in portcalls:
-        session.add(portcall)
-    session.commit()
+        try:
+            session.add(portcall)
+            session.commit()
+        except sqlalchemy.exc.IntegrityError as e:
+            session.rollback()
+            # First try if this is a missing port
+            if Port.query.filter(Port.unlocode==portcall.port_unlocode).count() == 0:
+                new_port = Port(**{"unlocode": portcall.port_unlocode,
+                      "iso2": portcall.port_unlocode[0:2]})
+                session.add(new_port)
+                session.commit()
+
+                # And try again
+                session.add(portcall)
+                session.commit()
+            else:
+                logger.warning("Failed to add portcall. Probably a duplicated portcall")
+                continue
 
     return filtered_portcall
+
+
+def update_departures(date_from=dt.date(2021, 11, 1), force_rebuild=False):
+    """
+    If force rebuild, we ignore cache port calls. Should only be used if we suspect
+    we missed some port calls (e.g. in the initial fill using manually downloaded data)
+    :param date_from:
+    :param force_rebuild:
+    :return:
+    """
+    print("=== Update departures (Portcall) ===")
+    ports = Port.query.filter(Port.check_departure).all()
+
+    for port in tqdm(ports):
+        last_portcall = session.query(PortCall) \
+            .filter(PortCall.port_unlocode==port.unlocode,
+                    PortCall.move_type=="departure") \
+            .order_by(PortCall.date_utc.desc()) \
+            .first()
+
+        if last_portcall is not None and not force_rebuild:
+            date_from = last_portcall.date_utc + dt.timedelta(minutes=1)
+
+        if not force_rebuild:
+            filtered_portcall, portcalls = Marinetraffic.get_first_departure_portcall(unlocode=port.unlocode,
+                                                                                      date_from=date_from,
+                                                                                      filter=None)
+        else:
+            portcalls = Marinetraffic.get_departure_portcalls_between_dates(unlocode=port.unlocode,
+                                                                         date_from=date_from,
+                                                                         date_to=dt.datetime.now())
+
+        # Store them in db so that we won't query them
+        for portcall in portcalls:
+            try:
+                session.add(portcall)
+                session.commit()
+                if force_rebuild:
+                    logger.info("Found a missing port call")
+            except sqlalchemy.exc.IntegrityError as e:
+                if "psycopg2.errors.UniqueViolation" in str(e):
+                    logger.warning("Failed to upload portcall: duplicated port call")
+                else:
+                    logger.warning("Failed to upload portcall: %s" % (str(e),))
+                session.rollback()
+                continue
+
+    return
+
+
+
+
 
 def update_ports():
     """

@@ -1,10 +1,14 @@
 import requests
 import json
 import datetime as dt
+import base
 
+from base.db import session
 from base.logger import logger
 from base.env import get_env
-from models import Ship, PortCall
+from base.models import Ship, PortCall
+
+from engine import ship
 
 
 def load_cache(f):
@@ -15,11 +19,9 @@ def load_cache(f):
         return []
 
 
-
 class Marinetraffic:
 
     api_base = 'https://services.marinetraffic.com/api/'
-    api_key = None
 
     cache_file_ship = 'cache/marinetraffic/ships.json'
     # cache_file_portcall = 'cache/marinetraffic/portcall.json'
@@ -72,7 +74,7 @@ class Marinetraffic:
 
 
     @classmethod
-    def get_ship(cls, imo):
+    def get_ship(cls, imo=None, mmsi=None):
 
         api_key = get_env("KEY_MARINETRAFFIC_VD02")
 
@@ -82,14 +84,17 @@ class Marinetraffic:
         # Otherwise query datalastic (and cache it as well)
         if not response_data:
             params = {
-                # 'api-key': cls.api_key,
                 'v': 1,
                 'protocol': 'jsono',
-                # 'mmsi': mmsi
-                'imo': imo
             }
+
+            if imo is not None:
+                params["imo"] = imo
+            elif mmsi is not None:
+                params["mmsi"] = mmsi
+
             method = 'vesselmasterdata/'
-            api_result = requests.get(Marinetraffic.api_base + method + cls.api_key, params)
+            api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
             if api_result.status_code != 200:
                 logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, api_result))
                 return None
@@ -100,7 +105,11 @@ class Marinetraffic:
                 return None
 
             if len(response_data) > 1:
-                raise ValueError("This function only querys one ship at a time")
+                # We assume only ships higher than base.DWT_MIN have been queried
+                #TODO find a better way
+                response_data = [x for x in response_data if float(x["SUMMER_DWT"]) > base.DWT_MIN]
+                if len(response_data) > 1:
+                    raise ValueError("Not sure which ship to pick: %s" % (response_data))
 
             response_data = response_data[0]
             cls.do_cache_ship(response_data)
@@ -122,6 +131,47 @@ class Marinetraffic:
         }
 
         return Ship(**data)
+
+    @classmethod
+    def get_departure_portcalls_between_dates(cls, unlocode, date_from, date_to):
+        api_key = get_env("KEY_MARINETRAFFIC_EV01")
+
+        params = {
+            'v': 1,
+            'protocol': 'jsono',
+            'portid': unlocode,
+            'msgtype': 'extended',
+            'movetype': 1,  # Receive departures only
+            'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
+            'todate': date_to.strftime("%Y-%m-%d %H:%M"),
+            'exclude_intransit': 1,
+            'dwt_min': base.DWT_MIN
+        }
+
+        method = 'portcalls/'
+        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
+        if api_result.status_code != 200:
+            logger.warning("Marinetraffic: Failed to query vessel %s: %s %s" % (unlocode, api_result, api_result.content))
+            return []
+        response_datas = api_result.json()
+
+        if not response_datas:
+            return []
+
+        portcalls = []
+        for r in response_datas:
+            # IMO's missing
+            imo = session.query(Ship.imo).filter(Ship.mmsi==r["MMSI"]).first()
+            if imo is None:
+                # Ship not found, let's add it
+                ship.fill(mmsis=[r["MMSI"]])
+                imo = session.query(Ship.imo).filter(Ship.mmsi == r["MMSI"]).first()
+
+            if imo is not None:
+                r["IMO"] = imo[0]
+                portcalls.append(cls.parse_portcall(r))
+
+        return portcalls
 
     @classmethod
     def get_arrival_portcalls_between_dates(cls, imo, date_from, date_to):
@@ -153,17 +203,18 @@ class Marinetraffic:
 
             # Store response in cache
             # but add IMO data in it first so that we can retrieve it
-            r["imo"] = imo
-            portcalls.append(cls.parse_portcall(imo, r))
+            # It is missing when querying with imo
+            r["IMO"] = imo
+            portcalls.append(cls.parse_portcall(r))
 
         return portcalls
 
 
     @classmethod
-    def parse_portcall(cls, imo, response_data):
+    def parse_portcall(cls, response_data):
         data = {
             "ship_mmsi": response_data["MMSI"],
-            "ship_imo": imo,
+            "ship_imo": response_data["IMO"],
             "date_utc": response_data["TIMESTAMP_UTC"],
             "port_unlocode": response_data["UNLOCODE"],
             "load_status": response_data.get("LOAD_STATUS"),
@@ -173,6 +224,48 @@ class Marinetraffic:
         }
         return PortCall(**data)
 
+    @classmethod
+    def get_first_departure_portcall(cls, unlocode, date_from, filter=None):
+        """
+        The function returns collects departure portcalls until it finds one matching
+        filter (or until it finds one if filter is None).
+
+        It returns the first matching one as well as all collected ones in the process,
+        so that we can cache them in the db, and not query again and again useless records.
+        :param imo:
+        :param date_from:
+        :param filter:
+        :return: two things: (first_matching_portcall, list_of_portcalls_collected)
+        """
+        delta_time = dt.timedelta(hours=24)
+        ncredits = 0
+        credit_per_record = 4
+
+        portcalls = []
+        filtered_portcalls = []
+        while not filtered_portcalls and date_from < dt.datetime.utcnow():
+            period_portcalls = cls.get_departure_portcalls_between_dates(unlocode=unlocode,
+                                                                         date_from=date_from,
+                                                                         date_to=date_from + delta_time)
+            ncredits += len(period_portcalls) * credit_per_record
+            portcalls.extend(period_portcalls)
+            if filter:
+                filtered_portcalls.extend([x for x in period_portcalls if filter(x)])
+            else:
+                filtered_portcalls.extend(period_portcalls)
+            date_from += delta_time
+
+        print("%d credits used" % (ncredits,))
+        if not filtered_portcalls:
+            # No arrival portcall arrived yet
+            filtered_portcall = None
+        else:
+            # Sort by date in the unlikely case
+            # there are several calls within this delta
+            filtered_portcalls.sort(key=lambda x: x.date_utc)
+            filtered_portcall = filtered_portcalls[0]
+
+        return filtered_portcall, portcalls
 
     @classmethod
     def get_first_arrival_portcall(cls, imo, date_from, filter=None):

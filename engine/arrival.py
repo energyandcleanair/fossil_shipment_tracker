@@ -1,10 +1,13 @@
 import datetime as dt
+import sqlalchemy
+from tqdm import tqdm
 
+import base
 from engine import departure
 from engine import portcall
+from base.logger import logger
 from base.db import session
-
-from models import Arrival, Flow
+from base.models import Arrival, Flow
 
 
 def get_dangling_arrivals():
@@ -12,7 +15,8 @@ def get_dangling_arrivals():
     return Arrival.query.filter(~Arrival.id.in_(subquery)).all()
 
 
-def update(min_dwt=None, limit=None):
+def update(min_dwt=base.DWT_MIN, limit=None):
+    print("=== Arrival update ===")
 
     # We take dangling departures, and try to find the next arrival
     dangling_departures = departure.get_dangling_departures(min_dwt=min_dwt)
@@ -26,7 +30,7 @@ def update(min_dwt=None, limit=None):
     # and we'd start looking from the latest departure
     dangling_departures.sort(key=lambda x: x.date_utc)
 
-    for d in dangling_departures:
+    for d in tqdm(dangling_departures):
         imo = d.ship_imo
         departure_date = d.date_utc
 
@@ -44,8 +48,13 @@ def update(min_dwt=None, limit=None):
                 "departure_id": d.id,
                 "method_id": "marinetraffic_portcall",
                 "date_utc": arrival_portcall.date_utc,
-                "port_unlocode": arrival_portcall.port_unlocode
+                "port_unlocode": arrival_portcall.port_unlocode,
+                "portcall_id": arrival_portcall.id
             }
             arrival = Arrival(**data)
             session.add(arrival)
-            session.commit()
+            try:
+                session.commit()
+            except sqlalchemy.exc.IntegrityError:
+                logger.warning("Failed to push portcall. Probably missing port_unllocode: %s"%(arrival.port_unlocode,))
+                session.rollback()

@@ -35,7 +35,6 @@ Base.query = session.query_property()
 
 
 def init_db(drop_first=False):
-    import models
     if drop_first:
         Base.metadata.drop_all(bind=engine)
 

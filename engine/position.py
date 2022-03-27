@@ -1,7 +1,4 @@
-import datalastic
 import departure
-from base.db import session
-from models import Departure
 
 
 def update_all():

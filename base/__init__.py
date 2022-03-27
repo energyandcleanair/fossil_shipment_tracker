@@ -5,3 +5,7 @@ OIL_OR_ORE = "oil_or_ore"
 LNG = "lng"
 BULK = "bulk"
 UNKNOWN = "unknown"
+
+
+
+DWT_MIN = 5000

@@ -1,17 +1,22 @@
 "This fills departure table using MarineTraffic PortCall data"
 from base.db import session
-from base.db_utils import upsert
+import base
+from base.models import PortCall, Departure, Arrival, Ship
 
-from models import PortCall, Departure, Arrival, Ship
 
-
-def get_dangling_departures(min_dwt=None):
+def get_dangling_departures(min_dwt=None, only_fossil_commodities=True):
     subquery = session.query(Arrival.departure_id)
-    query = session.query(Departure).filter(~Departure.id.in_(subquery))
+    query = session.query(Departure).filter(~Departure.id.in_(subquery)).join(Ship)
     if min_dwt is not None:
-        query = query.join(Ship).filter(Ship.dwt >= min_dwt)
+        query = query.filter(Ship.dwt >= min_dwt)
 
-    return query.all()
+    # Only track those which interesting commodities
+    if only_fossil_commodities:
+        fossil_commodities = [base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG]
+        #TODO add coal later on
+        query = query.filter(Ship.commodity.in_(fossil_commodities))
+
+    return query.order_by(Departure.date_utc).all()
 
 
 def get_dangling_imos():
@@ -25,7 +30,7 @@ def get_dangling_imo_dates():
 
 
 def update():
-
+    print("=== Update departures ===")
     # Look for relevant PortCalls without associated departure
     subquery = session.query(Departure.portcall_id)
     dangling_portcalls = PortCall.query.filter(

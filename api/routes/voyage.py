@@ -8,7 +8,7 @@ from flask import Response
 from flask_restx import Resource, reqparse
 
 
-@routes_api.route('/voyage', strict_slashes=False)
+@routes_api.route('/v0/voyage', strict_slashes=False)
 class VoyageResource(Resource):
 
     parser = reqparse.RequestParser()

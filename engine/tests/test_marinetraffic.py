@@ -1,5 +1,5 @@
 import datetime as dt
-from models import PortCall
+from base.models import PortCall
 
 from engine.marinetraffic import Marinetraffic
 

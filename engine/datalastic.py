@@ -4,7 +4,7 @@ import json
 from base.utils import latlon_to_point
 from base.env import get_env
 from base.logger import logger
-from models import Ship, Position
+from base.models import Ship, Position
 
 
 def load_cache(f):
@@ -41,7 +41,7 @@ class Datalastic:
             json.dump(cls.cache_ships, outfile)
 
     @classmethod
-    def get_ship(cls, imo, query_if_not_in_cache=True):
+    def get_ship(cls, imo=None, mmsi=None, query_if_not_in_cache=True):
 
         if not cls.api_key:
             cls.api_key = get_env("KEY_DATALASTIC")
@@ -55,9 +55,14 @@ class Datalastic:
                 return None
 
             params = {
-                'api-key': cls.api_key,
-                'imo': imo
+                'api-key': cls.api_key
             }
+
+            if imo is not None:
+                params["imo"] = imo
+            elif mmsi is not None:
+                params["mmsi"] = mmsi
+
             method = 'vessel_info'
             api_result = requests.get(Datalastic.api_base + method, params)
             if api_result.status_code != 200:

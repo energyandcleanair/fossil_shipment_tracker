@@ -1,10 +1,10 @@
 from base.db import session
-from models import Arrival, Ship, Departure, Flow
+from base.models import Ship, Departure, Flow
 from engine.arrival import get_dangling_arrivals
 
 
 def update():
-
+    print("=== Flow update ===")
     # We take dangling departures, and try to find the next arrival
     dangling_arrivals = get_dangling_arrivals()
 
