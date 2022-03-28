@@ -3,15 +3,17 @@ import datetime as dt
 import sqlalchemy
 from tqdm import tqdm
 
+import base
 from base.logger import logger
 from base.db import session
 from base.db_utils import upsert
 from base.models import DB_TABLE_PORTCALL
+from base.utils import to_datetime
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
 
-from base.models import PortCall, Port
+from base.models import PortCall, Port, Ship
 
 
 def fill(limit=None):
@@ -43,12 +45,19 @@ def fill(limit=None):
     return
 
 
-def get_first_arrival_portcall(imo, date_from, filter=None):
+def get_first_arrival_portcall(imo,
+                               date_from,
+                               filter=lambda x: x.port_unlocode is not None and x.port_unlocode != "", # An arrival without unlocode is probably an anchoring
+                               use_cache=True):
 
     # First look in DB
-    cached_portcalls = PortCall.query.filter(PortCall.ship_imo == imo,
-                                             PortCall.date_utc >= date_from,
-                                             PortCall.move_type == "arrival").all()
+    if use_cache:
+        cached_portcalls = PortCall.query.filter(PortCall.ship_imo == imo,
+                                                 PortCall.date_utc >= date_from,
+                                                 PortCall.move_type == "arrival").all()
+    else:
+        cached_portcalls = []
+
     filtered_cached_portcalls = None
 
     if filter is not None:
@@ -78,6 +87,9 @@ def get_first_arrival_portcall(imo, date_from, filter=None):
             session.commit()
         except sqlalchemy.exc.IntegrityError as e:
             session.rollback()
+            if portcall.port_unlocode is None or portcall.port_unlocode=="":
+                logger.debug("Port without unlocode. Probably an anchoring")
+                continue
             # First try if this is a missing port
             if Port.query.filter(Port.unlocode==portcall.port_unlocode).count() == 0:
                 new_port = Port(**{"unlocode": portcall.port_unlocode,
@@ -168,3 +180,40 @@ def update_ports():
 
 
 
+def fill_arrival_gaps(imo = None, date_from=None, min_dwt=base.DWT_MIN):
+    """
+    We missed quite a lot of arrival data in the original filling. Since by default,
+     the program is looking at arrivals after last departure, it will never look again
+     at arrivals for previous departures.
+     To solve this, we query again first arrival after problematic departures.
+    :param imo:
+    :param date_from:
+    :param filter:
+    :return:
+    """
+
+    query = PortCall.query
+    if imo is not None:
+        query = query.filter(PortCall.ship_imo == imo)
+
+    if min_dwt is not None:
+        query = query.join(Ship).filter(Ship.dwt >= min_dwt)
+
+    if date_from is not None:
+        query = query.filter(PortCall.date_utc >= to_datetime(date_from))
+
+    portcall_df = pd.read_sql(query.statement, session.bind)
+
+    # Isolate problematic ones: departure portcalls that are followed by another departure portcall
+    portcall_df = portcall_df[~pd.isnull(portcall_df.port_unlocode)].copy()
+    portcall_df['next_move_type'] = portcall_df.sort_values(['ship_imo', 'date_utc']) \
+        .groupby("ship_imo")['move_type'].shift(-1)
+
+    portcall_df = portcall_df.sort_values(['ship_imo', 'date_utc'])
+    problematic_df = portcall_df[(portcall_df.move_type=="departure") \
+                                 & (portcall_df.next_move_type=="departure") \
+                                 & (portcall_df.load_status=='fully_laden') #TOOD this is just to start with most important ones
+        ]
+
+    for index, row in tqdm(problematic_df.iterrows(), total=problematic_df.shape[0]):
+        new_portcall = get_first_arrival_portcall(imo=row.ship_imo, date_from=to_datetime(row.date_utc), use_cache=False)

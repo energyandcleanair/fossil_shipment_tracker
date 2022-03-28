@@ -1,15 +1,8 @@
-import departure
+from engine.datalastic import Datalastic
 
 
-def update_all():
-
-    # Get latest position or latest departure
-    dangling_imo_dates = departure.get_dangling_imo_dates()
-
-    # For each
-
-
-def update(imo):
-    return
+def get(imo, date_from, date_to):
+    positions = Datalastic.get_positions(imo=imo, date_from=date_from, date_to=date_to)
+    return positions
 
 

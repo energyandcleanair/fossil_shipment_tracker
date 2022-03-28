@@ -8,12 +8,12 @@ from base.db import init_db
 
 def init():
     # init_db(drop_first=False)
-    portcall.update_departures(date_from="2021-09-01",
-                               date_to="2021-12-01",
-                               force_rebuild=True)
-    departure.update()
-    arrival.update(min_dwt=5000)
-    flow.update()
+    # portcall.fill_arrival_gaps(date_from='2021-12-01')
+    # portcall.update_departures()
+    # departure.update()
+    # arrival.update(min_dwt=5000)
+    # flow.update()
+    flow.update_positions()
     return
 
 

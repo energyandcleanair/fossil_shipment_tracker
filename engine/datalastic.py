@@ -1,7 +1,9 @@
 import requests
 import json
+import datetime as dt
 
 from base.utils import latlon_to_point
+from base.utils import to_datetime
 from base.env import get_env
 from base.logger import logger
 from base.models import Ship, Position
@@ -88,7 +90,7 @@ class Datalastic:
         return Ship(**data)
 
     @classmethod
-    def get_position(cls, imo, date_from):
+    def get_positions(cls, imo, date_from, date_to):
 
         if not cls.api_key:
             cls.api_key = get_env("KEY_DATALASTIC")
@@ -96,22 +98,30 @@ class Datalastic:
         params = {
             'api-key': cls.api_key,
             'imo': imo,
-            'from': date_from.strftime("%Y-%m-%d")
+            'from': to_datetime(date_from).strftime("%Y-%m-%d")
         }
+        if date_to is not None:
+            params["to"] = to_datetime(date_to).strftime("%Y-%m-%d")
+
         method = 'vessel_history'
         api_result = requests.get(Datalastic.api_base + method, params)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query vessel position %s: %s" % (imo, api_result))
             return None
         response_data = api_result.json()["data"]
-        cls.cache_ship(response_data)
 
-        data = {
-            "geometry": latlon_to_point(lat=response_data["lat"], lon=response_data["lat"]),
+        positions = [Position(**{
+            "geometry": latlon_to_point(lat=x["lat"], lon=x["lon"]),
             "ship_imo": imo,
-            "status": response_data["navigation_status"],
-            "speed": response_data["speed"],
-            "date_utc": response_data["last_position_UTC"]
-        }
+            "navigation_status": x["navigation_status"],
+            "speed": x["speed"],
+            "date_utc": dt.datetime.strptime(x["last_position_UTC"], "%Y-%m-%dT%H:%M:%SZ")
+        }) for x in response_data["positions"]]
 
-        return Position(**data)
+
+        # Datalastic only takes day data as from, we further filter to prevent duplicates in the same day
+        positions = [p for p in positions if p.date_utc > date_from]
+        if date_to is not None:
+            positions = [p for p in positions if p.date_utc < date_to]
+
+        return positions

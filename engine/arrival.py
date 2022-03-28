@@ -38,7 +38,6 @@ def update(min_dwt=base.DWT_MIN, limit=None):
         # After manually inspecting some routes, we saw for instance that vessals would moore
         # away from departure terminal. This would have a unlocode=none
         # We also start 12 hours after departure
-
         filter = lambda x: x.port_unlocode is not None and x.port_unlocode != ""
         arrival_portcall = portcall.get_first_arrival_portcall(imo=imo,
                                                        date_from=departure_date + dt.timedelta(hours=12),

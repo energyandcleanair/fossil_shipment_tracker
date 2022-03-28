@@ -121,8 +121,11 @@ class Flow(Base):
 class Position(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"))
     date_utc = Column(DateTime(timezone=False))  # Departure time for departure, Arrival time for arrival
     geometry = Column(Geometry('POINT', srid=4326))
+    navigation_status = Column(String)
+    speed = Column(Numeric)
 
     __tablename__ = DB_TABLE_POSITION
 
