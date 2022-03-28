@@ -15,11 +15,18 @@ def get_dangling_arrivals():
     return Arrival.query.filter(~Arrival.id.in_(subquery)).all()
 
 
-def update(min_dwt=base.DWT_MIN, limit=None):
+def update(min_dwt=base.DWT_MIN, limit=None,
+           commodities=[base.LNG,
+                        base.CRUDE_OIL,
+                        base.OIL_PRODUCTS,
+                        base.OIL_OR_CHEMICAL]
+
+           ):
     print("=== Arrival update ===")
 
     # We take dangling departures, and try to find the next arrival
-    dangling_departures = departure.get_dangling_departures(min_dwt=min_dwt)
+    dangling_departures = departure.get_dangling_departures(min_dwt=min_dwt,
+                                                            commodities=commodities)
 
     if limit is not None:
         # For debugging without taking too many credits

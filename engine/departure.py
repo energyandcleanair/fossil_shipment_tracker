@@ -4,17 +4,15 @@ import base
 from base.models import PortCall, Departure, Arrival, Ship
 
 
-def get_dangling_departures(min_dwt=None, only_fossil_commodities=True):
+def get_dangling_departures(min_dwt=None, commodities=None):
     subquery = session.query(Arrival.departure_id)
     query = session.query(Departure).filter(~Departure.id.in_(subquery)).join(Ship)
     if min_dwt is not None:
         query = query.filter(Ship.dwt >= min_dwt)
 
     # Only track those which interesting commodities
-    if only_fossil_commodities:
-        fossil_commodities = [base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG, base.OIL_OR_CHEMICAL]
-        #TODO add coal later on
-        query = query.filter(Ship.commodity.in_(fossil_commodities))
+    if commodities is not None:
+        query = query.filter(Ship.commodity.in_(commodities))
 
     return query.order_by(Departure.date_utc).all()
 

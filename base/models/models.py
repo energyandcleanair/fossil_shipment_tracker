@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Numeric, BigInteger, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import validates
-from sqlalchemy import UniqueConstraint, ForeignKey
+from sqlalchemy import UniqueConstraint, ForeignKey, Index
 from geoalchemy2 import Geometry
 
 from base.db import Base
@@ -128,6 +128,8 @@ class Position(Base):
     speed = Column(Numeric)
 
     __tablename__ = DB_TABLE_POSITION
+    __table_args__ = (Index('idx_position_flow', "flow_id"), )
+
 
 
 # MarineTraffic only

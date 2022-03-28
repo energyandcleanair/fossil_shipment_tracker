@@ -77,6 +77,9 @@ def ship_to_commodity(ship):
             commodity = base.LNG
         elif re.match('Ore or Oil', ship.subtype, re.IGNORECASE):
             commodity = base.OIL_OR_ORE
+        elif re.match('Bulk', ship.type, re.IGNORECASE) \
+             or re.match('Bulk', ship.subtype, re.IGNORECASE):
+            commodity = base.BULK
         else:
             commodity = base.UNKNOWN
 

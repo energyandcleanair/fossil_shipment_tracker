@@ -64,6 +64,20 @@ def test_voyage(app):
         assert len(data) > 0
         assert all([x['arrival_date_utc'] > x['departure_date_utc'] for x in data])
 
+        # Test commodity parameter
+        params = {"format": "json", "commodity": "crude_oil"}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert all([x['commodity'] == "crude_oil" for x in data])
+
+        # Test id parameter
+        params = {"format": "json", "id": data[0]["id"]}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) == 1
+
 
 def test_voyage_geojson(app):
 
@@ -74,4 +88,4 @@ def test_voyage_geojson(app):
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
-        assert all([x['arrival_date_utc'] > x['departure_date_utc'] for x in data])
+        #TODO add some geojson validator

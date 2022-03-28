@@ -20,6 +20,10 @@ from sqlalchemy.orm import aliased
 class VoyageResource(Resource):
 
     parser = reqparse.RequestParser()
+    parser.add_argument('id', help='id(s) of voyage. Default: returns all of them',
+                        default=None, action='split', required=False)
+    parser.add_argument('commodity', help='commodity(ies) of interest. Default: returns all of them',
+                        default=None, action='split', required=False)
     parser.add_argument('date_from', help='start date for arrival (format 2020-01-15)',
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date for arrival (format 2020-01-15)', required=False,
@@ -28,15 +32,20 @@ class VoyageResource(Resource):
                         required=False, default="json")
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
                         type=inputs.boolean, default=True)
+    parser.add_argument('download', help='Whether to return results as a file or not.',
+                        type=inputs.boolean, default=False)
 
     @routes_api.expect(parser)
     def get(self):
 
         params = VoyageResource.parser.parse_args()
+        id = params.get("id")
+        commodity = params.get("commodity")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
+        download = params.get("download")
 
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
@@ -61,6 +70,12 @@ class VoyageResource(Resource):
              .join(Arrival, Departure.id == Arrival.departure_id)
              .join(ArrivalPort, Arrival.port_unlocode == ArrivalPort.unlocode)
              .join(Ship, Departure.ship_imo == Ship.imo))\
+
+        if id is not None:
+            flows_rich = flows_rich.filter(Flow.id.in_(id))
+
+        if commodity is not None:
+            flows_rich = flows_rich.filter(Ship.commodity.in_(commodity))
 
         if date_from is not None:
             flows_rich = flows_rich.filter(Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
@@ -137,10 +152,17 @@ class VoyageResource(Resource):
             else:
                 resp_content = flows_geojson
 
+            if download:
+                headers = {"Content-disposition":
+                               "attachment; filename=voyages.geojson"}
+            else:
+                headers={}
+
             return Response(
                 response=resp_content,
                 status=200,
-                mimetype='application/json')
+                mimetype='application/json',
+                headers=headers)
 
         return Response(response="Unknown format. Should be either csv, json or geojson",
                         status=HTTPStatus.BAD_REQUEST,
