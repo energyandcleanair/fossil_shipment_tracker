@@ -10,7 +10,7 @@ from . import routes_api
 import pandas as pd
 
 
-@routes_api.route('/v0/port', strict_slashes=False)
+@routes_api.route('/v0/port', methods=['GET'], strict_slashes=False)
 class PortResource(Resource):
 
     parser = reqparse.RequestParser()

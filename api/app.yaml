@@ -7,3 +7,7 @@ env_variables:
 entrypoint: gunicorn --log-level debug -b :$PORT -w 2 app:app
 automatic_scaling:
   min_instances: 1
+handlers:
+- url: .*
+  script: app.app  # the flask app handling requests
+  secure: always
