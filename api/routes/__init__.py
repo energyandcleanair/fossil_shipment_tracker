@@ -7,4 +7,5 @@ routes_api = Api(routes)
 from .ship import *
 from .port import *
 from .voyage import *
+from .position import *
 

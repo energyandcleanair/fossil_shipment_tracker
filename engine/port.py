@@ -26,3 +26,11 @@ def fill():
 
     upsert(df=ports_gdf, table=DB_TABLE_PORT, constraint_name="unique_port")
     return
+
+
+def insert_new_port(iso2, unlocode, name=None):
+    new_port = Port(**{"unlocode": unlocode,
+                       "iso2": iso2,
+                       "name": name})
+    session.add(new_port)
+    session.commit()

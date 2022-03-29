@@ -14,6 +14,8 @@ def fill(imos=[], mmsis=[]):
     :param source: what data source to use
     :return:
     """
+    imos = [str(x) for x in imos]
+    mmsis = [str(x) for x in mmsis]
     logger.info("Adding missing ships. MMSI: %s | IMO: %s" % (",".join(imos), ",".join(mmsis)))
 
     # Fill missing ships

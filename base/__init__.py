@@ -9,3 +9,7 @@ UNKNOWN = "unknown"
 
 
 DWT_MIN = 5000
+
+
+QUERY_POSITION_HOURS_AFTER_ARRIVAL = 24 #Datalastic only takes day as filter
+QUERY_POSITION_HOURS_BEFORE_DEPARTURE = 12

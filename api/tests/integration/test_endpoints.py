@@ -2,6 +2,8 @@ import requests
 import urllib
 import pandas as pd
 import json
+from base.models import Position
+from base.db import session
 
 
 
@@ -89,3 +91,14 @@ def test_voyage_geojson(app):
         data = response.json["data"]
         assert len(data) > 0
         #TODO add some geojson validator
+
+
+def test_position(app):
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        flow_id = session.query(Position.flow_id).first()[0]
+        params = {"voyage_id": flow_id}
+        response = test_client.get('/v0/position?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0

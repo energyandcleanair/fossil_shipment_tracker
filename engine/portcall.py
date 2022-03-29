@@ -92,10 +92,8 @@ def get_first_arrival_portcall(imo,
                 continue
             # First try if this is a missing port
             if Port.query.filter(Port.unlocode==portcall.port_unlocode).count() == 0:
-                new_port = Port(**{"unlocode": portcall.port_unlocode,
-                      "iso2": portcall.port_unlocode[0:2]})
-                session.add(new_port)
-                session.commit()
+                port.insert_new_port(iso2=portcall.port_unlocode[0:2],
+                                     unlocode=portcall.port_unlocode)
 
                 # And try again
                 session.add(portcall)

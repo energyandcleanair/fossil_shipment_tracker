@@ -4,9 +4,6 @@ instance_class: F4_1G
 env_variables:
   PROJECT_ID: 'fossil-shipment-tracker'
   ENVIRONMENT: 'development'
-entrypoint: gunicorn -b :$PORT -w 2 app:app
+entrypoint: gunicorn --log-level debug -b :$PORT -w 2 app:app
 automatic_scaling:
   min_instances: 1
-inbound_services:
-  - warmup
-app_engine_apis: true

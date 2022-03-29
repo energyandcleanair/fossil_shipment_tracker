@@ -9,8 +9,10 @@ from routes import routes
 app = Flask(__name__)
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.register_blueprint(routes, url_prefix='/')
+# CORS(app)
 CORS(app,
      origins=["https://fossil-shipment-tracker.appspot.com",
+              "https://fossil-shipment-tracker.ew.r.appspot.com/",
               "http://localhost:8080",
               "http://127.0.0.1",
               "https://energyandcleanair.github.io",
@@ -29,15 +31,17 @@ def exception_handler(err):
     if isinstance(err, HTTPException):
         code = err.code
         response = {
-            'message': getattr(err, 'description', code)
+            'message2': getattr(err, 'description', code) + " " + str(err)
         }
     else:
         code = 500
         response = {
-            'message': err.args[0]
+            'message2': err.args[0]
         }
-
     return jsonify(response), code
+
+
+
 
 
 

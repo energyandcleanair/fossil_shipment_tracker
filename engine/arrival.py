@@ -62,5 +62,5 @@ def update(min_dwt=base.DWT_MIN, limit=None,
             try:
                 session.commit()
             except sqlalchemy.exc.IntegrityError:
-                logger.warning("Failed to push portcall. Probably missing port_unllocode: %s"%(arrival.port_unlocode,))
+                logger.warning("Failed to push portcall. Probably missing port_unlocode: %s"%(arrival.port_unlocode,))
                 session.rollback()

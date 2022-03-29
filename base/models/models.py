@@ -16,6 +16,8 @@ from . import DB_TABLE_TERMINAL
 from . import DB_TABLE_BERTH
 from . import DB_TABLE_POSITION
 from . import DB_TABLE_FLOW
+from . import DB_TABLE_FLOWARRIVALBERTH
+from . import DB_TABLE_FLOWDEPARTUREBERTH
 
 
 class Ship(Base):
@@ -80,9 +82,43 @@ class Berth(Base):
     port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
     name = Column(String)
     commodity = Column(String)
+    geometry = Column(Geometry('GEOMETRY', srid=4326))
 
     __tablename__ = DB_TABLE_BERTH
 
+
+class FlowDepartureBerth(Base):
+    """
+    For each flow, lists the berth detected as well as the method used to find it
+    """
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"))
+    berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
+
+    # Optional
+    position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"))
+    method_id = Column(String)
+
+    __tablename__ = DB_TABLE_FLOWDEPARTUREBERTH
+    __table_args__ = (UniqueConstraint('flow_id', 'berth_id', name='unique_flowdepartureberth'),
+                      )
+
+
+class FlowArrivalBerth(Base):
+    """
+    For each flow, lists the berth detected as well as the method used to find it
+    """
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"))
+    berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
+
+    # Optional
+    position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"))
+    method_id = Column(String)
+
+    __tablename__ = DB_TABLE_FLOWARRIVALBERTH
+    __table_args__ = (UniqueConstraint('flow_id', 'berth_id', name='unique_flowarrivalberth'),
+                      )
 
 class Departure(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)

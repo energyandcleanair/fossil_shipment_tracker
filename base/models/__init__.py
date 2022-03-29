@@ -7,6 +7,8 @@ DB_TABLE_TERMINAL = "terminal"
 DB_TABLE_BERTH = "berth"
 DB_TABLE_POSITION = "position"
 DB_TABLE_FLOW = "flow"
+DB_TABLE_FLOWARRIVALBERTH = "flowarrivalberth"
+DB_TABLE_FLOWDEPARTUREBERTH = "flowdepartureberth"
 
 
 from .models import *
