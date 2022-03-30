@@ -3,6 +3,7 @@ import geopandas as gpd
 import shapely
 from geoalchemy2 import func
 import sqlalchemy
+import datetime as dt
 
 from base.db import session, engine
 from base.logger import logger
@@ -44,12 +45,12 @@ def fill():
     return
 
 def detect_berths():
-    detect_departure_berth()
-    detect_arrival_berth()
+    detect_departure_berths()
+    detect_arrival_berths()
     return
 
 
-def detect_departure_berth():
+def detect_departure_berths():
     # Look for flows to update
     flows_to_update = session.query(Flow.id).filter(Flow.id.notin_(session.query(FlowDepartureBerth.flow_id)))
 
@@ -80,12 +81,12 @@ def detect_departure_berth():
     return
 
 
-def detect_arrival_berth():
+def detect_arrival_berths(min_hours_at_berth=4):
 
     # Look for flows to update
     flows_to_update = session.query(Flow.id).filter(Flow.id.notin_(session.query(FlowArrivalBerth.flow_id)))
 
-    berths = session.query(Flow.id, Berth.id, Position.id, Berth.port_unlocode, Arrival.port_unlocode) \
+    berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc, Berth.port_unlocode, Arrival.port_unlocode) \
         .filter(Flow.id.in_(flows_to_update)) \
         .filter(Position.navigation_status == "Moored") \
         .join(Position, Position.flow_id == Flow.id) \
@@ -94,19 +95,35 @@ def detect_arrival_berth():
         .join(Berth, func.ST_Contains(Berth.geometry, Position.geometry)) \
         .filter((Arrival.date_utc - Position.date_utc) < (Position.date_utc - Departure.date_utc)) \
         .order_by(Flow.id, Berth.id, Position.date_utc) \
-        .distinct(Flow.id, Berth.id)
+        .distinct(Flow.id, Berth.id, Position.id, Position.date_utc)
 
     berths_df = pd.read_sql(berths.statement,
                             session.bind)
 
-    berths_df.columns = ["flow_id", "berth_id", "position_id", "berth_port_unlocode", "arrival_port_unlocode"]
+    berths_df.columns = ["flow_id", "berth_id", "position_id", "position_date_utc", "berth_port_unlocode",
+                         "arrival_port_unlocode"]
+
+    # They should stay minimum n-hours
+    berths_agg = berths_df \
+        .sort_values(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_unlocode", 'position_date_utc']) \
+        .groupby(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_unlocode"]) \
+        .agg(min_date_utc=('position_date_utc','min'),
+             max_date_utc=('position_date_utc', 'max'),
+             position_id=('position_id','first')) \
+        .reset_index()
+
+    if len(berths_agg) == 0:
+        return None
+
+    berths_agg_ok = berths_agg.loc[
+        (berths_agg.max_date_utc - berths_agg.min_date_utc) > dt.timedelta(hours=min_hours_at_berth)]
 
     # Look for problematic ones
-    problematic = berths_df.loc[berths_df.berth_port_unlocode != berths_df.arrival_port_unlocode]
+    problematic = berths_agg_ok.loc[berths_df.berth_port_unlocode != berths_df.arrival_port_unlocode].copy()
     if len(problematic) > 0:
         logger.warning("There are problematic matching (e.g. different unlocode between berth and port")
 
-    berths_df["method_id"] = "simple_overlapping"
-    berths_df = berths_df[["flow_id", "berth_id", "position_id", "method_id"]]
-    upsert(df=berths_df, table=DB_TABLE_FLOWARRIVALBERTH, constraint_name='unique_flowarrivalberth')
+    berths_agg_ok["method_id"] = "simple_overlapping"
+    berths_agg_ok = berths_agg_ok[["flow_id", "berth_id", "position_id", "method_id"]]
+    upsert(df=berths_agg_ok, table=DB_TABLE_FLOWARRIVALBERTH, constraint_name='unique_flowarrivalberth')
     return

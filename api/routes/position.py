@@ -38,9 +38,9 @@ class PositionResource(Resource):
         query = query.order_by(Position.date_utc)
         positions_df = pd.read_sql(query.statement, session.bind)
         positions_df["lon"] = positions_df.geometry.apply(
-            lambda geom: shapely.wkb.loads(bytes(positions_df.geometry.iloc[0].data)).x)
+            lambda geom: shapely.wkb.loads(bytes(geom.data)).x)
         positions_df["lat"] = positions_df.geometry.apply(
-            lambda geom: shapely.wkb.loads(bytes(positions_df.geometry.iloc[0].data)).y)
+            lambda geom: shapely.wkb.loads(bytes(geom.data)).y)
 
         positions_df.drop(["geometry"], axis=1, inplace=True)
 

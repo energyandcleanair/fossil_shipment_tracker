@@ -1,5 +1,7 @@
 import requests
 import urllib
+import geopandas as gpd
+import io
 import pandas as pd
 import json
 from base.models import Position
@@ -90,8 +92,9 @@ def test_voyage_geojson(app):
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
-        #TODO add some geojson validator
-
+        gdf = gpd.read_file(io.StringIO(json.dumps(data)))
+        assert len(gdf) > 0
+        assert "geometry" in gdf.columns
 
 def test_position(app):
     # Create a test client using the Flask application configured for testing
@@ -102,3 +105,23 @@ def test_position(app):
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
+
+
+def test_berth(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {"format": "json"}
+        response = test_client.get('/v0/berth?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+
+        # Test commodity parameter
+        params = {"format": "geojson"}
+        response = test_client.get('/v0/berth?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        gdf = gpd.read_file(io.StringIO(json.dumps(data)))
+        assert len(gdf) > 0
+        assert "geometry" in gdf.columns

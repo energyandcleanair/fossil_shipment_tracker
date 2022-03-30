@@ -1,5 +1,5 @@
 service: default
-runtime: python37
+runtime: python38
 instance_class: F4_1G
 env_variables:
   PROJECT_ID: 'fossil-shipment-tracker'
@@ -7,7 +7,3 @@ env_variables:
 entrypoint: gunicorn --log-level debug -b :$PORT -w 2 app:app
 automatic_scaling:
   min_instances: 1
-handlers:
-- url: .*
-  script: app.app  # the flask app handling requests
-  secure: always

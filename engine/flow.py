@@ -32,7 +32,7 @@ def update():
 
 
 def update_positions(commodities=None):
-
+    print("=== Position update ===")
     position_subq = session.query(
         Position.flow_id,
         func.max(Position.date_utc).label('last_date'),
@@ -41,15 +41,16 @@ def update_positions(commodities=None):
 
     # We update position which are still ongoing (no arrival yet)
     # or who are still missing some positions (should have til Arrival + n hours, and from Departure - n_hours)
-    flows_to_update = session.query(Flow, Departure.ship_imo, Departure.date_utc, Arrival.date_utc) \
+    flows_to_update = session.query(Flow, Departure.ship_imo, Departure.date_utc, Arrival.date_utc, position_subq.c.first_date, position_subq.c.last_date) \
         .join(Departure, Flow.departure_id == Departure.id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .join(Arrival, Flow.arrival_id == Arrival.id) \
-        .join(position_subq, Flow.id == position_subq.c.flow_id) \
+        .join(position_subq, Flow.id == position_subq.c.flow_id, isouter=True) \
         .filter(sqlalchemy.or_(Flow.arrival_id == sqlalchemy.null(),
                                sqlalchemy.or_(
-                                   position_subq.c.last_date <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
-                                   position_subq.c.first_date >= Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
+                                   position_subq.c.first_date == sqlalchemy.null(),
+                                   position_subq.c.last_date < Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
+                                   position_subq.c.first_date > Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
                                    )
                                )
                 )
@@ -64,9 +65,10 @@ def update_positions(commodities=None):
         ship_imo = f[1]
         departure_date = f[2]
         arrival_date = f[3]
-
-        date_from = departure_date - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
-        date_to = arrival_date + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL)
+        # Add a bit of buffer hours, so that next time, we don't update the flows
+        buffer_hours = 12
+        date_from = departure_date - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE - buffer_hours)
+        date_to = arrival_date + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL + buffer_hours)
 
         first_date, last_date = session.query(
             func.min(Position.date_utc).label('first_date'),

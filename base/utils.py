@@ -8,7 +8,10 @@ def latlon_to_point(lat, lon, wkt=True):
 
 def to_datetime(d):
     if isinstance(d, str):
-        return dt.datetime.strptime(d, "%Y-%m-%d")
+        try:
+            return dt.datetime.strptime(d, "%Y-%m-%d")
+        except ValueError:
+            return dt.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
     if isinstance(d, dt.datetime):
         return d
     if isinstance(d, dt.date):
@@ -20,3 +23,8 @@ def to_datetime(d):
 
     raise TypeError("d is not a date or datetime")
 
+
+def update_geometry_from_wkb(df):
+    from shapely import wkb
+    df["geometry"] = df.geometry.apply(lambda geom: wkb.loads(bytes(geom.data)))
+    return df

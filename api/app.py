@@ -1,12 +1,18 @@
 import os
 from base.db import session
 from werkzeug.exceptions import HTTPException
-from flask import Flask
+from flask import Flask, request
 from flask import jsonify
 from flask_cors import CORS
 from routes import routes
 
-
+try:
+    import googleclouddebugger
+    googleclouddebugger.enable(
+        breakpoint_enable_canary=True
+    )
+except ImportError:
+    pass
 
 app = Flask(__name__)
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
@@ -45,10 +51,10 @@ def exception_handler(err):
 
 
 
-
-
-
 if __name__ == "__main__":
+
+
+
     # This is used when running locally. Gunicorn is used to run the
     # application on Cloud Run. See entrypoint in Dockerfile.
     app.run(debug=True, ssl_context='adhoc', host='127.0.0.1', port=int(os.environ.get('PORT', 8080)))

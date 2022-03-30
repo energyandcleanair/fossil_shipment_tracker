@@ -120,6 +120,7 @@ class FlowArrivalBerth(Base):
     __table_args__ = (UniqueConstraint('flow_id', 'berth_id', name='unique_flowarrivalberth'),
                       )
 
+
 class Departure(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
@@ -238,7 +239,8 @@ class PortCall(Base):
         }
         if load_status is None:
             return None
-
+        if load_status in corr.values():
+            return load_status
         if not load_status in corr.keys():
             logger.warning("Unknown load status: %s" % (load_status,))
         return corr.get(load_status, load_status)
@@ -251,7 +253,8 @@ class PortCall(Base):
         }
         if move_type is None:
             return None
-
+        if move_type in corr.values():
+            return move_type
         if not move_type in corr.keys():
             logger.warning("Unknown move type: %s" % (move_type,))
         return corr.get(move_type, move_type)
@@ -267,7 +270,8 @@ class PortCall(Base):
         }
         if port_operation is None:
             return None
-
+        if port_operation in corr.values():
+            return port_operation
         if not port_operation in corr.keys():
             logger.warning("Unknown port_operation: %s" % (port_operation,))
         return corr.get(port_operation, port_operation)

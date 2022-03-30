@@ -135,23 +135,37 @@ class Marinetraffic:
         return Ship(**data)
 
     @classmethod
-    def get_departure_portcalls_between_dates(cls, unlocode, date_from, date_to):
+    def get_portcalls_between_dates(cls, date_from, date_to,
+                                    unlocode=None,
+                                    imo=None,
+                                    arrival_or_departure=None):
+
+        if imo is None and unlocode is None:
+            raise ValueError("Need to specify either imo or unlocode")
+
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
 
         api_key = get_env("KEY_MARINETRAFFIC_EV01")
 
         params = {
-            'v': 1,
+            'v': 4,
             'protocol': 'jsono',
-            'portid': unlocode,
             'msgtype': 'extended',
-            'movetype': 1,  # Receive departures only
             'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
             'todate': date_to.strftime("%Y-%m-%d %H:%M"),
             'exclude_intransit': 1,
             'dwt_min': base.DWT_MIN
         }
+
+        if unlocode:
+            params["portid"] = unlocode
+
+        if imo:
+            params["imo"] = imo
+
+        if arrival_or_departure:
+            params["movetype"] = {"departure":1, "arrival":0}[arrival_or_departure]
 
         method = 'portcalls/'
         api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
@@ -179,43 +193,6 @@ class Marinetraffic:
         return portcalls
 
     @classmethod
-    def get_arrival_portcalls_between_dates(cls, imo, date_from, date_to):
-        api_key = get_env("KEY_MARINETRAFFIC_EV01")
-
-        params = {
-            'v': 1,
-            'protocol': 'jsono',
-            'imo': imo,
-            'msgtype': 'extended',
-            'movetype': 0, # Receive arrivals only
-            'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
-            'todate': date_to.strftime("%Y-%m-%d %H:%M"),
-            'exclude_intransit': 1
-        }
-
-        method = 'portcalls/'
-        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
-        if api_result.status_code != 200:
-            logger.warning("Marinetraffic: Failed to query vessel %s: %s %s" % (imo, api_result, api_result.content))
-            return []
-        response_datas = api_result.json()
-
-        if not response_datas:
-            return []
-
-        portcalls = []
-        for r in response_datas:
-
-            # Store response in cache
-            # but add IMO data in it first so that we can retrieve it
-            # It is missing when querying with imo
-            r["IMO"] = imo
-            portcalls.append(cls.parse_portcall(r))
-
-        return portcalls
-
-
-    @classmethod
     def parse_portcall(cls, response_data):
         data = {
             "ship_mmsi": response_data["MMSI"],
@@ -229,53 +206,9 @@ class Marinetraffic:
         }
         return PortCall(**data)
 
-    @classmethod
-    def get_first_departure_portcall(cls, unlocode, date_from, date_to=dt.datetime.utcnow(), filter=None):
-        """
-        The function returns collects departure portcalls until it finds one matching
-        filter (or until it finds one if filter is None).
-
-        It returns the first matching one as well as all collected ones in the process,
-        so that we can cache them in the db, and not query again and again useless records.
-        :param imo:
-        :param date_from:
-        :param filter:
-        :return: two things: (first_matching_portcall, list_of_portcalls_collected)
-        """
-        date_from = to_datetime(date_from)
-        date_to = to_datetime(date_to)
-        delta_time = dt.timedelta(hours=24)
-        ncredits = 0
-        credit_per_record = 4
-
-        portcalls = []
-        filtered_portcalls = []
-        while not filtered_portcalls and date_from < date_to:
-            period_portcalls = cls.get_departure_portcalls_between_dates(unlocode=unlocode,
-                                                                         date_from=date_from,
-                                                                         date_to=date_from + delta_time)
-            ncredits += len(period_portcalls) * credit_per_record
-            portcalls.extend(period_portcalls)
-            if filter:
-                filtered_portcalls.extend([x for x in period_portcalls if filter(x)])
-            else:
-                filtered_portcalls.extend(period_portcalls)
-            date_from += delta_time
-
-        print("%d credits used" % (ncredits,))
-        if not filtered_portcalls:
-            # No arrival portcall arrived yet
-            filtered_portcall = None
-        else:
-            # Sort by date in the unlikely case
-            # there are several calls within this delta
-            filtered_portcalls.sort(key=lambda x: x.date_utc)
-            filtered_portcall = filtered_portcalls[0]
-
-        return filtered_portcall, portcalls
 
     @classmethod
-    def get_first_arrival_portcall(cls, imo, date_from, filter=None):
+    def get_next_portcall(cls, date_from, arrival_or_departure, imo=None, unlocode=None,  filter=None, go_backward=False):
         """
         The function returns collects arrival portcalls until it finds one matching
         filter (or until it finds one if filter is None).
@@ -288,20 +221,30 @@ class Marinetraffic:
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
         delta_time = dt.timedelta(hours=24)
+        date_from = to_datetime(date_from)
+        direction = -1 if go_backward else 1
         ncredits = 0
         credit_per_record = 4
+
+        if imo is None and unlocode is None:
+            raise ValueError("Need to specify either imo or unlocode")
 
         portcalls = []
         filtered_portcalls = []
         while not filtered_portcalls and date_from < dt.datetime.utcnow():
-            period_portcalls = cls.get_arrival_portcalls_between_dates(imo=imo, date_from=date_from, date_to=date_from + delta_time)
+            period_portcalls = cls.get_portcalls_between_dates(imo=imo,
+                                                               unlocode=unlocode,
+                                                               arrival_or_departure=arrival_or_departure,
+                                                               date_from=min(date_from, date_from + direction * delta_time),
+                                                               date_to=max(date_from, date_from + direction * delta_time))
             ncredits += len(period_portcalls) * credit_per_record
             portcalls.extend(period_portcalls)
             if filter:
                 filtered_portcalls.extend([x for x in period_portcalls if filter(x)])
             else:
                 filtered_portcalls.extend(period_portcalls)
-            date_from += delta_time
+
+            date_from += (delta_time * direction)
 
         print("%d credits used" % (ncredits,))
         if not filtered_portcalls:
@@ -314,3 +257,5 @@ class Marinetraffic:
             filtered_portcall = filtered_portcalls[0]
 
         return filtered_portcall, portcalls
+
+

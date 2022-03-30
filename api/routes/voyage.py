@@ -1,12 +1,13 @@
 import datetime as dt
 import pandas as pd
+import geopandas as gpd
 import json
 
 from . import routes_api
 from flask_restx import inputs
 
 
-from base.models import Flow, Ship, Arrival, Departure, Port, Position
+from base.models import Flow, Ship, Arrival, Departure, Port, Position, Berth, FlowArrivalBerth
 from base.db import session
 from base.encoder import JsonEncoder
 
@@ -14,7 +15,7 @@ from http import HTTPStatus
 from flask import Response
 from flask_restx import Resource, reqparse
 from sqlalchemy.orm import aliased
-
+from base.utils import update_geometry_from_wkb
 
 @routes_api.route('/v0/voyage', strict_slashes=False)
 class VoyageResource(Resource):
@@ -50,6 +51,9 @@ class VoyageResource(Resource):
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
 
+        DepartureBerth= aliased(Berth)
+        ArrivalBerth = aliased(Berth)
+
         # Query with joined information
         flows_rich = (session.query(Flow.id,
                                     Departure.date_utc,
@@ -64,12 +68,18 @@ class VoyageResource(Resource):
                                     Ship.subtype,
                                     Ship.commodity,
                                     Ship.quantity,
-                                    Ship.unit)
+                                    Ship.unit,
+                                    ArrivalBerth.id,
+                                    ArrivalBerth.name,
+                                    ArrivalBerth.commodity,
+                                    ArrivalBerth.port_unlocode)
              .join(Departure, Flow.departure_id == Departure.id)
              .join(DeparturePort, Departure.port_unlocode == DeparturePort.unlocode)
              .join(Arrival, Departure.id == Arrival.departure_id)
              .join(ArrivalPort, Arrival.port_unlocode == ArrivalPort.unlocode)
-             .join(Ship, Departure.ship_imo == Ship.imo))\
+             .join(Ship, Departure.ship_imo == Ship.imo)) \
+             .join(FlowArrivalBerth, Flow.id == FlowArrivalBerth.flow_id, isouter=True) \
+             .join(ArrivalBerth, ArrivalBerth.id == FlowArrivalBerth.berth_id, isouter=True)
 
         if id is not None:
             flows_rich = flows_rich.filter(Flow.id.in_(id))
@@ -96,11 +106,16 @@ class VoyageResource(Resource):
                    "ship_subtype",
                    "commodity",
                    "quantity",
-                   "unit"]
+                   "unit",
+                   "arrival_berth_id",
+                   "arrival_berth_name",
+                   "arrival_berth_commodity",
+                   "arrival_berth_unlocode"]
 
         def row_to_dict(row):
             return dict(zip(columns, row))
 
+        flows_rich = flows_rich.all()
         flows_rich = [row_to_dict(x) for x in flows_rich]
 
         if format == "csv":
@@ -127,24 +142,17 @@ class VoyageResource(Resource):
             flow_ids = list([int(x) for x in flows_df.id.unique()])
 
             #TODO find a faster option
-            positions = pd.read_sql(session.query(Position.flow_id, Position.date_utc, Position.geometry).filter(Position.flow_id.in_(flow_ids)).statement,
-                                    session.bind)
-            import geopandas as gpd
-            from geoalchemy2.shape import to_shape
-            from shapely.geometry import LineString
+            from geoalchemy2.functions import ST_MakeLine
+            ordered_position = session.query(Position) \
+                .filter(Position.flow_id.in_(flow_ids)) \
+                .order_by(Position.date_utc).subquery()
 
-            def pts_to_line(pts):
-                if pts.size > 1:
-                    return LineString([to_shape(y) for y in pts.tolist()])
-                else:
-                    return None
+            statement = session.query(ordered_position.c.flow_id, ST_MakeLine(ordered_position.c.geometry).label("geometry")) \
+                .group_by(ordered_position.c.flow_id).statement
 
-            lines = positions.sort_values(['flow_id', 'date_utc']) \
-                .groupby(['flow_id'])['geometry'].apply(pts_to_line) \
-                .rename("geometry") \
-                .reset_index()
-
-            flows_gdf = gpd.GeoDataFrame(flows_df.merge(lines.rename(columns={'flow_id':'id'})), geometry='geometry')
+            lines_df = pd.read_sql(statement, session.bind)
+            lines_df = update_geometry_from_wkb(lines_df)
+            flows_gdf = gpd.GeoDataFrame(flows_df.merge(lines_df.rename(columns={'flow_id':'id'})), geometry='geometry')
             flows_geojson = flows_gdf.to_json(cls=JsonEncoder)
 
             if nest_in_data:
