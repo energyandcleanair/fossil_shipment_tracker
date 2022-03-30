@@ -4,7 +4,7 @@ import geopandas as gpd
 import io
 import pandas as pd
 import json
-from base.models import Position
+from base.models import Position, FlowArrivalBerth
 from base.db import session
 
 
@@ -95,6 +95,21 @@ def test_voyage_geojson(app):
         gdf = gpd.read_file(io.StringIO(json.dumps(data)))
         assert len(gdf) > 0
         assert "geometry" in gdf.columns
+
+        # Test cutting trail works
+        voyage_id, date_berthing = session.query(FlowArrivalBerth.flow_id, Position.date_utc) \
+            .join(Position, FlowArrivalBerth.position_id == Position.id) \
+            .first()
+
+        params = {"format": "geojson", "id":voyage_id}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        gdf = gpd.read_file(io.StringIO(json.dumps(data)))
+        assert len(gdf) == 1
+        assert "geometry" in gdf.columns
+
 
 def test_position(app):
     # Create a test client using the Flask application configured for testing

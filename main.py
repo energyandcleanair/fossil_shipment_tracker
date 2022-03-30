@@ -10,7 +10,8 @@ import base
 def init():
     init_db(drop_first=False)
     # portcall.fill_arrival_gaps(date_from='2021-12-01')
-    portcall.fill_departure_gaps(date_from='2022-03-02')
+    portcall.fill_departure_gaps(date_from='2022-01-01',
+                                 date_to='2022-02-25')
     # portcall.update_departures()
     # portcall.fill_missing_port_operation()
     # portcall.fill_missing_port_operation()

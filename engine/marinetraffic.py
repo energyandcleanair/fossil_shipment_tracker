@@ -208,7 +208,7 @@ class Marinetraffic:
 
 
     @classmethod
-    def get_next_portcall(cls, date_from, arrival_or_departure, imo=None, unlocode=None,  filter=None, go_backward=False):
+    def get_next_portcall(cls, date_from, arrival_or_departure, date_to=None, imo=None, unlocode=None,  filter=None, go_backward=False):
         """
         The function returns collects arrival portcalls until it finds one matching
         filter (or until it finds one if filter is None).
@@ -222,6 +222,10 @@ class Marinetraffic:
         """
         delta_time = dt.timedelta(hours=24)
         date_from = to_datetime(date_from)
+        date_to = to_datetime(date_to)
+        if date_to is None:
+            date_to = to_datetime("2022-01-01") if go_backward else dt.datetime.utcnow()
+
         direction = -1 if go_backward else 1
         ncredits = 0
         credit_per_record = 4
@@ -231,7 +235,7 @@ class Marinetraffic:
 
         portcalls = []
         filtered_portcalls = []
-        while not filtered_portcalls and date_from < dt.datetime.utcnow():
+        while not filtered_portcalls and date_from < date_to:
             period_portcalls = cls.get_portcalls_between_dates(imo=imo,
                                                                unlocode=unlocode,
                                                                arrival_or_departure=arrival_or_departure,

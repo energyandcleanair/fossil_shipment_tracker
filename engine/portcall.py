@@ -47,6 +47,7 @@ def fill(limit=None):
 
 def get_next_portcall(date_from,
                       arrival_or_departure,
+                      date_to=None,
                       imo=None,
                       unlocode=None,
                       filter=lambda x: x.port_unlocode is not None and x.port_unlocode != "", # An arrival without unlocode is probably an anchoring
@@ -60,9 +61,13 @@ def get_next_portcall(date_from,
         if go_backward:
             direction = -1
             cached_portcalls = cached_portcalls.filter(PortCall.date_utc <= date_from)
+            if date_to:
+                cached_portcalls = cached_portcalls.filter(PortCall.date_utc >= date_to)
         else:
             direction = 1
             cached_portcalls = cached_portcalls.filter(PortCall.date_utc >= date_from)
+            if date_to:
+                cached_portcalls = cached_portcalls.filter(PortCall.date_utc <= date_to)
         if imo:
             cached_portcalls = cached_portcalls.filter(PortCall.ship_imo == imo)
         if unlocode:
@@ -93,11 +98,15 @@ def get_next_portcall(date_from,
     # If not, query MarineTraffic
     # But do so only after the last cached portcall to avoid additional costs
     if cached_portcalls:
-        date_from = max([x.date_utc for x in cached_portcalls]) + direction * dt.timedelta(minutes=1)
+        if go_backward:
+            date_from = min([x.date_utc for x in cached_portcalls]) - dt.timedelta(minutes=1)
+        else:
+            date_from = max([x.date_utc for x in cached_portcalls]) + dt.timedelta(minutes=1)
 
     filtered_portcall, portcalls = Marinetraffic.get_next_portcall(imo=imo,
                                                                    unlocode=unlocode,
                                                                    date_from=date_from,
+                                                                   date_to=date_to,
                                                                    filter=filter,
                                                                    arrival_or_departure=arrival_or_departure,
                                                                    go_backward=go_backward)
@@ -202,7 +211,10 @@ def update_ports():
 def fill_departure_gaps(imo=None, commodities=[base.LNG,
                         base.CRUDE_OIL,
                         base.OIL_PRODUCTS,
-                        base.OIL_OR_CHEMICAL,base.BULK], date_from=None, min_dwt=base.DWT_MIN):
+                        base.OIL_OR_CHEMICAL,base.BULK],
+                        date_from=None,
+                        date_to=None,
+                        min_dwt=base.DWT_MIN):
 
     """
     Under the new strategy, we query departure portcall with discharge or both
@@ -219,42 +231,66 @@ def fill_departure_gaps(imo=None, commodities=[base.LNG,
         PortCall.port_operation.in_(["load"])) \
         .join(Ship, Port).filter(Port.check_departure)
 
+    originally_checked_ports = [x for x, in session.query(Port.unlocode).filter(Port.check_departure).all()]
+
     if min_dwt is not None:
         query = query.filter(Ship.dwt >= min_dwt)
 
     if date_from is not None:
         query = query.filter(PortCall.date_utc >= to_datetime(date_from))
 
+    if date_to is not None:
+        query = query.filter(PortCall.date_utc <= to_datetime(date_to))
+
     if commodities:
         query = query.filter(Ship.commodity.in_(commodities))
 
     portcall_russia = query.all()
 
-    filter = lambda x: x.port_unlocode is not None \
+    filter_departure = lambda x: x.port_unlocode is not None \
                        and x.port_unlocode != "" \
                        and x.port_operation in ["discharge", "both"]
 
+    filter_departure_russia = lambda x: x.port_unlocode is not None \
+                       and x.port_unlocode != "" \
+                       and x.port_unlocode in originally_checked_ports
+
+    filter_arrival = lambda x: x.port_unlocode is not None and x.port_unlocode != ""
+
     portcall_russia.sort(key=lambda x: x.date_utc)
+
     for p in portcall_russia:
         print(p.date_utc)
-        # First look in cache only if there's something close to prevent doing it again
-        next_departure = get_next_portcall(date_from=p.date_utc,
+
+        # We query new departures only if there is none between current portcall and next departure from russia
+        next_departure = get_next_portcall(date_from=p.date_utc + dt.timedelta(minutes=1),
                                            arrival_or_departure="departure",
                                            imo=p.ship_imo,
                                            cache_only=True,
-                                           filter=filter)
+                                           filter=filter_departure)
+
+        next_departure_russia = get_next_portcall(date_from=p.date_utc + dt.timedelta(minutes=1),
+                                           arrival_or_departure="departure",
+                                           imo=p.ship_imo,
+                                           cache_only=True,
+                                           filter=filter_departure_russia)
 
         if not next_departure \
-                or to_datetime(next_departure.date_utc) > to_datetime(p.date_utc) + dt.timedelta(hours=24):
+            or not next_departure_russia \
+            or next_departure.port_unlocode in [originally_checked_ports] \
+            or to_datetime(next_departure.date_utc) > to_datetime(next_departure_russia.date_utc): #to_datetime(p.date_utc) + dt.timedelta(hours=24):
+
+            next_departure_date_to = next_departure_russia.date_utc - dt.timedelta(minutes=1) if next_departure_russia else date_to
             next_departure = get_next_portcall(date_from=p.date_utc,
+                                               date_to=next_departure_date_to,
                                                arrival_or_departure="departure",
                                                imo=p.ship_imo,
                                                use_cache=False,
-                                               filter=filter)
+                                               filter=filter_departure)
 
         if next_departure:
             # Then look backward for a relevant arrival
-            filter_arrival = lambda x: x.port_unlocode is not None and x.port_unlocode != ""
+
             # But first look in cache only if there's something close to prevent doing it again
             cached_portcall = get_next_portcall(imo=next_departure.ship_imo,
                                                  arrival_or_departure="arrival",
@@ -264,8 +300,9 @@ def fill_departure_gaps(imo=None, commodities=[base.LNG,
                                                  cache_only=True)
 
             if not cached_portcall \
-                    or cached_portcall.date_utc < to_datetime(next_departure.date_utc) - dt.timedelta(hours=48) \
+                    or cached_portcall.date_utc < to_datetime(next_departure.date_utc) - dt.timedelta(hours=72) \
                     or cached_portcall.port_unlocode != next_departure.port_unlocode:
+                # Query previous arrival (will be stored in db)
                 arrival_portcall = get_next_portcall(imo=next_departure.ship_imo,
                                                      arrival_or_departure="arrival",
                                                      date_from=next_departure.date_utc,

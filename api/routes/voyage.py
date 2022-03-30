@@ -15,6 +15,7 @@ from http import HTTPStatus
 from flask import Response
 from flask_restx import Resource, reqparse
 from sqlalchemy.orm import aliased
+from sqlalchemy import func
 from base.utils import update_geometry_from_wkb
 
 @routes_api.route('/v0/voyage', strict_slashes=False)
@@ -59,9 +60,11 @@ class VoyageResource(Resource):
                                     Departure.date_utc,
                                     Departure.port_unlocode,
                                     DeparturePort.iso2,
+                                    DeparturePort.name,
                                     Arrival.date_utc,
                                     Arrival.port_unlocode,
                                     ArrivalPort.iso2,
+                                    ArrivalPort.name,
                                     Ship.imo,
                                     Ship.mmsi,
                                     Ship.type,
@@ -97,9 +100,11 @@ class VoyageResource(Resource):
                    "departure_date_utc",
                    "departure_unlocode",
                    "departure_iso2",
+                   "departure_name",
                    "arrival_date_utc",
                    "arrival_unlocode",
                    "arrival_iso2",
+                   "arrival_name",
                    "ship_imo",
                    "ship_mmsi",
                    "ship_type",
@@ -143,16 +148,25 @@ class VoyageResource(Resource):
 
             #TODO find a faster option
             from geoalchemy2.functions import ST_MakeLine
-            ordered_position = session.query(Position) \
+
+            date_berthing = session.query(FlowArrivalBerth.flow_id, func.max(Position.date_utc).label("berthing_date_utc")) \
+                .filter(FlowArrivalBerth.flow_id.in_(flow_ids)) \
+                .join(FlowArrivalBerth, FlowArrivalBerth.flow_id == Position.flow_id) \
+                .group_by(FlowArrivalBerth.flow_id).subquery()
+
+            ordered_position = session.query(Position, date_berthing) \
                 .filter(Position.flow_id.in_(flow_ids)) \
-                .order_by(Position.date_utc).subquery()
+                .join(date_berthing, date_berthing.c.flow_id == Position.flow_id, isouter=True) \
+                .filter(Position.date_utc <= date_berthing.c.berthing_date_utc) \
+                .order_by(Position.date_utc) \
+                .subquery()
 
             statement = session.query(ordered_position.c.flow_id, ST_MakeLine(ordered_position.c.geometry).label("geometry")) \
                 .group_by(ordered_position.c.flow_id).statement
 
             lines_df = pd.read_sql(statement, session.bind)
             lines_df = update_geometry_from_wkb(lines_df)
-            flows_gdf = gpd.GeoDataFrame(flows_df.merge(lines_df.rename(columns={'flow_id':'id'})), geometry='geometry')
+            flows_gdf = gpd.GeoDataFrame(flows_df.merge(lines_df.rename(columns={'flow_id': 'id'})), geometry='geometry')
             flows_geojson = flows_gdf.to_json(cls=JsonEncoder)
 
             if nest_in_data:

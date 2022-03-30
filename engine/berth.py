@@ -107,9 +107,9 @@ def detect_arrival_berths(min_hours_at_berth=4):
     berths_agg = berths_df \
         .sort_values(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_unlocode", 'position_date_utc']) \
         .groupby(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_unlocode"]) \
-        .agg(min_date_utc=('position_date_utc','min'),
+        .agg(min_date_utc=('position_date_utc',' min'),
              max_date_utc=('position_date_utc', 'max'),
-             position_id=('position_id','first')) \
+             position_id=('position_id', 'first')) \
         .reset_index()
 
     if len(berths_agg) == 0:
