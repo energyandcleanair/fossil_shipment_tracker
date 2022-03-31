@@ -86,7 +86,7 @@ def detect_arrival_berths(min_hours_at_berth=4):
     # Look for flows to update
     flows_to_update = session.query(Flow.id).filter(Flow.id.notin_(session.query(FlowArrivalBerth.flow_id)))
 
-    berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc, Berth.port_unlocode, Arrival.port_unlocode) \
+    berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc, Berth.port_unlocode, Arrival.port_id) \
         .filter(Flow.id.in_(flows_to_update)) \
         .filter(Position.navigation_status == "Moored") \
         .join(Position, Position.flow_id == Flow.id) \
@@ -101,13 +101,13 @@ def detect_arrival_berths(min_hours_at_berth=4):
                             session.bind)
 
     berths_df.columns = ["flow_id", "berth_id", "position_id", "position_date_utc", "berth_port_unlocode",
-                         "arrival_port_unlocode"]
+                         "arrival_port_id"]
 
     # They should stay minimum n-hours
     berths_agg = berths_df \
-        .sort_values(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_unlocode", 'position_date_utc']) \
-        .groupby(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_unlocode"]) \
-        .agg(min_date_utc=('position_date_utc',' min'),
+        .sort_values(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_id", 'position_date_utc']) \
+        .groupby(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_id"]) \
+        .agg(min_date_utc=('position_date_utc', 'min'),
              max_date_utc=('position_date_utc', 'max'),
              position_id=('position_id', 'first')) \
         .reset_index()
@@ -119,9 +119,9 @@ def detect_arrival_berths(min_hours_at_berth=4):
         (berths_agg.max_date_utc - berths_agg.min_date_utc) > dt.timedelta(hours=min_hours_at_berth)]
 
     # Look for problematic ones
-    problematic = berths_agg_ok.loc[berths_df.berth_port_unlocode != berths_df.arrival_port_unlocode].copy()
-    if len(problematic) > 0:
-        logger.warning("There are problematic matching (e.g. different unlocode between berth and port")
+    # problematic = berths_agg_ok.loc[berths_df.berth_port_unlocode != berths_df.arrival_port_unlocode].copy()
+    # if len(problematic) > 0:
+    #     logger.warning("There are problematic matching (e.g. different unlocode between berth and port")
 
     berths_agg_ok["method_id"] = "simple_overlapping"
     berths_agg_ok = berths_agg_ok[["flow_id", "berth_id", "position_id", "method_id"]]

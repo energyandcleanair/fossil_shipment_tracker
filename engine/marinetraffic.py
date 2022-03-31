@@ -199,6 +199,7 @@ class Marinetraffic:
             "ship_imo": response_data["IMO"],
             "date_utc": response_data["TIMESTAMP_UTC"],
             "port_unlocode": response_data["UNLOCODE"],
+            "port_name": response_data["PORT_NAME"],
             "load_status": response_data.get("LOAD_STATUS"),
             "move_type": response_data["MOVE_TYPE"],
             "port_operation": response_data.get("PORT_OPERATION"),

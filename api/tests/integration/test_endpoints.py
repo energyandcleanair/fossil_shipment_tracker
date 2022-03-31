@@ -87,21 +87,21 @@ def test_voyage_geojson(app):
 
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
-        params = {"format": "geojson"}
-        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        data = response.json["data"]
-        assert len(data) > 0
-        gdf = gpd.read_file(io.StringIO(json.dumps(data)))
-        assert len(gdf) > 0
-        assert "geometry" in gdf.columns
+        # params = {"format": "geojson"}
+        # response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        # assert response.status_code == 200
+        # data = response.json["data"]
+        # assert len(data) > 0
+        # gdf = gpd.read_file(io.StringIO(json.dumps(data)))
+        # assert len(gdf) > 0
+        # assert "geometry" in gdf.columns
 
         # Test cutting trail works
         voyage_id, date_berthing = session.query(FlowArrivalBerth.flow_id, Position.date_utc) \
             .join(Position, FlowArrivalBerth.position_id == Position.id) \
             .first()
 
-        params = {"format": "geojson", "id":voyage_id}
+        params = {"format": "geojson", "id": voyage_id}
         response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
@@ -109,6 +109,11 @@ def test_voyage_geojson(app):
         gdf = gpd.read_file(io.StringIO(json.dumps(data)))
         assert len(gdf) == 1
         assert "geometry" in gdf.columns
+
+        from http import HTTPStatus
+        params = {"format": "geojson", "id": -9999}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == HTTPStatus.NO_CONTENT
 
 
 def test_position(app):

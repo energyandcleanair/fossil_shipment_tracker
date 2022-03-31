@@ -34,14 +34,14 @@ def get_dangling_imo_dates():
 def update(date_from=None, limit=None):
     print("=== Update departures ===")
     # Look for relevant PortCalls without associated departure
-    subquery_ports = session.query(Port.unlocode).filter(Port.check_departure)
+    subquery_ports = session.query(Port.id).filter(Port.check_departure)
     subquery = session.query(Departure.portcall_id)
     dangling_portcalls = PortCall.query.filter(
         PortCall.move_type == "departure",
         PortCall.load_status.in_(["fully_laden"]),
         PortCall.port_operation.in_(["load"]),
         ~PortCall.id.in_(subquery),
-        PortCall.port_unlocode.in_(subquery_ports))\
+        PortCall.port_id.in_(subquery_ports))
 
     if date_from is not None:
         dangling_portcalls = dangling_portcalls.filter(PortCall.date_utc >= date_from)
@@ -55,7 +55,7 @@ def update(date_from=None, limit=None):
     # we create a Departure
     for pc in dangling_portcalls:
         departure_data = {
-            "port_unlocode": pc.port_unlocode,
+            "port_id": pc.port_id,
             "ship_imo": pc.ship_imo,
             "date_utc": pc.date_utc,
             "portcall_id": pc.id,

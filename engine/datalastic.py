@@ -6,7 +6,7 @@ from base.utils import latlon_to_point
 from base.utils import to_datetime
 from base.env import get_env
 from base.logger import logger
-from base.models import Ship, Position
+from base.models import Ship, Position, Port
 
 
 def load_cache(f):
@@ -125,3 +125,91 @@ class Datalastic:
             positions = [p for p in positions if p.date_utc < date_to]
 
         return positions
+
+
+    @classmethod
+    def get_port_infos(cls, name=None, marinetraffic_id=None):
+        """
+        Some ports aren't in the UNLOCODE base. MarineTraffic returns port_name however, so
+        we can look them up by name here.
+        :param name:
+        :return:
+        """
+        if not cls.api_key:
+            cls.api_key = get_env("KEY_DATALASTIC")
+
+        params = {
+            'api-key': cls.api_key,
+            'name': name,
+        }
+
+        method = 'port_find'
+        api_result = requests.get(Datalastic.api_base + method, params)
+        if api_result.status_code != 200:
+            logger.warning("Datalastic: Failed to query port %s: %s" % (name, api_result))
+            return None
+        data = api_result.json()["data"]
+
+        # Some manual fixes for now
+        #TODO Clean and put manual matchings in a separate files
+        manual_matches = {
+            "25565": {
+                "port_name": name,
+                "country_iso": "RU",
+                "lat": 71.00034,
+                "lon": 73.7961,
+                "uuid": None,
+                "unlocode": None
+            },
+            "25566": {
+                "port_name": name,
+                "country_iso": "RU",
+                "lat": 69.08401,
+                "lon": 33.20049,
+                "uuid": None,
+                "unlocode": None
+            },
+            "22097": {
+                "port_name": name,
+                "country_iso": "CN",
+                "lat": 31.18777,
+                "lon": 122.6466,
+                "uuid": None,
+                "unlocode": "CNCJK"
+            }
+        }
+        if marinetraffic_id in manual_matches:
+            data = [manual_matches[str(marinetraffic_id)]]
+
+        if len(data) == 0:
+            logger.warning("No port found matching name %s" % (name,))
+            return None
+
+        if len(data) > 1:
+            # Manual fix: we use marinetraffic PORT_ID to disentangle potentially confusing ports
+            fixes = {
+                "20643": {"country_iso": "ES"},
+                "22836": {'country_iso': 'BS'},
+                '23300': {'country_iso': 'US'},
+                "25566": {'country_iso': 'RU'},
+                '156': {'country_iso': 'FR'}
+            }
+            if marinetraffic_id and str(marinetraffic_id) in fixes:
+                data = [x for x in data if x[list(fixes[str(marinetraffic_id)].keys())[0]] == list(fixes[str(marinetraffic_id)].values())[0]]
+            else:
+                logger.warning("More than one port found matching name %s" % (name,))
+                return None
+
+        data = data[0]
+
+        port = Port(**{
+            "geometry": latlon_to_point(lat=data["lat"], lon=data["lon"]),
+            "iso2": data["country_iso"],
+            "unlocode": data["unlocode"] if data["unlocode"] != "" else None,
+            "name": data["port_name"],
+            "datalastic_id": data["uuid"]})
+
+        if marinetraffic_id:
+            port.marinetraffic_id = marinetraffic_id
+
+        return port

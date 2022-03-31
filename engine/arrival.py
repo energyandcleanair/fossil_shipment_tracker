@@ -23,7 +23,6 @@ def update(min_dwt=base.DWT_MIN,
                         base.OIL_PRODUCTS,
                         base.OIL_OR_CHEMICAL,
                         base.BULK]
-
            ):
     print("=== Arrival update ===")
 
@@ -47,9 +46,10 @@ def update(min_dwt=base.DWT_MIN,
         departure_date = d.date_utc
 
         # Get next departure with discharge or load
-        filter_departure = lambda x: x.port_unlocode is not None \
-                                     and x.port_unlocode != "" \
-                                     and x.port_operation in ["discharge", "both"]
+        # filter_departure = lambda x: x.port_unlocode is not None \
+        #                              and x.port_unlocode != "" \
+        #                              and x.port_operation in ["discharge", "both"]
+        filter_departure = lambda x: x.port_operation in ["discharge", "both"]
 
         next_departure_portcall = portcall.get_next_portcall(imo=imo,
                                                     arrival_or_departure="departure",
@@ -63,10 +63,11 @@ def update(min_dwt=base.DWT_MIN,
             # After manually inspecting some routes, we saw for instance that vessals would moore
             # away from departure terminal. This would have a unlocode=none
             # We also start 12 hours after departure
-            filter_arrival = lambda x: x.port_unlocode is not None and x.port_unlocode != ""
+            filter_arrival = None #lambda x: x.port_unlocode is not None and x.port_unlocode != ""
             arrival_portcall = portcall.get_next_portcall(imo=imo,
                                                           arrival_or_departure="arrival",
                                                           date_from=next_departure_portcall.date_utc,
+                                                          date_to=d.date_utc,
                                                           filter=filter_arrival,
                                                           go_backward=True)
             if arrival_portcall:
@@ -74,7 +75,7 @@ def update(min_dwt=base.DWT_MIN,
                     "departure_id": d.id,
                     "method_id": "marinetraffic_portcall",
                     "date_utc": arrival_portcall.date_utc,
-                    "port_unlocode": arrival_portcall.port_unlocode,
+                    "port_id": arrival_portcall.port_id,
                     "portcall_id": arrival_portcall.id
                 }
                 arrival = Arrival(**data)
@@ -82,7 +83,7 @@ def update(min_dwt=base.DWT_MIN,
                 try:
                     session.commit()
                 except sqlalchemy.exc.IntegrityError:
-                    logger.warning("Failed to push portcall. Probably missing port_unlocode: %s" % (arrival.port_unlocode,))
+                    logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
                     session.rollback()
 
         else:

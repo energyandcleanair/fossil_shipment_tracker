@@ -56,9 +56,11 @@ class Ship(Base):
         except (ValueError, TypeError):
             return None
 
-
 class Port(Base):
-    unlocode = Column(String, primary_key=True)
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    unlocode = Column(String, unique=True, nullable=True)
+    marinetraffic_id = Column(String, unique=True, nullable=True)
+    datalastic_id = Column(String, unique=True, nullable=True)
     name = Column(String)
     iso2 = Column(String)
     check_departure = Column(Boolean)
@@ -66,7 +68,6 @@ class Port(Base):
     geometry = Column(Geometry('POINT', srid=4326))
 
     __tablename__ = DB_TABLE_PORT
-
 
 class Terminal(Base):
     id = Column(String, unique=True, primary_key=True)
@@ -123,7 +124,7 @@ class FlowArrivalBerth(Base):
 
 class Departure(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
+    port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'))
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo'))
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String) # Method through which we detected the departure
@@ -131,7 +132,7 @@ class Departure(Base):
 
     __tablename__ = DB_TABLE_DEPARTURE
 
-    __table_args__ = (UniqueConstraint('port_unlocode', 'ship_imo', 'date_utc', name='unique_departure'),
+    __table_args__ = (UniqueConstraint('port_id', 'ship_imo', 'date_utc', name='unique_departure'),
                       )
 
 
@@ -140,11 +141,12 @@ class Arrival(Base):
     departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"))
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String)
-    port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
+    port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'))
 
     # Optional
     portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'))
     __tablename__ = DB_TABLE_ARRIVAL
+
 
 
 class Flow(Base):
@@ -168,49 +170,16 @@ class Position(Base):
     __table_args__ = (Index('idx_position_flow', "flow_id"), )
 
 
-
-# MarineTraffic only
 class PortCall(Base):
-    """
-    Copied from MarineTraffic. Could also be Berth call
-    Example of returned data:
-
-   {
-        "MMSI": "244770588",
-        "SHIPNAME": "PIETERNELLA",
-        "SHIP_ID": "3351323",
-        "TIMESTAMP_LT": "2020-10-20T12:15:00.000Z",
-        "TIMESTAMP_UTC": "2020-10-20T10:15:00.000Z",
-        "MOVE_TYPE": "0",
-        "TYPE_NAME": "Inland, Unknown",
-        "PORT_ID": "1766",
-        "PORT_NAME": "AMSTERDAM",
-        "UNLOCODE": "NLAMS",
-        "DRAUGHT": "59",
-        "LOAD_STATUS": "0",
-        "PORT_OPERATION": "0",
-        "INTRANSIT": "0",
-        "DISTANCE_TRAVELLED": "0",
-        "VOYAGE_SPEED_AVG": null,
-        "VOYAGE_SPEED_MAX": null,
-        "VOYAGE_IDLE_TIME_MINS": null,
-        "ELAPSED_NOANCH": "672",
-        "DISTANCE_LEG": null,
-        "COMFLEET_GROUPEDTYPE": "DRY BREAKBULK",
-        "SHIPCLASS": null
-    }
-    """
-
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     ship_mmsi = Column(String) #, ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
     date_utc = Column(DateTime(timezone=False)) # Departure time for departure, Arrival time for arrival
-    port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode', onupdate="CASCADE"))
+    port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id', onupdate="CASCADE"))
 
     load_status = Column(String)  # (0 : N/A, 1 : In Ballast, 2 : Partially Laden, 3 : Fully Laden)
     move_type = Column(String)  # "1": "departure", "0":"arrival"
     port_operation = Column(String) # (0: N / A, 1: load, 2: discharge, 3: both, 4: none)
-
 
     # Optional
     terminal_id = Column(String, ForeignKey(DB_TABLE_TERMINAL + '.id', onupdate="CASCADE"))
@@ -220,7 +189,7 @@ class PortCall(Base):
     others = Column(JSONB)
 
     __tablename__ = DB_TABLE_PORTCALL
-    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall2'),)
 
 
     @validates('port_unlocode')
@@ -275,4 +244,3 @@ class PortCall(Base):
         if not port_operation in corr.keys():
             logger.warning("Unknown port_operation: %s" % (port_operation,))
         return corr.get(port_operation, port_operation)
-

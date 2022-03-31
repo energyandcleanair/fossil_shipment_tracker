@@ -14,7 +14,9 @@ from base.encoder import JsonEncoder
 from http import HTTPStatus
 from flask import Response
 from flask_restx import Resource, reqparse
+import sqlalchemy as sa
 from sqlalchemy.orm import aliased
+from sqlalchemy import or_
 from sqlalchemy import func
 from base.utils import update_geometry_from_wkb
 
@@ -58,11 +60,11 @@ class VoyageResource(Resource):
         # Query with joined information
         flows_rich = (session.query(Flow.id,
                                     Departure.date_utc,
-                                    Departure.port_unlocode,
+                                    DeparturePort.unlocode,
                                     DeparturePort.iso2,
                                     DeparturePort.name,
                                     Arrival.date_utc,
-                                    Arrival.port_unlocode,
+                                    ArrivalPort.unlocode,
                                     ArrivalPort.iso2,
                                     ArrivalPort.name,
                                     Ship.imo,
@@ -77,9 +79,9 @@ class VoyageResource(Resource):
                                     ArrivalBerth.commodity,
                                     ArrivalBerth.port_unlocode)
              .join(Departure, Flow.departure_id == Departure.id)
-             .join(DeparturePort, Departure.port_unlocode == DeparturePort.unlocode)
+             .join(DeparturePort, Departure.port_id == DeparturePort.id)
              .join(Arrival, Departure.id == Arrival.departure_id)
-             .join(ArrivalPort, Arrival.port_unlocode == ArrivalPort.unlocode)
+             .join(ArrivalPort, Arrival.port_id == ArrivalPort.id)
              .join(Ship, Departure.ship_imo == Ship.imo)) \
              .join(FlowArrivalBerth, Flow.id == FlowArrivalBerth.flow_id, isouter=True) \
              .join(ArrivalBerth, ArrivalBerth.id == FlowArrivalBerth.berth_id, isouter=True)
@@ -121,6 +123,11 @@ class VoyageResource(Resource):
             return dict(zip(columns, row))
 
         flows_rich = flows_rich.all()
+        if len(flows_rich) == 0:
+            return Response(response="No voyage found",
+                        status=HTTPStatus.NO_CONTENT,
+                        mimetype='application/json')
+
         flows_rich = [row_to_dict(x) for x in flows_rich]
 
         if format == "csv":
@@ -149,15 +156,17 @@ class VoyageResource(Resource):
             #TODO find a faster option
             from geoalchemy2.functions import ST_MakeLine
 
-            date_berthing = session.query(FlowArrivalBerth.flow_id, func.max(Position.date_utc).label("berthing_date_utc")) \
+            date_berthing = session.query(FlowArrivalBerth.flow_id, func.min(Position.date_utc).label("berthing_date_utc")) \
                 .filter(FlowArrivalBerth.flow_id.in_(flow_ids)) \
-                .join(FlowArrivalBerth, FlowArrivalBerth.flow_id == Position.flow_id) \
+                .join(Position, Position.id == FlowArrivalBerth.position_id) \
                 .group_by(FlowArrivalBerth.flow_id).subquery()
 
             ordered_position = session.query(Position, date_berthing) \
                 .filter(Position.flow_id.in_(flow_ids)) \
                 .join(date_berthing, date_berthing.c.flow_id == Position.flow_id, isouter=True) \
-                .filter(Position.date_utc <= date_berthing.c.berthing_date_utc) \
+                .filter(or_(
+                    Position.date_utc <= date_berthing.c.berthing_date_utc,
+                    date_berthing.c.berthing_date_utc == sa.null())) \
                 .order_by(Position.date_utc) \
                 .subquery()
 
