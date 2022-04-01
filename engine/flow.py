@@ -93,4 +93,4 @@ def update_positions(commodities=None):
                 for p in positions:
                     p.flow_id = flow.id
                     session.add(p)
-            session.commit()
+        session.commit()

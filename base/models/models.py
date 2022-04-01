@@ -175,6 +175,8 @@ class PortCall(Base):
     ship_mmsi = Column(String) #, ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
     date_utc = Column(DateTime(timezone=False)) # Departure time for departure, Arrival time for arrival
+    date_lt = Column(DateTime(timezone=False))  # local time
+
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id', onupdate="CASCADE"))
 
     load_status = Column(String)  # (0 : N/A, 1 : In Ballast, 2 : Partially Laden, 3 : Fully Laden)

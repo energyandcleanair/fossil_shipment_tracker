@@ -10,19 +10,21 @@ from . import routes_api
 import pandas as pd
 
 
-@routes_api.route('/v0/ship', strict_slashes=False)
-class ShipResource(Resource):
+@routes_api.route('/v0/statistics', strict_slashes=False)
+class StatisticsResource(Resource):
 
     parser = reqparse.RequestParser()
-    parser.add_argument('imo', required=False, help='imo(s) of ships (optional)', action='split')
+    parser.add_argument('date_from', help='start date for arrival (format 2020-01-15)',
+                        default="2022-01-01", required=False)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
 
     @routes_api.expect(parser)
     def get(self):
 
-        params = ShipResource.parser.parse_args()
-        imo = params.get("imo")
+        params = StatisticsResource.parser.parse_args()
+        date_from = params.get("date_from")
+        date_to = params.get("date_to")
         format = params.get("format")
 
         query = Ship.query

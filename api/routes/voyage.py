@@ -124,9 +124,11 @@ class VoyageResource(Resource):
 
         flows_rich = flows_rich.all()
         if len(flows_rich) == 0:
-            return Response(response="No voyage found",
-                        status=HTTPStatus.NO_CONTENT,
-                        mimetype='application/json')
+            return Response(
+                response="empty",
+                mimetype="text/csv",
+                headers={"Content-disposition":
+                             "attachment; filename=flows.csv"})
 
         flows_rich = [row_to_dict(x) for x in flows_rich]
 

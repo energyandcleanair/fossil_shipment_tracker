@@ -1,6 +1,7 @@
 import pandas as pd
 import geopandas as gpd
 
+from base.logger import logger
 from base.db import session
 from base.db_utils import upsert
 from base.models import Port
@@ -10,6 +11,27 @@ from engine.datalastic import Datalastic
 
 def count():
     return session.query(Port).count()
+
+
+def get_id(unlocode=None, marinetraffic_id=None):
+    found = session.query(Port.id)
+
+    if unlocode:
+        found = found.filter(Port.unlocode==str(unlocode))
+
+    elif marinetraffic_id:
+        found = found.filter(Port.marinetraffic_id==marinetraffic_id)
+
+    found = found.all()
+    if len(found) == 0:
+        logger.warning("Didn't found any port (unlocode: %s, marinetraffic: %s)" %(unlocode, marinetraffic_id))
+        return None
+
+    if len(found) > 1:
+        logger.warning("Found more than one port (unlocode: %s, marinetraffic: %s)" %(unlocode, marinetraffic_id))
+        return None
+
+    return found[0][0]
 
 
 def fill():

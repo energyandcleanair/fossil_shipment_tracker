@@ -9,7 +9,7 @@ from base.env import get_env
 from base.models import Ship, PortCall
 from base.utils import to_datetime
 
-from engine import ship
+from engine import ship, port
 
 
 def load_cache(f):
@@ -198,8 +198,8 @@ class Marinetraffic:
             "ship_mmsi": response_data["MMSI"],
             "ship_imo": response_data["IMO"],
             "date_utc": response_data["TIMESTAMP_UTC"],
-            "port_unlocode": response_data["UNLOCODE"],
-            "port_name": response_data["PORT_NAME"],
+            "date_lt": response_data["TIMESTAMP_LT"],
+            "port_id": port.get_id(unlocode=response_data["UNLOCODE"], marinetraffic_id=response_data["PORT_ID"]),
             "load_status": response_data.get("LOAD_STATUS"),
             "move_type": response_data["MOVE_TYPE"],
             "port_operation": response_data.get("PORT_OPERATION"),
@@ -237,11 +237,17 @@ class Marinetraffic:
         portcalls = []
         filtered_portcalls = []
         while not filtered_portcalls and date_from < date_to:
+            date_from_call = min(date_from, date_from + direction * delta_time)
+            if go_backward:
+                date_to_call = max(date_to, max(date_from, date_from + direction * delta_time))
+            else:
+                date_to_call = min(date_to, max(date_from, date_from + direction * delta_time))
+
             period_portcalls = cls.get_portcalls_between_dates(imo=imo,
                                                                unlocode=unlocode,
                                                                arrival_or_departure=arrival_or_departure,
-                                                               date_from=min(date_from, date_from + direction * delta_time),
-                                                               date_to=max(date_from, date_from + direction * delta_time))
+                                                               date_from=date_from_call,
+                                                               date_to=date_to_call)
             ncredits += len(period_portcalls) * credit_per_record
             portcalls.extend(period_portcalls)
             if filter:
@@ -250,8 +256,9 @@ class Marinetraffic:
                 filtered_portcalls.extend(period_portcalls)
 
             date_from += (delta_time * direction)
-
-        print("%d credits used" % (ncredits,))
+        
+        if ncredits > 0:
+            print("%d credits used" % (ncredits,))
         if not filtered_portcalls:
             # No arrival portcall arrived yet
             filtered_portcall = None

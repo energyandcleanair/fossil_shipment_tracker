@@ -65,22 +65,27 @@ def ship_to_commodity(ship):
     """
     import re
     try:
-        if re.match('Crude oil', ship.type, re.IGNORECASE) \
-                or re.match('Crude oil', ship.subtype, re.IGNORECASE):
+        type = ship.type or ""
+        subtype = ship.subtype or ""
+        if re.match('Crude oil', type, re.IGNORECASE) \
+                or re.match('Crude oil', subtype, re.IGNORECASE):
             commodity = base.CRUDE_OIL
-        elif re.match('OIL/CHEMICAL', ship.type, re.IGNORECASE) \
-                or re.match('Oil or chemical', ship.subtype, re.IGNORECASE):
+        elif re.match('OIL/CHEMICAL', type, re.IGNORECASE) \
+                or re.match('Oil or chemical', subtype, re.IGNORECASE):
             commodity = base.OIL_OR_CHEMICAL
-        elif re.match('OIL PRODUCTS', ship.type, re.IGNORECASE) \
-                or re.match('Oil products', ship.subtype, re.IGNORECASE):
+        elif re.match('OIL PRODUCTS', type, re.IGNORECASE) \
+                or re.match('Oil products', subtype, re.IGNORECASE):
             commodity = base.OIL_PRODUCTS
-        elif re.match('LNG', ship.type, re.IGNORECASE) \
-             or re.match('LNG', ship.subtype, re.IGNORECASE):
+        elif re.match('LNG', type, re.IGNORECASE) \
+             or re.match('LNG', subtype, re.IGNORECASE):
             commodity = base.LNG
-        elif re.match('Ore or Oil', ship.subtype, re.IGNORECASE):
+        elif re.match('LPG', type, re.IGNORECASE) \
+             or re.match('LPG', subtype, re.IGNORECASE):
+            commodity = base.LPG
+        elif re.match('Ore or Oil', subtype, re.IGNORECASE):
             commodity = base.OIL_OR_ORE
-        elif re.match('Bulk', ship.type, re.IGNORECASE) \
-             or re.match('Bulk', ship.subtype, re.IGNORECASE):
+        elif re.match('Bulk', type, re.IGNORECASE) \
+             or re.match('Bulk', subtype, re.IGNORECASE):
             commodity = base.BULK
         else:
             commodity = base.UNKNOWN

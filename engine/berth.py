@@ -2,7 +2,7 @@ import pandas as pd
 import geopandas as gpd
 import shapely
 from geoalchemy2 import func
-import sqlalchemy
+import sqlalchemy as sa
 import datetime as dt
 
 from base.db import session, engine
@@ -10,6 +10,7 @@ from base.logger import logger
 from base.db_utils import upsert
 from base.models import Berth, Port, Flow, FlowArrivalBerth, FlowDepartureBerth, Position, Arrival, Departure
 from base.models import DB_TABLE_BERTH, DB_TABLE_FLOWARRIVALBERTH, DB_TABLE_FLOWDEPARTUREBERTH
+from base.utils import to_list
 
 from engine import port
 
@@ -81,14 +82,20 @@ def detect_departure_berths():
     return
 
 
-def detect_arrival_berths(min_hours_at_berth=4):
+def detect_arrival_berths(flow_id=None, min_hours_at_berth=4):
 
     # Look for flows to update
     flows_to_update = session.query(Flow.id).filter(Flow.id.notin_(session.query(FlowArrivalBerth.flow_id)))
 
+    if flow_id is not None:
+        flow_id = to_list(flow_id)
+        flows_to_update = flows_to_update.filter(Flow.id.in_(flow_id))
+
     berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc, Berth.port_unlocode, Arrival.port_id) \
         .filter(Flow.id.in_(flows_to_update)) \
-        .filter(Position.navigation_status == "Moored") \
+        .filter(sa.or_(
+            Position.navigation_status == "Moored",
+            Position.speed <0.5)) \
         .join(Position, Position.flow_id == Flow.id) \
         .join(Departure, Flow.departure_id == Departure.id) \
         .join(Arrival, Flow.arrival_id == Arrival.id) \
@@ -105,8 +112,8 @@ def detect_arrival_berths(min_hours_at_berth=4):
 
     # They should stay minimum n-hours
     berths_agg = berths_df \
-        .sort_values(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_id", 'position_date_utc']) \
-        .groupby(["flow_id", "berth_id", "berth_port_unlocode", "arrival_port_id"]) \
+        .sort_values(["flow_id", "berth_id", 'position_date_utc']) \
+        .groupby(["flow_id", "berth_id"]) \
         .agg(min_date_utc=('position_date_utc', 'min'),
              max_date_utc=('position_date_utc', 'max'),
              position_id=('position_id', 'first')) \

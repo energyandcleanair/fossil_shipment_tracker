@@ -8,7 +8,7 @@ from base.logger import logger
 from base.db import session
 from base.db_utils import upsert
 from base.models import DB_TABLE_PORTCALL
-from base.utils import to_datetime
+from base.utils import to_datetime, to_list
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
@@ -69,9 +69,9 @@ def get_next_portcall(date_from,
             if date_to:
                 cached_portcalls = cached_portcalls.filter(PortCall.date_utc <= date_to)
         if imo:
-            cached_portcalls = cached_portcalls.filter(PortCall.ship_imo == imo)
+            cached_portcalls = cached_portcalls.filter(PortCall.ship_imo.in_(to_list(imo)))
         if unlocode:
-            cached_portcalls = cached_portcalls.join(Port, Port.id == PortCall.port_id).filter(Port.unlocode == unlocode)
+            cached_portcalls = cached_portcalls.join(Port, Port.id == PortCall.port_id).filter(Port.unlocode.in_(to_list(unlocode)))
 
         cached_portcalls = cached_portcalls.all()
     else:
@@ -96,20 +96,37 @@ def get_next_portcall(date_from,
         return None
 
     # If not, query MarineTraffic
-    # But do so only after the last cached portcall to avoid additional costs
+    # But do so only inbetween cached portcalls to avoid additional costs
     if cached_portcalls:
-        if go_backward:
-            date_from = min([x.date_utc for x in cached_portcalls]) - dt.timedelta(minutes=1)
-        else:
-            date_from = max([x.date_utc for x in cached_portcalls]) + dt.timedelta(minutes=1)
+        portcalls = []
+        direction = -1 if go_backward else 1
+        cached_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
+        #IMPORTANT marinetraffic uses UTC for filtering
+        date_froms = [x.date_utc for x in cached_portcalls]
+        date_tos = [x.date_utc for x in cached_portcalls[1:]] + [date_to]
+        for dates in list(zip(date_froms, date_tos)):
+            date_from = dates[0] + direction * dt.timedelta(minutes=1)
+            date_to = dates[1] - direction * dt.timedelta(minutes=1) if dates[1] else dt.datetime.utcnow()
 
-    filtered_portcall, portcalls = Marinetraffic.get_next_portcall(imo=imo,
-                                                                   unlocode=unlocode,
-                                                                   date_from=date_from,
-                                                                   date_to=date_to,
-                                                                   filter=filter,
-                                                                   arrival_or_departure=arrival_or_departure,
-                                                                   go_backward=go_backward)
+            filtered_portcall, portcalls_interval = Marinetraffic.get_next_portcall(imo=imo,
+                                                   unlocode=unlocode,
+                                                   date_from=date_from,
+                                                   date_to=date_to,
+                                                   filter=filter,
+                                                   arrival_or_departure=arrival_or_departure,
+                                                   go_backward=go_backward
+                                                   )
+            portcalls.extend(portcalls_interval)
+            if filtered_portcall:
+                break
+
+    else:
+        filtered_portcall, portcalls = Marinetraffic.get_next_portcall(imo=imo,
+                                                                       unlocode=unlocode,
+                                                                       date_from=date_from,
+                                                                       date_to=date_to,
+                                                                       arrival_or_departure=arrival_or_departure,
+                                                                       go_backward=go_backward)
 
     # Store them in db so that we won't query them again
     for portcall in portcalls:
@@ -119,7 +136,7 @@ def get_next_portcall(date_from,
         except sqlalchemy.exc.IntegrityError as e:
             session.rollback()
             # First try if this is a missing port
-            if Port.query.filter(Port.id==portcall.port_id).count() == 0:
+            if Port.query.filter(Port.id == portcall.port_id).count() == 0:
                 port.insert_new_port(iso2=portcall.port_unlocode[0:2],
                                      unlocode=portcall.port_unlocode)
 
@@ -156,17 +173,11 @@ def update_departures(date_from=dt.date(2021, 11, 1),
         if last_portcall is not None and not force_rebuild:
             date_from = last_portcall.date_utc + dt.timedelta(minutes=1)
 
-        if not force_rebuild:
-            filtered_portcall, portcalls = Marinetraffic.get_next_portcall(arrival_or_departure="departure",
-                                                                           unlocode=port.unlocode,
-                                                                           date_from=date_from,
-                                                                           date_to=date_to,
-                                                                           filter=None)
-        else:
-            portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
-                                                                  unlocode=port.unlocode,
-                                                                  date_from=date_from,
-                                                                  date_to=date_to)
+
+        portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
+                                                              unlocode=port.unlocode,
+                                                              date_from=date_from,
+                                                              date_to=date_to)
 
         # Store them in db so that we won't query them
         for portcall in portcalls:
@@ -210,7 +221,8 @@ def update_ports():
 def fill_departure_gaps(imo=None, commodities=[base.LNG,
                         base.CRUDE_OIL,
                         base.OIL_PRODUCTS,
-                        base.OIL_OR_CHEMICAL,base.BULK],
+                        base.OIL_OR_CHEMICAL,
+                        base.BULK],
                         date_from=None,
                         date_to=None,
                         min_dwt=base.DWT_MIN):
@@ -246,13 +258,9 @@ def fill_departure_gaps(imo=None, commodities=[base.LNG,
 
     portcall_russia = query.all()
 
-    filter_departure = lambda x: x.port_id is not None \
-                       and x.port_id != "" \
-                       and x.port_operation in ["discharge", "both"]
+    filter_departure = lambda x: x.port_operation in ["discharge", "both"]
 
-    filter_departure_russia = lambda x: x.port_id is not None \
-                       and x.port_id != "" \
-                       and x.port_id in originally_checked_ports
+    filter_departure_russia = lambda x: x.port_id in originally_checked_ports
 
     filter_arrival = lambda x: x.port_unlocode is not None and x.port_unlocode != ""
 
@@ -297,7 +305,7 @@ def fill_departure_gaps(imo=None, commodities=[base.LNG,
                                                date_to=next_departure_date_to,
                                                arrival_or_departure="departure",
                                                imo=p.ship_imo,
-                                               use_cache=False,
+                                               use_cache=True,
                                                filter=filter_departure)
 
         if next_departure:
@@ -309,19 +317,18 @@ def fill_departure_gaps(imo=None, commodities=[base.LNG,
                                                  date_from=next_departure.date_utc,
                                                  filter=filter_arrival,
                                                  go_backward=True,
-                                                 cache_only=True)
+                                                 cache_only=False)
 
-            if not cached_portcall \
-                    or cached_portcall.date_utc < to_datetime(next_departure.date_utc) - dt.timedelta(hours=72) \
-                    or cached_portcall.port_unlocode != next_departure.port_unlocode:
-                # Query previous arrival (will be stored in db)
-                arrival_portcall = get_next_portcall(imo=next_departure.ship_imo,
-                                                     arrival_or_departure="arrival",
-                                                     date_from=next_departure.date_utc,
-                                                     filter=filter_arrival,
-                                                     go_backward=True,
-                                                     use_cache=False)
-
+            # if not cached_portcall \
+            #         or cached_portcall.date_utc < to_datetime(next_departure.date_utc) - dt.timedelta(hours=72) \
+            #         or cached_portcall.port_unlocode != next_departure.port_unlocode:
+            #     # Query previous arrival (will be stored in db)
+            #     arrival_portcall = get_next_portcall(imo=next_departure.ship_imo,
+            #                                          arrival_or_departure="arrival",
+            #                                          date_from=next_departure.date_utc,
+            #                                          filter=filter_arrival,
+            #                                          go_backward=True,
+            #                                          use_cache=True)
 
 
 def fill_arrival_gaps(imo = None, date_from=None, min_dwt=base.DWT_MIN):
@@ -387,7 +394,6 @@ def fill_missing_port_operation():
 
         else:
             logger.warning("Didn't find a single matching portcall")
-
 
 
 def fill_missing_port_id():
