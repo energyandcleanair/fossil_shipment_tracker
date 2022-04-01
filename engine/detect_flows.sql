@@ -15,6 +15,7 @@ with portcalls as (
  	    ORDER BY date_utc
  	) as previous_load_status
 	from portcall left join port on portcall.port_id=port.id
+-- 	where ship_imo='9794446'
 --   	where ship_imo in (select imo from ship limit 100)
 	order by date_utc
 ),
@@ -34,7 +35,7 @@ departures_russia_full as (
 ),
 -- insert into departure
 next_departure as (
-	select
+	select distinct on (departure_portcall_id)
 		d.ship_imo as ship_imo,
 		d.port_id as departure_port_id,
 		d.id as departure_portcall_id,
@@ -55,6 +56,9 @@ next_departure as (
 		AND nextd.date_utc > d.date_utc
 		AND (d.next_russia_departure_date_utc is null or nextd.date_utc <= d.next_russia_departure_date_utc)
  		AND (nextd.port_operation='discharge' OR (nextd.previous_load_status='fully_laden' AND nextd.load_status='in_ballast'))
+	order by departure_portcall_id, nextd.date_utc
+
+
 ),
 
 previous_arrival as (
@@ -66,7 +70,7 @@ previous_arrival as (
 		nextd.departure_portcall_id,
 		preva.id as arrival_portcall_id,
 		preva.date_utc as arrival_date_utc,
-		preva.port_id
+		preva.port_id as arrival_port_id
 	from next_departure nextd
 	left join portcalls preva --previous arrival
 	on preva.ship_imo=nextd.ship_imo
@@ -86,8 +90,8 @@ inserted_departures as (
 ),
 
 inserted_arrivals as (
-	INSERT INTO arrival (id, departure_id, date_utc, method_id, portcall_id)
-	SELECT arrival_id, departure_id, arrival_date_utc, 'postgres', arrival_portcall_id
+	INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id)
+	SELECT arrival_id, departure_id, arrival_date_utc, 'postgres', arrival_port_id, arrival_portcall_id
 	from flows
 ),
 
