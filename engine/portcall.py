@@ -102,8 +102,8 @@ def get_next_portcall(date_from,
         direction = -1 if go_backward else 1
         cached_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
         #IMPORTANT marinetraffic uses UTC for filtering
-        date_froms = [x.date_utc for x in cached_portcalls]
-        date_tos = [x.date_utc for x in cached_portcalls[1:]] + [to_datetime(date_to)]
+        date_froms = [to_datetime(date_from)] + [x.date_utc for x in cached_portcalls]
+        date_tos = [x.date_utc for x in cached_portcalls] + [to_datetime(date_to)]
         for dates in list(zip(date_froms, date_tos)):
             date_from = dates[0] + direction * dt.timedelta(minutes=1)
             date_to = dates[1] - direction * dt.timedelta(minutes=1) if dates[1] else dt.datetime.utcnow()
@@ -129,6 +129,7 @@ def get_next_portcall(date_from,
                                                                        go_backward=go_backward)
 
     # Store them in db so that we won't query them again
+    print("Adding %d portcalls" % (len(portcalls),))
     for portcall in portcalls:
         try:
             session.add(portcall)
@@ -244,14 +245,14 @@ def fill_departure_gaps(imo=None,
     originally_checked_port_unlocodes = [x for x, in session.query(Port.unlocode).filter(Port.check_departure).all()]
 
     # 1/2: update port departures from Russia
-    # filter_impossibble = lambda x: False # To force continuing
-    # for unlocode in tqdm(originally_checked_port_unlocodes):
-    #     next_departure = get_next_portcall(date_from=date_from,
-    #                                        date_to=date_to,
-    #                                        arrival_or_departure="departure",
-    #                                        unlocode=unlocode,
-    #                                        cache_only=False,
-    #                                        filter=filter_impossibble)
+    filter_impossibble = lambda x: False # To force continuing
+    for unlocode in tqdm(originally_checked_port_unlocodes):
+        next_departure = get_next_portcall(date_from=date_from,
+                                           date_to=date_to,
+                                           arrival_or_departure="departure",
+                                           unlocode=unlocode,
+                                           cache_only=False,
+                                           filter=filter_impossibble)
 
 
 

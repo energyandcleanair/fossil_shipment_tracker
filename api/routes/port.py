@@ -8,6 +8,7 @@ from base.db import session
 from . import routes_api
 
 import pandas as pd
+import numpy as np
 
 
 @routes_api.route('/v0/port', methods=['GET'], strict_slashes=False)
@@ -31,6 +32,7 @@ class PortResource(Resource):
 
         ports_df = pd.read_sql(query.statement, session.bind)
         ports_df.drop(["geometry"], axis=1, inplace=True)
+        ports_df.replace({np.nan: None}, inplace=True)
 
         if format == "csv":
             return Response(
