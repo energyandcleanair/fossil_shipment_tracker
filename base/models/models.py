@@ -15,6 +15,7 @@ from . import DB_TABLE_PORT
 from . import DB_TABLE_TERMINAL
 from . import DB_TABLE_BERTH
 from . import DB_TABLE_POSITION
+from . import DB_TABLE_TRAJECTORY
 from . import DB_TABLE_FLOW
 from . import DB_TABLE_FLOWARRIVALBERTH
 from . import DB_TABLE_FLOWDEPARTUREBERTH
@@ -55,6 +56,7 @@ class Ship(Base):
             return float(liquid_gas)
         except (ValueError, TypeError):
             return None
+
 
 class Port(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
@@ -160,14 +162,22 @@ class Flow(Base):
 class Position(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"))
     date_utc = Column(DateTime(timezone=False))  # Departure time for departure, Arrival time for arrival
     geometry = Column(Geometry('POINT', srid=4326))
     navigation_status = Column(String)
     speed = Column(Numeric)
 
     __tablename__ = DB_TABLE_POSITION
-    __table_args__ = (Index('idx_position_flow', "flow_id"), )
+    __table_args__ = (Index('idx_position_ship_imo', "ship_imo"),)
+
+
+class Trajectory(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"), unique=True)
+    geometry = Column(Geometry('LINESTRING', srid=4326))
+
+    __tablename__ = DB_TABLE_TRAJECTORY
+    __table_args__ = (Index('idx_trajectory_flow', "flow_id"), )
 
 
 class PortCall(Base):

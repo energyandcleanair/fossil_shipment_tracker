@@ -83,10 +83,6 @@ def test_voyage(app):
         assert len(data) == 1
 
 
-def test_voyage_geojson(app):
-
-    # Create a test client using the Flask application configured for testing
-    with app.test_client() as test_client:
         params = {"format": "geojson"}
         response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
         assert response.status_code == 200

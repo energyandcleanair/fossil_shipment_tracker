@@ -111,7 +111,7 @@ class Marinetraffic:
                 response_data = [x for x in response_data if float(x["SUMMER_DWT"]) > base.DWT_MIN]
                 if len(response_data) > 1:
                     logger.warning("Two ships available with this mmsi. Taking the most recnt one: %s" % (response_data))
-                    response_data.sort(key=lambda x: x["BUILD"], reversed=True)
+                    response_data.sort(key=lambda x: x["BUILD"], reverse=True)
 
             response_data = response_data[0]
             cls.do_cache_ship(response_data)

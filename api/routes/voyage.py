@@ -7,7 +7,7 @@ from . import routes_api
 from flask_restx import inputs
 
 
-from base.models import Flow, Ship, Arrival, Departure, Port, Position, Berth, FlowArrivalBerth
+from base.models import Flow, Ship, Arrival, Departure, Port, Berth, FlowDepartureBerth, FlowArrivalBerth, Trajectory
 from base.db import session
 from base.encoder import JsonEncoder
 
@@ -74,6 +74,10 @@ class VoyageResource(Resource):
                                     Ship.commodity,
                                     Ship.quantity,
                                     Ship.unit,
+                                    DepartureBerth.id,
+                                    DepartureBerth.name,
+                                    DepartureBerth.commodity,
+                                    DepartureBerth.port_unlocode,
                                     ArrivalBerth.id,
                                     ArrivalBerth.name,
                                     ArrivalBerth.commodity,
@@ -83,7 +87,9 @@ class VoyageResource(Resource):
              .join(Arrival, Departure.id == Arrival.departure_id)
              .join(ArrivalPort, Arrival.port_id == ArrivalPort.id)
              .join(Ship, Departure.ship_imo == Ship.imo)) \
+             .join(FlowDepartureBerth, Flow.id == FlowDepartureBerth.flow_id, isouter=True) \
              .join(FlowArrivalBerth, Flow.id == FlowArrivalBerth.flow_id, isouter=True) \
+             .join(DepartureBerth, DepartureBerth.id == FlowDepartureBerth.berth_id, isouter=True) \
              .join(ArrivalBerth, ArrivalBerth.id == FlowArrivalBerth.berth_id, isouter=True)
 
         if id is not None:
@@ -114,6 +120,10 @@ class VoyageResource(Resource):
                    "commodity",
                    "quantity",
                    "unit",
+                   "departure_berth_id",
+                   "departure_berth_name",
+                   "departure_berth_commodity",
+                   "departure_berth_unlocode",
                    "arrival_berth_id",
                    "arrival_berth_name",
                    "arrival_berth_commodity",
@@ -127,13 +137,17 @@ class VoyageResource(Resource):
             return Response(
                 response="empty",
                 mimetype="text/csv",
-                headers={"Content-disposition":
-                             "attachment; filename=flows.csv"})
+                headers={"Content-disposition": "attachment; filename=flows.csv"})
 
         flows_rich = [row_to_dict(x) for x in flows_rich]
 
+
+        # If bulk and departure berth is coal, replace commodity with coal
+        flows_df = pd.DataFrame(flows_rich)
+        flows_df.loc[(flows_df.commodity=="bulk") & \
+                     (flows_df.departure_berth_commodity.str.contains("Coal", case=False)), "commodity"] = "coal"
+
         if format == "csv":
-            flows_df = pd.DataFrame(flows_rich)
             return Response(
                 response=flows_df.to_csv(index=False),
                 mimetype="text/csv",
@@ -142,9 +156,9 @@ class VoyageResource(Resource):
 
         if format == "json":
             if nest_in_data:
-                resp_content = json.dumps({"data": flows_rich}, cls=JsonEncoder)
+                resp_content = json.dumps({"data": flows_df.to_dict(orient="records")}, cls=JsonEncoder)
             else:
-                resp_content = json.dumps(flows_rich, cls=JsonEncoder)
+                resp_content = json.dumps(flows_df.to_dict(orient="records"), cls=JsonEncoder)
 
             return Response(
                 response=resp_content,
@@ -152,32 +166,14 @@ class VoyageResource(Resource):
                 mimetype='application/json')
 
         if format == "geojson":
-            flows_df = pd.DataFrame(flows_rich)
             flow_ids = list([int(x) for x in flows_df.id.unique()])
 
-            #TODO find a faster option
-            from geoalchemy2.functions import ST_MakeLine
+            trajectories = session.query(Trajectory) \
+                .filter(Trajectory.flow_id.in_(flow_ids))
 
-            date_berthing = session.query(FlowArrivalBerth.flow_id, func.min(Position.date_utc).label("berthing_date_utc")) \
-                .filter(FlowArrivalBerth.flow_id.in_(flow_ids)) \
-                .join(Position, Position.id == FlowArrivalBerth.position_id) \
-                .group_by(FlowArrivalBerth.flow_id).subquery()
-
-            ordered_position = session.query(Position, date_berthing) \
-                .filter(Position.flow_id.in_(flow_ids)) \
-                .join(date_berthing, date_berthing.c.flow_id == Position.flow_id, isouter=True) \
-                .filter(or_(
-                    Position.date_utc <= date_berthing.c.berthing_date_utc,
-                    date_berthing.c.berthing_date_utc == sa.null())) \
-                .order_by(Position.date_utc) \
-                .subquery()
-
-            statement = session.query(ordered_position.c.flow_id, ST_MakeLine(ordered_position.c.geometry).label("geometry")) \
-                .group_by(ordered_position.c.flow_id).statement
-
-            lines_df = pd.read_sql(statement, session.bind)
-            lines_df = update_geometry_from_wkb(lines_df)
-            flows_gdf = gpd.GeoDataFrame(flows_df.merge(lines_df.rename(columns={'flow_id': 'id'})), geometry='geometry')
+            trajectories_df = pd.read_sql(trajectories.statement, session.bind)
+            trajectories_df = update_geometry_from_wkb(trajectories_df)
+            flows_gdf = gpd.GeoDataFrame(flows_df.merge(trajectories_df[["flow_id", "geometry"]].rename(columns={'flow_id': 'id'})), geometry='geometry')
             flows_geojson = flows_gdf.to_json(cls=JsonEncoder)
 
             if nest_in_data:

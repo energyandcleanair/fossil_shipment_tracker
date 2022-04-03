@@ -29,7 +29,9 @@ def get_upsert_method(constraint_name):
     return upsert
 
 
-def upsert(df, table, constraint_name):
+def upsert(df, table, constraint_name, dtype={}):
+
+
     if isinstance(df, gpd.GeoDataFrame):
         #TODO upsert not yet supported. Not sure what's the best way to proceed
         # It will fail if constraint is violated
@@ -44,4 +46,5 @@ def upsert(df, table, constraint_name):
                   con=engine,
                   if_exists="append",
                   index=False,
-                  method=get_upsert_method(constraint_name))
+                  method=get_upsert_method(constraint_name),
+                  dtype=dtype)

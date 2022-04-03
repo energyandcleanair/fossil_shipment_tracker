@@ -1,8 +1,10 @@
+delete from trajectory;
+delete from flowdepartureberth;
 delete from flowarrivalberth;
-delete from position;
 delete from flow;
 delete from arrival;
 delete from departure;
+
 
 
 with portcalls as (

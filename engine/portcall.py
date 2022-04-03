@@ -103,7 +103,7 @@ def get_next_portcall(date_from,
         cached_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
         #IMPORTANT marinetraffic uses UTC for filtering
         date_froms = [x.date_utc for x in cached_portcalls]
-        date_tos = [x.date_utc for x in cached_portcalls[1:]] + [date_to]
+        date_tos = [x.date_utc for x in cached_portcalls[1:]] + [to_datetime(date_to)]
         for dates in list(zip(date_froms, date_tos)):
             date_from = dates[0] + direction * dt.timedelta(minutes=1)
             date_to = dates[1] - direction * dt.timedelta(minutes=1) if dates[1] else dt.datetime.utcnow()
@@ -218,11 +218,14 @@ def update_ports():
     return
 
 
-def fill_departure_gaps(imo=None, commodities=[base.LNG,
-                        base.CRUDE_OIL,
-                        base.OIL_PRODUCTS,
-                        base.OIL_OR_CHEMICAL,
-                        base.BULK],
+
+
+def fill_departure_gaps(imo=None,
+                        commodities=[base.LNG,
+                            base.CRUDE_OIL,
+                            base.OIL_PRODUCTS,
+                            base.OIL_OR_CHEMICAL,
+                            base.BULK],
                         date_from=None,
                         date_to=None,
                         min_dwt=base.DWT_MIN):
@@ -236,13 +239,31 @@ def fill_departure_gaps(imo=None, commodities=[base.LNG,
     :param filter:
     :return:
     """
+
+    originally_checked_port_ids = [x for x, in session.query(Port.id).filter(Port.check_departure).all()]
+    originally_checked_port_unlocodes = [x for x, in session.query(Port.unlocode).filter(Port.check_departure).all()]
+
+    # 1/2: update port departures from Russia
+    # filter_impossibble = lambda x: False # To force continuing
+    # for unlocode in tqdm(originally_checked_port_unlocodes):
+    #     next_departure = get_next_portcall(date_from=date_from,
+    #                                        date_to=date_to,
+    #                                        arrival_or_departure="departure",
+    #                                        unlocode=unlocode,
+    #                                        cache_only=False,
+    #                                        filter=filter_impossibble)
+
+
+
+
+
+
+    # 2/2: update subsequent departure calls for ships leaving
     query = PortCall.query.filter(
         PortCall.move_type == "departure",
         PortCall.load_status.in_(["fully_laden"]),
         PortCall.port_operation.in_(["load"])) \
         .join(Ship, Port).filter(Port.check_departure)
-
-    originally_checked_ports = [x for x, in session.query(Port.id).filter(Port.check_departure).all()]
 
     if min_dwt is not None:
         query = query.filter(Ship.dwt >= min_dwt)
@@ -258,11 +279,12 @@ def fill_departure_gaps(imo=None, commodities=[base.LNG,
 
     portcall_russia = query.all()
 
-    filter_departure = lambda x: x.port_operation in ["discharge", "both"]
+    # filter_departure = lambda x: x.port_operation in ["discharge", "both"]
+    filter_departure = lambda x: x.load_status in ["in_ballast"]
 
-    filter_departure_russia = lambda x: x.port_id in originally_checked_ports
+    filter_departure_russia = lambda x: x.port_id in originally_checked_port_ids
 
-    filter_arrival = lambda x: x.port_unlocode is not None and x.port_unlocode != ""
+    filter_arrival = lambda x: x.port_id is not None
 
     portcall_russia.sort(key=lambda x: x.date_utc)
 
@@ -282,24 +304,21 @@ def fill_departure_gaps(imo=None, commodities=[base.LNG,
                                            cache_only=True,
                                            filter=filter_departure_russia)
 
-        next_arrival = get_next_portcall(date_from=p.date_utc + dt.timedelta(minutes=1),
-                                          arrival_or_departure="arrival",
-                                          imo=p.ship_imo,
-                                          cache_only=True,
-                                          filter=filter_arrival)
+        # next_arrival = get_next_portcall(date_from=p.date_utc + dt.timedelta(minutes=1),
+        #                                   arrival_or_departure="arrival",
+        #                                   imo=p.ship_imo,
+        #                                   cache_only=True,
+        #                                   filter=filter_arrival)
 
         if not next_departure \
             or not next_departure_russia \
-            or not next_arrival \
-            or next_departure.port_unlocode in [originally_checked_ports] \
+            or next_departure.port_id in [originally_checked_port_ids] \
             or to_datetime(next_departure.date_utc) > to_datetime(next_departure_russia.date_utc): #to_datetime(p.date_utc) + dt.timedelta(hours=24):
 
-
             next_departure_date_to = next_departure_russia.date_utc - dt.timedelta(minutes=1) if next_departure_russia else to_datetime(date_to)
-            next_departure_date_from = next_arrival.date_utc \
-                if next_arrival and next_arrival.date_utc < next_departure_date_to \
-                else p.date_utc + dt.timedelta(minutes=1)
-
+            # next_departure_date_from = next_arrival.date_utc \
+            #     if next_arrival and next_arrival.date_utc < next_departure_date_to \
+            next_departure_date_from = p.date_utc + dt.timedelta(minutes=1)
 
             next_departure = get_next_portcall(date_from=next_departure_date_from,
                                                date_to=next_departure_date_to,

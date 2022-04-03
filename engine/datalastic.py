@@ -116,7 +116,7 @@ class Datalastic:
             "navigation_status": x["navigation_status"],
             "speed": x["speed"],
             "date_utc": dt.datetime.strptime(x["last_position_UTC"], "%Y-%m-%dT%H:%M:%SZ")
-        }) for x in response_data["positions"]]
+        }) for x in response_data["positions"] if abs(x["lat"] > 1e-4)]
 
 
         # Datalastic only takes day data as from, we further filter to prevent duplicates in the same day
