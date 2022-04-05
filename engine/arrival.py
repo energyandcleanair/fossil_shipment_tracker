@@ -22,6 +22,7 @@ def update(min_dwt=base.DWT_MIN,
                         base.CRUDE_OIL,
                         base.OIL_PRODUCTS,
                         base.OIL_OR_CHEMICAL,
+                        base.COAL,
                         base.BULK]
            ):
     print("=== Arrival update ===")
@@ -30,7 +31,6 @@ def update(min_dwt=base.DWT_MIN,
     dangling_departures = departure.get_dangling_departures(min_dwt=min_dwt,
                                                             commodities=commodities,
                                                             date_from=date_from)
-    russia_unlocodes = [x for x, in session.query(Port.unlocode).filter(Port.check_departure).all()]
 
     if limit is not None:
         # For debugging without taking too many credits
@@ -40,73 +40,27 @@ def update(min_dwt=base.DWT_MIN,
     # That would happen if a ship had two departure without yet an arrival
     # and we'd start looking from the latest departure
     dangling_departures.sort(key=lambda x: x.date_utc)
-    i=0
 
     for d in tqdm(dangling_departures):
-        imo = d.ship_imo
-        departure_date = d.date_utc
+        departure_portcall = PortCall.query.filter(PortCall.id == d.portcall_id).first()
+        imo = departure_portcall.ship_imo
+        arrival_portcall = portcall.find_arrival(departure_portcall=departure_portcall)
+        if arrival_portcall:
+            data = {
+                "departure_id": d.id,
+                "method_id": "python",
+                "date_utc": arrival_portcall.date_utc,
+                "port_id": arrival_portcall.port_id,
+                "portcall_id": arrival_portcall.id
+            }
+            arrival = Arrival(**data)
+            session.add(arrival)
+            try:
+                session.commit()
+            except sqlalchemy.exc.IntegrityError:
+                logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
+                session.rollback()
 
-        # Get next departure with discharge or load
-        filter_departure = lambda x: x.port_operation in ["discharge", "both"]
-        next_departure_portcall_russia = portcall.get_next_portcall(imo=imo,
-                                                                    unlocode=russia_unlocodes,
-                                                                    arrival_or_departure="departure",
-                                                                    date_from=departure_date + dt.timedelta(hours=1),
-                                                                    cache_only=True)
-        date_to_departure = next_departure_portcall_russia.date_utc if next_departure_portcall_russia else None
-        next_departure_portcall = portcall.get_next_portcall(imo=imo,
-                                                    arrival_or_departure="departure",
-                                                    date_from=departure_date + dt.timedelta(hours=12),
-                                                    date_to=date_to_departure,
-                                                    filter=filter_departure,
-                                                    cache_only=False)
-        method_id = 'last_arrival_before_discharge'
-
-        if not next_departure_portcall:
-            current_loadstatus = session.query(PortCall.load_status).filter(PortCall.id == d.portcall_id).first()[0]
-            if current_loadstatus == "fully_laden":
-                filter_toballast = lambda x: x.load_status in ["in_ballast"]
-                next_departure_portcall = portcall.get_next_portcall(imo=imo,
-                                                                     arrival_or_departure="departure",
-                                                                     date_from=departure_date + dt.timedelta(hours=1),
-                                                                     date_to=date_to_departure,
-                                                                     filter=filter_toballast,
-                                                                     cache_only=False)
-
-                method_id = 'last_arrival_before_toballast'
-
-        if not next_departure_portcall:
-            logger.info(
-                "No relevant departure found. Should check portcalls for imo %s from date %s." % (imo, d.date_utc))
         else:
-            # Then look backward for closest arrival
-            # This is the filter that will be applied to arrival portcall to consider it legit
-            # After manually inspecting some routes, we saw for instance that vessals would moore
-            # away from departure terminal. This would have a unlocode=none
-            # We also start 12 hours after departure
-            filter_arrival = None  # lambda x: x.port_unlocode is not None and x.port_unlocode != ""
-            arrival_portcall = portcall.get_next_portcall(imo=imo,
-                                                          arrival_or_departure="arrival",
-                                                          date_from=next_departure_portcall.date_utc,
-                                                          date_to=d.date_utc,
-                                                          filter=filter_arrival,
-                                                          go_backward=True)
-            if arrival_portcall:
-                data = {
-                    "departure_id": d.id,
-                    "method_id": method_id,
-                    "date_utc": arrival_portcall.date_utc,
-                    "port_id": arrival_portcall.port_id,
-                    "portcall_id": arrival_portcall.id
-                }
-                arrival = Arrival(**data)
-                session.add(arrival)
-                try:
-                    session.commit()
-                except sqlalchemy.exc.IntegrityError:
-                    logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
-                    session.rollback()
-
-            else:
-                logger.info(
-                    "No relevant arrival found. Should check portcalls for imo %s from date %s." % (imo, d.date_utc))
+            logger.info(
+                "No relevant arrival found. Should check portcalls for imo %s from date %s." % (imo, d.date_utc))

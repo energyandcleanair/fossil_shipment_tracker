@@ -146,6 +146,8 @@ class VoyageResource(Resource):
         flows_df = pd.DataFrame(flows_rich)
         flows_df.loc[(flows_df.commodity=="bulk") & \
                      (flows_df.departure_berth_commodity.str.contains("Coal", case=False)), "commodity"] = "coal"
+        flows_df.loc[(flows_df.commodity == "bulk") & \
+                     (~flows_df.departure_berth_commodity.str.contains("Coal", case=False)), "commodity"] = "bulk_notcoal"
 
         if format == "csv":
             return Response(

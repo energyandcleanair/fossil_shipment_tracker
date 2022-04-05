@@ -26,12 +26,12 @@ def update(flow_id=None, rebuild_all=False):
 
     flows_to_update = session.query(Flow.id.label('flow_id'),
                                     sa.func.greatest(
-                                        Departure.date_utc,
+                                        Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE),
                                         DepartureBerthPosition.date_utc
                                     ).label('departure_date'),
                                     Departure.ship_imo.label('ship_imo'),
                                     sa.func.least(
-                                        Arrival.date_utc,
+                                        Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
                                         ArrivalBerthPosition.date_utc
                                     ).label('arrival_date'),
                                     Trajectory.flow_id
@@ -42,7 +42,7 @@ def update(flow_id=None, rebuild_all=False):
         .outerjoin(FlowDepartureBerth, FlowDepartureBerth.flow_id == Flow.id) \
         .outerjoin(FlowArrivalBerth, FlowArrivalBerth.flow_id == Flow.id) \
         .outerjoin(DepartureBerthPosition, DepartureBerthPosition.id == FlowDepartureBerth.position_id) \
-        .outerjoin(ArrivalBerthPosition, ArrivalBerthPosition.id == FlowDepartureBerth.position_id) \
+        .outerjoin(ArrivalBerthPosition, ArrivalBerthPosition.id == FlowArrivalBerth.position_id) \
         .filter(sa.or_(rebuild_all, Trajectory.flow_id.is_(None)))
 
     if flow_id is not None:

@@ -8,6 +8,7 @@ def get(imo, date_from, date_to):
     positions = Datalastic.get_positions(imo=imo, date_from=date_from, date_to=date_to)
     return positions
 
+
 def update(ship_imo, date_from, date_to):
         first_date, last_date = session.query(
             func.min(Position.date_utc).label('first_date'),

@@ -7,3 +7,23 @@
 ```
 pg_dump --file "portcall_backup" -d $DB_URL_DEVELOPMENT --verbose --format=t --blobs --table "public.portcall"
 ```
+
+
+# Transfer from development to production
+```bash
+pg_dump -t ship $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t port $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t berth $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t terminal $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t portcall $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t position $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t flowdepartureberth $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t flowarrivalberth $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t flow $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+pg_dump -t trajectory $DB_URL_DEVELOPMENT | psql $DB_URL_PRODUCTION
+
+
+```
+
+
+

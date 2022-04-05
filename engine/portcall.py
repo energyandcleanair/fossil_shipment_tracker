@@ -16,7 +16,7 @@ from engine.marinetraffic import Marinetraffic
 from base.models import PortCall, Port, Ship
 
 
-def fill(limit=None):
+def initial_fill(limit=None):
     """
     Fill PortCall table with manually downloaded data (from MarimeTraffic interface)
     Original files are in assets/marinetraffic
@@ -43,6 +43,79 @@ def fill(limit=None):
     # Upsert portcalls
     upsert(df=portcalls_df, table=DB_TABLE_PORTCALL, constraint_name="unique_portcall")
     return
+
+def fill_missing_port_operation():
+    """
+    We queried initially with MT v1, which misses PORT_OPERATION field.
+    Here we take all already loaded arrival portcalls and query again MT
+    :return:
+    """
+    portcalls_to_update = PortCall.query.filter(
+        PortCall.move_type == "departure",
+        PortCall.port_operation == sqlalchemy.null(),
+        PortCall.port_id != sqlalchemy.null()).all()
+
+    for pc in tqdm(portcalls_to_update):
+        new_pc = Marinetraffic.get_departure_portcalls_between_dates(port_id=pc.port_id,
+                                                                  date_from=pc.date_utc - dt.timedelta(minutes=1),
+                                                                  date_to=pc.date_utc + dt.timedelta(minutes=1))
+        if len(new_pc) == 1 \
+                and pc.port_id == new_pc[0].port_id:
+            pc.others = new_pc[0].others
+            pc.load_status = new_pc[0].load_status
+            pc.port_operation = new_pc[0].port_operation
+            session.commit()
+
+        else:
+            logger.warning("Didn't find a single matching portcall")
+
+
+def fill_missing_port_id():
+    """
+    For manually collected portcalls that no port_unlocode info,
+    we need to query using api to at least have MT port_id and port_name
+    :return:
+    """
+    portcalls_to_update = PortCall.query.filter(
+        PortCall.others == sqlalchemy.null(),
+        PortCall.port_id == sqlalchemy.null()).all()
+
+    for pc in tqdm(portcalls_to_update):
+        new_pc = Marinetraffic.get_portcalls_between_dates(imo=pc.ship_imo,
+                                                           date_from=pc.date_utc - dt.timedelta(minutes=10),
+                                                           date_to=pc.date_utc + dt.timedelta(minutes=10))
+        if len(new_pc) == 1 \
+                and pc.date_utc == to_datetime(new_pc[0].date_utc):
+            pc.others = new_pc[0].others
+            pc.load_status = new_pc[0].load_status
+            pc.port_operation = new_pc[0].port_operation
+            pc.port_id = new_pc[0].port_id
+            session.commit()
+
+        else:
+            logger.warning("Didn't find a single matching portcall")
+
+
+def upload_portcalls(portcalls):
+    # Store them in db so that we won't query them again
+    print("Adding %d portcalls" % (len(portcalls),))
+    for portcall in portcalls:
+        try:
+            session.add(portcall)
+            session.commit()
+        except sqlalchemy.exc.IntegrityError as e:
+            session.rollback()
+            # First try if this is a missing port
+            if Port.query.filter(Port.id == portcall.port_id).count() == 0:
+                port.insert_new_port(iso2=portcall.port_unlocode[0:2],
+                                     unlocode=portcall.port_unlocode)
+
+                # And try again
+                session.add(portcall)
+                session.commit()
+            else:
+                logger.warning("Failed to add portcall. Probably a duplicated portcall")
+                continue
 
 
 def get_next_portcall(date_from,
@@ -96,6 +169,7 @@ def get_next_portcall(date_from,
         return None
 
     # If not, query MarineTraffic
+    flush = True
     # But do so only inbetween cached portcalls to avoid additional costs
     if cached_portcalls:
         portcalls = []
@@ -116,7 +190,11 @@ def get_next_portcall(date_from,
                                                    arrival_or_departure=arrival_or_departure,
                                                    go_backward=go_backward
                                                    )
-            portcalls.extend(portcalls_interval)
+
+            if flush:
+                upload_portcalls(portcalls_interval)
+            else:
+                portcalls.extend(portcalls_interval)
             if filtered_portcall:
                 break
 
@@ -128,32 +206,15 @@ def get_next_portcall(date_from,
                                                                        arrival_or_departure=arrival_or_departure,
                                                                        go_backward=go_backward)
 
-    # Store them in db so that we won't query them again
-    print("Adding %d portcalls" % (len(portcalls),))
-    for portcall in portcalls:
-        try:
-            session.add(portcall)
-            session.commit()
-        except sqlalchemy.exc.IntegrityError as e:
-            session.rollback()
-            # First try if this is a missing port
-            if Port.query.filter(Port.id == portcall.port_id).count() == 0:
-                port.insert_new_port(iso2=portcall.port_unlocode[0:2],
-                                     unlocode=portcall.port_unlocode)
-
-                # And try again
-                session.add(portcall)
-                session.commit()
-            else:
-                logger.warning("Failed to add portcall. Probably a duplicated portcall")
-                continue
+    upload_portcalls(portcalls)
 
     return filtered_portcall
 
 
-def update_departures(date_from=dt.date(2021, 11, 1),
-                      date_to=dt.date.today() + dt.timedelta(days=1),
-                      force_rebuild=False):
+def update_departures_from_russia(
+        date_from=dt.date(2021, 11, 1),
+        date_to=dt.date.today() + dt.timedelta(days=1),
+        force_rebuild=False):
     """
     If force rebuild, we ignore cache port calls. Should only be used if we suspect
     we missed some port calls (e.g. in the initial fill using manually downloaded data)
@@ -173,7 +234,6 @@ def update_departures(date_from=dt.date(2021, 11, 1),
 
         if last_portcall is not None and not force_rebuild:
             date_from = last_portcall.date_utc + dt.timedelta(minutes=1)
-
 
         portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
                                                               unlocode=port.unlocode,
@@ -198,25 +258,63 @@ def update_departures(date_from=dt.date(2021, 11, 1),
     return
 
 
-
-
-
-def update_ports():
+def find_arrival(departure_portcall,
+                 date_to=dt.datetime.utcnow()):
     """
-    Fill port calls for ports of interest, for dates not yet queried in database
+    Key function that will keep looking for subsequent portcalls
+    to find where the boat stopped by looking at next departure with load_status in ballast
+    :param departure_portcall:
     :return:
     """
+    originally_checked_port_ids = [x for x, in session.query(Port.id).filter(Port.check_departure).all()]
 
+    # filter_departure = lambda x: x.port_operation in ["discharge", "both"]
+    filter_departure_russia = lambda x: x.port_id in originally_checked_port_ids
+    filter_departure = lambda x: (departure_portcall.load_status == "fully_ladden" and x.load_status in ["in_ballast"]) \
+                                 or x.port_operation in ["discharge", "both"]
+    filter_arrival = lambda x: x.port_id is not None
 
-    #TODO
-    # - query MarineTraffic for portcalls at ports of interest (assets/departure_port_of_interest.csv)
-    # - upsert in db
-    # Things to pay attention to:
-    # - we want to minimize credits use from MarineTraffic. So need to only query from last date available.
-    # - port call have foreignkeys towards Port and Ship tables. If Port or Ship are missing, we need to find
-    # information and insert them in their respective tables (probably using Datalastic)
+    # We query new departures only if there is none between current portcall and next departure from russia
+    next_departure = get_next_portcall(date_from=departure_portcall.date_utc + dt.timedelta(minutes=1),
+                                       arrival_or_departure="departure",
+                                       imo=departure_portcall.ship_imo,
+                                       cache_only=True,
+                                       filter=filter_departure)
 
-    return
+    next_departure_russia = get_next_portcall(date_from=departure_portcall.date_utc + dt.timedelta(minutes=1),
+                                              arrival_or_departure="departure",
+                                              imo=departure_portcall.ship_imo,
+                                              cache_only=True,
+                                              filter=filter_departure_russia)
+
+    if not next_departure \
+            or not next_departure_russia \
+            or next_departure.port_id in [originally_checked_port_ids] \
+            or to_datetime(next_departure.date_utc) > to_datetime(
+        next_departure_russia.date_utc):  # to_datetime(p.date_utc) + dt.timedelta(hours=24):
+
+        next_departure_date_to = next_departure_russia.date_utc - dt.timedelta(
+            minutes=1) if next_departure_russia else to_datetime(date_to)
+
+        next_departure_date_from = departure_portcall.date_utc + dt.timedelta(minutes=1)
+        next_departure = get_next_portcall(date_from=next_departure_date_from,
+                                           date_to=next_departure_date_to,
+                                           arrival_or_departure="departure",
+                                           imo=departure_portcall.ship_imo,
+                                           use_cache=True,
+                                           filter=filter_departure)
+
+    if next_departure:
+        # Then look backward for a relevant arrival
+        arrival = get_next_portcall(imo=next_departure.ship_imo,
+                                    arrival_or_departure="arrival",
+                                    date_from=next_departure.date_utc,
+                                    filter=filter_arrival,
+                                    go_backward=True,
+                                    cache_only=False)
+        return arrival
+    else:
+        return None
 
 
 
@@ -247,6 +345,7 @@ def fill_departure_gaps(imo=None,
     # 1/2: update port departures from Russia
     filter_impossibble = lambda x: False # To force continuing
     for unlocode in tqdm(originally_checked_port_unlocodes):
+        print(unlocode)
         next_departure = get_next_portcall(date_from=date_from,
                                            date_to=date_to,
                                            arrival_or_departure="departure",
@@ -280,75 +379,10 @@ def fill_departure_gaps(imo=None,
 
     portcall_russia = query.all()
 
-    # filter_departure = lambda x: x.port_operation in ["discharge", "both"]
-    filter_departure = lambda x: x.load_status in ["in_ballast"]
-
-    filter_departure_russia = lambda x: x.port_id in originally_checked_port_ids
-
-    filter_arrival = lambda x: x.port_id is not None
-
     portcall_russia.sort(key=lambda x: x.date_utc)
 
     for p in portcall_russia:
-        print(p.date_utc)
-
-        # We query new departures only if there is none between current portcall and next departure from russia
-        next_departure = get_next_portcall(date_from=p.date_utc + dt.timedelta(minutes=1),
-                                           arrival_or_departure="departure",
-                                           imo=p.ship_imo,
-                                           cache_only=True,
-                                           filter=filter_departure)
-
-        next_departure_russia = get_next_portcall(date_from=p.date_utc + dt.timedelta(minutes=1),
-                                           arrival_or_departure="departure",
-                                           imo=p.ship_imo,
-                                           cache_only=True,
-                                           filter=filter_departure_russia)
-
-        # next_arrival = get_next_portcall(date_from=p.date_utc + dt.timedelta(minutes=1),
-        #                                   arrival_or_departure="arrival",
-        #                                   imo=p.ship_imo,
-        #                                   cache_only=True,
-        #                                   filter=filter_arrival)
-
-        if not next_departure \
-            or not next_departure_russia \
-            or next_departure.port_id in [originally_checked_port_ids] \
-            or to_datetime(next_departure.date_utc) > to_datetime(next_departure_russia.date_utc): #to_datetime(p.date_utc) + dt.timedelta(hours=24):
-
-            next_departure_date_to = next_departure_russia.date_utc - dt.timedelta(minutes=1) if next_departure_russia else to_datetime(date_to)
-            # next_departure_date_from = next_arrival.date_utc \
-            #     if next_arrival and next_arrival.date_utc < next_departure_date_to \
-            next_departure_date_from = p.date_utc + dt.timedelta(minutes=1)
-
-            next_departure = get_next_portcall(date_from=next_departure_date_from,
-                                               date_to=next_departure_date_to,
-                                               arrival_or_departure="departure",
-                                               imo=p.ship_imo,
-                                               use_cache=True,
-                                               filter=filter_departure)
-
-        if next_departure:
-            # Then look backward for a relevant arrival
-
-            # But first look in cache only if there's something close to prevent doing it again
-            cached_portcall = get_next_portcall(imo=next_departure.ship_imo,
-                                                 arrival_or_departure="arrival",
-                                                 date_from=next_departure.date_utc,
-                                                 filter=filter_arrival,
-                                                 go_backward=True,
-                                                 cache_only=False)
-
-            # if not cached_portcall \
-            #         or cached_portcall.date_utc < to_datetime(next_departure.date_utc) - dt.timedelta(hours=72) \
-            #         or cached_portcall.port_unlocode != next_departure.port_unlocode:
-            #     # Query previous arrival (will be stored in db)
-            #     arrival_portcall = get_next_portcall(imo=next_departure.ship_imo,
-            #                                          arrival_or_departure="arrival",
-            #                                          date_from=next_departure.date_utc,
-            #                                          filter=filter_arrival,
-            #                                          go_backward=True,
-            #                                          use_cache=True)
+        find_arrival(departure_portcall=p, date_to=date_to)
 
 
 def fill_arrival_gaps(imo = None, date_from=None, min_dwt=base.DWT_MIN):
@@ -390,53 +424,4 @@ def fill_arrival_gaps(imo = None, date_from=None, min_dwt=base.DWT_MIN):
         new_portcall = get_next_portcall(arrival_or_departure="arrival", imo=row.ship_imo, date_from=to_datetime(row.date_utc), use_cache=False)
 
 
-def fill_missing_port_operation():
-    """
-    We queried initially with MT v1, which misses PORT_OPERATION field.
-    Here we take all already loaded arrival portcalls and query again MT
-    :return:
-    """
-    portcalls_to_update = PortCall.query.filter(
-        PortCall.move_type == "departure",
-        PortCall.port_operation == sqlalchemy.null(),
-        PortCall.port_id != sqlalchemy.null()).all()
 
-    for pc in tqdm(portcalls_to_update):
-        new_pc = Marinetraffic.get_departure_portcalls_between_dates(port_id=pc.port_id,
-                                                                  date_from=pc.date_utc - dt.timedelta(minutes=1),
-                                                                  date_to=pc.date_utc + dt.timedelta(minutes=1))
-        if len(new_pc) == 1 \
-                and pc.port_id == new_pc[0].port_id:
-            pc.others = new_pc[0].others
-            pc.load_status = new_pc[0].load_status
-            pc.port_operation = new_pc[0].port_operation
-            session.commit()
-
-        else:
-            logger.warning("Didn't find a single matching portcall")
-
-
-def fill_missing_port_id():
-    """
-    For manually collected portcalls that no port_unlocode info,
-    we need to query using api to at least have MT port_id and port_name
-    :return:
-    """
-    portcalls_to_update = PortCall.query.filter(
-        PortCall.others == sqlalchemy.null(),
-        PortCall.port_id == sqlalchemy.null()).all()
-
-    for pc in tqdm(portcalls_to_update):
-        new_pc = Marinetraffic.get_portcalls_between_dates(imo=pc.ship_imo,
-                                                           date_from=pc.date_utc - dt.timedelta(minutes=10),
-                                                           date_to=pc.date_utc + dt.timedelta(minutes=10))
-        if len(new_pc) == 1 \
-                and pc.date_utc == to_datetime(new_pc[0].date_utc):
-            pc.others = new_pc[0].others
-            pc.load_status = new_pc[0].load_status
-            pc.port_operation = new_pc[0].port_operation
-            pc.port_id = new_pc[0].port_id
-            session.commit()
-
-        else:
-            logger.warning("Didn't find a single matching portcall")

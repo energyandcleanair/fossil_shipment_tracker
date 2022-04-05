@@ -103,15 +103,27 @@ class Marinetraffic:
 
             if not response_data:
                 logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, "Response is empty"))
-                return None
+                response_data = [{"MMSI": mmsi,
+                                 "IMO": imo,
+                                 "NAME": None
+                                 }]
 
             if len(response_data) > 1:
                 # We assume only ships higher than base.DWT_MIN have been queried
-                #TODO find a better way
-                response_data = [x for x in response_data if float(x["SUMMER_DWT"]) > base.DWT_MIN]
-                if len(response_data) > 1:
-                    logger.warning("Two ships available with this mmsi. Taking the most recnt one: %s" % (response_data))
-                    response_data.sort(key=lambda x: x["BUILD"], reverse=True)
+                try:
+                    response_data = [x for x in response_data if float(x["SUMMER_DWT"]) > base.DWT_MIN]
+                    if len(response_data) > 1:
+                        logger.warning(
+                            "Two ships available with this mmsi: %s" % (response_data,))
+                        response_data = [{"MMSI": mmsi,
+                                          "IMO": imo,
+                                          "NAME": None
+                                          }]
+                except Exception as e:
+                    response_data = [{"MMSI": mmsi,
+                                     "IMO": imo,
+                                     "NAME": None
+                                     }]
 
             response_data = response_data[0]
             cls.do_cache_ship(response_data)
@@ -119,12 +131,12 @@ class Marinetraffic:
 
         data = {
             "mmsi": response_data["MMSI"],
-            "name": response_data["NAME"],
             "imo": response_data["IMO"],
-            "type": response_data["VESSEL_TYPE"],
+            "name": response_data.get("NAME"),
+            "type": response_data.get("VESSEL_TYPE"),
             # "subtype": None,
-            "dwt": response_data["SUMMER_DWT"],
-            "country_iso2": response_data["FLAG"],
+            "dwt": response_data.get("SUMMER_DWT"),
+            "country_iso2": response_data.get("FLAG"),
             # "country_name": None,
             # "home_port": None,
             "liquid_gas": response_data.get("LIQUID_GAS"),
@@ -170,7 +182,7 @@ class Marinetraffic:
         method = 'portcalls/'
         api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
         if api_result.status_code != 200:
-            logger.warning("Marinetraffic: Failed to query vessel %s: %s %s" % (unlocode, api_result, api_result.content))
+            logger.warning("Marinetraffic: Failed to query portcall %s: %s %s" % (unlocode, api_result, api_result.content))
             return []
         response_datas = api_result.json()
 

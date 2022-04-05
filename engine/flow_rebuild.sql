@@ -77,7 +77,7 @@ previous_arrival as (
 	left join portcalls preva --previous arrival
 	on preva.ship_imo=nextd.ship_imo
 	where preva.date_utc < nextd.nextdeparture_date_utc and preva.date_utc > nextd.departure_date_utc
-	order by departure_portcall_id, nextdeparture_portcall_id, preva.id, preva.date_utc desc
+	order by departure_portcall_id, nextdeparture_portcall_id, preva.date_utc desc
 ),
 
 flows as (

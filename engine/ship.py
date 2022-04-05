@@ -41,6 +41,7 @@ def fill(imos=[], mmsis=[]):
     ships = [Marinetraffic.get_ship(mmsi=x) for x in get_missing_ships_mmsis(mmsis)]
     upload_ships(ships)
 
+
     missing = get_missing_ships_imos(imos)
     missing.extend(get_missing_ships_mmsis(mmsis))
     if missing:
