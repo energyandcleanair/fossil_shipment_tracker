@@ -11,7 +11,7 @@ from base.models import Arrival, Flow, Port, PortCall
 
 
 def get_dangling_arrivals():
-    subquery = session.query(Flow.arrival_id)
+    subquery = session.query(Flow.arrival_id).filter(Flow.arrival_id != sqlalchemy.null())
     return Arrival.query.filter(~Arrival.id.in_(subquery)).all()
 
 
@@ -23,14 +23,15 @@ def update(min_dwt=base.DWT_MIN,
                         base.OIL_PRODUCTS,
                         base.OIL_OR_CHEMICAL,
                         base.COAL,
-                        base.BULK]
-           ):
+                        base.BULK],
+           ship_imo=None):
     print("=== Arrival update ===")
 
     # We take dangling departures, and try to find the next arrival
-    dangling_departures = departure.get_dangling_departures(min_dwt=min_dwt,
+    dangling_departures = departure.get_departures_without_arrival(min_dwt=min_dwt,
                                                             commodities=commodities,
-                                                            date_from=date_from)
+                                                            date_from=date_from,
+                                                            ship_imo=ship_imo)
 
     if limit is not None:
         # For debugging without taking too many credits
@@ -40,6 +41,12 @@ def update(min_dwt=base.DWT_MIN,
     # That would happen if a ship had two departure without yet an arrival
     # and we'd start looking from the latest departure
     dangling_departures.sort(key=lambda x: x.date_utc)
+
+    # Temporary. Actually we do look between all portcalls, so the order
+    # shouldn't really matter anymore.
+    # Until we fix arrival detection, the first hundreds of dangling departures
+    # will take lot of time for not much
+    # dangling_departures.sort(key=lambda x: x.date_utc, reverse=True)
 
     for d in tqdm(dangling_departures):
         departure_portcall = PortCall.query.filter(PortCall.id == d.portcall_id).first()

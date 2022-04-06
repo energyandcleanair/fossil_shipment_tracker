@@ -1,12 +1,13 @@
 "This fills departure table using MarineTraffic PortCall data"
 from base.db import session
-from base.utils import to_datetime
+from base.utils import to_datetime, to_list
 import base
-from base.models import PortCall, Departure, Arrival, Ship, Port
+import sqlalchemy as sa
+from base.models import PortCall, Departure, Arrival, Ship, Port, Flow
 
 
-def get_dangling_departures(min_dwt=None, commodities=None, date_from=None):
-    subquery = session.query(Arrival.departure_id)
+def get_departures_without_arrival(min_dwt=None, commodities=None, date_from=None, ship_imo=None):
+    subquery = session.query(Arrival.departure_id).filter(Arrival.departure_id != sa.null())
     query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
         .join(PortCall, PortCall.id == Departure.portcall_id) \
         .join(Ship, PortCall.ship_imo == Ship.imo)
@@ -18,7 +19,31 @@ def get_dangling_departures(min_dwt=None, commodities=None, date_from=None):
         query = query.filter(Departure.date_utc >= to_datetime(date_from))
 
     if commodities is not None:
-        query = query.filter(Ship.commodity.in_(commodities))
+        query = query.filter(Ship.commodity.in_(to_list(commodities)))
+
+    if ship_imo is not None:
+        query = query.filter(Ship.imo.in_(to_list(ship_imo)))
+
+    return query.order_by(Departure.date_utc).all()
+
+
+def get_departures_without_flow(min_dwt=None, commodities=None, date_from=None, ship_imo=None):
+    subquery = session.query(Flow.departure_id).filter(Flow.departure_id != sa.null())
+    query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
+        .join(PortCall, PortCall.id == Departure.portcall_id) \
+        .join(Ship, PortCall.ship_imo == Ship.imo)
+
+    if min_dwt is not None:
+        query = query.filter(Ship.dwt >= min_dwt)
+
+    if date_from is not None:
+        query = query.filter(Departure.date_utc >= to_datetime(date_from))
+
+    if commodities is not None:
+        query = query.filter(Ship.commodity.in_(to_list(commodities)))
+
+    if ship_imo is not None:
+        query = query.filter(Ship.imo.in_(to_list(ship_imo)))
 
     return query.order_by(Departure.date_utc).all()
 

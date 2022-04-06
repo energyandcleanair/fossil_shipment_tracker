@@ -112,8 +112,13 @@ def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
     #     logger.warning("There are problematic matching (e.g. different unlocode between berth and port")
 
     # Maximum one berthing per flow
-    if berths_agg_ok.groupby(['flow_id'])["berth_id"].count().max() > 1:
-        raise ValueError("Found more than one berth for a flow")
+    berths_count = berths_agg_ok.groupby(['flow_id'])["berth_id"].count().reset_index()
+    if berths_count.berth_id.max() > 1:
+        logger.warning("Found more than one berth for a flow")
+
+
+    berths_agg_ok = pd.DataFrame(berths_count["flow_id"].loc[berths_count.berth_id==1]) \
+        .merge(berths_agg_ok)
 
     berths_agg_ok["method_id"] = "simple_overlapping"
     berths_agg_ok = berths_agg_ok[["flow_id", "berth_id", "position_id", "method_id"]]

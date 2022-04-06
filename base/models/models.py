@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Numeric, BigInteger, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import validates
-from sqlalchemy import UniqueConstraint, ForeignKey, Index
+from sqlalchemy import UniqueConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
 
 from base.db import Base
@@ -70,6 +70,10 @@ class Port(Base):
     geometry = Column(Geometry('POINT', srid=4326))
 
     __tablename__ = DB_TABLE_PORT
+    __table_args__ = (Index('idx_port_unlocode', "unlocode"),
+                      Index('idx_port_name_lower', func.lower(name))
+                      )
+
 
 class Terminal(Base):
     id = Column(String, unique=True, primary_key=True)
@@ -130,7 +134,7 @@ class Departure(Base):
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo'))
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String) # Method through which we detected the departure
-    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'))
+    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=True)
 
     __tablename__ = DB_TABLE_DEPARTURE
 
@@ -140,21 +144,21 @@ class Departure(Base):
 
 class Arrival(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"))
+    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=True)
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String)
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'))
 
     # Optional
-    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'))
+    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=True)
     __tablename__ = DB_TABLE_ARRIVAL
-
 
 
 class Flow(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"))
+    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=True)
     arrival_id = Column(BigInteger, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"))
+    status = Column(String)
 
     __tablename__ = DB_TABLE_FLOW
 
@@ -166,6 +170,8 @@ class Position(Base):
     geometry = Column(Geometry('POINT', srid=4326))
     navigation_status = Column(String)
     speed = Column(Numeric)
+    destination_name = Column(String)
+    destination_port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id', onupdate="CASCADE"))
 
     __tablename__ = DB_TABLE_POSITION
     __table_args__ = (Index('idx_position_ship_imo', "ship_imo"),)

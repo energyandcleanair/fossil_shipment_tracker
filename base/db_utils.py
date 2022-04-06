@@ -8,8 +8,8 @@ import geopandas as gpd
 import pandas as pd
 
 from base.db import engine
-
-
+from tqdm import tqdm
+from tqdm.contrib import tzip
 # For upsert: https://stackoverflow.com/questions/55187884/insert-into-postgresql-table-from-pandas-with-on-conflict-update
 meta = sqlalchemy.MetaData()
 meta.bind = engine
@@ -19,7 +19,8 @@ meta.reflect(views=True)
 def get_upsert_method(constraint_name):
     def upsert(table, conn, keys, data_iter):
         upsert_args = {"constraint": constraint_name}
-        for data in data_iter:
+        data_list = list(data_iter)
+        for data in tqdm(data_list):
             data = {k: data[i] for i, k in enumerate(keys)}
             upsert_args["set_"] = data
             insert_stmt = insert(meta.tables[table.name]).values(**data)

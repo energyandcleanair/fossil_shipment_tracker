@@ -109,26 +109,32 @@ class Datalastic:
             logger.warning("Datalastic: Failed to query vessel position %s: %s" % (imo, api_result))
             return None
         response_data = api_result.json()["data"]
+        positions = Datalastic.parse_position_response_data(imo=imo, response_data=response_data)
 
-        positions = [Position(**{
-            "geometry": latlon_to_point(lat=x["lat"], lon=x["lon"]),
-            "ship_imo": imo,
-            "navigation_status": x["navigation_status"],
-            "speed": x["speed"],
-            "date_utc": dt.datetime.strptime(x["last_position_UTC"], "%Y-%m-%dT%H:%M:%SZ")
-        }) for x in response_data["positions"] if abs(x["lat"] > 1e-4)]
-
-
-        # Datalastic only takes day data as from, we further filter to prevent duplicates in the same day
+        # Datalastic only takes day data as from,
+        # we further filter to prevent duplicates in the same day
         positions = [p for p in positions if p.date_utc > date_from]
         if date_to is not None:
             positions = [p for p in positions if p.date_utc < date_to]
 
         return positions
 
+    @classmethod
+    def parse_position_response_data(cls, imo, response_data):
+
+        positions = [Position(**{
+            "geometry": latlon_to_point(lat=x["lat"], lon=x["lon"]),
+            "ship_imo": imo,
+            "navigation_status": x["navigation_status"],
+            "speed": x["speed"],
+            "date_utc": dt.datetime.strptime(x["last_position_UTC"], "%Y-%m-%dT%H:%M:%SZ"),
+            "destination_name": x["destination"]
+        }) for x in response_data["positions"] if abs(x["lat"] > 1e-4)]
+
+        return positions
 
     @classmethod
-    def get_port_infos(cls, name=None, marinetraffic_id=None):
+    def get_port_infos(cls, name=None, marinetraffic_id=None, fuzzy=False):
         """
         Some ports aren't in the UNLOCODE base. MarineTraffic returns port_name however, so
         we can look them up by name here.
@@ -141,6 +147,7 @@ class Datalastic:
         params = {
             'api-key': cls.api_key,
             'name': name,
+            'fuzzy': int(fuzzy)
         }
 
         method = 'port_find'

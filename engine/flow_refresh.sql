@@ -1,13 +1,11 @@
- delete from trajectory;
- delete from flowdepartureberth;
- delete from flowarrivalberth;
- delete from flow;
- delete from arrival;
- delete from departure;
+with completed_portcalls as (
+    select departure.portcall_id as id
+    from flow
+    left join departure on flow.departure_id = departure.id
+    where flow.status='completed'
+),
 
-
-
-with departure_portcalls as (
+departure_portcalls_all as (
 	select portcall.id, portcall.date_utc, portcall.port_id, load_status, move_type, port_operation,
 	port.unlocode, port.name, port.check_departure, portcall.ship_imo,
 
@@ -26,6 +24,13 @@ with departure_portcalls as (
 --   	where ship_imo in (select imo from ship limit 100)
 	order by date_utc
 ),
+
+
+departure_portcalls as (
+    select * from departure_portcalls_all
+    where id not in (select id from completed_portcalls)
+),
+
 
 ships_in_ballast as (
     select distinct ship_imo
@@ -125,9 +130,12 @@ previous_arrival as (
 ),
 
 
+
+
 completed_flows as (
 	select *, NEXTVAL('departure_id_seq') departure_id, NEXTVAL('arrival_id_seq') arrival_id, 'completed' status
 	from previous_arrival
+	where departure_portcall_id not in (select id from completed_portcalls)
 ),
 
 uncompleted_flows as (
@@ -136,6 +144,7 @@ uncompleted_flows as (
 	ELSE 'arrival_undetected' END as status
 	from next_departure_full nd
 	where nd.departure_portcall_id not in (select departure_portcall_id from previous_arrival)
+	and departure_portcall_id not in (select id from completed_portcalls)
 ),
 
 flows as (
@@ -146,23 +155,40 @@ flows as (
 	NULL::bigint as arrival_portcall_id, departure_id, arrival_id, status from uncompleted_flows
 ),
 
+   inserted_departures as (
+   	INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id)
+   	SELECT departure_id, departure_port_id, ship_imo, departure_date_utc, 'postgres', departure_portcall_id
+   	from flows
+	   ON CONFLICT (portcall_id) DO UPDATE SET port_id=excluded.port_id -- just for id to be returned
+	returning id, portcall_id
+   ),
 
- inserted_departures as (
- 	INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id)
- 	SELECT departure_id, departure_port_id, ship_imo, departure_date_utc, 'postgres', departure_portcall_id
- 	from flows
+  inserted_arrivals as (
+  	INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id)
+  	SELECT arrival_id, departure_id, arrival_date_utc, 'postgres', arrival_port_id, arrival_portcall_id
+  	from completed_flows
+	ON CONFLICT (portcall_id) DO UPDATE SET port_id=excluded.port_id -- just for id to be returned
+	  RETURNING id, portcall_id
+  ),
+
+  flows_after_insertion as (
+ 	select
+	  departure_portcall_id, inserted_departures.id as departure_id,
+	  arrival_portcall_id, inserted_arrivals.id as arrival_id,
+	  status
+	  from flows
+     left join inserted_departures on flows.departure_portcall_id=inserted_departures.portcall_id
+ 	left join inserted_arrivals on 	 flows.arrival_portcall_id=inserted_arrivals.portcall_id
  ),
 
- inserted_arrivals as (
- 	INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id)
- 	SELECT arrival_id, departure_id, arrival_date_utc, 'postgres', arrival_port_id, arrival_portcall_id
- 	from completed_flows
- ),
+   inserted_flows as (
+   	INSERT INTO flow (departure_id, arrival_id, status)
+   	SELECT departure_id, arrival_id, status
+   	from flows_after_insertion
+ 	 ON CONFLICT (departure_id) DO UPDATE
+ 	SET arrival_id = EXCLUDED.arrival_id,
+ 	  status = EXCLUDED.status
+	returning departure_id, arrival_id, status
+   )
 
- inserted_flows as (
- 	INSERT INTO flow (departure_id, arrival_id, status)
- 	SELECT departure_id, arrival_id, status
- 	from flows
- )
-
-select status, count(*) from flows group by 1;
+ select status, count(*) from inserted_flows group by 1;

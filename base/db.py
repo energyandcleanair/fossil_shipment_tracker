@@ -5,6 +5,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from base.logger import logger
 from base.env import get_env
 
+import numpy as np
+import psycopg2
+from psycopg2.extensions import register_adapter, AsIs
+psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
+
 
 environment = get_env('ENVIRONMENT', 'development').lower() # development, production, test
 connections = {

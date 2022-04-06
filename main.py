@@ -4,6 +4,7 @@ from engine import departure
 from engine import arrival
 from engine import flow
 from engine import trajectory
+from engine import position
 from engine import berth
 from base.db import init_db
 import base
@@ -12,6 +13,7 @@ import base
 def init():
     # init_db(drop_first=False)
     # port.fill()
+    portcall.initial_fill()
     # berth.fill()
     # flow.rebuild()
 
@@ -26,18 +28,20 @@ def init():
     # flow.update()
     # flow.update_positions(commodities=base.BULK)
     # berth.detect_berths()
-    trajectory.update(rebuild_all=False)
+    # trajectory.update(rebuild_all=False)
     return
 
 
 def update():
-    portcall.update_departures_from_russia()
-    departure.update()
-    arrival.update()
+    # portcall.update_departures_from_russia()
+    # departure.update()
+    # arrival.update(date_from="2022-01-01")
     flow.update()
-    flow.update_positions()
+    # flow.rebuild()
+    position.update()
     berth.detect_berths()
     trajectory.update()
+    return
 
 
 if __name__ == "__main__":

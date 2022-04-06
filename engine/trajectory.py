@@ -43,7 +43,7 @@ def update(flow_id=None, rebuild_all=False):
         .outerjoin(FlowArrivalBerth, FlowArrivalBerth.flow_id == Flow.id) \
         .outerjoin(DepartureBerthPosition, DepartureBerthPosition.id == FlowDepartureBerth.position_id) \
         .outerjoin(ArrivalBerthPosition, ArrivalBerthPosition.id == FlowArrivalBerth.position_id) \
-        .filter(sa.or_(rebuild_all, Trajectory.flow_id.is_(None)))
+        .filter(sa.or_(rebuild_all, Trajectory.flow_id.is_(None)), Flow.status==base.COMPLETED)
 
     if flow_id is not None:
         flows_to_update = flows_to_update.filter(Flow.id.in_(to_list(flow_id)))

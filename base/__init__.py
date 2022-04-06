@@ -9,6 +9,12 @@ COAL = "coal"
 UNKNOWN = "unknown"
 
 
+ONGOING = "ongoing"
+COMPLETED = "completed"
+MISSED_ARRIVAL = "lost"
+UNKNOWN = "UNKNOWN"
+
+
 DWT_MIN = 5000
 
 

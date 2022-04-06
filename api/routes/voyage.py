@@ -59,6 +59,7 @@ class VoyageResource(Resource):
 
         # Query with joined information
         flows_rich = (session.query(Flow.id,
+                                    Flow.status,
                                     Departure.date_utc,
                                     DeparturePort.unlocode,
                                     DeparturePort.iso2,
@@ -84,13 +85,18 @@ class VoyageResource(Resource):
                                     ArrivalBerth.port_unlocode)
              .join(Departure, Flow.departure_id == Departure.id)
              .join(DeparturePort, Departure.port_id == DeparturePort.id)
-             .join(Arrival, Departure.id == Arrival.departure_id)
-             .join(ArrivalPort, Arrival.port_id == ArrivalPort.id)
+             .outerjoin(Arrival, Departure.id == Arrival.departure_id)
+             .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id)
              .join(Ship, Departure.ship_imo == Ship.imo)) \
              .join(FlowDepartureBerth, Flow.id == FlowDepartureBerth.flow_id, isouter=True) \
              .join(FlowArrivalBerth, Flow.id == FlowArrivalBerth.flow_id, isouter=True) \
              .join(DepartureBerth, DepartureBerth.id == FlowDepartureBerth.berth_id, isouter=True) \
              .join(ArrivalBerth, ArrivalBerth.id == FlowArrivalBerth.berth_id, isouter=True)
+
+
+
+        # Adding destination
+
 
         if id is not None:
             flows_rich = flows_rich.filter(Flow.id.in_(id))

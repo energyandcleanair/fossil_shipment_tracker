@@ -28,8 +28,9 @@ def initial_fill(limit=None):
         portcalls_df = portcalls_df.iloc[0:limit]
 
     portcalls_df["move_type"] = portcalls_df.move_type.str.lower()
-    portcalls_df = portcalls_df[["ship_mmsi", "ship_imo", "port_unlocode", "move_type",
-                                 "load_status", "port_operation", "date_utc", "terminal_id", "berth_id"]]
+    portcalls_df["others"] = portcalls_df.apply(lambda row: {"marinetraffic":{"DRAUGHT": str(row.draught)}}, axis=1)
+
+
     portcalls_df = portcalls_df.drop_duplicates(subset=["ship_imo", "move_type", "date_utc"])
     portcall_imos = portcalls_df.ship_imo.unique()
 
@@ -40,8 +41,27 @@ def initial_fill(limit=None):
     if port.count() == 0:
         port.fill()
 
+    ports_df = pd.read_sql(session.query(Port.id, Port.unlocode).statement,
+                           session.bind)
+
+    portcalls_df = pd.merge(portcalls_df, ports_df.rename(columns={"id":"port_id", "unlocode":"port_unlocode"}))
+
+    portcalls_df = portcalls_df[["ship_mmsi", "ship_imo", "port_id", "move_type",
+                                 "load_status", "port_operation", "date_utc",
+                                 "terminal_id", "berth_id", "others"]]
+
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    portcalls_df['ship_mmsi'] = portcalls_df.ship_mmsi.apply(str)
+    portcalls_df['ship_imo'] = portcalls_df.ship_imo.apply(str)
+    portcalls_df['port_id'] = list([int(x) for x in portcalls_df['port_id'].values.astype(int)])
+    import numpy as np
+    portcalls_df.replace({np.nan: None}, inplace=True)
+
     # Upsert portcalls
-    upsert(df=portcalls_df, table=DB_TABLE_PORTCALL, constraint_name="unique_portcall")
+    upsert(df=portcalls_df, table=DB_TABLE_PORTCALL, constraint_name="unique_portcall",
+           dtype={'others': JSONB})
+    session.commit()
     return
 
 def fill_missing_port_operation():
@@ -269,7 +289,7 @@ def find_arrival(departure_portcall,
     originally_checked_port_ids = [x for x, in session.query(Port.id).filter(Port.check_departure).all()]
 
     # filter_departure = lambda x: x.port_operation in ["discharge", "both"]
-    filter_departure_russia = lambda x: x.port_id in originally_checked_port_ids
+    filter_departure_russia = lambda x: x.port_id in originally_checked_port_ids and x.port_operation == 'load'
     filter_departure = lambda x: (departure_portcall.load_status == "fully_ladden" and x.load_status in ["in_ballast"]) \
                                  or x.port_operation in ["discharge", "both"]
     filter_arrival = lambda x: x.port_id is not None
