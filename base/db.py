@@ -41,6 +41,9 @@ Base.query = session.query_property()
 
 def init_db(drop_first=False):
     if drop_first:
-        Base.metadata.drop_all(bind=engine)
+        if environment == "test":
+            Base.metadata.drop_all(bind=engine)
+        else:
+            raise ValueError("Are you sure you want to delete db?")
 
     Base.metadata.create_all(bind=engine)

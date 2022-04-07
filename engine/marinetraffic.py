@@ -248,7 +248,9 @@ class Marinetraffic:
 
         portcalls = []
         filtered_portcalls = []
-        while not filtered_portcalls and date_from < date_to:
+        while not filtered_portcalls and \
+            ((date_from < date_to and not go_backward) or \
+             (date_from > date_to and go_backward)):
             date_from_call = min(date_from, date_from + direction * delta_time)
             if go_backward:
                 date_to_call = max(date_to, max(date_from, date_from + direction * delta_time))
@@ -277,8 +279,9 @@ class Marinetraffic:
         else:
             # Sort by date in the unlikely case
             # there are several calls within this delta
-            filtered_portcalls.sort(key=lambda x: x.date_utc)
+            filtered_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
             filtered_portcall = filtered_portcalls[0]
+
 
         return filtered_portcall, portcalls
 

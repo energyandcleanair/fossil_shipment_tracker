@@ -329,14 +329,13 @@ def find_arrival(departure_portcall,
         arrival = get_next_portcall(imo=next_departure.ship_imo,
                                     arrival_or_departure="arrival",
                                     date_from=next_departure.date_utc,
+                                    date_to=departure_portcall.date_utc,
                                     filter=filter_arrival,
                                     go_backward=True,
                                     cache_only=False)
         return arrival
     else:
         return None
-
-
 
 
 def fill_departure_gaps(imo=None,

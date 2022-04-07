@@ -64,7 +64,8 @@ next_departure as (
 		nextd.date_utc as nextdeparture_date_utc,
  		nextd.unlocode as nextdeparture_unlocode,
 		nextd.load_status as nextdeparture_load_status,
-		nextd.move_type as nextdeparture_move_type
+		nextd.move_type as nextdeparture_move_type,
+		nextd.port_operation as nextdeparture_port_operation
 	from departures_russia_full d
 	left join departure_portcalls nextd on
 		d.ship_imo=nextd.ship_imo
@@ -100,7 +101,8 @@ select distinct on (departure_portcall_id)
 		nextdeparture_date_utc,
  		nextdeparture_unlocode,
 		nextdeparture_load_status,
-		nextdeparture_move_type
+		nextdeparture_move_type,
+		nextdeparture_port_operation
 	from departures_russia_full d
 	left join next_departure nd
 	on d.id=nd.departure_portcall_id
@@ -120,7 +122,9 @@ previous_arrival as (
 	from next_departure_full nextd
 	left join portcall preva --previous arrival
 	on preva.ship_imo=nextd.ship_imo
-	where preva.date_utc < nextd.nextdeparture_date_utc and preva.date_utc > nextd.departure_date_utc
+	where preva.date_utc <= nextd.nextdeparture_date_utc
+    and preva.move_type='arrival'
+	and preva.date_utc > nextd.departure_date_utc
 	order by departure_portcall_id, nextdeparture_portcall_id, preva.date_utc desc
 ),
 

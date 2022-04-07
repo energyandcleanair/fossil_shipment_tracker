@@ -15,6 +15,7 @@ from . import DB_TABLE_PORT
 from . import DB_TABLE_TERMINAL
 from . import DB_TABLE_BERTH
 from . import DB_TABLE_POSITION
+from . import DB_TABLE_DESTINATION
 from . import DB_TABLE_TRAJECTORY
 from . import DB_TABLE_FLOW
 from . import DB_TABLE_FLOWARRIVALBERTH
@@ -158,6 +159,8 @@ class Flow(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=True)
     arrival_id = Column(BigInteger, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"))
+    last_position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"), unique=True)
+    last_destination_name = Column(String)
     status = Column(String)
 
     __tablename__ = DB_TABLE_FLOW
@@ -175,6 +178,20 @@ class Position(Base):
 
     __tablename__ = DB_TABLE_POSITION
     __table_args__ = (Index('idx_position_ship_imo', "ship_imo"),)
+
+
+class Destination(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    name = Column(String)
+    source = Column(String)
+    port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id', onupdate="CASCADE"))
+    iso2 = Column(String)
+    method = Column(String)
+    type = Column(String)
+
+    __tablename__ = DB_TABLE_DESTINATION
+    __table_args__ = (Index('idx_destination_name', "name"),
+                      UniqueConstraint('name', 'source', name='unique_destination'))
 
 
 class Trajectory(Base):
@@ -207,7 +224,7 @@ class PortCall(Base):
     others = Column(JSONB)
 
     __tablename__ = DB_TABLE_PORTCALL
-    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall2'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
 
 
     @validates('port_unlocode')
@@ -262,3 +279,4 @@ class PortCall(Base):
         if not port_operation in corr.keys():
             logger.warning("Unknown port_operation: %s" % (port_operation,))
         return corr.get(port_operation, port_operation)
+

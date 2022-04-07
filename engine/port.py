@@ -59,11 +59,11 @@ def fill():
                     'name' : x[0]['marinetraffic']['PORT_NAME']} for x in missing_ports]
     missing_ports = pd.DataFrame(missing_ports).drop_duplicates().to_dict(orient="records")
 
-    ports = []
     for m in missing_ports:
         print(m)
-        port = Datalastic.get_port_infos(name=m["name"], marinetraffic_id=m["marinetraffic_id"])
-        session.add(port)
+        ports = Datalastic.get_port_infos(name=m["name"], marinetraffic_id=m["marinetraffic_id"])
+        for port in ports:
+            session.add(port)
 
     session.commit()
     return
@@ -71,9 +71,11 @@ def fill():
 
 def insert_new_port(iso2, unlocode, name=None, marinetraffic_id=None):
     if name is not None:
-        new_port = Datalastic.get_port_infos(name=name, marinetraffic_id=marinetraffic_id)
+        new_ports = Datalastic.get_port_infos(name=name, marinetraffic_id=marinetraffic_id)
     else:
-        new_port = Port(**{"unlocode": unlocode,
-                           "iso2": iso2})
-    session.add(new_port)
+        new_ports = [Port(**{"unlocode": unlocode,
+                           "iso2": iso2})]
+
+    for new_port in new_ports:
+        session.add(new_port)
     session.commit()

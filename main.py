@@ -34,13 +34,18 @@ def init():
 
 def update():
     # portcall.update_departures_from_russia()
-    # departure.update()
+    # departure.update(date_from="2022-01-01")
     # arrival.update(date_from="2022-01-01")
-    flow.update()
+    # flow.update()
     # flow.rebuild()
+    # init_db()
+    # position.update_flow_last_destination()
+    # position.update_destinations()
     position.update()
-    berth.detect_berths()
-    trajectory.update()
+    position.update_flow_last_destination()
+    position.update_flow_last_position()
+    # berth.detect_berths()
+    # trajectory.update()
     return
 
 

@@ -155,7 +155,7 @@ class Datalastic:
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query port %s: %s" % (name, api_result))
             return None
-        data = api_result.json()["data"]
+        datas = api_result.json()["data"]
 
         # Some manual fixes for now
         #TODO Clean and put manual matchings in a separate files
@@ -186,13 +186,13 @@ class Datalastic:
             }
         }
         if marinetraffic_id in manual_matches:
-            data = [manual_matches[str(marinetraffic_id)]]
+            datas = [manual_matches[str(marinetraffic_id)]]
 
-        if len(data) == 0:
+        if len(datas) == 0:
             logger.warning("No port found matching name %s" % (name,))
             return None
 
-        if len(data) > 1:
+        if len(datas) > 1:
             # Manual fix: we use marinetraffic PORT_ID to disentangle potentially confusing ports
             fixes = {
                 "20643": {"country_iso": "ES"},
@@ -202,21 +202,22 @@ class Datalastic:
                 '156': {'country_iso': 'FR'}
             }
             if marinetraffic_id and str(marinetraffic_id) in fixes:
-                data = [x for x in data if x[list(fixes[str(marinetraffic_id)].keys())[0]] == list(fixes[str(marinetraffic_id)].values())[0]]
+                datas = [x for x in datas if x[list(fixes[str(marinetraffic_id)].keys())[0]] == list(fixes[str(marinetraffic_id)].values())[0]]
             else:
                 logger.warning("More than one port found matching name %s" % (name,))
-                return None
 
-        data = data[0]
+        ports = []
+        for data in datas:
+            port = Port(**{
+                "geometry": latlon_to_point(lat=data["lat"], lon=data["lon"]),
+                "iso2": data["country_iso"],
+                "unlocode": data["unlocode"] if data["unlocode"] != "" else None,
+                "name": data["port_name"],
+                "datalastic_id": data["uuid"]})
 
-        port = Port(**{
-            "geometry": latlon_to_point(lat=data["lat"], lon=data["lon"]),
-            "iso2": data["country_iso"],
-            "unlocode": data["unlocode"] if data["unlocode"] != "" else None,
-            "name": data["port_name"],
-            "datalastic_id": data["uuid"]})
+            if marinetraffic_id:
+                port.marinetraffic_id = marinetraffic_id
 
-        if marinetraffic_id:
-            port.marinetraffic_id = marinetraffic_id
+            ports.append(port)
 
-        return port
+        return ports

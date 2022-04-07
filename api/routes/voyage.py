@@ -7,7 +7,8 @@ from . import routes_api
 from flask_restx import inputs
 
 
-from base.models import Flow, Ship, Arrival, Departure, Port, Berth, FlowDepartureBerth, FlowArrivalBerth, Trajectory
+from base.models import Flow, Ship, Arrival, Departure, Port, Berth,\
+    FlowDepartureBerth, FlowArrivalBerth, Position, Trajectory, Destination
 from base.db import session
 from base.encoder import JsonEncoder
 
@@ -57,6 +58,8 @@ class VoyageResource(Resource):
         DepartureBerth= aliased(Berth)
         ArrivalBerth = aliased(Berth)
 
+        DestinationPort = aliased(Port)
+
         # Query with joined information
         flows_rich = (session.query(Flow.id,
                                     Flow.status,
@@ -68,10 +71,13 @@ class VoyageResource(Resource):
                                     ArrivalPort.unlocode,
                                     ArrivalPort.iso2,
                                     ArrivalPort.name,
+                                    Destination.name,
+                                    func.coalesce(ArrivalPort.iso2, DestinationPort.iso2),
                                     Ship.imo,
                                     Ship.mmsi,
                                     Ship.type,
                                     Ship.subtype,
+                                    Ship.dwt,
                                     Ship.commodity,
                                     Ship.quantity,
                                     Ship.unit,
@@ -88,15 +94,12 @@ class VoyageResource(Resource):
              .outerjoin(Arrival, Departure.id == Arrival.departure_id)
              .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id)
              .join(Ship, Departure.ship_imo == Ship.imo)) \
-             .join(FlowDepartureBerth, Flow.id == FlowDepartureBerth.flow_id, isouter=True) \
-             .join(FlowArrivalBerth, Flow.id == FlowArrivalBerth.flow_id, isouter=True) \
-             .join(DepartureBerth, DepartureBerth.id == FlowDepartureBerth.berth_id, isouter=True) \
-             .join(ArrivalBerth, ArrivalBerth.id == FlowArrivalBerth.berth_id, isouter=True)
-
-
-
-        # Adding destination
-
+             .outerjoin(FlowDepartureBerth, Flow.id == FlowDepartureBerth.flow_id) \
+             .outerjoin(FlowArrivalBerth, Flow.id == FlowArrivalBerth.flow_id) \
+             .outerjoin(DepartureBerth, DepartureBerth.id == FlowDepartureBerth.berth_id) \
+             .outerjoin(ArrivalBerth, ArrivalBerth.id == FlowArrivalBerth.berth_id) \
+             .outerjoin(Destination, Flow.last_destination_name == Destination.name) \
+             .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
 
         if id is not None:
             flows_rich = flows_rich.filter(Flow.id.in_(id))
@@ -105,12 +108,21 @@ class VoyageResource(Resource):
             flows_rich = flows_rich.filter(Ship.commodity.in_(commodity))
 
         if date_from is not None:
-            flows_rich = flows_rich.filter(Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
+            flows_rich = flows_rich.filter(
+                sa.or_(
+                    Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"),
+                    Departure.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d")
+                ))
 
         if date_to is not None:
-            flows_rich = flows_rich.filter(Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
+            flows_rich = flows_rich.filter(
+                sa.or_(
+                    Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
+                    Departure.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d")
+                ))
 
         columns = ["id",
+                   "status",
                    "departure_date_utc",
                    "departure_unlocode",
                    "departure_iso2",
@@ -119,10 +131,13 @@ class VoyageResource(Resource):
                    "arrival_unlocode",
                    "arrival_iso2",
                    "arrival_port_name",
+                   "destination_name",
+                   "destination_iso2",
                    "ship_imo",
                    "ship_mmsi",
                    "ship_type",
                    "ship_subtype",
+                   "ship_dwt",
                    "commodity",
                    "quantity",
                    "unit",
@@ -141,9 +156,9 @@ class VoyageResource(Resource):
         flows_rich = flows_rich.all()
         if len(flows_rich) == 0:
             return Response(
+                status=HTTPStatus.NO_CONTENT,
                 response="empty",
-                mimetype="text/csv",
-                headers={"Content-disposition": "attachment; filename=flows.csv"})
+                mimetype='application/json')
 
         flows_rich = [row_to_dict(x) for x in flows_rich]
 
@@ -151,9 +166,9 @@ class VoyageResource(Resource):
         # If bulk and departure berth is coal, replace commodity with coal
         flows_df = pd.DataFrame(flows_rich)
         flows_df.loc[(flows_df.commodity=="bulk") & \
-                     (flows_df.departure_berth_commodity.str.contains("Coal", case=False)), "commodity"] = "coal"
+                     (flows_df.departure_berth_commodity.str.contains("Coal", case=False, na=False)), "commodity"] = "coal"
         flows_df.loc[(flows_df.commodity == "bulk") & \
-                     (~flows_df.departure_berth_commodity.str.contains("Coal", case=False)), "commodity"] = "bulk_notcoal"
+                     (~flows_df.departure_berth_commodity.str.contains("Coal", case=False, na=False)), "commodity"] = "bulk_notcoal"
 
         if format == "csv":
             return Response(

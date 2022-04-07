@@ -11,7 +11,7 @@ UNKNOWN = "unknown"
 
 ONGOING = "ongoing"
 COMPLETED = "completed"
-MISSED_ARRIVAL = "lost"
+UNDETECTED_ARRIVAL = "undetected_arrival"
 UNKNOWN = "UNKNOWN"
 
 
