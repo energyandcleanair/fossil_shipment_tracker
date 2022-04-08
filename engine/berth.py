@@ -15,9 +15,16 @@ from base.utils import to_list
 
 from engine import port
 
+
+def update(flow_id=None):
+    print("=== Berth update ===")
+    detect_departure_berths(flow_id=flow_id)
+    detect_arrival_berths(flow_id=flow_id)
+    return
+
+
 def count():
     return session.query(Berth).count()
-
 
 def fill():
     """
@@ -46,10 +53,6 @@ def fill():
     upsert(df=berths_gdf, table=DB_TABLE_BERTH, constraint_name="berth_pkey")
     return
 
-def detect_berths():
-    detect_departure_berths()
-    detect_arrival_berths()
-    return
 
 
 def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
@@ -60,7 +63,9 @@ def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
         flow_id = to_list(flow_id)
         flows_to_update = flows_to_update.filter(Flow.id.in_(flow_id))
 
-    berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc, Berth.port_unlocode, Departure.port_id) \
+    berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc,
+                           Position.navigation_status, Position.speed,
+                           Berth.port_unlocode, Departure.port_id) \
         .filter(Flow.id.in_(flows_to_update)) \
         .filter(sa.or_(
             Position.navigation_status == "Moored",
@@ -75,17 +80,22 @@ def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
         .order_by(Flow.id, Berth.id, Position.date_utc) \
         .distinct(Flow.id, Berth.id, Position.id, Position.date_utc)
 
-    berths_df = pd.read_sql(berths.statement,
-                            session.bind)
+    berths_df = pd.read_sql(berths.statement, session.bind)
 
-    berths_df.columns = ["flow_id", "berth_id", "position_id", "position_date_utc", "berth_port_unlocode",
+    berths_df.columns = ["flow_id", "berth_id", "position_id", "position_date_utc",
+                         "navigation_status", "speed", "berth_port_unlocode",
                          "departure_port_id"]
 
-    # They should stay minimum n-hours
+    berths_df["has_moored"] = berths_df.navigation_status == "Moored"
+
+    # They should stay minimum n-hours if not moored or stopped
     berths_agg = berths_df \
         .sort_values(["flow_id", "berth_id", 'position_date_utc']) \
         .groupby(["flow_id", "berth_id"]) \
-        .agg(min_date_utc=('position_date_utc', 'min'),
+        .agg(
+             has_moored=('has_moored', 'max'),
+             min_speed=('speed', 'min'),
+             min_date_utc=('position_date_utc', 'min'),
              max_date_utc=('position_date_utc', 'max'),
              position_id=('position_id', 'last')) \
         .reset_index()
@@ -94,12 +104,23 @@ def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
         return None
 
     berths_agg_ok = berths_agg.loc[
-        (berths_agg.max_date_utc - berths_agg.min_date_utc) > dt.timedelta(hours=min_hours_at_berth)].copy()
+        ((berths_agg.max_date_utc - berths_agg.min_date_utc) > dt.timedelta(hours=min_hours_at_berth)) \
+        | (berths_agg.has_moored) \
+        | (berths_agg.min_speed == 0)].copy()
 
     # Look for problematic ones
     # problematic = berths_agg_ok.loc[berths_df.berth_port_unlocode != berths_df.arrival_port_unlocode].copy()
     # if len(problematic) > 0:
     #     logger.warning("There are problematic matching (e.g. different unlocode between berth and port")
+
+    # Maximum one berthing per flow
+    berths_count = berths_agg_ok.groupby(['flow_id'])["berth_id"].count().reset_index()
+    if berths_count.berth_id.max() > 1:
+        logger.warning("Found more than one berth for a flow")
+
+
+    berths_agg_ok = pd.DataFrame(berths_count["flow_id"].loc[berths_count.berth_id==1]) \
+        .merge(berths_agg_ok)
 
     berths_agg_ok["method_id"] = "simple_overlapping"
     berths_agg_ok = berths_agg_ok[["flow_id", "berth_id", "position_id", "method_id"]]

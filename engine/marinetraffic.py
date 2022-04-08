@@ -2,11 +2,12 @@ import requests
 import json
 import datetime as dt
 import base
+import sqlalchemy as sa
 
 from base.db import session
 from base.logger import logger
 from base.env import get_env
-from base.models import Ship, PortCall
+from base.models import Ship, PortCall, MTVoyageInfo
 from base.utils import to_datetime
 
 from engine import ship, port
@@ -103,15 +104,27 @@ class Marinetraffic:
 
             if not response_data:
                 logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, "Response is empty"))
-                return None
+                response_data = [{"MMSI": mmsi,
+                                 "IMO": imo,
+                                 "NAME": None
+                                 }]
 
             if len(response_data) > 1:
                 # We assume only ships higher than base.DWT_MIN have been queried
-                #TODO find a better way
-                response_data = [x for x in response_data if float(x["SUMMER_DWT"]) > base.DWT_MIN]
-                if len(response_data) > 1:
-                    logger.warning("Two ships available with this mmsi. Taking the most recnt one: %s" % (response_data))
-                    response_data.sort(key=lambda x: x["BUILD"], reverse=True)
+                try:
+                    response_data = [x for x in response_data if float(x["SUMMER_DWT"]) > base.DWT_MIN]
+                    if len(response_data) > 1:
+                        logger.warning(
+                            "Two ships available with this mmsi: %s" % (response_data,))
+                        response_data = [{"MMSI": mmsi,
+                                          "IMO": imo,
+                                          "NAME": None
+                                          }]
+                except Exception as e:
+                    response_data = [{"MMSI": mmsi,
+                                     "IMO": imo,
+                                     "NAME": None
+                                     }]
 
             response_data = response_data[0]
             cls.do_cache_ship(response_data)
@@ -119,12 +132,12 @@ class Marinetraffic:
 
         data = {
             "mmsi": response_data["MMSI"],
-            "name": response_data["NAME"],
             "imo": response_data["IMO"],
-            "type": response_data["VESSEL_TYPE"],
+            "name": response_data.get("NAME"),
+            "type": response_data.get("VESSEL_TYPE"),
             # "subtype": None,
-            "dwt": response_data["SUMMER_DWT"],
-            "country_iso2": response_data["FLAG"],
+            "dwt": response_data.get("SUMMER_DWT"),
+            "country_iso2": response_data.get("FLAG"),
             # "country_name": None,
             # "home_port": None,
             "liquid_gas": response_data.get("LIQUID_GAS"),
@@ -170,7 +183,7 @@ class Marinetraffic:
         method = 'portcalls/'
         api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
         if api_result.status_code != 200:
-            logger.warning("Marinetraffic: Failed to query vessel %s: %s %s" % (unlocode, api_result, api_result.content))
+            logger.warning("Marinetraffic: Failed to query portcall %s: %s %s" % (unlocode, api_result, api_result.content))
             return []
         response_datas = api_result.json()
 
@@ -236,7 +249,9 @@ class Marinetraffic:
 
         portcalls = []
         filtered_portcalls = []
-        while not filtered_portcalls and date_from < date_to:
+        while not filtered_portcalls and \
+            ((date_from < date_to and not go_backward) or \
+             (date_from > date_to and go_backward)):
             date_from_call = min(date_from, date_from + direction * delta_time)
             if go_backward:
                 date_to_call = max(date_to, max(date_from, date_from + direction * delta_time))
@@ -265,9 +280,75 @@ class Marinetraffic:
         else:
             # Sort by date in the unlikely case
             # there are several calls within this delta
-            filtered_portcalls.sort(key=lambda x: x.date_utc)
+            filtered_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
             filtered_portcall = filtered_portcalls[0]
 
+
         return filtered_portcall, portcalls
+
+    @classmethod
+    def get_voyage_info(cls, imo, date_from):
+
+        credit_per_record = 4
+
+        # First look in cache to save query credits
+        cached_info = MTVoyageInfo.query.filter(
+            sa.and_(
+                MTVoyageInfo.ship_imo==imo,
+                MTVoyageInfo.queried_date_utc >= date_from)
+            ).first()
+
+        if cached_info:
+            logger.info("Found a cached VoyageInfo: %s from %s: %s" % (imo, date_from, cached_info.destination_name))
+            return cached_info
+
+        # Otherwise query datalastic (and cache it as well)
+        api_key = get_env("KEY_MARINETRAFFIC_VI01")
+
+        params = {
+            'protocol': 'jsono',
+            'msgtype': 'simple',
+            'imo': imo,
+        }
+        method = 'voyageforecast/'
+        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
+        if api_result.status_code != 200:
+            logger.warning(
+                "Marinetraffic: Failed to query voyageforecast %s: %s %s" % (imo, api_result, api_result.content))
+            return []
+        response_datas = api_result.json()
+
+        if not response_datas:
+            logger.info("Didn't find any voyage infos for imo %s" % (imo,))
+            return []
+
+        voyageinfos = []
+        for r in response_datas:
+            r["IMO"] = imo
+            voyageinfos.append(cls.parse_voyageinfo(r))
+
+        # Cache them
+        logger.info("Found %d voyage infos for imo %s (%d credits used)" % (len(voyageinfos), imo,
+                                                                            len(voyageinfos) * credit_per_record))
+
+        for v in voyageinfos:
+            session.add(v)
+        session.commit()
+
+        return voyageinfos
+
+    @classmethod
+    def parse_voyageinfo(cls, response_data):
+        data = {
+            "ship_mmsi": response_data["MMSI"],
+            "ship_imo": response_data["IMO"],
+            "queried_date_utc": dt.datetime.utcnow(),
+            "destination_name": response_data["DESTINATION"],
+            "next_port_name": response_data["NEXT_PORT_NAME"],
+            "next_port_unlocode": response_data["NEXT_PORT_UNLOCODE"],
+            "others": {"marinetraffic": response_data}
+        }
+        return MTVoyageInfo(**data)
+
 
 

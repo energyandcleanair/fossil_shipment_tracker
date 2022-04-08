@@ -4,8 +4,12 @@ import datetime as dt
 import pandas as pd
 from geoalchemy2 import WKTElement
 
+
 def latlon_to_point(lat, lon, wkt=True):
-    return "SRID=4326;" + geometry.Point(float(lon), lat).wkt
+    try:
+        return "SRID=4326;" + geometry.Point(float(lon), lat).wkt
+    except TypeError:
+        return None
 
 
 def to_list(d):

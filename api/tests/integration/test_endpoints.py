@@ -3,6 +3,7 @@ import urllib
 import geopandas as gpd
 import io
 import pandas as pd
+import base
 import json
 from base.models import Position, FlowArrivalBerth
 from base.db import session
@@ -42,7 +43,7 @@ def test_port(app):
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
-        assert all([x['unlocode'] is not None for x in data])
+        # assert all([x['unlocode'] is not None for x in data])
 
         params = {'unlocode': data[0]["unlocode"]}
         response = test_client.get('/v0/port?' + urllib.parse.urlencode(params))
@@ -66,6 +67,8 @@ def test_voyage(app):
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
+        assert base.ONGOING in set([x['status'] for x in data])
+        assert base.COMPLETED in set([x['status'] for x in data])
         assert all([x['arrival_date_utc'] > x['departure_date_utc'] for x in data])
 
         # Test commodity parameter

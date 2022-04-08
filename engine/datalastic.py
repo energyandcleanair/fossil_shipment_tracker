@@ -109,26 +109,32 @@ class Datalastic:
             logger.warning("Datalastic: Failed to query vessel position %s: %s" % (imo, api_result))
             return None
         response_data = api_result.json()["data"]
+        positions = Datalastic.parse_position_response_data(imo=imo, response_data=response_data)
 
-        positions = [Position(**{
-            "geometry": latlon_to_point(lat=x["lat"], lon=x["lon"]),
-            "ship_imo": imo,
-            "navigation_status": x["navigation_status"],
-            "speed": x["speed"],
-            "date_utc": dt.datetime.strptime(x["last_position_UTC"], "%Y-%m-%dT%H:%M:%SZ")
-        }) for x in response_data["positions"] if abs(x["lat"] > 1e-4)]
-
-
-        # Datalastic only takes day data as from, we further filter to prevent duplicates in the same day
+        # Datalastic only takes day data as from,
+        # we further filter to prevent duplicates in the same day
         positions = [p for p in positions if p.date_utc > date_from]
         if date_to is not None:
             positions = [p for p in positions if p.date_utc < date_to]
 
         return positions
 
+    @classmethod
+    def parse_position_response_data(cls, imo, response_data):
+
+        positions = [Position(**{
+            "geometry": latlon_to_point(lat=x["lat"], lon=x["lon"]),
+            "ship_imo": imo,
+            "navigation_status": x["navigation_status"],
+            "speed": x["speed"],
+            "date_utc": dt.datetime.strptime(x["last_position_UTC"], "%Y-%m-%dT%H:%M:%SZ"),
+            "destination_name": x["destination"]
+        }) for x in response_data["positions"] if abs(x["lat"] > 1e-4)]
+
+        return positions
 
     @classmethod
-    def get_port_infos(cls, name=None, marinetraffic_id=None):
+    def get_port_infos(cls, name=None, marinetraffic_id=None, fuzzy=False):
         """
         Some ports aren't in the UNLOCODE base. MarineTraffic returns port_name however, so
         we can look them up by name here.
@@ -141,6 +147,7 @@ class Datalastic:
         params = {
             'api-key': cls.api_key,
             'name': name,
+            'fuzzy': int(fuzzy)
         }
 
         method = 'port_find'
@@ -148,7 +155,7 @@ class Datalastic:
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query port %s: %s" % (name, api_result))
             return None
-        data = api_result.json()["data"]
+        datas = api_result.json()["data"]
 
         # Some manual fixes for now
         #TODO Clean and put manual matchings in a separate files
@@ -179,13 +186,13 @@ class Datalastic:
             }
         }
         if marinetraffic_id in manual_matches:
-            data = [manual_matches[str(marinetraffic_id)]]
+            datas = [manual_matches[str(marinetraffic_id)]]
 
-        if len(data) == 0:
+        if len(datas) == 0:
             logger.warning("No port found matching name %s" % (name,))
             return None
 
-        if len(data) > 1:
+        if len(datas) > 1:
             # Manual fix: we use marinetraffic PORT_ID to disentangle potentially confusing ports
             fixes = {
                 "20643": {"country_iso": "ES"},
@@ -195,21 +202,22 @@ class Datalastic:
                 '156': {'country_iso': 'FR'}
             }
             if marinetraffic_id and str(marinetraffic_id) in fixes:
-                data = [x for x in data if x[list(fixes[str(marinetraffic_id)].keys())[0]] == list(fixes[str(marinetraffic_id)].values())[0]]
+                datas = [x for x in datas if x[list(fixes[str(marinetraffic_id)].keys())[0]] == list(fixes[str(marinetraffic_id)].values())[0]]
             else:
                 logger.warning("More than one port found matching name %s" % (name,))
-                return None
 
-        data = data[0]
+        ports = []
+        for data in datas:
+            port = Port(**{
+                "geometry": latlon_to_point(lat=data["lat"], lon=data["lon"]),
+                "iso2": data["country_iso"],
+                "unlocode": data["unlocode"] if data["unlocode"] != "" else None,
+                "name": data["port_name"],
+                "datalastic_id": data["uuid"]})
 
-        port = Port(**{
-            "geometry": latlon_to_point(lat=data["lat"], lon=data["lon"]),
-            "iso2": data["country_iso"],
-            "unlocode": data["unlocode"] if data["unlocode"] != "" else None,
-            "name": data["port_name"],
-            "datalastic_id": data["uuid"]})
+            if marinetraffic_id:
+                port.marinetraffic_id = marinetraffic_id
 
-        if marinetraffic_id:
-            port.marinetraffic_id = marinetraffic_id
+            ports.append(port)
 
-        return port
+        return ports
