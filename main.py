@@ -36,12 +36,12 @@ def init():
 def update():
     # portcall.update_departures_from_russia()
     # departure.update()
-    arrival.update()
+    # arrival.update()
     # flow.update()
     # position.update()
-    # destination.update()
-    # berth.update()
-    # trajectory.update()
+    destination.update()
+    berth.update()
+    trajectory.update()
     return
 
 

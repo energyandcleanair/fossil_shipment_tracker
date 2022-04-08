@@ -46,7 +46,7 @@ def update(min_dwt=base.DWT_MIN,
     # shouldn't really matter anymore.
     # Until we fix arrival detection, the first hundreds of dangling departures
     # will take lot of time for not much
-    dangling_departures.sort(key=lambda x: x.date_utc, reverse=True)
+    # dangling_departures.sort(key=lambda x: x.date_utc, reverse=True)
 
     for d in tqdm(dangling_departures):
         departure_portcall = PortCall.query.filter(PortCall.id == d.portcall_id).first()
