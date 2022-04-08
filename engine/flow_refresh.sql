@@ -1,11 +1,11 @@
-with completed_portcalls as (
+with completed_departure_portcalls as (
     select departure.portcall_id as id
     from flow
     left join departure on flow.departure_id = departure.id
     where flow.status='completed'
 ),
 
-departure_portcalls_all as (
+departure_portcalls as (
 	select portcall.id, portcall.date_utc, portcall.port_id, load_status, move_type, port_operation,
 	port.unlocode, port.name, port.check_departure, portcall.ship_imo,
 
@@ -19,18 +19,9 @@ departure_portcalls_all as (
 	left join ship on ship.imo = portcall.ship_imo
 	where date_utc >= '2022-01-01'
 	and ship.commodity != 'unknown'
---  	and ship_imo='9327372'
 	and move_type='departure'
---   	where ship_imo in (select imo from ship limit 100)
 	order by date_utc
 ),
-
-
-departure_portcalls as (
-    select * from departure_portcalls_all
-    where id not in (select id from completed_portcalls)
-),
-
 
 ships_in_ballast as (
     select distinct ship_imo
@@ -127,9 +118,10 @@ previous_arrival as (
 	from next_departure_full nextd
 	left join portcall preva --previous arrival
 	on preva.ship_imo=nextd.ship_imo
-	where preva.date_utc < nextd.nextdeparture_date_utc
-	and preva.move_type='arrival'
+	where preva.date_utc <= nextd.nextdeparture_date_utc
+    and preva.move_type='arrival'
 	and preva.date_utc > nextd.departure_date_utc
+	and departure_portcall_id not in (select id from completed_departure_portcalls)
 	order by departure_portcall_id, nextdeparture_portcall_id, preva.date_utc desc
 ),
 
@@ -137,16 +129,14 @@ previous_arrival as (
 completed_flows as (
 	select *, NEXTVAL('departure_id_seq') departure_id, NEXTVAL('arrival_id_seq') arrival_id, 'completed' status
 	from previous_arrival
-	where departure_portcall_id not in (select id from completed_portcalls)
 ),
 
 uncompleted_flows as (
 	select *, NEXTVAL('departure_id_seq') departure_id, NULL::bigint arrival_id,
 	CASE WHEN nd.next_russia_departure_date_utc is NULL THEN 'ongoing'
-	ELSE 'arrival_undetected' END as status
+	ELSE 'undetected_arrival' END as status
 	from next_departure_full nd
 	where nd.departure_portcall_id not in (select departure_portcall_id from previous_arrival)
-	and departure_portcall_id not in (select id from completed_portcalls)
 ),
 
 flows as (
@@ -157,7 +147,8 @@ flows as (
 	NULL::bigint as arrival_portcall_id, departure_id, arrival_id, status from uncompleted_flows
 ),
 
-   inserted_departures as (
+
+  inserted_departures as (
    	INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id)
    	SELECT departure_id, departure_port_id, ship_imo, departure_date_utc, 'postgres', departure_portcall_id
    	from flows
@@ -167,8 +158,9 @@ flows as (
 
   inserted_arrivals as (
   	INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id)
-  	SELECT arrival_id, departure_id, arrival_date_utc, 'postgres', arrival_port_id, arrival_portcall_id
-  	from completed_flows
+  	SELECT arrival_id, inserted_departures.id, arrival_date_utc, 'postgres', arrival_port_id, arrival_portcall_id
+  	from completed_flows left join
+	inserted_departures on completed_flows.departure_portcall_id=inserted_departures.portcall_id
 	ON CONFLICT (portcall_id) DO UPDATE SET port_id=excluded.port_id -- just for id to be returned
 	  RETURNING id, portcall_id
   ),

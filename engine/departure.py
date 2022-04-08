@@ -58,7 +58,9 @@ def get_dangling_imo_dates():
     return session.query(Departure.ship_imo, Departure.date_utc).filter(~Departure.id.in_(subquery)).all()
 
 
-def update(date_from="2022-01-01", min_dwt=None, limit=None,
+def update(date_from="2022-01-01",
+           min_dwt=base.DWT_MIN,
+           limit=None,
            commodities=[base.LNG,
                         base.CRUDE_OIL,
                         base.OIL_PRODUCTS,
@@ -73,7 +75,7 @@ def update(date_from="2022-01-01", min_dwt=None, limit=None,
 
     dangling_portcalls = PortCall.query.filter(
         PortCall.move_type == "departure",
-        PortCall.load_status.in_(["fully_laden"]),
+        PortCall.load_status.in_([base.FULLY_LADEN]),
         PortCall.port_operation.in_(["load"]),
         ~PortCall.id.in_(subquery),
         PortCall.port_id.in_(subquery_ports)) \

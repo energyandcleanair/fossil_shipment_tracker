@@ -2,11 +2,12 @@ import requests
 import json
 import datetime as dt
 import base
+import sqlalchemy as sa
 
 from base.db import session
 from base.logger import logger
 from base.env import get_env
-from base.models import Ship, PortCall
+from base.models import Ship, PortCall, MTVoyageInfo
 from base.utils import to_datetime
 
 from engine import ship, port
@@ -284,5 +285,70 @@ class Marinetraffic:
 
 
         return filtered_portcall, portcalls
+
+    @classmethod
+    def get_voyage_info(cls, imo, date_from):
+
+        credit_per_record = 4
+
+        # First look in cache to save query credits
+        cached_info = MTVoyageInfo.query.filter(
+            sa.and_(
+                MTVoyageInfo.ship_imo==imo,
+                MTVoyageInfo.queried_date_utc >= date_from)
+            ).first()
+
+        if cached_info:
+            logger.info("Found a cached VoyageInfo: %s from %s: %s" % (imo, date_from, cached_info.destination_name))
+            return cached_info
+
+        # Otherwise query datalastic (and cache it as well)
+        api_key = get_env("KEY_MARINETRAFFIC_VI01")
+
+        params = {
+            'protocol': 'jsono',
+            'msgtype': 'simple',
+            'imo': imo,
+        }
+        method = 'voyageforecast/'
+        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
+        if api_result.status_code != 200:
+            logger.warning(
+                "Marinetraffic: Failed to query voyageforecast %s: %s %s" % (imo, api_result, api_result.content))
+            return []
+        response_datas = api_result.json()
+
+        if not response_datas:
+            logger.info("Didn't find any voyage infos for imo %s" % (imo,))
+            return []
+
+        voyageinfos = []
+        for r in response_datas:
+            r["IMO"] = imo
+            voyageinfos.append(cls.parse_voyageinfo(r))
+
+        # Cache them
+        logger.info("Found %d voyage infos for imo %s (%d credits used)" % (len(voyageinfos), imo,
+                                                                            len(voyageinfos) * credit_per_record))
+
+        for v in voyageinfos:
+            session.add(v)
+        session.commit()
+
+        return voyageinfos
+
+    @classmethod
+    def parse_voyageinfo(cls, response_data):
+        data = {
+            "ship_mmsi": response_data["MMSI"],
+            "ship_imo": response_data["IMO"],
+            "queried_date_utc": dt.datetime.utcnow(),
+            "destination_name": response_data["DESTINATION"],
+            "next_port_name": response_data["NEXT_PORT_NAME"],
+            "next_port_unlocode": response_data["NEXT_PORT_UNLOCODE"],
+            "others": {"marinetraffic": response_data}
+        }
+        return MTVoyageInfo(**data)
+
 
 

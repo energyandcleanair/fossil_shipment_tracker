@@ -15,8 +15,10 @@ def rebuild():
     print("=== Flow rebuild ===")
     with engine.connect() as con:
         with open('engine/flow_rebuild.sql', 'r') as file:
-            sql_content = file.read()
-        con.execute(sql_content)
+            sql_content1 = file.read()
+        with open('engine/flow_refresh.sql', 'r') as file:
+            sql_content2 = file.read()
+        con.execute(sql_content1 + sql_content2)
     session.commit()
 
 

@@ -232,7 +232,7 @@ def get_next_portcall(date_from,
 
 
 def update_departures_from_russia(
-        date_from=dt.date(2021, 11, 1),
+        date_from="2022-01-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         force_rebuild=False):
     """
@@ -257,7 +257,7 @@ def update_departures_from_russia(
 
         portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
                                                               unlocode=port.unlocode,
-                                                              date_from=date_from,
+                                                              date_from=to_datetime(date_from),
                                                               date_to=date_to)
 
         # Store them in db so that we won't query them
@@ -290,7 +290,7 @@ def find_arrival(departure_portcall,
 
     # filter_departure = lambda x: x.port_operation in ["discharge", "both"]
     filter_departure_russia = lambda x: x.port_id in originally_checked_port_ids and x.port_operation == 'load'
-    filter_departure = lambda x: (departure_portcall.load_status == "fully_ladden" and x.load_status in ["in_ballast"]) \
+    filter_departure = lambda x: (departure_portcall.load_status == base.FULLY_LADEN and x.load_status == base.IN_BALLAST) \
                                  or x.port_operation in ["discharge", "both"]
     filter_arrival = lambda x: x.port_id is not None
 
@@ -380,7 +380,7 @@ def fill_departure_gaps(imo=None,
     # 2/2: update subsequent departure calls for ships leaving
     query = PortCall.query.filter(
         PortCall.move_type == "departure",
-        PortCall.load_status.in_(["fully_laden"]),
+        PortCall.load_status.in_([base.FULLY_LADEN]),
         PortCall.port_operation.in_(["load"])) \
         .join(Ship, Port).filter(Port.check_departure)
 
@@ -436,7 +436,7 @@ def fill_arrival_gaps(imo = None, date_from=None, min_dwt=base.DWT_MIN):
     portcall_df = portcall_df.sort_values(['ship_imo', 'date_utc'])
     problematic_df = portcall_df[(portcall_df.move_type=="departure") \
                                  & (portcall_df.next_move_type=="departure") \
-                                 & (portcall_df.load_status=='fully_laden') #TOOD this is just to start with most important ones
+                                 & (portcall_df.load_status == base.FULLY_LADEN) #TOOD this is just to start with most important ones
         ]
 
     for index, row in tqdm(problematic_df.iterrows(), total=problematic_df.shape[0]):

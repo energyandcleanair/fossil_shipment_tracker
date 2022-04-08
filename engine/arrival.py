@@ -17,7 +17,7 @@ def get_dangling_arrivals():
 
 def update(min_dwt=base.DWT_MIN,
            limit=None,
-           date_from=None,
+           date_from="2022-01-01",
            commodities=[base.LNG,
                         base.CRUDE_OIL,
                         base.OIL_PRODUCTS,

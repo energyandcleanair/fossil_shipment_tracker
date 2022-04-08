@@ -12,5 +12,8 @@ DB_TABLE_FLOW = "flow"
 DB_TABLE_FLOWARRIVALBERTH = "flowarrivalberth"
 DB_TABLE_FLOWDEPARTUREBERTH = "flowdepartureberth"
 
+# Marine Traffic cache
+DB_TABLE_MTVOYAGEINFO = "voyageinfo"
+
 
 from .models import *

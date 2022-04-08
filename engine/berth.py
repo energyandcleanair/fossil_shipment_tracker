@@ -15,9 +15,16 @@ from base.utils import to_list
 
 from engine import port
 
+
+def update(flow_id=None):
+    print("=== Berth update ===")
+    detect_departure_berths(flow_id=flow_id)
+    detect_arrival_berths(flow_id=flow_id)
+    return
+
+
 def count():
     return session.query(Berth).count()
-
 
 def fill():
     """
@@ -46,11 +53,6 @@ def fill():
     upsert(df=berths_gdf, table=DB_TABLE_BERTH, constraint_name="berth_pkey")
     return
 
-def detect_berths(flow_id=None):
-    print("=== Detect berths ===")
-    detect_departure_berths(flow_id=flow_id)
-    detect_arrival_berths(flow_id=flow_id)
-    return
 
 
 def detect_departure_berths(flow_id=None, min_hours_at_berth=4):

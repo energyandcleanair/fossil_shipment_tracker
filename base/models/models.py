@@ -4,6 +4,7 @@ from sqlalchemy.orm import validates
 from sqlalchemy import UniqueConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
 
+import base
 from base.db import Base
 from base.logger import logger
 
@@ -20,6 +21,7 @@ from . import DB_TABLE_TRAJECTORY
 from . import DB_TABLE_FLOW
 from . import DB_TABLE_FLOWARRIVALBERTH
 from . import DB_TABLE_FLOWDEPARTUREBERTH
+from . import DB_TABLE_MTVOYAGEINFO
 
 
 class Ship(Base):
@@ -158,7 +160,7 @@ class Arrival(Base):
 class Flow(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=True)
-    arrival_id = Column(BigInteger, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"))
+    arrival_id = Column(BigInteger, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"), unique=True)
     last_position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"), unique=True)
     last_destination_name = Column(String)
     status = Column(String)
@@ -237,9 +239,9 @@ class PortCall(Base):
     def validate_load_status(self, key, load_status):
         corr = {
             "0": "na",
-            "1": "in_ballast",
-            "2": "partially_laden",
-            "3": "fully_laden",
+            "1": base.IN_BALLAST,
+            "2": base.PARTIALLY_LADEN,
+            "3": base.FULLY_LADEN,
         }
         if load_status is None:
             return None
@@ -279,4 +281,32 @@ class PortCall(Base):
         if not port_operation in corr.keys():
             logger.warning("Unknown port_operation: %s" % (port_operation,))
         return corr.get(port_operation, port_operation)
+
+
+class MTVoyageInfo(Base):
+    """{
+        "MMSI": "310627000",
+        "DESTINATION": "TORQUAY",
+        "LAST_PORT_ID": "106",
+        "LAST_PORT": "SOUTHAMPTON",
+        "LAST_PORT_UNLOCODE": "GBSOU",
+        "LAST_PORT_TIME": "2020-10-14T17:00:00.000Z",
+        "NEXT_PORT_ID": "10379",
+        "NEXT_PORT_NAME": "TORQUAY",
+        "NEXT_PORT_UNLOCODE": "GBTOR",
+        "ETA": "2020-10-14T13:00:00.000Z",
+        "ETA_CALC": ""
+    }"""
+
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_mmsi = Column(String)  # , ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    queried_date_utc = Column(DateTime(timezone=False))  # Departure time for departure, Arrival time for arrival
+    destination_name = Column(String)
+    next_port_name = Column(String)
+    next_port_unlocode = Column(String)
+    others = Column(JSONB)
+
+    __tablename__ = DB_TABLE_MTVOYAGEINFO
+
 

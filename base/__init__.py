@@ -9,6 +9,13 @@ COAL = "coal"
 UNKNOWN = "unknown"
 
 
+# LOAD STATUS
+FULLY_LADEN = "fully_laden"
+PARTIALLY_LADEN = "partially_laden"
+IN_BALLAST = "in_ballast"
+
+
+# FLOW STATUS
 ONGOING = "ongoing"
 COMPLETED = "completed"
 UNDETECTED_ARRIVAL = "undetected_arrival"

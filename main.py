@@ -5,6 +5,7 @@ from engine import arrival
 from engine import flow
 from engine import trajectory
 from engine import position
+from engine import destination
 from engine import berth
 from base.db import init_db
 import base
@@ -34,17 +35,12 @@ def init():
 
 def update():
     # portcall.update_departures_from_russia()
-    # departure.update(date_from="2022-01-01")
-    # arrival.update(date_from="2022-01-01")
+    # departure.update()
+    arrival.update()
     # flow.update()
-    # flow.rebuild()
-    # init_db()
-    # position.update_flow_last_destination()
-    # position.update_destinations()
-    position.update()
-    position.update_flow_last_destination()
-    position.update_flow_last_position()
-    # berth.detect_berths()
+    # position.update()
+    # destination.update()
+    # berth.update()
     # trajectory.update()
     return
 
