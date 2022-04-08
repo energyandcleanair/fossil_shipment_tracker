@@ -118,7 +118,8 @@ def fill_missing_port_id():
 
 def upload_portcalls(portcalls):
     # Store them in db so that we won't query them again
-    print("Adding %d portcalls" % (len(portcalls),))
+    if portcalls:
+        print("Uploading %d portcalls" % (len(portcalls),))
     for portcall in portcalls:
         try:
             session.add(portcall)
