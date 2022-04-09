@@ -193,7 +193,7 @@ class Destination(Base):
 
     __tablename__ = DB_TABLE_DESTINATION
     __table_args__ = (Index('idx_destination_name', "name"),
-                      UniqueConstraint('name', 'source', name='unique_destination'))
+                      UniqueConstraint('name', name='unique_destination'))
 
 
 class Trajectory(Base):

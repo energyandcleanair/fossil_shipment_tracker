@@ -8,7 +8,7 @@ from engine.departure import get_departures_without_flow
 from engine import position
 from tqdm import tqdm
 from base.db import engine
-from base.utils import to_list
+from base.utils import to_list, to_datetime
 
 
 def rebuild():
@@ -28,6 +28,8 @@ def update(date_from="2022-01-01"):
     with engine.connect() as con:
         with open('engine/flow_refresh.sql', 'r') as file:
             sql_content = file.read()
+        sql_content=sql_content.replace("date_utc >= '2022-01-01'",
+                            "date_utc >= '%s'" % (to_datetime(date_from).strftime('%Y-%m-%d')))
         con.execute(sql_content)
     session.commit()
 

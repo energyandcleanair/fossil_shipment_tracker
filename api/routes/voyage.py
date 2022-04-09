@@ -72,7 +72,7 @@ class VoyageResource(Resource):
                                     ArrivalPort.iso2,
                                     ArrivalPort.name,
                                     Destination.name,
-                                    func.coalesce(ArrivalPort.iso2, DestinationPort.iso2),
+                                    func.coalesce(ArrivalPort.iso2, Destination.iso2),
                                     Ship.imo,
                                     Ship.mmsi,
                                     Ship.type,

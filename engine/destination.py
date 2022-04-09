@@ -35,7 +35,7 @@ def update_matching():
                         func.lower(Destination.__table__.c.name) == func.lower(Port.__table__.c.name),
                         Destination.__table__.c.name == Port.__table__.c.unlocode,
                         func.replace(Destination.__table__.c.name, " ", "") == Port.__table__.c.unlocode,
-                        func.replace(func.regexp_replace(Destination.__table__.c.name, '(.*)(>|/){1,}', ''), " ", "") == Port.__table__.c.unlocode,
+                        func.replace(func.regexp_replace(Destination.__table__.c.name, '(.*)(>|/|_){1,}', ''), " ", "") == Port.__table__.c.unlocode,
                         func.replace(func.regexp_replace(Destination.__table__.c.name, ' VIA(.*)', ''), " ", "") == Port.__table__.c.unlocode
                 )
         )
@@ -44,16 +44,6 @@ def update_matching():
         with engine.connect() as con:
             con.execute(update)
 
-        # "For orders"
-        update = Destination.__table__.update().values(type="for_order") \
-            .where(or_(
-                Destination.__table__.c.name.ilike('%FOR ORDER%'),
-                Destination.__table__.c.name.ilike('%FOR...ORDER%'),
-                Destination.__table__.c.name.ilike('%FOR_ORDER%'),
-        ))
-
-        with engine.connect() as con:
-            con.execute(update)
 
         # Using datalastic to query port information
         # for ongoing flows. Note that we only query those destinations for which we have no country
@@ -65,7 +55,8 @@ def update_matching():
                             Destination.iso2 == sa.null())).all()
 
         for still_missing in tqdm(still_missings):
-            found = Datalastic.get_port_infos(name=still_missing.name, fuzzy=False)
+            looking_name = still_missing.name.replace(" OPL","")
+            found = Datalastic.get_port_infos(name=looking_name, fuzzy=False)
             if found:
                 ratios = np.array([SequenceMatcher(None, x.name, still_missing.name).ratio() for x in found])
                 if max(ratios) > 0.8:
@@ -81,7 +72,7 @@ def update_matching():
         country_regexps = {
             'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$','^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$', '[ |,|_|\.]{1}RU[\w]{3}$'],
             'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$', '^TOROS$', 'CANAKALE$'],
-            'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK'],
+            'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$'],
             'BR': ['[ |,|_]{1}BRAZIL$'],
             'SE': ['[ |,|_]{1}SWEDEN$'],
             'IN': ['[ |,|_]{1}INDIA$'],
@@ -97,7 +88,7 @@ def update_matching():
             'NL': ['^NL [\s|\w]*$', '[ |,|_|\.]{1}NL[\s]?[\w]{3}$'],
             'KR': ['[ |,|_]{1}S[\.]?KOREA$','^KR [\s|\w]*$'],
             'JP': ['^JP [\s|\w]*$','[ |,|_]{1}JP$'],
-            'CN': ['[ |,|_]{1}CHINA$','^CN [\s|\w]*$','^HUANG DAO$','^CAOFEIDIAN$','^LANYUNGANG$'],
+            'CN': ['[ |,|_]{1}CHINA$','^CN [\s|\w]*$','^HUANG DAO$','^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$'],
             'MY': ['[ |,|_|/]{1}MALAYSIA$'],
             'TW': ['^TW[\s|\w]*','[ |,|_]{1}TW$'],
             'OM': ['[ |,|_|-]{1}OMAN'],
@@ -106,7 +97,8 @@ def update_matching():
             'MT': ['[ |,|_|-]{1}MALTA$'],
             'IR': ['ANZALI'],
             'YE': ['^YE [\s|\w]*$'],
-            'AE': ['[ |,|_]{1}UAE$']
+            'AE': ['[ |,|_]{1}UAE$'],
+            'US': ["^USA$"]
         }
 
         for key, regexps in country_regexps.items():
@@ -114,6 +106,18 @@ def update_matching():
             update = Destination.__table__.update().values(iso2=key) \
                 .where(condition)
             with engine.connect() as con:
+                con.execute(update)
+
+
+        # "For orders" should be unknown
+        update = Destination.__table__.update().values(type="for_order", iso2=None) \
+            .where(or_(
+            Destination.__table__.c.name.ilike('%FOR ORDER%'),
+            Destination.__table__.c.name.ilike('%FOR...ORDER%'),
+            Destination.__table__.c.name.ilike('%FOR_ORDER%'),
+        ))
+
+        with engine.connect() as con:
                 con.execute(update)
 
 
