@@ -57,31 +57,45 @@ def update(commodities=None, imo=None, flow_id=None):
 
     # We update position which are still ongoing (no arrival yet)
     # or who are still missing some positions (should have til Arrival + n hours, and from Departure - n_hours)
-    flows_to_update = session.query(Flow,
-                                    Departure.ship_imo,
-                                    Departure.date_utc.label('departure_date'),
-                                    Arrival.date_utc.label('arrival_date'),
-                                    Ship.commodity,
-                                    func.min(Position.date_utc).label('first_date'),
-                                    func.max(Position.date_utc).label('last_date')
+
+
+    flows_positions = session.query(Flow.id.label('flow_id'),
+                                    # Departure.ship_imo.label('ship_imo'),
+                                    # Departure.date_utc.label('departure_date'),
+                                    # Arrival.date_utc.label('arrival_date'),
+                                    # Ship.commodity.label('commodity'),
+                                    Position.date_utc.label('position_date')
                                     ) \
         .join(Departure, Flow.departure_id == Departure.id) \
         .outerjoin(Arrival, Flow.arrival_id == Arrival.id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .outerjoin(Position, Position.ship_imo == Departure.ship_imo) \
+        .filter(Position.date_utc >= Departure.date_utc - dt.timedelta(
+            hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE) - buffer) \
         .filter(sa.or_(
-                    Position.date_utc == sa.null(),
-                    Position.date_utc >= Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE) - buffer)) \
-        .filter(sa.or_(
-                    Position.date_utc == sa.null(),
-                    Arrival.date_utc == sa.null(),
-                    Position.date_utc <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL) + buffer)) \
+            Arrival.date_utc == sa.null(),
+            Position.date_utc <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL) + buffer)) \
+        .subquery()
+
+
+    flows_to_update = session.query(Flow,
+                                    Departure.ship_imo,
+                                    Departure.date_utc.label('departure_date'),
+                                    Arrival.date_utc.label('arrival_date'),
+                                    Ship.commodity,
+                                    func.min(flows_positions.c.position_date).label('first_date'),
+                                    func.max(flows_positions.c.position_date).label('last_date')
+                                    ) \
+        .outerjoin(flows_positions, Flow.id == flows_positions.c.flow_id) \
+        .join(Departure, Flow.departure_id == Departure.id) \
+        .outerjoin(Arrival, Flow.arrival_id == Arrival.id) \
+        .join(Ship, Ship.imo == Departure.ship_imo) \
         .group_by(Flow.id, Departure.ship_imo, Departure.date_utc, Arrival.date_utc, Ship.commodity) \
         .having(sa.or_(Arrival.date_utc == sa.null(),
                                sa.or_(
-                                   func.min(Position.date_utc) == sa.null(),
-                                   func.max(Position.date_utc) < Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
-                                   func.min(Position.date_utc) > Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
+                                   func.min(flows_positions.c.position_date) == sa.null(),
+                                   func.max(flows_positions.c.position_date) < Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
+                                   func.min(flows_positions.c.position_date) > Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
                                    )
                                )
                 )

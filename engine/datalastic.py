@@ -104,6 +104,14 @@ class Datalastic:
         if date_to is not None:
             params["to"] = to_datetime(date_to).strftime("%Y-%m-%d")
 
+        # Datalastic doesn't accept more than one month
+        if date_to - date_from >= dt.timedelta(days=31):
+            positions = []
+            while date_from < date_to:
+                date_to_chunk = min(date_to, date_from + dt.timedelta(days=30))
+                positions.extend(cls.get_positions(imo=imo, date_from=date_from, date_to=date_to_chunk))
+                date_from = date_to_chunk + dt.timedelta(minutes=1)
+
         method = 'vessel_history'
         api_result = requests.get(Datalastic.api_base + method, params)
         if api_result.status_code != 200:
