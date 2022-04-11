@@ -126,16 +126,47 @@ def upload_portcalls(portcalls):
             session.commit()
         except sqlalchemy.exc.IntegrityError as e:
             session.rollback()
+
             # First try if this is a missing port
-            if Port.query.filter(Port.id == portcall.port_id).count() == 0:
-                port.insert_new_port(iso2=portcall.port_unlocode[0:2],
-                                     unlocode=portcall.port_unlocode)
+            if portcall.port_id is None and not "unique_portcall" in str(e):
+                unlocode = portcall.others.get("marinetraffic", {}).get("UNLOCODE")
+                name = portcall.others.get("marinetraffic", {}).get("PORT_NAME")
+                marinetraffic_id = portcall.others.get("marinetraffic", {}).get("PORT_ID")
+
+                if unlocode is None:
+                    from engine.datalastic import Datalastic
+                    from difflib import SequenceMatcher
+                    import numpy as np
+                    found = Datalastic.get_port_infos(name=name, marinetraffic_id=marinetraffic_id)
+                    if found:
+                        ratios = np.array([SequenceMatcher(None, x.name, name).ratio() for x in found])
+                        if max(ratios) >= 0.9:
+                            print("Best match: %s == %s (%f)" % (name, found[ratios.argmax()].name, ratios.max()))
+                            found_and_filtered = found[ratios.argmax()]
+                            if found_and_filtered:
+                                session.add(found_and_filtered)
+                                session.commit()
+                                port_id = session.query(Port.id).filter(Port.iso2==found_and_filtered.iso2,
+                                                              Port.name==found_and_filtered.name,
+                                                              Port.unlocode==found_and_filtered.unlocode).first()[0]
+                                portcall.port_id = port_id
+                            else:
+                                print("wasn't close enough")
+
 
                 # And try again
-                session.add(portcall)
-                session.commit()
+                try:
+                    session.add(portcall)
+                    session.commit()
+                except sqlalchemy.exc.IntegrityError as e:
+                    session.rollback()
+                    logger.warning("Failed to add portcall. Probably a problem with port: %s"%(str(e).split("\n")[0]))
+                    continue
             else:
-                logger.warning("Failed to add portcall. Probably a duplicated portcall")
+                if "unique_portcall" in str(e):
+                    logger.warning("Failed to add portcall. Duplicated portcall: %s"%(str(e).split("\n")[0]))
+                else:
+                    logger.warning("Failed to add portcall: %s" % (str(e).split("\n")[0]))
                 continue
 
 
@@ -363,20 +394,20 @@ def fill_departure_gaps(imo=None,
     originally_checked_port_unlocodes = [x for x, in session.query(Port.unlocode).filter(Port.check_departure).all()]
 
     # 1/2: update port departures from Russia
-    filter_impossible = lambda x: False # To force continuing
-    for unlocode in tqdm(originally_checked_port_unlocodes):
-        print(unlocode)
-        next_departure = get_next_portcall(date_from=date_from,
-                                           date_to=date_to,
-                                           arrival_or_departure="departure",
-                                           unlocode=unlocode,
-                                           cache_only=False,
-                                           filter=filter_impossible)
-
-
-
-
-
+    # filter_impossible = lambda x: False # To force continuing
+    # for unlocode in tqdm(originally_checked_port_unlocodes):
+    #     print(unlocode)
+    #     next_departure = get_next_portcall(date_from=date_from,
+    #                                        date_to=date_to,
+    #                                        arrival_or_departure="departure",
+    #                                        unlocode=unlocode,
+    #                                        cache_only=False,
+    #                                        filter=filter_impossible)
+    #
+    #
+    #
+    #
+    #
 
     # 2/2: update subsequent departure calls for ships leaving
     query = PortCall.query.filter(

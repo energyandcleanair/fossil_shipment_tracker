@@ -49,15 +49,8 @@ def update(commodities=None, imo=None, flow_id=None):
 
     print("=== Position update ===")
     buffer = dt.timedelta(hours=24)
-    # position_subq = session.query(
-    #     Position.flow_id,
-    #     func.max(Position.date_utc).label('last_date'),
-    #     func.min(Position.date_utc).label('first_date')
-    # ).group_by(Position.flow_id).subquery('last_position')
-
     # We update position which are still ongoing (no arrival yet)
     # or who are still missing some positions (should have til Arrival + n hours, and from Departure - n_hours)
-
 
     flows_positions = session.query(Flow.id.label('flow_id'),
                                     # Departure.ship_imo.label('ship_imo'),
@@ -91,8 +84,10 @@ def update(commodities=None, imo=None, flow_id=None):
         .outerjoin(Arrival, Flow.arrival_id == Arrival.id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .group_by(Flow.id, Departure.ship_imo, Departure.date_utc, Arrival.date_utc, Ship.commodity) \
-        .having(sa.or_(Arrival.date_utc == sa.null(),
-                               sa.or_(
+        .having(sa.or_(
+                        sa.and_(Arrival.date_utc == sa.null(),
+                                func.max(flows_positions.c.position_date) < dt.datetime.utcnow()-dt.timedelta(hours=12)), # To prevent too much refreshing
+                        sa.or_(
                                    func.min(flows_positions.c.position_date) == sa.null(),
                                    func.max(flows_positions.c.position_date) < Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
                                    func.min(flows_positions.c.position_date) > Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)

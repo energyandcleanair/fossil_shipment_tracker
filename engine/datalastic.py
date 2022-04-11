@@ -108,9 +108,12 @@ class Datalastic:
         if date_to - date_from >= dt.timedelta(days=31):
             positions = []
             while date_from < date_to:
-                date_to_chunk = min(date_to, date_from + dt.timedelta(days=30))
-                positions.extend(cls.get_positions(imo=imo, date_from=date_from, date_to=date_to_chunk))
+                date_to_chunk = min(date_to, date_from + dt.timedelta(days=10))
+                new_positions = cls.get_positions(imo=imo, date_from=date_from, date_to=date_to_chunk)
+                if new_positions is not None:
+                    positions.extend(new_positions)
                 date_from = date_to_chunk + dt.timedelta(minutes=1)
+            return positions
 
         method = 'vessel_history'
         api_result = requests.get(Datalastic.api_base + method, params)

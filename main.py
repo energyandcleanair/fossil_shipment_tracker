@@ -13,7 +13,7 @@ import base
 
 def update():
     # portcall.update_departures_from_russia(date_from="2021-12-01")
-    portcall.fill_departure_gaps(date_from="2021-12-01", date_to="2022-01-01")
+    # portcall.fill_departure_gaps(date_from="2021-12-01", date_to="2022-01-01")
     # departure.update(date_from="2021-12-01")
     # arrival.update(date_from="2021-12-01")
     # flow.update(date_from="2021-12-01")

@@ -24,7 +24,7 @@ def get_id(unlocode=None, marinetraffic_id=None):
 
     found = found.all()
     if len(found) == 0:
-        logger.warning("Didn't found any port (unlocode: %s, marinetraffic: %s)" %(unlocode, marinetraffic_id))
+        logger.warning("Didn't find any port (unlocode: %s, marinetraffic: %s)" %(unlocode, marinetraffic_id))
         return None
 
     if len(found) > 1:

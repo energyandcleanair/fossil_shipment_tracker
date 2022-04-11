@@ -144,3 +144,24 @@ def test_berth(app):
         gdf = gpd.read_file(io.StringIO(json.dumps(data)))
         assert len(gdf) > 0
         assert "geometry" in gdf.columns
+
+
+
+def test_aggregated(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {"format": "json", "aggregate_by": "departure_port,date,commodity,status"}
+        response = test_client.get('/v0/aggregated?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+
+        # Test commodity parameter
+        params = {"format": "geojson"}
+        response = test_client.get('/v0/berth?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        gdf = gpd.read_file(io.StringIO(json.dumps(data)))
+        assert len(gdf) > 0
+        assert "geometry" in gdf.columns

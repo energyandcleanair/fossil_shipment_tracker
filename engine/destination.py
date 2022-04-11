@@ -21,8 +21,10 @@ def update():
 
 def update_matching():
         # Insert missing ones
-        new_destinations = Flow.query \
-            .filter(Flow.last_destination_name.notin_(session.query(Destination.name))).all()
+        new_destinations = session.query(Flow.last_destination_name) \
+            .filter(Flow.last_destination_name.notin_(session.query(Destination.name))) \
+            .distinct() \
+            .all()
 
         for new_destination in new_destinations:
             session.add(Destination(name=new_destination.last_destination_name))

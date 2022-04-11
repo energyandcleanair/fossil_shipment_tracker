@@ -195,7 +195,7 @@ class Marinetraffic:
         portcalls = []
         for r in response_datas:
             # IMO's missing
-            imo = session.query(Ship.imo).filter(Ship.mmsi==r["MMSI"]).first()
+            # imo = session.query(Ship.imo).filter(Ship.mmsi==r["MMSI"]).first()
             if imo is None:
                 # Ship not found, let's add it
                 found = ship.fill(mmsis=[r["MMSI"]])
@@ -205,10 +205,10 @@ class Marinetraffic:
                     session.add(unknown_ship)
                     session.commit()
 
-                imo = session.query(Ship.imo).filter(Ship.mmsi == r["MMSI"]).first()
+                imo = session.query(Ship.imo).filter(Ship.mmsi == r["MMSI"]).first()[0]
 
             if imo is not None:
-                r["IMO"] = imo[0]
+                r["IMO"] = imo
                 portcalls.append(cls.parse_portcall(r))
 
         return portcalls
@@ -242,7 +242,7 @@ class Marinetraffic:
         :param filter:
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
-        delta_time = dt.timedelta(hours=24)
+        delta_time = dt.timedelta(hours=4)
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
         if date_to is None:
