@@ -16,7 +16,7 @@ def fill(imos=[], mmsis=[]):
     """
     imos = [str(x) for x in imos]
     mmsis = [str(x) for x in mmsis]
-    logger.info("Adding missing ships. MMSI: %s | IMO: %s" % (",".join(imos), ",".join(mmsis)))
+    logger.info("Adding missing ships. IMO: %s | MMSI: %s" % (",".join(imos), ",".join(mmsis)))
 
     # Fill missing ships
     def get_missing_ships_imos(imos):
@@ -41,13 +41,13 @@ def fill(imos=[], mmsis=[]):
     ships = [Marinetraffic.get_ship(mmsi=x) for x in get_missing_ships_mmsis(mmsis)]
     upload_ships(ships)
 
-
     missing = get_missing_ships_imos(imos)
     missing.extend(get_missing_ships_mmsis(mmsis))
     if missing:
         logger.warning("Some ships are still missing: %s" % (",".join(missing)))
+        return False
 
-    return
+    return True
 
 
 def upload_ships(ships):

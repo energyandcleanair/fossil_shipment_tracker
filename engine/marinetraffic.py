@@ -33,9 +33,11 @@ class Marinetraffic:
 
 
     @classmethod
-    def get_ship_cached(cls, imo):
+    def get_ship_cached(cls, imo=None, mmsi=None):
         try:
-            return next(x for x in cls.cache_ship if str(x["IMO"]) == str(imo))
+            filter = lambda x: (imo is not None and str(x["IMO"]) == str(imo)) or (
+                        mmsi is not None and str(x["MMSI"]) == str(mmsi))
+            return next(x for x in cls.cache_ship if filter(x))
         except StopIteration:
             return None
 
@@ -81,7 +83,7 @@ class Marinetraffic:
         api_key = get_env("KEY_MARINETRAFFIC_VD02")
 
         # First look in cache to save query credits
-        response_data = cls.get_ship_cached(imo)
+        response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi)
 
         # Otherwise query datalastic (and cache it as well)
         if not response_data:
@@ -196,7 +198,13 @@ class Marinetraffic:
             imo = session.query(Ship.imo).filter(Ship.mmsi==r["MMSI"]).first()
             if imo is None:
                 # Ship not found, let's add it
-                ship.fill(mmsis=[r["MMSI"]])
+                found = ship.fill(mmsis=[r["MMSI"]])
+                if not found:
+                    unknown_ship = Ship(imo='NOTFOUND_' + r['MMSI'], mmsi=r['MMSI'], type=r["TYPE_NAME"],
+                                    name=r['SHIPNAME'])
+                    session.add(unknown_ship)
+                    session.commit()
+
                 imo = session.query(Ship.imo).filter(Ship.mmsi == r["MMSI"]).first()
 
             if imo is not None:

@@ -13,6 +13,7 @@ import numpy as np
 
 
 def update():
+    print("=== Destination update ===")
     update_from_positions()
     update_from_voyageinfo()
     update_matching()

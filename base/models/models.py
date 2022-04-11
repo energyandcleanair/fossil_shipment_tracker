@@ -102,7 +102,7 @@ class FlowDepartureBerth(Base):
     For each flow, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"))
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"), unique=True)
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
 
     # Optional
@@ -119,7 +119,7 @@ class FlowArrivalBerth(Base):
     For each flow, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"))
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"), unique=True)
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
 
     # Optional

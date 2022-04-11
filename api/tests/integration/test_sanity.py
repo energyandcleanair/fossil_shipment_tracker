@@ -3,7 +3,7 @@ import urllib
 import pandas as pd
 import json
 import pandas as pd
-
+import base
 
 
 def test_voyage(app):
@@ -15,10 +15,12 @@ def test_voyage(app):
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
-        assert all([x['arrival_date_utc'] > x['departure_date_utc'] for x in data])
+        assert all([x['status'] != 'completed' or x['arrival_date_utc'] > x['departure_date_utc'] for x in data])
 
         voyages = pd.DataFrame(data)
+        assert voyages.duplicated(subset=['id']).any() == False
         voyages['former_arrival_date_utc'] = voyages.sort_values(['ship_imo', 'arrival_date_utc']).groupby("ship_imo")['arrival_date_utc'].shift(1)
         v = voyages.sort_values(['ship_imo', 'arrival_date_utc'])
-        problematic = v.loc[v.former_arrival_date_utc > v.departure_date_utc]
+
+        problematic = v.loc[(v.former_arrival_date_utc > v.departure_date_utc) & (v.status != base.UNDETECTED_ARRIVAL)]
         assert len(problematic) == 0

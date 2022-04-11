@@ -15,7 +15,7 @@ import shapely
 class PositionResource(Resource):
 
     parser = reqparse.RequestParser()
-    parser.add_argument('voyage_id', required=True, help='id(s) of voyage', action='split')
+    parser.add_argument('ship_imo', required=True, help='imo(s) of ship', action='split')
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
 
@@ -23,7 +23,7 @@ class PositionResource(Resource):
     def get(self):
 
         params = PositionResource.parser.parse_args()
-        voyage_id = params.get("voyage_id")
+        ship_imo = params.get("ship_imo")
         format = params.get("format")
 
         query = session.query(Position,
@@ -32,8 +32,8 @@ class PositionResource(Resource):
             .join(FlowDepartureBerth, Position.id == FlowDepartureBerth.position_id, isouter=True) \
             .join(FlowArrivalBerth, Position.id == FlowArrivalBerth.position_id, isouter=True)
 
-        if voyage_id is not None:
-            query = query.filter(Position.flow_id.in_(voyage_id))
+        if ship_imo is not None:
+            query = query.filter(Position.ship_imo.in_(ship_imo))
 
         query = query.order_by(Position.date_utc)
         positions_df = pd.read_sql(query.statement, session.bind)

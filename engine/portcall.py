@@ -363,7 +363,7 @@ def fill_departure_gaps(imo=None,
     originally_checked_port_unlocodes = [x for x, in session.query(Port.unlocode).filter(Port.check_departure).all()]
 
     # 1/2: update port departures from Russia
-    filter_impossibble = lambda x: False # To force continuing
+    filter_impossible = lambda x: False # To force continuing
     for unlocode in tqdm(originally_checked_port_unlocodes):
         print(unlocode)
         next_departure = get_next_portcall(date_from=date_from,
@@ -371,7 +371,7 @@ def fill_departure_gaps(imo=None,
                                            arrival_or_departure="departure",
                                            unlocode=unlocode,
                                            cache_only=False,
-                                           filter=filter_impossibble)
+                                           filter=filter_impossible)
 
 
 
@@ -397,11 +397,14 @@ def fill_departure_gaps(imo=None,
     if commodities:
         query = query.filter(Ship.commodity.in_(commodities))
 
+    if imo:
+        query = query.filter(Ship.imo.in_(to_list(imo)))
+
     portcall_russia = query.all()
 
     portcall_russia.sort(key=lambda x: x.date_utc)
 
-    for p in portcall_russia:
+    for p in tqdm(portcall_russia):
         find_arrival(departure_portcall=p, date_to=date_to)
 
 

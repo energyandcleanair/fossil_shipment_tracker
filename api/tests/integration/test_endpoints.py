@@ -118,8 +118,8 @@ def test_voyage(app):
 def test_position(app):
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
-        flow_id = session.query(Position.flow_id).first()[0]
-        params = {"voyage_id": flow_id}
+        ship_imo = session.query(Position.ship_imo).first()[0]
+        params = {"ship_imo": ship_imo}
         response = test_client.get('/v0/position?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]

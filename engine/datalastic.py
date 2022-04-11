@@ -25,9 +25,10 @@ class Datalastic:
 
 
     @classmethod
-    def get_ship_cached(cls, imo):
+    def get_ship_cached(cls, imo=None, mmsi=None):
         try:
-            return next(x for x in cls.cache_ships if str(x["imo"]) == str(imo))
+            filter = lambda x : (imo is not None and str(x["imo"]) == str(imo)) or (mmsi is not None and str(x["mmsi"]) == str(mmsi))
+            return next(x for x in cls.cache_ships if filter(x))
         except StopIteration:
             return None
 
@@ -49,7 +50,7 @@ class Datalastic:
             cls.api_key = get_env("KEY_DATALASTIC")
 
         # First look in cache to save query credits
-        response_data = cls.get_ship_cached(imo)
+        response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi)
 
         # Otherwise query datalastic (and cache it as well)
         if not response_data:

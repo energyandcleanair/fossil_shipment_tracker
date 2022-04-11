@@ -1,7 +1,7 @@
 import json
 
 from flask import Response
-from flask_restx import Resource, reqparse
+from flask_restx import Resource, reqparse, inputs
 from base.models import Port
 from base.encoder import JsonEncoder
 from base.db import session
@@ -16,6 +16,8 @@ class PortResource(Resource):
 
     parser = reqparse.RequestParser()
     parser.add_argument('unlocode', required=False, help='unlocode(s) of ports (optional)', action='split')
+    parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
+                        type=inputs.boolean, default=True)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
 
@@ -25,6 +27,7 @@ class PortResource(Resource):
         params = PortResource.parser.parse_args()
         unlocode = params.get("unlocode")
         format = params.get("format")
+        nest_in_data = params.get("nest_in_data")
 
         query = Port.query
         if unlocode is not None:
@@ -42,7 +45,12 @@ class PortResource(Resource):
                              "attachment; filename=ports.csv"})
 
         if format == "json":
+            if nest_in_data:
+                resp_content = json.dumps({"data": ports_df.to_dict(orient="records")}, cls=JsonEncoder)
+            else:
+                resp_content = json.dumps(ports_df.to_dict(orient="records"), cls=JsonEncoder)
+
             return Response(
-                response=json.dumps({"data": ports_df.to_dict(orient="records")}, cls=JsonEncoder),
+                response=resp_content,
                 status=200,
                 mimetype='application/json')

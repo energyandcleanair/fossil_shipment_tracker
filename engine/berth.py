@@ -118,7 +118,6 @@ def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
     if berths_count.berth_id.max() > 1:
         logger.warning("Found more than one berth for a flow")
 
-
     berths_agg_ok = pd.DataFrame(berths_count["flow_id"].loc[berths_count.berth_id==1]) \
         .merge(berths_agg_ok)
 
@@ -172,6 +171,14 @@ def detect_arrival_berths(flow_id=None, min_hours_at_berth=4):
 
     berths_agg_ok = berths_agg.loc[
         (berths_agg.max_date_utc - berths_agg.min_date_utc) > dt.timedelta(hours=min_hours_at_berth)]
+
+    # Maximum one berthing per flow
+    berths_count = berths_agg_ok.groupby(['flow_id'])["berth_id"].count().reset_index()
+    if berths_count.berth_id.max() > 1:
+        logger.warning("Found more than one berth for a flow")
+
+    berths_agg_ok = pd.DataFrame(berths_count["flow_id"].loc[berths_count.berth_id == 1]) \
+        .merge(berths_agg_ok)
 
     # Look for problematic ones
     # problematic = berths_agg_ok.loc[berths_df.berth_port_unlocode != berths_df.arrival_port_unlocode].copy()
