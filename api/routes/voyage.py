@@ -20,6 +20,12 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import or_
 from sqlalchemy import func
 from base.utils import update_geometry_from_wkb
+import country_converter as coco
+
+
+
+
+
 
 @routes_api.route('/v0/voyage', strict_slashes=False)
 class VoyageResource(Resource):
@@ -29,10 +35,16 @@ class VoyageResource(Resource):
                         default=None, action='split', required=False)
     parser.add_argument('commodity', help='commodity(ies) of interest. Default: returns all of them',
                         default=None, action='split', required=False)
-    parser.add_argument('date_from', help='start date for arrival (format 2020-01-15)',
+    parser.add_argument('status', help='status of flows. Could be any or several of completed, ongoing, undetected_arrival. Default: returns all of them',
+                        default=None, action='split', required=False)
+    parser.add_argument('date_from', help='start date for departure or arrival (format 2020-01-15)',
                         default="2022-01-01", required=False)
-    parser.add_argument('date_to', type=str, help='end date for arrival (format 2020-01-15)', required=False,
+    parser.add_argument('date_to', type=str, help='end date for departure or arrival arrival (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('aggregate_by', type=str, action='split',
+                        default=None,
+                        help='which variables to aggregate by. Could be any of commodity, status, departure_date, arrival_date, departure_port, departure_country,'
+                             'destination_port, destination_country')
     parser.add_argument('format', type=str, help='format of returned results (json, geojson or csv)',
                         required=False, default="json")
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
@@ -46,11 +58,14 @@ class VoyageResource(Resource):
         params = VoyageResource.parser.parse_args()
         id = params.get("id")
         commodity = params.get("commodity")
+        status = params.get("status")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
+        aggregate_by = params.get("aggregate_by")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
         download = params.get("download")
+
 
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
@@ -63,32 +78,32 @@ class VoyageResource(Resource):
         # Query with joined information
         flows_rich = (session.query(Flow.id,
                                     Flow.status,
-                                    Departure.date_utc,
-                                    DeparturePort.unlocode,
-                                    DeparturePort.iso2,
-                                    DeparturePort.name,
-                                    Arrival.date_utc,
-                                    ArrivalPort.unlocode,
-                                    ArrivalPort.iso2,
-                                    ArrivalPort.name,
-                                    Destination.name,
-                                    func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2),
-                                    Ship.imo,
-                                    Ship.mmsi,
-                                    Ship.type,
-                                    Ship.subtype,
-                                    Ship.dwt,
-                                    Ship.commodity,
+                                    Departure.date_utc.label("departure_date_utc"),
+                                    DeparturePort.unlocode.label("departure_unlocode"),
+                                    DeparturePort.iso2.label("departure_iso2"),
+                                    DeparturePort.name.label("departure_port_name"),
+                                    Arrival.date_utc.label("arrival_date_utc"),
+                                    ArrivalPort.unlocode.label("arrival_unlocode"),
+                                    ArrivalPort.iso2.label("arrival_iso2"),
+                                    ArrivalPort.name.label("arrival_port_name"),
+                                    Destination.name.label("destination_name"),
+                                    func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2).label('destination_iso2'),
+                                    Ship.imo.label("ship_imo"),
+                                    Ship.mmsi.label("ship_mmsi"),
+                                    Ship.type.label("ship_type"),
+                                    Ship.subtype.label("ship_subtype"),
+                                    Ship.dwt.label("dwt"),
+                                    func.coalesce(DepartureBerth.commodity, ArrivalBerth.commodity, Ship.commodity).label('commodity'),
                                     Ship.quantity,
                                     Ship.unit,
-                                    DepartureBerth.id,
-                                    DepartureBerth.name,
-                                    DepartureBerth.commodity,
-                                    DepartureBerth.port_unlocode,
-                                    ArrivalBerth.id,
-                                    ArrivalBerth.name,
-                                    ArrivalBerth.commodity,
-                                    ArrivalBerth.port_unlocode)
+                                    DepartureBerth.id.label("departure_berth_id"),
+                                    DepartureBerth.name.label("departure_berth_name"),
+                                    DepartureBerth.commodity.label("departure_berth_commodity"),
+                                    DepartureBerth.port_unlocode.label("departure_berth_unlocode"),
+                                    ArrivalBerth.id.label("arrival_berth_id"),
+                                    ArrivalBerth.name.label("arrival_berth_name"),
+                                    ArrivalBerth.commodity.label("arrival_berth_commodity"),
+                                    ArrivalBerth.port_unlocode.label("arrival_berth_unlocode"))
              .join(Departure, Flow.departure_id == Departure.id)
              .join(DeparturePort, Departure.port_id == DeparturePort.id)
              .outerjoin(Arrival, Departure.id == Arrival.departure_id)
@@ -105,7 +120,10 @@ class VoyageResource(Resource):
             flows_rich = flows_rich.filter(Flow.id.in_(id))
 
         if commodity is not None:
-            flows_rich = flows_rich.filter(Ship.commodity.in_(commodity))
+            flows_rich = flows_rich.filter(func.coalesce(DepartureBerth.commodity, ArrivalBerth.commodity, Ship.commodity).in_(commodity))
+
+        if status is not None:
+            flows_rich = flows_rich.filter(Flow.status.in_(status))
 
         if date_from is not None:
             flows_rich = flows_rich.filter(
@@ -121,67 +139,40 @@ class VoyageResource(Resource):
                     Departure.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d")
                 ))
 
-        columns = ["id",
-                   "status",
-                   "departure_date_utc",
-                   "departure_unlocode",
-                   "departure_iso2",
-                   "departure_port_name",
-                   "arrival_date_utc",
-                   "arrival_unlocode",
-                   "arrival_iso2",
-                   "arrival_port_name",
-                   "destination_name",
-                   "destination_iso2",
-                   "ship_imo",
-                   "ship_mmsi",
-                   "ship_type",
-                   "ship_subtype",
-                   "ship_dwt",
-                   "commodity",
-                   "quantity",
-                   "unit",
-                   "departure_berth_id",
-                   "departure_berth_name",
-                   "departure_berth_commodity",
-                   "departure_berth_unlocode",
-                   "arrival_berth_id",
-                   "arrival_berth_name",
-                   "arrival_berth_commodity",
-                   "arrival_berth_unlocode"]
 
-        def row_to_dict(row):
-            return dict(zip(columns, row))
+        query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)
 
-        flows_rich = flows_rich.all()
-        if len(flows_rich) == 0:
+        result = pd.read_sql(query.statement, session.bind)
+
+        if len(result) == 0:
             return Response(
                 status=HTTPStatus.NO_CONTENT,
                 response="empty",
                 mimetype='application/json')
 
-        flows_rich = [row_to_dict(x) for x in flows_rich]
+        # Some modifications aorund countries, commodities etc.
+        result.loc[(result.commodity == "bulk"), "commodity"] = "bulk_notcoal"
+
+        if "departure_iso2" in result.columns:
+            result = self.fill_country(result, iso2_column="departure_iso2", country_column='departure_country')
+
+        if "destination_iso2" in result.columns:
+            result = self.fill_country(result, iso2_column="destination_iso2", country_column='destination_country')
 
 
         # If bulk and departure berth is coal, replace commodity with coal
-        flows_df = pd.DataFrame(flows_rich)
-        flows_df.loc[(flows_df.commodity=="bulk") & \
-                     (flows_df.departure_berth_commodity.str.contains("Coal", case=False, na=False)), "commodity"] = "coal"
-        flows_df.loc[(flows_df.commodity == "bulk") & \
-                     (~flows_df.departure_berth_commodity.str.contains("Coal", case=False, na=False)), "commodity"] = "bulk_notcoal"
-
         if format == "csv":
             return Response(
-                response=flows_df.to_csv(index=False),
+                response=result.to_csv(index=False),
                 mimetype="text/csv",
                 headers={"Content-disposition":
                              "attachment; filename=flows.csv"})
 
         if format == "json":
             if nest_in_data:
-                resp_content = json.dumps({"data": flows_df.to_dict(orient="records")}, cls=JsonEncoder)
+                resp_content = json.dumps({"data": result.to_dict(orient="records")}, cls=JsonEncoder)
             else:
-                resp_content = json.dumps(flows_df.to_dict(orient="records"), cls=JsonEncoder)
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
             return Response(
                 response=resp_content,
@@ -189,26 +180,34 @@ class VoyageResource(Resource):
                 mimetype='application/json')
 
         if format == "geojson":
-            flow_ids = list([int(x) for x in flows_df.id.unique()])
+            if aggregate_by is not None:
+                return Response(
+                    response="Cannot query geojson with aggregation.",
+                    status=HTTPStatus.BAD_REQUEST,
+                    mimetype='application/json')
+
+            flow_ids = list([int(x) for x in result.id.unique()])
 
             trajectories = session.query(Trajectory) \
                 .filter(Trajectory.flow_id.in_(flow_ids))
 
             trajectories_df = pd.read_sql(trajectories.statement, session.bind)
             trajectories_df = update_geometry_from_wkb(trajectories_df)
-            flows_gdf = gpd.GeoDataFrame(flows_df.merge(trajectories_df[["flow_id", "geometry"]].rename(columns={'flow_id': 'id'})), geometry='geometry')
-            flows_geojson = flows_gdf.to_json(cls=JsonEncoder)
+            result_gdf = gpd.GeoDataFrame(
+                result.merge(trajectories_df[["flow_id", "geometry"]].rename(columns={'flow_id': 'id'})),
+                geometry='geometry')
+            result_geojson = result_gdf.to_json(cls=JsonEncoder)
 
             if nest_in_data:
-                resp_content = '{"data": ' + flows_geojson + '}'
+                resp_content = '{"data": ' + result_geojson + '}'
             else:
-                resp_content = flows_geojson
+                resp_content = result_geojson
 
             if download:
                 headers = {"Content-disposition":
                                "attachment; filename=voyages.geojson"}
             else:
-                headers={}
+                headers = {}
 
             return Response(
                 response=resp_content,
@@ -216,7 +215,73 @@ class VoyageResource(Resource):
                 mimetype='application/json',
                 headers=headers)
 
+
         return Response(response="Unknown format. Should be either csv, json or geojson",
                         status=HTTPStatus.BAD_REQUEST,
                         mimetype='application/json')
 
+
+    def fill_country(self, result, iso2_column, country_column):
+
+        cc = coco.CountryConverter()
+
+        def country_convert(x):
+            return cc.convert(names=x.iloc[0], to='name_short', not_found=None)
+
+        result[country_column] = result[[iso2_column]] \
+            .fillna("NULL") \
+            .groupby(iso2_column)[iso2_column] \
+            .transform(country_convert)
+
+        return result
+
+
+    def aggregate(self, query, aggregate_by):
+        """Perform aggregation based on user agparameters"""
+
+        if aggregate_by is None:
+            return query
+
+        subquery = query.subquery()
+
+        # Aggregate
+        value_cols = [
+            func.sum(subquery.c.dwt).label("dwt"),
+            func.sum(subquery.c.quantity).label("quantity"),
+        ]
+
+        # Adding must have grouping columns
+        must_group_by = ['unit']
+        aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
+
+        # Aggregating
+        aggregateby_cols_dict = {
+            'unit': [subquery.c.unit],
+            'commodity': [subquery.c.commodity],
+            'status': [subquery.c.status],
+
+            'departure_date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
+            'arrival_date': [func.date_trunc('day', subquery.c.arrival_date_utc).label('arrival_date')],
+
+            'departure_port': [subquery.c.departure_port_name, subquery.c.departure_unlocode,
+                               subquery.c.departure_iso2],
+            'departure_country': [subquery.c.departure_iso2],
+
+            'destination_port': [subquery.c.arrival_port_name, subquery.c.arrival_unlocode,
+                                 subquery.c.destination_iso2],
+            'destination_country': [subquery.c.destination_iso2]
+        }
+
+        if any([x not in aggregateby_cols_dict for x in aggregate_by]):
+            return Response(
+                status=HTTPStatus.BAD_REQUEST,
+                response={
+                    "msg": "aggregate_by can only be a selection of %s" % (",".join(aggregateby_cols_dict.keys()))},
+                mimetype='application/json')
+
+        groupby_cols = []
+        for x in aggregate_by:
+            groupby_cols.extend(aggregateby_cols_dict[x])
+
+        query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
+        return query
