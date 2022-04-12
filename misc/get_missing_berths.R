@@ -15,7 +15,7 @@ positions <- read_csv("https://fossil-shipment-tracker.ew.r.appspot.com/v0/posit
 positions <- positions %>%
   filter(abs(date_utc-arrival_date_utc) < lubridate::hours(24)) %>%
   mutate(is_coal = grepl("coal", departure_berth_name, ignore.case = T)) %>%
-  filter(is_coal | !grepl("Bulk Carrier", ship_subtype, , ignore.case=T))
+  filter(is_coal | !grepl("Bulk Carrier", ship_subtype, ignore.case=T))
 
 cluster <- function(sf, distKM) {
   require(geosphere)
