@@ -1,10 +1,12 @@
 import json
+import datetime as dt
 
 from flask import Response
 from flask_restx import Resource, reqparse
 from base.models import Position, FlowDepartureBerth, FlowArrivalBerth
 from base.encoder import JsonEncoder
 from base.db import session
+from base.utils import to_datetime
 from . import routes_api
 
 import pandas as pd
@@ -16,6 +18,10 @@ class PositionResource(Resource):
 
     parser = reqparse.RequestParser()
     parser.add_argument('ship_imo', required=True, help='imo(s) of ship', action='split')
+    parser.add_argument('date_from', help='start date (format 2020-01-15)',
+                        default="2022-01-01", required=False)
+    parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
+                        default=dt.datetime.today().strftime("%Y-%m-%d"))
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
 
@@ -23,6 +29,8 @@ class PositionResource(Resource):
     def get(self):
 
         params = PositionResource.parser.parse_args()
+        date_from = params.get("date_from")
+        date_to = params.get("date_to")
         ship_imo = params.get("ship_imo")
         format = params.get("format")
 
@@ -34,6 +42,12 @@ class PositionResource(Resource):
 
         if ship_imo is not None:
             query = query.filter(Position.ship_imo.in_(ship_imo))
+
+        if date_from is not None:
+            query = query.filter(Position.date_utc >= to_datetime(date_from))
+
+        if date_to is not None:
+            query = query.filter(Position.date_utc <= to_datetime(date_to))
 
         query = query.order_by(Position.date_utc)
         positions_df = pd.read_sql(query.statement, session.bind)
