@@ -18,6 +18,7 @@ def get_dangling_arrivals():
 def update(min_dwt=base.DWT_MIN,
            limit=None,
            date_from="2022-01-01",
+           date_to=None,
            commodities=[base.LNG,
                         base.CRUDE_OIL,
                         base.OIL_PRODUCTS,
@@ -29,9 +30,10 @@ def update(min_dwt=base.DWT_MIN,
 
     # We take dangling departures, and try to find the next arrival
     dangling_departures = departure.get_departures_without_arrival(min_dwt=min_dwt,
-                                                            commodities=commodities,
-                                                            date_from=date_from,
-                                                            ship_imo=ship_imo)
+                                                                   commodities=commodities,
+                                                                   date_from=date_from,
+                                                                   date_to=date_to,
+                                                                   ship_imo=ship_imo)
 
     if limit is not None:
         # For debugging without taking too many credits

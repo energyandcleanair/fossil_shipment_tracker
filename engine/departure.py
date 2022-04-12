@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from base.models import PortCall, Departure, Arrival, Ship, Port, Flow
 
 
-def get_departures_without_arrival(min_dwt=None, commodities=None, date_from=None, ship_imo=None):
+def get_departures_without_arrival(min_dwt=None, commodities=None, date_from=None, ship_imo=None, date_to=None):
     subquery = session.query(Arrival.departure_id).filter(Arrival.departure_id != sa.null())
     query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
         .join(PortCall, PortCall.id == Departure.portcall_id) \
@@ -17,6 +17,9 @@ def get_departures_without_arrival(min_dwt=None, commodities=None, date_from=Non
 
     if date_from is not None:
         query = query.filter(Departure.date_utc >= to_datetime(date_from))
+
+    if date_to is not None:
+        query = query.filter(Departure.date_utc <= to_datetime(date_to))
 
     if commodities is not None:
         query = query.filter(Ship.commodity.in_(to_list(commodities)))
