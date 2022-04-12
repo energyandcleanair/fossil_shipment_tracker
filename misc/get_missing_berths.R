@@ -14,7 +14,7 @@ positions <- read_csv("https://fossil-shipment-tracker.ew.r.appspot.com/v0/posit
 # and exclude bulk that is not coal
 positions <- positions %>%
   filter(abs(date_utc-arrival_date_utc) < lubridate::hours(24)) %>%
-  mutate(is_coal = grepl("coal", departure_berth_name, ignore.case = T)) %>%
+  mutate(is_coal = grepl("coal", departure_berth_commodity, ignore.case = T)) %>%
   filter(is_coal | !grepl("Bulk Carrier", ship_subtype, ignore.case=T))
 
 cluster <- function(sf, distKM) {
@@ -25,7 +25,7 @@ cluster <- function(sf, distKM) {
 }
 
 berths <- positions %>%
-  group_by(id, is_coal, ship_type, ship_subtype, imo) %>%
+  group_by(voyage_id, is_coal, ship_type, ship_subtype, imo) %>%
   group_modify(function(df, ...) {
 
     df$cluster <- 1

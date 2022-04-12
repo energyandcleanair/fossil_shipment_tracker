@@ -89,10 +89,10 @@ def ship_to_commodity(ship):
              or re.match('Bulk', subtype, re.IGNORECASE):
             commodity = base.BULK
         else:
-            commodity = base.UNKNOWN
+            commodity = base.UNKNOWN_COMMODITY
 
     except TypeError:
-        commodity = base.UNKNOWN
+        commodity = base.UNKNOWN_COMMODITY
 
     if ship.liquid_gas is not None and commodity==base.LNG:
         unit = "m3"

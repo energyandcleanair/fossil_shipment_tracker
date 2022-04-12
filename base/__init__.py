@@ -6,7 +6,8 @@ LNG = "lng"
 LPG = "lpg"
 BULK = "bulk"
 COAL = "coal"
-UNKNOWN = "unknown"
+BULK_NOT_COAL = "bulk_not_coal"
+UNKNOWN_COMMODITY = "unknown"
 
 
 # LOAD STATUS
@@ -19,7 +20,7 @@ IN_BALLAST = "in_ballast"
 ONGOING = "ongoing"
 COMPLETED = "completed"
 UNDETECTED_ARRIVAL = "undetected_arrival"
-UNKNOWN = "UNKNOWN"
+UNKNOWN = "unkown"
 
 
 DWT_MIN = 5000

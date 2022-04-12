@@ -126,6 +126,13 @@ def test_position(app):
         assert len(data) > 0
 
 
+        # Test data required for finding missing berth
+        params = {"has_arrival_berth": "false", "speed_max": "0.1", "status": "completed"}
+        response = test_client.get('/v0/position?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+
 def test_berth(app):
 
     # Create a test client using the Flask application configured for testing
@@ -153,6 +160,8 @@ def test_aggregated(app):
     with app.test_client() as test_client:
 
         aggregate_bys = [
+            [],
+            ['destination_country', 'departure_date'],
             ['departure_port', 'departure_date', 'commodity', 'status'],
             ['departure_port', 'arrival_date', 'commodity', 'status'],
             ['departure_country', 'departure_date', 'commodity', 'status'],
@@ -169,7 +178,7 @@ def test_aggregated(app):
             assert len(data) > 0
             data_df = pd.DataFrame(data)
 
-            expected_columns = set(aggregate_by + ['unit', 'quantity', 'dwt'])
+            expected_columns = set(aggregate_by + ['commodity', 'unit', 'quantity', 'ship_dwt'])
 
             if "departure_port" in aggregate_by:
                 expected_columns.update(["departure_port_name", "departure_unlocode", "departure_iso2", "departure_country"])
@@ -186,3 +195,15 @@ def test_aggregated(app):
                 expected_columns.discard("destination_port")
 
             assert set(data_df.columns) == expected_columns
+
+            assert set(data_df.commodity.unique()) < set([base.OIL_PRODUCTS,
+                                                           base.CRUDE_OIL,
+                                                           base.COAL,
+                                                           base.BULK,
+                                                           base.BULK_NOT_COAL,
+                                                           base.OIL_OR_CHEMICAL,
+                                                           base.OIL_OR_ORE,
+                                                           base.LPG,
+                                                           base.LNG,
+                                                           base.UNKNOWN_COMMODITY
+                                                           ])
