@@ -14,24 +14,30 @@ from base.utils import to_list, to_datetime
 def rebuild():
     print("=== Flow rebuild ===")
     with engine.connect() as con:
+        con = con.execution_options(isolation_level="AUTOCOMMIT")
         with open('engine/flow_rebuild.sql', 'r') as file:
             sql_content1 = file.read()
         with open('engine/flow_refresh.sql', 'r') as file:
             sql_content2 = file.read()
-        con.execute(sql_content1 + sql_content2)
-    session.commit()
+        rs = con.execute(sql_content1 + sql_content2)
+        for row in rs:
+            print(row)
 
 
 def update(date_from="2022-01-01"):
     print("=== Flow update ===")
 
     with engine.connect() as con:
+        con = con.execution_options(isolation_level="AUTOCOMMIT")
         with open('engine/flow_refresh.sql', 'r') as file:
             sql_content = file.read()
         sql_content=sql_content.replace("date_utc >= '2022-01-01'",
                             "date_utc >= '%s'" % (to_datetime(date_from).strftime('%Y-%m-%d')))
-        con.execute(sql_content)
-    session.commit()
+        rs = con.execute(sql_content)
+        for row in rs:
+            print(row)
+
+
 
 
     # # Create a flow for each dangling departure

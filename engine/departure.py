@@ -6,11 +6,15 @@ import sqlalchemy as sa
 from base.models import PortCall, Departure, Arrival, Ship, Port, Flow
 
 
-def get_departures_without_arrival(min_dwt=None, commodities=None, date_from=None, ship_imo=None, date_to=None):
+def get_departures_without_arrival(min_dwt=None, commodities=None,
+                                   date_from=None, ship_imo=None, date_to=None,
+                                   unlocode=None):
+
     subquery = session.query(Arrival.departure_id).filter(Arrival.departure_id != sa.null())
     query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
         .join(PortCall, PortCall.id == Departure.portcall_id) \
-        .join(Ship, PortCall.ship_imo == Ship.imo)
+        .join(Ship, PortCall.ship_imo == Ship.imo) \
+        .join(Port, Departure.port_id == Port.id)
 
     if min_dwt is not None:
         query = query.filter(Ship.dwt >= min_dwt)
@@ -26,6 +30,9 @@ def get_departures_without_arrival(min_dwt=None, commodities=None, date_from=Non
 
     if ship_imo is not None:
         query = query.filter(Ship.imo.in_(to_list(ship_imo)))
+
+    if unlocode is not None:
+        query = query.filter(Port.unlocode.in_(to_list(unlocode)))
 
     return query.order_by(Departure.date_utc).all()
 
