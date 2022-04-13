@@ -11,6 +11,7 @@ from base.models import Flow, Ship, Arrival, Departure, Port, Berth,\
     FlowDepartureBerth, FlowArrivalBerth, Position, Trajectory, Destination
 from base.db import session
 from base.encoder import JsonEncoder
+from base.utils import to_list
 
 from http import HTTPStatus
 from flask import Response
@@ -21,9 +22,6 @@ from sqlalchemy import or_
 from sqlalchemy import func
 from base.utils import update_geometry_from_wkb
 import country_converter as coco
-
-
-
 
 
 
@@ -41,6 +39,9 @@ class VoyageResource(Resource):
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date for departure or arrival arrival (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('destination_iso2', action='split', help='iso2(s) of destination',
+                        required=False,
+                        default=None)
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
                         help='which variables to aggregate by. Could be any of commodity, status, departure_date, arrival_date, departure_port, departure_country,'
@@ -60,6 +61,7 @@ class VoyageResource(Resource):
         commodity = params.get("commodity")
         status = params.get("status")
         date_from = params.get("date_from")
+        destination_iso2 = params.get("destination_iso2")
         date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
         format = params.get("format")
@@ -86,6 +88,9 @@ class VoyageResource(Resource):
             else_ = Ship.commodity
         ).label('commodity')
 
+        destination_iso2_field = func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2) \
+                                     .label('destination_iso2')
+
         # Query with joined information
         flows_rich = (session.query(Flow.id,
                                     Flow.status,
@@ -98,7 +103,7 @@ class VoyageResource(Resource):
                                     ArrivalPort.iso2.label("arrival_iso2"),
                                     ArrivalPort.name.label("arrival_port_name"),
                                     Destination.name.label("destination_name"),
-                                    func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2).label('destination_iso2'),
+                                    destination_iso2_field,
                                     Ship.imo.label("ship_imo"),
                                     Ship.mmsi.label("ship_mmsi"),
                                     Ship.type.label("ship_type"),
@@ -131,7 +136,7 @@ class VoyageResource(Resource):
             flows_rich = flows_rich.filter(Flow.id.in_(id))
 
         if commodity is not None:
-            flows_rich = flows_rich.filter(func.coalesce(DepartureBerth.commodity, ArrivalBerth.commodity, Ship.commodity).in_(commodity))
+            flows_rich = flows_rich.filter(commodity_field.in_(to_list(commodity)))
 
         if status is not None:
             flows_rich = flows_rich.filter(Flow.status.in_(status))
@@ -150,6 +155,8 @@ class VoyageResource(Resource):
                     Departure.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d")
                 ))
 
+        if destination_iso2 is not None:
+            flows_rich = flows_rich.filter(destination_iso2_field.in_(to_list(destination_iso2)))
 
         query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)
 

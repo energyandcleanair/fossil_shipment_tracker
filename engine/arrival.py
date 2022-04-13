@@ -25,7 +25,8 @@ def update(min_dwt=base.DWT_MIN,
                         base.OIL_OR_CHEMICAL,
                         base.COAL,
                         base.BULK],
-           ship_imo=None):
+           ship_imo=None,
+           unlocode=None):
     print("=== Arrival update ===")
 
     # We take dangling departures, and try to find the next arrival
@@ -33,7 +34,8 @@ def update(min_dwt=base.DWT_MIN,
                                                                    commodities=commodities,
                                                                    date_from=date_from,
                                                                    date_to=date_to,
-                                                                   ship_imo=ship_imo)
+                                                                   ship_imo=ship_imo,
+                                                                   unlocode=unlocode)
 
     if limit is not None:
         # For debugging without taking too many credits
