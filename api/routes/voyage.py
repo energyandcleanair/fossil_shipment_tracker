@@ -75,6 +75,17 @@ class VoyageResource(Resource):
 
         DestinationPort = aliased(Port)
 
+
+        # Commodity
+        from sqlalchemy import case
+        commodity_field = case(
+            [
+                (DepartureBerth.commodity.ilike('%coal%'), 'coal'),
+                (ArrivalBerth.commodity.ilike('%coal%'), 'coal'),
+            ],
+            else_ = Ship.commodity
+        ).label('commodity')
+
         # Query with joined information
         flows_rich = (session.query(Flow.id,
                                     Flow.status,
@@ -92,8 +103,8 @@ class VoyageResource(Resource):
                                     Ship.mmsi.label("ship_mmsi"),
                                     Ship.type.label("ship_type"),
                                     Ship.subtype.label("ship_subtype"),
-                                    Ship.dwt.label("dwt"),
-                                    func.coalesce(DepartureBerth.commodity, ArrivalBerth.commodity, Ship.commodity).label('commodity'),
+                                    Ship.dwt.label("ship_dwt"),
+                                    commodity_field,
                                     Ship.quantity,
                                     Ship.unit,
                                     DepartureBerth.id.label("departure_berth_id"),
@@ -151,7 +162,7 @@ class VoyageResource(Resource):
                 mimetype='application/json')
 
         # Some modifications aorund countries, commodities etc.
-        result.loc[(result.commodity == "bulk"), "commodity"] = "bulk_notcoal"
+        result.loc[(result.commodity == "bulk"), "commodity"] = "bulk_not_coal"
 
         if "departure_iso2" in result.columns:
             result = self.fill_country(result, iso2_column="departure_iso2", country_column='departure_country')
@@ -229,10 +240,11 @@ class VoyageResource(Resource):
             return cc.convert(names=x.iloc[0], to='name_short', not_found=None)
 
         result[country_column] = result[[iso2_column]] \
-            .fillna("NULL") \
+            .fillna("NULL_COUNTRY_PLACEHOLDER") \
             .groupby(iso2_column)[iso2_column] \
             .transform(country_convert)
 
+        result.replace({'NULL_COUNTRY_PLACEHOLDER': None}, inplace=True)
         return result
 
 
@@ -246,14 +258,15 @@ class VoyageResource(Resource):
 
         # Aggregate
         value_cols = [
-            func.sum(subquery.c.dwt).label("dwt"),
+            func.sum(subquery.c.ship_dwt).label("ship_dwt"),
             func.sum(subquery.c.quantity).label("quantity"),
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['unit']
+        must_group_by = ['commodity', 'unit']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
-
+        if '' in aggregate_by:
+            aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
             'unit': [subquery.c.unit],
