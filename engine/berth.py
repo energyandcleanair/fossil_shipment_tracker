@@ -56,6 +56,7 @@ def fill():
 
 
 def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
+
     # Look for flows to update
     flows_to_update = session.query(Flow.id).filter(Flow.id.notin_(session.query(FlowDepartureBerth.flow_id)))
 
@@ -108,11 +109,17 @@ def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
         | (berths_agg.has_moored) \
         | (berths_agg.min_speed == 0)].copy()
 
+    if len(berths_agg) == 0:
+        return None
+
+    # Only keep moored if any
+    berths_agg_ok = berths_agg_ok.groupby(['flow_id'])["has_moored"].max().reset_index() \
+        .merge(berths_agg_ok)
+
     # Look for problematic ones
     # problematic = berths_agg_ok.loc[berths_df.berth_port_unlocode != berths_df.arrival_port_unlocode].copy()
     # if len(problematic) > 0:
     #     logger.warning("There are problematic matching (e.g. different unlocode between berth and port")
-
     # Maximum one berthing per flow
     berths_count = berths_agg_ok.groupby(['flow_id'])["berth_id"].count().reset_index()
     if berths_count.berth_id.max() > 1:
@@ -121,8 +128,6 @@ def detect_departure_berths(flow_id=None, min_hours_at_berth=4):
             .sort_values(["flow_id", "max_date_utc"]) \
             .drop_duplicates(['flow_id'], keep="last")
 
-    berths_agg_ok = pd.DataFrame(berths_count["flow_id"].loc[berths_count.berth_id==1]) \
-        .merge(berths_agg_ok)
 
     berths_agg_ok["method_id"] = "simple_overlapping"
     berths_agg_ok = berths_agg_ok[["flow_id", "berth_id", "position_id", "method_id"]]
@@ -136,8 +141,7 @@ def detect_arrival_berths(flow_id=None, min_hours_at_berth=4):
     flows_to_update = session.query(Flow.id).filter(Flow.id.notin_(session.query(FlowArrivalBerth.flow_id)))
 
     if flow_id is not None:
-        flow_id = to_list(flow_id)
-        flows_to_update = flows_to_update.filter(Flow.id.in_(flow_id))
+        flows_to_update = flows_to_update.filter(Flow.id.in_(to_list(flow_id)))
 
     berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc, Berth.port_unlocode, Arrival.port_id) \
         .filter(Flow.id.in_(flows_to_update)) \
@@ -154,8 +158,7 @@ def detect_arrival_berths(flow_id=None, min_hours_at_berth=4):
         .order_by(Flow.id, Berth.id, Position.date_utc) \
         .distinct(Flow.id, Berth.id, Position.id, Position.date_utc)
 
-    berths_df = pd.read_sql(berths.statement,
-                            session.bind)
+    berths_df = pd.read_sql(berths.statement, session.bind)
 
     berths_df.columns = ["flow_id", "berth_id", "position_id", "position_date_utc", "berth_port_unlocode",
                          "arrival_port_id"]
@@ -174,6 +177,12 @@ def detect_arrival_berths(flow_id=None, min_hours_at_berth=4):
 
     berths_agg_ok = berths_agg.loc[
         (berths_agg.max_date_utc - berths_agg.min_date_utc) > dt.timedelta(hours=min_hours_at_berth)]
+
+    if len(berths_agg_ok) == 0:
+        return None
+    # Only keep moored if any
+    berths_agg_ok = berths_agg_ok.groupby(['flow_id'])["has_moored"].max().reset_index() \
+        .merge(berths_agg_ok)
 
     # Maximum one berthing per flow
     berths_count = berths_agg_ok.groupby(['flow_id'])["berth_id"].count().reset_index()
