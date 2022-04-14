@@ -85,6 +85,16 @@ def test_voyage(app):
         data = response.json["data"]
         assert len(data) == 1
 
+        # Test destination_iso2 parameter
+        params = {"format": "json", "destination_iso2": "IT"}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        assert all([x['destination_iso2'] == "IT" for x in data])
+
+
+
 
         params = {"format": "geojson"}
         response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))

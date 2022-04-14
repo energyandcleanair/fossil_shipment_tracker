@@ -233,9 +233,9 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
     FROM
         completed_flows
         LEFT JOIN inserted_departures ON completed_flows.departure_portcall_id = inserted_departures.portcall_id
-    ON CONFLICT (portcall_id)
+     ON CONFLICT (departure_id)
         DO UPDATE SET
-            port_id = excluded.port_id -- just for id to be returned
+            portcall_id = excluded.portcall_id
         RETURNING
             id,
             portcall_id

@@ -8,43 +8,69 @@ library(creahelpers)
 library(sp)
 
 
-positions <- read_csv("https://fossil-shipment-tracker.ew.r.appspot.com/v0/position?speed_max=0.1&has_arrival_berth=False&status=completed&format=csv&buffer_hour=24")
+arrival_positions <- 
+  read_csv("https://fossil-shipment-tracker.ew.r.appspot.com/v0/position?speed_max=0.1&has_arrival_berth=False&status=completed&format=csv&buffer_hour=24")
+departure_positions <- 
+  read_csv("https://fossil-shipment-tracker.ew.r.appspot.com/v0/position?speed_max=0.1&has_departure_berth=False&status=completed&format=csv&buffer_hour=24")
+
+voy <- read_csv("https://fossil-shipment-tracker.ew.r.appspot.com/v0/voyage?format=csv&nest_in_data=False")
+
+voy %<>% select(voyage_id=id, destination_iso2, destination_country, arrival_port_name)
 
 # We keep only positions around arrival time,
 # and exclude bulk that is not coal
-positions <- positions %>%
-  filter(abs(date_utc-arrival_date_utc) < lubridate::hours(24)) %>%
+arrival_positions %<>%
+  filter(date_utc-arrival_date_utc < lubridate::hours(72),
+         date_utc-arrival_date_utc > -lubridate::hours(2)) %>%
   mutate(is_coal = grepl("coal", departure_berth_commodity, ignore.case = T)) %>%
-  filter(is_coal | !grepl("Bulk Carrier", ship_subtype, ignore.case=T))
+  left_join(voy) %>% 
+  filter(is_coal | !grepl("Bulk Carrier", ship_subtype, ignore.case=T),
+         destination_iso2 %in% codelist$iso2c[!is.na(codelist$eu28)] | 
+           grepl('US|TR|GI|JP|NO|MT|GB|IL|TW|CA', destination_iso2),
+         departure_date_utc>='2022-02-24')
+
+departure_positions <- departure_positions %>%
+  left_join(voy) %>% 
+  filter(date_utc-departure_date_utc < lubridate::hours(2),
+         date_utc-departure_date_utc > -lubridate::hours(72),
+         ship_subtype=='Bulk Carrier', 
+         destination_iso2 != 'RU')
 
 cluster <- function(sf, distKM) {
   require(geosphere)
-  sp <- to_spdf(sf)
+  sp <- to_spdf(sf, llcols=c('lon', 'lat'))
   hc <- sp %>% coordinates %>% distm %>% as.dist %>% hclust
   cutree(hc,h=distKM*1000)
 }
 
-berths <- positions %>%
-  group_by(voyage_id, is_coal, ship_type, ship_subtype, imo) %>%
+berths <- bind_rows(arrival_positions %>% mutate(direction='arrival'), 
+                    departure_positions %>% mutate(direction='departure')) %>%
+  group_by(voyage_id, is_coal, ship_type, ship_subtype, imo, direction) %>%
   group_modify(function(df, ...) {
 
     df$cluster <- 1
     if(nrow(df)>1){
-      df$cluster <- df %>% sf::st_as_sf(coords=c("lon","lat")) %>% cluster(.1)
+      df$cluster <- df %>% sf::st_as_sf(coords=c("lon","lat")) %>% cluster(.5)
     }
 
     df %>%
       group_by(cluster) %>%
       summarise(across(c(lon, lat), mean),
                 duration = date_utc %>% (function(x) max(x)-min(x)),
-                arrival_to_position = min(date_utc) - min(arrival_date_utc)) %>%
+                arrival_to_position = min(date_utc)) %>%
       ungroup %>% select(-cluster)
   })
 
-berths_sf <- berths %>%
+berths %<>% filter(duration>hours(6)) %>% 
   ungroup() %>%
-  mutate(duration_hour = paste0(as.numeric(duration, unit="hours"), "hours")) %>%
-  mutate_at(c("is_coal", "imo"), as.character) %>%
+  mutate(duration_hour = paste0(as.numeric(duration, unit="hours"), "hours"),
+         Name = paste(ship_subtype, imo)) %>%
+  mutate_at(c("is_coal", "imo"), as.character)
+
+berths %>% filter(direction=='departure') %>% write_csv('bulk_ships_missing_departure_berths.csv')
+berths %>% filter(direction=='arrival') %>% write_csv('missing_arrival_berths.csv')
+
+berths_sf <- berths %>%
   sf::st_as_sf(coords=c("lon","lat")) %>%
   st_set_crs(4326)
 

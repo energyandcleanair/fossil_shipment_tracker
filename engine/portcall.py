@@ -266,6 +266,7 @@ def get_next_portcall(date_from,
 def update_departures_from_russia(
         date_from="2022-01-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
+        unlocode=None,
         force_rebuild=False):
     """
     If force rebuild, we ignore cache port calls. Should only be used if we suspect
@@ -275,9 +276,12 @@ def update_departures_from_russia(
     :return:
     """
     print("=== Update departures (Portcall) ===")
-    ports = Port.query.filter(Port.check_departure).all()
+    ports = Port.query.filter(Port.check_departure)\
 
-    for port in tqdm(ports):
+    if unlocode is not None:
+        ports = ports.filter(Port.unlocode.in_(to_list(unlocode)))
+
+    for port in tqdm(ports.all()):
         last_portcall = session.query(PortCall) \
             .filter(PortCall.port_id==port.id,
                     PortCall.move_type=="departure") \
