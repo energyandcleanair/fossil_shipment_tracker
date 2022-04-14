@@ -6,6 +6,7 @@ LNG = "lng"
 LPG = "lpg"
 BULK = "bulk"
 COAL = "coal"
+GENERAL_CARGO = "general_cargo"
 BULK_NOT_COAL = "bulk_not_coal"
 UNKNOWN_COMMODITY = "unknown"
 
