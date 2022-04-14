@@ -12,12 +12,13 @@ import base
 
 
 def update():
-    # portcall.update_departures_from_russia()
+    # portcall.update_departures_from_russia(unlocode="FIKVH", date_from="2021-12-01")
     # portcall.fill_departure_gaps(date_from="2021-12-01", date_to="2022-01-01")
-    # arrival.update(date_from="2021-12-21", date_to="2022-01-01")
-    # flow.update(date_from="2021-12-01")
-    # position.update()
-    # destination.update()
+    # departure.update(date_from="2021-12-01")
+    arrival.update()
+    flow.update(date_from="2021-12-01")
+    position.update()
+    destination.update()
     berth.update()
     trajectory.update()
     return

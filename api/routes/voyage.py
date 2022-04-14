@@ -12,6 +12,8 @@ from base.models import Flow, Ship, Arrival, Departure, Port, Berth,\
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list
+from base.logger import logger
+
 
 from http import HTTPStatus
 from flask import Response
@@ -39,6 +41,9 @@ class VoyageResource(Resource):
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date for departure or arrival arrival (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure (only RU should be available)',
+                        required=False,
+                        default=None)
     parser.add_argument('destination_iso2', action='split', help='iso2(s) of destination',
                         required=False,
                         default=None)
@@ -46,6 +51,8 @@ class VoyageResource(Resource):
                         default=None,
                         help='which variables to aggregate by. Could be any of commodity, status, departure_date, arrival_date, departure_port, departure_country,'
                              'destination_port, destination_country')
+    parser.add_argument('rolling_days', type=int, help='rolling average window (in days). Default: no rolling averaging',
+                        required=False, default=None)
     parser.add_argument('format', type=str, help='format of returned results (json, geojson or csv)',
                         required=False, default="json")
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
@@ -61,12 +68,14 @@ class VoyageResource(Resource):
         commodity = params.get("commodity")
         status = params.get("status")
         date_from = params.get("date_from")
+        departure_iso2 = params.get("departure_iso2")
         destination_iso2 = params.get("destination_iso2")
         date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
         download = params.get("download")
+        rolling_days = params.get("rolling_days")
 
 
         DeparturePort = aliased(Port)
@@ -122,7 +131,7 @@ class VoyageResource(Resource):
                                     ArrivalBerth.port_unlocode.label("arrival_berth_unlocode"))
              .join(Departure, Flow.departure_id == Departure.id)
              .join(DeparturePort, Departure.port_id == DeparturePort.id)
-             .outerjoin(Arrival, Departure.id == Arrival.departure_id)
+             .outerjoin(Arrival, Flow.arrival_id == Arrival.id)
              .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id)
              .join(Ship, Departure.ship_imo == Ship.imo)) \
              .outerjoin(FlowDepartureBerth, Flow.id == FlowDepartureBerth.flow_id) \
@@ -155,6 +164,9 @@ class VoyageResource(Resource):
                     Departure.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d")
                 ))
 
+        if departure_iso2 is not None:
+            flows_rich = flows_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
+
         if destination_iso2 is not None:
             flows_rich = flows_rich.filter(destination_iso2_field.in_(to_list(destination_iso2)))
 
@@ -177,6 +189,8 @@ class VoyageResource(Resource):
         if "destination_iso2" in result.columns:
             result = self.fill_country(result, iso2_column="destination_iso2", country_column='destination_country')
 
+        # Rolling average
+        result = self.roll_average(result = result, aggregate_by=aggregate_by, rolling_days=rolling_days)
 
         # If bulk and departure berth is coal, replace commodity with coal
         if format == "csv":
@@ -305,3 +319,27 @@ class VoyageResource(Resource):
 
         query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
         return query
+
+
+    def roll_average(self, result, aggregate_by, rolling_days):
+
+        if rolling_days is not None:
+            date_column = None
+            if aggregate_by is not None and "departure_date" in aggregate_by:
+                date_column = "departure_date"
+            if aggregate_by is not None and "arrival_date" in aggregate_by:
+                date_column = "arrival_date"
+            if date_column is None:
+                logger.warning("No date to roll-average with. Not doing anything")
+            else:
+
+                result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
+                result = result \
+                    .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "quantity"]]) \
+                    .apply(lambda x: x.set_index(date_column) \
+                           .resample("D").sum().fillna(0) \
+                           .rolling(rolling_days, min_periods=1) \
+                           .mean()) \
+                    .reset_index()
+
+        return result

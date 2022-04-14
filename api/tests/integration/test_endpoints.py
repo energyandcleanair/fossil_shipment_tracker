@@ -70,6 +70,8 @@ def test_voyage(app):
         assert base.ONGOING in set([x['status'] for x in data])
         assert base.COMPLETED in set([x['status'] for x in data])
         assert all([x['arrival_date_utc'] is None or x['arrival_date_utc'] > x['departure_date_utc'] for x in data])
+        assert all([x['arrival_date_utc'] is not None for x in data if x['status'] == base.COMPLETED])
+        assert all([x['arrival_date_utc'] is None for x in data if x['status'] == base.ONGOING])
 
         # Test commodity parameter
         params = {"format": "json", "commodity": "crude_oil"}
@@ -123,6 +125,20 @@ def test_voyage(app):
         params = {"format": "geojson", "id": -9999}
         response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
         assert response.status_code == HTTPStatus.NO_CONTENT
+
+
+def test_voyage_rolling(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        #TODO find a relevant test
+        params = {"format": "json", "rolling_days": 7, "aggregate_by": "departure_date,destination_country,status"}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        assert base.ONGOING in set([x['status'] for x in data])
+        assert base.COMPLETED in set([x['status'] for x in data])
 
 
 def test_position(app):
