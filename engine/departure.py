@@ -76,7 +76,9 @@ def update(date_from="2022-01-01",
                         base.OIL_PRODUCTS,
                         base.OIL_OR_CHEMICAL,
                         base.COAL,
-                        base.BULK]
+                        base.BULK],
+           ship_imo=None,
+           unlocode=None
            ):
     print("=== Update departures ===")
     # Look for relevant PortCalls without associated departure
@@ -89,16 +91,23 @@ def update(date_from="2022-01-01",
         PortCall.port_operation.in_(["load"]),
         ~PortCall.id.in_(subquery),
         PortCall.port_id.in_(subquery_ports)) \
-        .join(Ship, PortCall.ship_imo == Ship.imo)
+        .join(Ship, PortCall.ship_imo == Ship.imo) \
+        .join(Port, PortCall.port_id == Port.id)
 
     if commodities:
-        dangling_portcalls = dangling_portcalls.filter(Ship.commodity.in_(commodities))
+        dangling_portcalls = dangling_portcalls.filter(Ship.commodity.in_(to_list(commodities)))
 
     if min_dwt is not None:
         dangling_portcalls = dangling_portcalls.filter(Ship.dwt >= min_dwt)
 
     if date_from is not None:
         dangling_portcalls = dangling_portcalls.filter(PortCall.date_utc >= to_datetime(date_from))
+
+    if ship_imo is not None:
+        dangling_portcalls = dangling_portcalls.filter(PortCall.ship_imo.in_(to_list(ship_imo)))
+
+    if unlocode is not None:
+        dangling_portcalls = dangling_portcalls.filter(Port.unlocode.in_(to_list(unlocode)))
 
     dangling_portcalls = dangling_portcalls.all()
 

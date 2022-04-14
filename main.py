@@ -12,10 +12,11 @@ import base
 
 
 def update():
-    # portcall.update_departures_from_russia(unlocode="FIKVH", date_from="2021-12-01")
+    # portcall.update_departures_from_russia()
     # portcall.fill_departure_gaps(date_from="2021-12-01", date_to="2022-01-01")
-    # departure.update(date_from="2021-12-01")
-    arrival.update()
+    # departure.update(ship_imo='9248552')
+    # departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN'], commodities=base.GENERAL_CARGO)
+    # arrival.update(commodities=base.GENERAL_CARGO)
     flow.update(date_from="2021-12-01")
     position.update()
     destination.update()

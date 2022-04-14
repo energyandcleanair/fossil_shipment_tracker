@@ -19,14 +19,10 @@ def update(min_dwt=base.DWT_MIN,
            limit=None,
            date_from="2022-01-01",
            date_to=None,
-           commodities=[base.LNG,
-                        base.CRUDE_OIL,
-                        base.OIL_PRODUCTS,
-                        base.OIL_OR_CHEMICAL,
-                        base.COAL,
-                        base.BULK],
+           commodities=None,
            ship_imo=None,
            unlocode=None):
+
     print("=== Arrival update ===")
 
     # We take dangling departures, and try to find the next arrival
