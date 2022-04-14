@@ -7,6 +7,7 @@ from base.models import Ship, Departure, Flow, Position, Arrival, Port, Destinat
 import sqlalchemy as sa
 from sqlalchemy import func, or_
 from tqdm import tqdm
+from base.db_utils import execute_statement
 from difflib import SequenceMatcher
 import numpy as np
 
@@ -40,9 +41,7 @@ def update_flow_last_position():
 
     update = Flow.__table__.update().values(last_position_id=flows_w_last_position.c.position_id) \
         .where(Flow.__table__.c.id == flows_w_last_position.c.id)
-    from base.db import engine
-    with engine.connect() as con:
-        con.execute(update)
+    execute_statement(update)
 
 
 def update(commodities=None, imo=None, flow_id=None):

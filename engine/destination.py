@@ -10,7 +10,7 @@ from sqlalchemy import func, or_
 from tqdm import tqdm
 from difflib import SequenceMatcher
 import numpy as np
-
+from base.db_utils import execute_statement
 
 def update():
     print("=== Destination update ===")
@@ -43,9 +43,7 @@ def update_matching():
                 )
         )
 
-        from base.db import engine
-        with engine.connect() as con:
-            con.execute(update)
+        execute_statement(update)
 
 
         # Using datalastic to query port information
@@ -108,8 +106,7 @@ def update_matching():
             condition = or_(*[Destination.name.op('~')(regexp) for regexp in regexps])
             update = Destination.__table__.update().values(iso2=key) \
                 .where(condition)
-            with engine.connect() as con:
-                con.execute(update)
+            execute_statement(update)
 
 
         # "For orders" should be unknown
@@ -119,9 +116,7 @@ def update_matching():
             Destination.__table__.c.name.ilike('%FOR...ORDER%'),
             Destination.__table__.c.name.ilike('%FOR_ORDER%'),
         ))
-
-        with engine.connect() as con:
-                con.execute(update)
+        execute_statement(update)
 
 
 def update_from_positions():
@@ -148,8 +143,7 @@ def update_from_positions():
 
     update = Flow.__table__.update().values(last_destination_name=flows_w_last_position.c.destination_name) \
         .where(Flow.__table__.c.id == flows_w_last_position.c.id)
-    with engine.connect() as con:
-        con.execute(update)
+    execute_statement(update)
 
 
     # For ongoing flows still missing a destination
@@ -206,7 +200,6 @@ def update_from_voyageinfo(commodities = [base.LNG,
 
     update = Flow.__table__.update().values(last_destination_name=new_destinations.c.destination_name) \
         .where(Flow.__table__.c.id == new_destinations.c.flow_id)
-    with engine.connect() as con:
-        con.execute(update)
+    execute_statement(update)
 
     return

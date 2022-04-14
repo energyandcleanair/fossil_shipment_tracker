@@ -16,6 +16,15 @@ meta.bind = engine
 meta.reflect(views=True)
 
 
+def execute_statement(stmt, print_result=True):
+    with engine.connect() as con:
+        con = con.execution_options(isolation_level="AUTOCOMMIT")
+        con.execute(stmt)
+        # if print_result:
+        #     for row in rs:
+        #         print(row)
+
+
 def get_upsert_method(constraint_name):
     def upsert(table, conn, keys, data_iter):
         upsert_args = {"constraint": constraint_name}

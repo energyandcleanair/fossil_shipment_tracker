@@ -143,7 +143,8 @@ def detect_arrival_berths(flow_id=None, min_hours_at_berth=4):
     if flow_id is not None:
         flows_to_update = flows_to_update.filter(Flow.id.in_(to_list(flow_id)))
 
-    berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc, Berth.port_unlocode, Arrival.port_id) \
+    berths = session.query(Flow.id, Berth.id, Position.id, Position.date_utc, Position.navigation_status,
+                 Berth.port_unlocode, Arrival.port_id) \
         .filter(Flow.id.in_(flows_to_update)) \
         .filter(sa.or_(
             Position.navigation_status == "Moored",
@@ -160,16 +161,20 @@ def detect_arrival_berths(flow_id=None, min_hours_at_berth=4):
 
     berths_df = pd.read_sql(berths.statement, session.bind)
 
-    berths_df.columns = ["flow_id", "berth_id", "position_id", "position_date_utc", "berth_port_unlocode",
-                         "arrival_port_id"]
+    berths_df.columns = ["flow_id", "berth_id", "position_id", "position_date_utc",
+                         "navigation_status", "berth_port_unlocode", "arrival_port_id"]
+
+    berths_df["has_moored"] = berths_df.navigation_status == "Moored"
 
     # They should stay minimum n-hours
     berths_agg = berths_df \
         .sort_values(["flow_id", "berth_id", 'position_date_utc']) \
         .groupby(["flow_id", "berth_id"]) \
-        .agg(min_date_utc=('position_date_utc', 'min'),
-             max_date_utc=('position_date_utc', 'max'),
-             position_id=('position_id', 'first')) \
+        .agg(
+            has_moored=('has_moored', 'max'),
+            min_date_utc=('position_date_utc', 'min'),
+            max_date_utc=('position_date_utc', 'max'),
+            position_id=('position_id', 'first')) \
         .reset_index()
 
     if len(berths_agg) == 0:
@@ -180,6 +185,7 @@ def detect_arrival_berths(flow_id=None, min_hours_at_berth=4):
 
     if len(berths_agg_ok) == 0:
         return None
+
     # Only keep moored if any
     berths_agg_ok = berths_agg_ok.groupby(['flow_id'])["has_moored"].max().reset_index() \
         .merge(berths_agg_ok)

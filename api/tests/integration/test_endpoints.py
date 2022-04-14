@@ -139,6 +139,7 @@ def test_voyage_rolling(app):
         assert len(data) > 0
         assert base.ONGOING in set([x['status'] for x in data])
         assert base.COMPLETED in set([x['status'] for x in data])
+        assert all(["departure_date" in x.keys() for x in data])
 
 
 def test_position(app):
