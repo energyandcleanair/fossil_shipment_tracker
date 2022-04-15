@@ -120,7 +120,7 @@ next_departure_full AS (
         departures_russia_full d
         LEFT JOIN next_departure nd ON d.id = nd.departure_portcall_id
     -- very important not to erase or modify previously completed flows
-    WHERE departure_portcall_id NOT IN (
+    WHERE d.id NOT IN (
             SELECT
                 id
             FROM

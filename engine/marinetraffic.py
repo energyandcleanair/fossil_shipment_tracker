@@ -242,7 +242,7 @@ class Marinetraffic:
         :param filter:
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
-        delta_time = dt.timedelta(hours=4)
+        delta_time = "12H"
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
         if date_to is None:
@@ -257,14 +257,15 @@ class Marinetraffic:
 
         portcalls = []
         filtered_portcalls = []
-        while not filtered_portcalls and \
-            ((date_from < date_to and not go_backward) or \
-             (date_from > date_to and go_backward)):
-            date_from_call = min(date_from, date_from + direction * delta_time)
-            if go_backward:
-                date_to_call = max(date_to, max(date_from, date_from + direction * delta_time))
-            else:
-                date_to_call = min(date_to, max(date_from, date_from + direction * delta_time))
+        import pandas as pd
+
+        intervals = list(pd.interval_range(start=min(date_from, date_to), end=max(date_from, date_to), freq=delta_time))
+        if go_backward:
+            intervals.reverse()
+
+        for interval in intervals:
+            date_from_call = interval.left.to_pydatetime()
+            date_to_call = interval.right.to_pydatetime()
 
             period_portcalls = cls.get_portcalls_between_dates(imo=imo,
                                                                unlocode=unlocode,
@@ -278,7 +279,8 @@ class Marinetraffic:
             else:
                 filtered_portcalls.extend(period_portcalls)
 
-            date_from += (delta_time * direction)
+            if filtered_portcalls:
+                break
         
         if ncredits > 0:
             print("%d credits used" % (ncredits,))

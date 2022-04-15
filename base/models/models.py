@@ -102,8 +102,8 @@ class FlowDepartureBerth(Base):
     For each flow, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"), unique=True)
-    berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE", ondelete="CASCADE"))
 
     # Optional
     position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"))
@@ -119,8 +119,8 @@ class FlowArrivalBerth(Base):
     For each flow, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"), unique=True)
-    berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE"))
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE", ondelete="CASCADE"))
 
     # Optional
     position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"))
@@ -198,7 +198,7 @@ class Destination(Base):
 
 class Trajectory(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE"), unique=True)
+    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
     geometry = Column(Geometry('LINESTRING', srid=4326))
 
     __tablename__ = DB_TABLE_TRAJECTORY

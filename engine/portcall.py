@@ -164,7 +164,7 @@ def upload_portcalls(portcalls):
                     continue
             else:
                 if "unique_portcall" in str(e):
-                    logger.warning("Failed to add portcall. Duplicated portcall: %s"%(str(e).split("\n")[0]))
+                    logger.warning("Failed to add portcall. Duplicated portcall: %s" % (str(e).split("\n")[0]))
                 else:
                     logger.warning("Failed to add portcall: %s" % (str(e).split("\n")[0]))
                 continue
@@ -215,7 +215,8 @@ def get_next_portcall(date_from,
             filtered_cached_portcalls.sort(key=lambda x: x.date_utc, reverse=True)
         else:
             filtered_cached_portcalls.sort(key=lambda x: x.date_utc)
-        return filtered_cached_portcalls[0]
+        if cache_only:
+            return filtered_cached_portcalls[0]
 
     if cache_only:
         return None
@@ -258,7 +259,7 @@ def get_next_portcall(date_from,
                                                                        arrival_or_departure=arrival_or_departure,
                                                                        go_backward=go_backward)
 
-    upload_portcalls(portcalls)
+        upload_portcalls(portcalls)
 
     return filtered_portcall
 
@@ -362,10 +363,25 @@ def find_arrival(departure_portcall,
 
     if next_departure:
         # Then look backward for a relevant arrival
-        arrival = get_next_portcall(imo=next_departure.ship_imo,
+
+        # But only go until the next arrival (backward)
+        cached_arrival = get_next_portcall(imo=next_departure.ship_imo,
                                     arrival_or_departure="arrival",
                                     date_from=next_departure.date_utc,
                                     date_to=departure_portcall.date_utc,
+                                    filter=filter_arrival,
+                                    go_backward=True,
+                                    cache_only=True)
+
+        if cached_arrival:
+            date_to = cached_arrival.date_utc + dt.timedelta(minutes=1)
+        else:
+            date_to = departure_portcall.date_utc
+
+        arrival = get_next_portcall(imo=next_departure.ship_imo,
+                                    arrival_or_departure="arrival",
+                                    date_from=next_departure.date_utc,
+                                    date_to=date_to,
                                     filter=filter_arrival,
                                     go_backward=True,
                                     cache_only=False)

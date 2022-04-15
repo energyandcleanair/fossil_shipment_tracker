@@ -3,7 +3,51 @@ from base.db import session
 from base.utils import to_datetime, to_list
 import base
 import sqlalchemy as sa
+from sqlalchemy import func
 from base.models import PortCall, Departure, Arrival, Ship, Port, Flow
+
+
+
+def get_departures_with_arrival_too_remote_from_next_departure(min_timedelta,
+                                                               min_dwt=None, commodities=None,
+                                                               date_from=None, ship_imo=None, date_to=None,
+                                                               unlocode=None):
+
+    next_departure_date = func.lead(Departure.date_utc).over(
+                            Departure.ship_imo,
+                            Departure.date_utc).label('next_date_utc')
+
+    subq1 = session.query(Departure,
+                          next_departure_date,
+                          Arrival.date_utc.label('arrival_date_utc')) \
+        .join(Arrival, Arrival.departure_id == Departure.id).subquery()
+
+    query = session.query(Departure) \
+        .join(subq1, Departure.id == subq1.c.id) \
+        .join(PortCall, PortCall.id == Departure.portcall_id) \
+        .join(Ship, PortCall.ship_imo == Ship.imo) \
+        .join(Port, Departure.port_id == Port.id) \
+        .filter((subq1.c.next_date_utc - subq1.c.arrival_date_utc) > min_timedelta)
+
+    if min_dwt is not None:
+        query = query.filter(Ship.dwt >= min_dwt)
+
+    if date_from is not None:
+        query = query.filter(Departure.date_utc >= to_datetime(date_from))
+
+    if date_to is not None:
+        query = query.filter(Departure.date_utc <= to_datetime(date_to))
+
+    if commodities is not None:
+        query = query.filter(Ship.commodity.in_(to_list(commodities)))
+
+    if ship_imo is not None:
+        query = query.filter(Ship.imo.in_(to_list(ship_imo)))
+
+    if unlocode is not None:
+        query = query.filter(Port.unlocode.in_(to_list(unlocode)))
+
+    return query.order_by(Departure.date_utc).all()
 
 
 def get_departures_without_arrival(min_dwt=None, commodities=None,

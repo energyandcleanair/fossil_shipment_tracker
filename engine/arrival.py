@@ -7,7 +7,7 @@ from engine import departure
 from engine import portcall
 from base.logger import logger
 from base.db import session
-from base.models import Arrival, Flow, Port, PortCall
+from base.models import Arrival, Flow, Port, PortCall, Departure, FlowArrivalBerth, Trajectory
 
 
 def get_dangling_arrivals():
@@ -21,17 +21,28 @@ def update(min_dwt=base.DWT_MIN,
            date_to=None,
            commodities=None,
            ship_imo=None,
-           unlocode=None):
+           unlocode=None,
+           force_for_arrival_to_departure_greater_than=None):
 
     print("=== Arrival update ===")
 
     # We take dangling departures, and try to find the next arrival
     dangling_departures = departure.get_departures_without_arrival(min_dwt=min_dwt,
-                                                                   commodities=commodities,
-                                                                   date_from=date_from,
-                                                                   date_to=date_to,
-                                                                   ship_imo=ship_imo,
-                                                                   unlocode=unlocode)
+                                                                       commodities=commodities,
+                                                                       date_from=date_from,
+                                                                       date_to=date_to,
+                                                                       ship_imo=ship_imo,
+                                                                       unlocode=unlocode)
+    if force_for_arrival_to_departure_greater_than is not None:
+        dangling_departures.extend(departure.get_departures_with_arrival_too_remote_from_next_departure(
+            min_timedelta=force_for_arrival_to_departure_greater_than,
+            min_dwt=min_dwt,
+            commodities=commodities,
+            date_from=date_from,
+            date_to=date_to,
+            ship_imo=ship_imo,
+            unlocode=unlocode))
+
 
     if limit is not None:
         # For debugging without taking too many credits
@@ -52,21 +63,42 @@ def update(min_dwt=base.DWT_MIN,
         departure_portcall = PortCall.query.filter(PortCall.id == d.portcall_id).first()
         imo = departure_portcall.ship_imo
         arrival_portcall = portcall.find_arrival(departure_portcall=departure_portcall)
+
         if arrival_portcall:
-            data = {
-                "departure_id": d.id,
-                "method_id": "python",
-                "date_utc": arrival_portcall.date_utc,
-                "port_id": arrival_portcall.port_id,
-                "portcall_id": arrival_portcall.id
-            }
-            arrival = Arrival(**data)
-            session.add(arrival)
-            try:
+
+            existing_arrival = Arrival.query.filter(Arrival.departure_id == d.id).first()
+            if existing_arrival is not None and existing_arrival.portcall_id != arrival_portcall.id:
+                # Update
+                existing_arrival.date_utc = arrival_portcall.date_utc
+                existing_arrival.port_id = arrival_portcall.port_id
+                existing_arrival.portcall_id = arrival_portcall.id
+                existing_arrival.method_id = "python"
                 session.commit()
-            except sqlalchemy.exc.IntegrityError:
-                logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
-                session.rollback()
+
+                # And remove associated trajectories, berths etc
+                existing_flow = Flow.query.filter(Flow.departure_id == d.id).first()
+                if existing_flow is not None:
+                    session.query(FlowArrivalBerth).filter(FlowArrivalBerth.flow_id == existing_flow.id).delete()
+                    session.query(Trajectory).filter(Trajectory.flow_id == existing_flow.id).delete()
+
+                session.commit()
+
+            else:
+                # There was no such arrival
+                data = {
+                    "departure_id": d.id,
+                    "method_id": "python",
+                    "date_utc": arrival_portcall.date_utc,
+                    "port_id": arrival_portcall.port_id,
+                    "portcall_id": arrival_portcall.id
+                }
+                arrival = Arrival(**data)
+                session.add(arrival)
+                try:
+                    session.commit()
+                except sqlalchemy.exc.IntegrityError:
+                    logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
+                    session.rollback()
 
         else:
             logger.info(
