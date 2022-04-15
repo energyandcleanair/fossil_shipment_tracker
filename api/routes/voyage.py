@@ -332,13 +332,18 @@ class VoyageResource(Resource):
             if date_column is None:
                 logger.warning("No date to roll-average with. Not doing anything")
             else:
+                min_date = result[date_column].min()
+                max_date = result[date_column].max() # change your date here
+                daterange = pd.date_range(min_date, max_date).rename(date_column)
 
                 result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
                 result = result \
                     .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "quantity"]]) \
                     .apply(lambda x: x.set_index(date_column) \
-                           .resample("D").sum().fillna(0) \
-                           .rolling(rolling_days, min_periods=1) \
+                           .resample("D").sum() \
+                           .reindex(daterange) \
+                           .fillna(0) \
+                           .rolling(rolling_days, min_periods=rolling_days) \
                            .mean()) \
                     .reset_index()
 

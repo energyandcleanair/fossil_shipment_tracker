@@ -18,7 +18,7 @@ def update():
     # departure.update(ship_imo='9248552')
     # departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN'], commodities=base.GENERAL_CARGO)
     arrival.update(force_for_arrival_to_departure_greater_than=dt.timedelta(hours=24*10))
-    # flow.update(date_from="2021-12-01")
+    flow.update(date_from="2021-12-01")
     position.update()
     destination.update()
     berth.update()
