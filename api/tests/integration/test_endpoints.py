@@ -96,8 +96,6 @@ def test_voyage(app):
         assert all([x['destination_iso2'] == "IT" for x in data])
 
 
-
-
         params = {"format": "geojson"}
         response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
@@ -132,7 +130,7 @@ def test_voyage_rolling(app):
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
         #TODO find a relevant test
-        params = {"format": "json", "rolling_days": 7, "aggregate_by": "departure_date,destination_country,status"}
+        params = {"format": "json", "rolling_days": 7, "aggregate_by": "departure_date,destination_country,commodity,status"}
         response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
@@ -140,6 +138,7 @@ def test_voyage_rolling(app):
         assert base.ONGOING in set([x['status'] for x in data])
         assert base.COMPLETED in set([x['status'] for x in data])
         assert all(["departure_date" in x.keys() for x in data])
+
 
 
 def test_position(app):
@@ -205,7 +204,7 @@ def test_aggregated(app):
             assert len(data) > 0
             data_df = pd.DataFrame(data)
 
-            expected_columns = set(aggregate_by + ['commodity', 'unit', 'quantity', 'ship_dwt'])
+            expected_columns = set(aggregate_by + ['value_tonne', 'value_m3', 'ship_dwt', 'value_eur'])
 
             if "departure_port" in aggregate_by:
                 expected_columns.update(["departure_port_name", "departure_unlocode", "departure_iso2", "departure_country"])
@@ -223,14 +222,16 @@ def test_aggregated(app):
 
             assert set(data_df.columns) == expected_columns
 
-            assert set(data_df.commodity.unique()) < set([base.OIL_PRODUCTS,
-                                                           base.CRUDE_OIL,
-                                                           base.COAL,
-                                                           base.BULK,
-                                                           base.BULK_NOT_COAL,
-                                                           base.OIL_OR_CHEMICAL,
-                                                           base.OIL_OR_ORE,
-                                                           base.LPG,
-                                                           base.LNG,
-                                                           base.UNKNOWN_COMMODITY
-                                                           ])
+            if "commodity" in aggregate_by:
+                assert set(data_df.commodity.unique()) < set([base.OIL_PRODUCTS,
+                                                               base.CRUDE_OIL,
+                                                               base.COAL,
+                                                               # base.BULK,
+                                                               base.BULK_NOT_COAL,
+                                                               base.OIL_OR_CHEMICAL,
+                                                               base.OIL_OR_ORE,
+                                                               base.LPG,
+                                                               base.LNG,
+                                                               base.UNKNOWN_COMMODITY,
+                                                               base.GENERAL_CARGO
+                                                               ])

@@ -47,3 +47,8 @@ def init_db(drop_first=False):
             raise ValueError("Are you sure you want to delete db?")
 
     Base.metadata.create_all(bind=engine)
+
+
+from pymongo import MongoClient
+import pymongo
+mongo_client = MongoClient(get_env("CREA_MONGODB_URL"))

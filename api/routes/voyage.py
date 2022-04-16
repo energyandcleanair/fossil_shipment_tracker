@@ -2,13 +2,14 @@ import datetime as dt
 import pandas as pd
 import geopandas as gpd
 import json
+import numpy as np
 
 from . import routes_api
 from flask_restx import inputs
 
 
 from base.models import Flow, Ship, Arrival, Departure, Port, Berth,\
-    FlowDepartureBerth, FlowArrivalBerth, Position, Trajectory, Destination
+    FlowDepartureBerth, FlowArrivalBerth, Position, Trajectory, Destination, Price
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list
@@ -31,6 +32,8 @@ import country_converter as coco
 class VoyageResource(Resource):
 
     parser = reqparse.RequestParser()
+
+    # Query content
     parser.add_argument('id', help='id(s) of voyage. Default: returns all of them',
                         default=None, action='split', required=False)
     parser.add_argument('commodity', help='commodity(ies) of interest. Default: returns all of them',
@@ -47,12 +50,16 @@ class VoyageResource(Resource):
     parser.add_argument('destination_iso2', action='split', help='iso2(s) of destination',
                         required=False,
                         default=None)
+    # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
                         help='which variables to aggregate by. Could be any of commodity, status, departure_date, arrival_date, departure_port, departure_country,'
                              'destination_port, destination_country')
     parser.add_argument('rolling_days', type=int, help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=None)
+
+
+    # Query format
     parser.add_argument('format', type=str, help='format of returned results (json, geojson or csv)',
                         required=False, default="json")
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
@@ -93,9 +100,31 @@ class VoyageResource(Resource):
             [
                 (DepartureBerth.commodity.ilike('%coal%'), 'coal'),
                 (ArrivalBerth.commodity.ilike('%coal%'), 'coal'),
+                (Ship.commodity.ilike('%bulk%'), 'bulk_not_coal')
             ],
             else_ = Ship.commodity
         ).label('commodity')
+
+        value_eur_field = (
+            Ship.dwt * Price.eur_per_tonne
+        ).label('value_eur')
+
+        # Technically, we could pivot long -> wide
+        # but since we know there's a single ship per flow
+        # a rename will be faster
+        value_tonne_field = case(
+            [
+                (Ship.unit == 'tonne', Ship.quantity),
+            ],
+            else_=Ship.dwt
+        ).label('value_tonne')
+
+        value_m3_field = case(
+            [
+                (Ship.unit == 'm3', Ship.quantity)
+            ],
+            else_=sa.null()
+        ).label('value_m3')
 
         destination_iso2_field = func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2) \
                                      .label('destination_iso2')
@@ -119,8 +148,9 @@ class VoyageResource(Resource):
                                     Ship.subtype.label("ship_subtype"),
                                     Ship.dwt.label("ship_dwt"),
                                     commodity_field,
-                                    Ship.quantity,
-                                    Ship.unit,
+                                    value_tonne_field,
+                                    value_m3_field,
+                                    value_eur_field,
                                     DepartureBerth.id.label("departure_berth_id"),
                                     DepartureBerth.name.label("departure_berth_name"),
                                     DepartureBerth.commodity.label("departure_berth_commodity"),
@@ -139,7 +169,10 @@ class VoyageResource(Resource):
              .outerjoin(DepartureBerth, DepartureBerth.id == FlowDepartureBerth.berth_id) \
              .outerjoin(ArrivalBerth, ArrivalBerth.id == FlowArrivalBerth.berth_id) \
              .outerjoin(Destination, Flow.last_destination_name == Destination.name) \
-             .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
+             .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id) \
+             .outerjoin(Price, sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
+                                       Price.commodity == commodity_field)) \
+             .filter(destination_iso2_field != "RU")
 
         if id is not None:
             flows_rich = flows_rich.filter(Flow.id.in_(id))
@@ -153,14 +186,14 @@ class VoyageResource(Resource):
         if date_from is not None:
             flows_rich = flows_rich.filter(
                 sa.or_(
-                    Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"),
+                    # Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"),
                     Departure.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d")
                 ))
 
         if date_to is not None:
             flows_rich = flows_rich.filter(
                 sa.or_(
-                    Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
+                    # Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
                     Departure.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d")
                 ))
 
@@ -170,8 +203,10 @@ class VoyageResource(Resource):
         if destination_iso2 is not None:
             flows_rich = flows_rich.filter(destination_iso2_field.in_(to_list(destination_iso2)))
 
+        # Aggregate
         query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)
 
+        # Query
         result = pd.read_sql(query.statement, session.bind)
 
         if len(result) == 0:
@@ -181,8 +216,6 @@ class VoyageResource(Resource):
                 mimetype='application/json')
 
         # Some modifications aorund countries, commodities etc.
-        result.loc[(result.commodity == "bulk"), "commodity"] = "bulk_not_coal"
-
         if "departure_iso2" in result.columns:
             result = self.fill_country(result, iso2_column="departure_iso2", country_column='departure_country')
 
@@ -191,6 +224,111 @@ class VoyageResource(Resource):
 
         # Rolling average
         result = self.roll_average(result = result, aggregate_by=aggregate_by, rolling_days=rolling_days)
+        response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
+                                       aggregate_by=aggregate_by)
+        return response
+
+
+    def fill_country(self, result, iso2_column, country_column):
+
+        cc = coco.CountryConverter()
+
+        def country_convert(x):
+            return cc.convert(names=x.iloc[0], to='name_short', not_found=None)
+
+        result[country_column] = result[[iso2_column]] \
+            .fillna("NULL_COUNTRY_PLACEHOLDER") \
+            .groupby(iso2_column)[iso2_column] \
+            .transform(country_convert)
+
+        result.replace({'NULL_COUNTRY_PLACEHOLDER': None}, inplace=True)
+        return result
+
+
+    def aggregate(self, query, aggregate_by):
+        """Perform aggregation based on user agparameters"""
+
+        if aggregate_by is None:
+            return query
+
+        subquery = query.subquery()
+
+        # Aggregate
+        value_cols = [
+            func.sum(subquery.c.ship_dwt).label("ship_dwt"),
+            func.sum(subquery.c.value_tonne).label("value_tonne"),
+            func.sum(subquery.c.value_m3).label("value_m3"),
+            func.sum(subquery.c.value_eur).label("value_eur")
+        ]
+
+        # Adding must have grouping columns
+        must_group_by = []
+        aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
+        if '' in aggregate_by:
+            aggregate_by.remove('')
+        # Aggregating
+        aggregateby_cols_dict = {
+            'commodity': [subquery.c.commodity],
+            'status': [subquery.c.status],
+
+            'departure_date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
+            'arrival_date': [func.date_trunc('day', subquery.c.arrival_date_utc).label('arrival_date')],
+
+            'departure_port': [subquery.c.departure_port_name, subquery.c.departure_unlocode,
+                               subquery.c.departure_iso2],
+            'departure_country': [subquery.c.departure_iso2],
+            'departure_iso2': [subquery.c.departure_iso2],
+
+            'destination_port': [subquery.c.arrival_port_name, subquery.c.arrival_unlocode,
+                                 subquery.c.destination_iso2],
+            'destination_country': [subquery.c.destination_iso2],
+            'destination_iso2': [subquery.c.destination_iso2]
+        }
+
+        if any([x not in aggregateby_cols_dict for x in aggregate_by]):
+            logger.warning("aggregate_by can only be a selection of %s" % (",".join(aggregateby_cols_dict.keys())))
+            aggregate_by = [x for x in aggregate_by if x in aggregateby_cols_dict]
+
+        groupby_cols = []
+        for x in aggregate_by:
+            groupby_cols.extend(aggregateby_cols_dict[x])
+
+        query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
+        return query
+
+
+    def roll_average(self, result, aggregate_by, rolling_days):
+
+        if rolling_days is not None:
+            date_column = None
+            if aggregate_by is not None and "departure_date" in aggregate_by:
+                date_column = "departure_date"
+            if aggregate_by is not None and "arrival_date" in aggregate_by:
+                date_column = "arrival_date"
+            if date_column is None:
+                logger.warning("No date to roll-average with. Not doing anything")
+            else:
+                min_date = result[date_column].min()
+                max_date = result[date_column].max() # change your date here
+                daterange = pd.date_range(min_date, max_date).rename(date_column)
+
+                result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
+                result = result \
+                    .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "value_tonne", "value_m3", "value_eur"]]) \
+                    .apply(lambda x: x.set_index(date_column) \
+                           .resample("D").sum() \
+                           .reindex(daterange) \
+                           .fillna(0) \
+                           .rolling(rolling_days, min_periods=rolling_days) \
+                           .mean()) \
+                    .reset_index()
+
+        return result
+
+
+    def build_response(self, result, format, nest_in_data, aggregate_by):
+
+        result.replace({np.nan: None}, inplace=True)
 
         # If bulk and departure berth is coal, replace commodity with coal
         if format == "csv":
@@ -247,104 +385,6 @@ class VoyageResource(Resource):
                 mimetype='application/json',
                 headers=headers)
 
-
         return Response(response="Unknown format. Should be either csv, json or geojson",
                         status=HTTPStatus.BAD_REQUEST,
                         mimetype='application/json')
-
-
-    def fill_country(self, result, iso2_column, country_column):
-
-        cc = coco.CountryConverter()
-
-        def country_convert(x):
-            return cc.convert(names=x.iloc[0], to='name_short', not_found=None)
-
-        result[country_column] = result[[iso2_column]] \
-            .fillna("NULL_COUNTRY_PLACEHOLDER") \
-            .groupby(iso2_column)[iso2_column] \
-            .transform(country_convert)
-
-        result.replace({'NULL_COUNTRY_PLACEHOLDER': None}, inplace=True)
-        return result
-
-
-    def aggregate(self, query, aggregate_by):
-        """Perform aggregation based on user agparameters"""
-
-        if aggregate_by is None:
-            return query
-
-        subquery = query.subquery()
-
-        # Aggregate
-        value_cols = [
-            func.sum(subquery.c.ship_dwt).label("ship_dwt"),
-            func.sum(subquery.c.quantity).label("quantity"),
-        ]
-
-        # Adding must have grouping columns
-        must_group_by = ['commodity', 'unit']
-        aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
-        if '' in aggregate_by:
-            aggregate_by.remove('')
-        # Aggregating
-        aggregateby_cols_dict = {
-            'unit': [subquery.c.unit],
-            'commodity': [subquery.c.commodity],
-            'status': [subquery.c.status],
-
-            'departure_date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
-            'arrival_date': [func.date_trunc('day', subquery.c.arrival_date_utc).label('arrival_date')],
-
-            'departure_port': [subquery.c.departure_port_name, subquery.c.departure_unlocode,
-                               subquery.c.departure_iso2],
-            'departure_country': [subquery.c.departure_iso2],
-
-            'destination_port': [subquery.c.arrival_port_name, subquery.c.arrival_unlocode,
-                                 subquery.c.destination_iso2],
-            'destination_country': [subquery.c.destination_iso2]
-        }
-
-        if any([x not in aggregateby_cols_dict for x in aggregate_by]):
-            return Response(
-                status=HTTPStatus.BAD_REQUEST,
-                response={
-                    "msg": "aggregate_by can only be a selection of %s" % (",".join(aggregateby_cols_dict.keys()))},
-                mimetype='application/json')
-
-        groupby_cols = []
-        for x in aggregate_by:
-            groupby_cols.extend(aggregateby_cols_dict[x])
-
-        query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
-        return query
-
-
-    def roll_average(self, result, aggregate_by, rolling_days):
-
-        if rolling_days is not None:
-            date_column = None
-            if aggregate_by is not None and "departure_date" in aggregate_by:
-                date_column = "departure_date"
-            if aggregate_by is not None and "arrival_date" in aggregate_by:
-                date_column = "arrival_date"
-            if date_column is None:
-                logger.warning("No date to roll-average with. Not doing anything")
-            else:
-                min_date = result[date_column].min()
-                max_date = result[date_column].max() # change your date here
-                daterange = pd.date_range(min_date, max_date).rename(date_column)
-
-                result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
-                result = result \
-                    .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "quantity"]]) \
-                    .apply(lambda x: x.set_index(date_column) \
-                           .resample("D").sum() \
-                           .reindex(daterange) \
-                           .fillna(0) \
-                           .rolling(rolling_days, min_periods=rolling_days) \
-                           .mean()) \
-                    .reset_index()
-
-        return result

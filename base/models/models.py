@@ -22,6 +22,7 @@ from . import DB_TABLE_FLOW
 from . import DB_TABLE_FLOWARRIVALBERTH
 from . import DB_TABLE_FLOWDEPARTUREBERTH
 from . import DB_TABLE_MTVOYAGEINFO
+from . import DB_TABLE_PRICE
 
 
 class Ship(Base):
@@ -310,3 +311,11 @@ class MTVoyageInfo(Base):
     __tablename__ = DB_TABLE_MTVOYAGEINFO
 
 
+class Price(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    commodity = Column(String)
+    date = Column(DateTime(timezone=False))
+    eur_per_tonne = Column(Numeric)
+
+    __tablename__ = DB_TABLE_PRICE
+    __table_args__ = (UniqueConstraint('date', 'commodity', name='unique_price'),)

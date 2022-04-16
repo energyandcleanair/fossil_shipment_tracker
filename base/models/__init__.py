@@ -11,6 +11,7 @@ DB_TABLE_TRAJECTORY = "trajectory"
 DB_TABLE_FLOW = "flow"
 DB_TABLE_FLOWARRIVALBERTH = "flowarrivalberth"
 DB_TABLE_FLOWDEPARTUREBERTH = "flowdepartureberth"
+DB_TABLE_PRICE = "price"
 
 # Marine Traffic cache
 DB_TABLE_MTVOYAGEINFO = "voyageinfo"
