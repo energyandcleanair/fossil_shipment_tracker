@@ -9,6 +9,7 @@ COAL = "coal"
 GENERAL_CARGO = "general_cargo"
 BULK_NOT_COAL = "bulk_not_coal"
 UNKNOWN_COMMODITY = "unknown"
+PIPELINE_GAS = "natural_gas"
 
 
 # LOAD STATUS
@@ -17,7 +18,7 @@ PARTIALLY_LADEN = "partially_laden"
 IN_BALLAST = "in_ballast"
 
 
-# FLOW STATUS
+# SHIPMENT STATUS
 ONGOING = "ongoing"
 COMPLETED = "completed"
 UNDETECTED_ARRIVAL = "undetected_arrival"

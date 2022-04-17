@@ -3,7 +3,7 @@ from base.db import session
 import datetime as dt
 import base
 from base.utils import to_list
-from base.models import Ship, Departure, Flow, Position, Arrival, Port, Destination
+from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination
 import sqlalchemy as sa
 from sqlalchemy import func, or_
 from tqdm import tqdm
@@ -17,49 +17,49 @@ def get(imo, date_from, date_to):
     return positions
 
 
-def update_flow_last_position():
+def update_shipment_last_position():
 
-    # add last_position to flow table for faster retrieval
-    flows_w_last_position = session.query(Flow.id,
+    # add last_position to shipment table for faster retrieval
+    shipments_w_last_position = session.query(Shipment.id,
                                           Position.id.label('position_id'),
                                           Position.destination_name,
                                           Position.destination_port_id
                                           ) \
-        .join(Departure, Departure.id == Flow.departure_id) \
-        .outerjoin(Arrival, Arrival.id == Flow.arrival_id) \
+        .join(Departure, Departure.id == Shipment.departure_id) \
+        .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
             sa.and_(
                 Position.date_utc >= Departure.date_utc,
                 sa.or_(Arrival.date_utc == sa.null(),
                        Position.date_utc < Arrival.date_utc),
-                Flow.status != base.UNDETECTED_ARRIVAL,
+                Shipment.status != base.UNDETECTED_ARRIVAL,
             )) \
-        .distinct(Flow.id) \
-        .order_by(Flow.id, Position.date_utc.desc()) \
+        .distinct(Shipment.id) \
+        .order_by(Shipment.id, Position.date_utc.desc()) \
         .subquery()
 
-    update = Flow.__table__.update().values(last_position_id=flows_w_last_position.c.position_id) \
-        .where(Flow.__table__.c.id == flows_w_last_position.c.id)
+    update = Shipment.__table__.update().values(last_position_id=shipments_w_last_position.c.position_id) \
+        .where(Shipment.__table__.c.id == shipments_w_last_position.c.id)
     execute_statement(update)
 
 
-def update(commodities=None, imo=None, flow_id=None):
+def update(commodities=None, imo=None, shipment_id=None):
 
     print("=== Position update ===")
     buffer = dt.timedelta(hours=24)
     # We update position which are still ongoing (no arrival yet)
     # or who are still missing some positions (should have til Arrival + n hours, and from Departure - n_hours)
 
-    flows_positions = session.query(Flow.id.label('flow_id'),
+    shipments_positions = session.query(Shipment.id.label('shipment_id'),
                                     # Departure.ship_imo.label('ship_imo'),
                                     # Departure.date_utc.label('departure_date'),
                                     # Arrival.date_utc.label('arrival_date'),
                                     # Ship.commodity.label('commodity'),
                                     Position.date_utc.label('position_date')
                                     ) \
-        .join(Departure, Flow.departure_id == Departure.id) \
-        .outerjoin(Arrival, Flow.arrival_id == Arrival.id) \
+        .join(Departure, Shipment.departure_id == Departure.id) \
+        .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .outerjoin(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(Position.date_utc >= Departure.date_utc - dt.timedelta(
@@ -70,49 +70,49 @@ def update(commodities=None, imo=None, flow_id=None):
         .subquery()
 
 
-    flows_to_update = session.query(Flow,
+    shipments_to_update = session.query(Shipment,
                                     Departure.ship_imo,
                                     Departure.date_utc.label('departure_date'),
                                     Arrival.date_utc.label('arrival_date'),
                                     Ship.commodity,
-                                    func.min(flows_positions.c.position_date).label('first_date'),
-                                    func.max(flows_positions.c.position_date).label('last_date')
+                                    func.min(shipments_positions.c.position_date).label('first_date'),
+                                    func.max(shipments_positions.c.position_date).label('last_date')
                                     ) \
-        .outerjoin(flows_positions, Flow.id == flows_positions.c.flow_id) \
-        .join(Departure, Flow.departure_id == Departure.id) \
-        .outerjoin(Arrival, Flow.arrival_id == Arrival.id) \
+        .outerjoin(shipments_positions, Shipment.id == shipments_positions.c.shipment_id) \
+        .join(Departure, Shipment.departure_id == Departure.id) \
+        .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
-        .group_by(Flow.id, Departure.ship_imo, Departure.date_utc, Arrival.date_utc, Ship.commodity) \
+        .group_by(Shipment.id, Departure.ship_imo, Departure.date_utc, Arrival.date_utc, Ship.commodity) \
         .having(sa.or_(
                         sa.and_(Arrival.date_utc == sa.null(),
-                                func.max(flows_positions.c.position_date) < dt.datetime.utcnow()-dt.timedelta(hours=12)), # To prevent too much refreshing
+                                func.max(shipments_positions.c.position_date) < dt.datetime.utcnow()-dt.timedelta(hours=12)), # To prevent too much refreshing
                         sa.or_(
-                                   func.min(flows_positions.c.position_date) == sa.null(),
-                                   func.max(flows_positions.c.position_date) < Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
-                                   func.min(flows_positions.c.position_date) > Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
+                                   func.min(shipments_positions.c.position_date) == sa.null(),
+                                   func.max(shipments_positions.c.position_date) < Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
+                                   func.min(shipments_positions.c.position_date) > Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
                                    )
                                )
                 )
 
-    if flow_id is not None:
-        flows_to_update = flows_to_update.filter(Flow.id.in_(to_list(flow_id)))
+    if shipment_id is not None:
+        shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))
 
     if imo is not None:
-        flows_to_update = flows_to_update.filter(Ship.imo.in_(to_list(imo)))
+        shipments_to_update = shipments_to_update.filter(Ship.imo.in_(to_list(imo)))
 
     if commodities is not None:
-        flows_to_update = flows_to_update.filter(Ship.commodity.in_(to_list(commodities)))
+        shipments_to_update = shipments_to_update.filter(Ship.commodity.in_(to_list(commodities)))
 
-    flows_to_update = flows_to_update.order_by(Departure.date_utc.desc()).all()
+    shipments_to_update = shipments_to_update.order_by(Departure.date_utc.desc()).all()
     # Add positions
-    for f in tqdm(flows_to_update):
-        flow = f[0]
+    for f in tqdm(shipments_to_update):
+        shipment = f[0]
         ship_imo = f[1]
         departure_date = f[2]
         arrival_date = f[3] if f[3] is not None else dt.datetime.utcnow()
         first_date = f[5]
         last_date = f[6]
-        # Add a bit of buffer hours, so that next time, we don't update the flows
+        # Add a bit of buffer hours, so that next time, we don't update the shipments
         date_from = departure_date - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
         date_to = arrival_date + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL)
 
@@ -132,11 +132,11 @@ def update(commodities=None, imo=None, flow_id=None):
             if positions:
                 print("Uploading %d positions" % (len(positions),))
                 for p in positions:
-                    p.flow_id = flow.id
+                    p.shipment_id = shipment.id
                     session.add(p)
             session.commit()
 
-    update_flow_last_position()
+    update_shipment_last_position()
 
 
 

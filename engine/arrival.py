@@ -7,11 +7,11 @@ from engine import departure
 from engine import portcall
 from base.logger import logger
 from base.db import session
-from base.models import Arrival, Flow, Port, PortCall, Departure, FlowArrivalBerth, Trajectory
+from base.models import Arrival, Shipment, Port, PortCall, Departure, ShipmentArrivalBerth, Trajectory
 
 
 def get_dangling_arrivals():
-    subquery = session.query(Flow.arrival_id).filter(Flow.arrival_id != sqlalchemy.null())
+    subquery = session.query(Shipment.arrival_id).filter(Shipment.arrival_id != sqlalchemy.null())
     return Arrival.query.filter(~Arrival.id.in_(subquery)).all()
 
 
@@ -76,10 +76,10 @@ def update(min_dwt=base.DWT_MIN,
                 session.commit()
 
                 # And remove associated trajectories, berths etc
-                existing_flow = Flow.query.filter(Flow.departure_id == d.id).first()
-                if existing_flow is not None:
-                    session.query(FlowArrivalBerth).filter(FlowArrivalBerth.flow_id == existing_flow.id).delete()
-                    session.query(Trajectory).filter(Trajectory.flow_id == existing_flow.id).delete()
+                existing_shipment = Shipment.query.filter(Shipment.departure_id == d.id).first()
+                if existing_shipment is not None:
+                    session.query(ShipmentArrivalBerth).filter(ShipmentArrivalBerth.shipment_id == existing_shipment.id).delete()
+                    session.query(Trajectory).filter(Trajectory.shipment_id == existing_shipment.id).delete()
 
                 session.commit()
 

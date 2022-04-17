@@ -2,7 +2,7 @@ from engine import port
 from engine import portcall
 from engine import departure
 from engine import arrival
-from engine import flow
+from engine import shipment
 from engine import berth
 
 
@@ -25,8 +25,8 @@ def test_port(test_db_empty):
 #     return
 #
 #
-# def test_flow(test_db):
-#     # flow.update()
-#     # flow.update_positions()
+# def test_shipment(test_db):
+#     # shipment.update()
+#     # shipment.update_positions()
 #     berth.detect_arrival_berth()
 #     return

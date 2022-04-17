@@ -49,7 +49,7 @@ class BerthResource(Resource):
                 response=berths_df.to_csv(index=False),
                 mimetype="text/csv",
                 headers={"Content-disposition":
-                             "attachment; filename=flows.csv"})
+                             "attachment; filename=shipments.csv"})
 
         if format == "json":
             berths_df.drop(["geometry"], axis=1, inplace=True)

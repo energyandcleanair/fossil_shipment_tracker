@@ -5,7 +5,7 @@ import io
 import pandas as pd
 import base
 import json
-from base.models import Position, FlowArrivalBerth
+from base.models import Position, ShipmentArrivalBerth
 from base.db import session
 
 
@@ -106,8 +106,8 @@ def test_voyage(app):
         assert "geometry" in gdf.columns
 
         # Test cutting trail works
-        voyage_id, date_berthing = session.query(FlowArrivalBerth.flow_id, Position.date_utc) \
-            .join(Position, FlowArrivalBerth.position_id == Position.id) \
+        voyage_id, date_berthing = session.query(ShipmentArrivalBerth.shipment_id, Position.date_utc) \
+            .join(Position, ShipmentArrivalBerth.position_id == Position.id) \
             .first()
 
         params = {"format": "geojson", "id": voyage_id}
@@ -180,7 +180,7 @@ def test_berth(app):
 
 
 
-def test_aggregated(app):
+def test_voyage_aggregated(app):
 
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
@@ -235,3 +235,32 @@ def test_aggregated(app):
                                                                base.UNKNOWN_COMMODITY,
                                                                base.GENERAL_CARGO
                                                                ])
+
+
+def test_counter(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {"format": "json"}
+        response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        data_df = pd.DataFrame(data)
+
+        expected_columns = set(['commodity', 'date', 'destination_region', 'value_tonne', 'value_eur'])
+        assert set(data_df.columns) == expected_columns
+
+        params = {"format": "json", "cumulate": True}
+        response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        data_df = pd.DataFrame(data)
+
+        params = {"format": "json", "rolling_days": 7}
+        response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        data_df = pd.DataFrame(data)

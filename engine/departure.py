@@ -4,7 +4,7 @@ from base.utils import to_datetime, to_list
 import base
 import sqlalchemy as sa
 from sqlalchemy import func
-from base.models import PortCall, Departure, Arrival, Ship, Port, Flow
+from base.models import PortCall, Departure, Arrival, Ship, Port, Shipment
 
 
 
@@ -81,8 +81,8 @@ def get_departures_without_arrival(min_dwt=None, commodities=None,
     return query.order_by(Departure.date_utc).all()
 
 
-def get_departures_without_flow(min_dwt=None, commodities=None, date_from=None, ship_imo=None):
-    subquery = session.query(Flow.departure_id).filter(Flow.departure_id != sa.null())
+def get_departures_without_shipment(min_dwt=None, commodities=None, date_from=None, ship_imo=None):
+    subquery = session.query(Shipment.departure_id).filter(Shipment.departure_id != sa.null())
     query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
         .join(PortCall, PortCall.id == Departure.portcall_id) \
         .join(Ship, PortCall.ship_imo == Ship.imo)

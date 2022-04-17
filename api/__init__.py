@@ -1,10 +1,2 @@
 import urllib
 
-def test_vflow(app):
-
-    # Create a test client using the Flask application configured for testing
-    with app.test_client() as test_client:
-
-        params = {}
-        response = test_client.get('/flow?'+ urllib.parse.urlencode(params))
-        assert response.status_code == 200

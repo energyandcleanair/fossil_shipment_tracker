@@ -8,12 +8,11 @@ import geopandas as gpd
 import pandas as pd
 
 from base.db import engine
+from base.db import meta
 from tqdm import tqdm
-from tqdm.contrib import tzip
-# For upsert: https://stackoverflow.com/questions/55187884/insert-into-postgresql-table-from-pandas-with-on-conflict-update
-meta = sqlalchemy.MetaData()
-meta.bind = engine
-meta.reflect(views=True)
+
+
+
 
 
 def execute_statement(stmt, print_result=True):
@@ -29,6 +28,7 @@ def get_upsert_method(constraint_name):
     def upsert(table, conn, keys, data_iter):
         upsert_args = {"constraint": constraint_name}
         data_list = list(data_iter)
+        global meta
         for data in tqdm(data_list):
             data = {k: data[i] for i, k in enumerate(keys)}
             upsert_args["set_"] = data
@@ -39,8 +39,12 @@ def get_upsert_method(constraint_name):
     return upsert
 
 
-def upsert(df, table, constraint_name, dtype={}):
-
+def upsert(df, table, constraint_name, dtype={}): 
+    global meta
+    if meta is None:
+        meta = sqlalchemy.MetaData()
+        meta.bind = engine
+        meta.reflect(views=False, resolve_fks=False)
 
     if isinstance(df, gpd.GeoDataFrame):
         #TODO upsert not yet supported. Not sure what's the best way to proceed

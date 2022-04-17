@@ -15,14 +15,17 @@ from . import DB_TABLE_SHIP
 from . import DB_TABLE_PORT
 from . import DB_TABLE_TERMINAL
 from . import DB_TABLE_BERTH
+from . import DB_TABLE_COUNTRY
 from . import DB_TABLE_POSITION
 from . import DB_TABLE_DESTINATION
 from . import DB_TABLE_TRAJECTORY
-from . import DB_TABLE_FLOW
-from . import DB_TABLE_FLOWARRIVALBERTH
-from . import DB_TABLE_FLOWDEPARTUREBERTH
+from . import DB_TABLE_SHIPMENT
+from . import DB_TABLE_SHIPMENTARRIVALBERTH
+from . import DB_TABLE_SHIPMENTDEPARTUREBERTH
 from . import DB_TABLE_MTVOYAGEINFO
 from . import DB_TABLE_PRICE
+from . import DB_TABLE_PIPELINEFLOW
+from . import DB_TABLE_COUNTER
 
 
 class Ship(Base):
@@ -98,37 +101,49 @@ class Berth(Base):
     __tablename__ = DB_TABLE_BERTH
 
 
-class FlowDepartureBerth(Base):
+class Country(Base):
+    iso2 = Column(String, unique=True, primary_key=True)
+    iso3 = Column(String)
+    name_official = Column(String)
+    name = Column(String)
+    name_local = Column(String)
+    region = Column(String)
+
+    __tablename__ = DB_TABLE_COUNTRY
+    __table_args__ = (UniqueConstraint('iso2', name='unique_country'),)
+
+
+class ShipmentDepartureBerth(Base):
     """
-    For each flow, lists the berth detected as well as the method used to find it
+    For each shipment, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE", ondelete="CASCADE"))
 
     # Optional
     position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"))
     method_id = Column(String)
 
-    __tablename__ = DB_TABLE_FLOWDEPARTUREBERTH
-    __table_args__ = (UniqueConstraint('flow_id', 'berth_id', name='unique_flowdepartureberth'),
+    __tablename__ = DB_TABLE_SHIPMENTDEPARTUREBERTH
+    __table_args__ = (UniqueConstraint('shipment_id', 'berth_id', name='unique_shipmentdepartureberth'),
                       )
 
 
-class FlowArrivalBerth(Base):
+class ShipmentArrivalBerth(Base):
     """
-    For each flow, lists the berth detected as well as the method used to find it
+    For each shipment, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE", ondelete="CASCADE"))
 
     # Optional
     position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"))
     method_id = Column(String)
 
-    __tablename__ = DB_TABLE_FLOWARRIVALBERTH
-    __table_args__ = (UniqueConstraint('flow_id', 'berth_id', name='unique_flowarrivalberth'),
+    __tablename__ = DB_TABLE_SHIPMENTARRIVALBERTH
+    __table_args__ = (UniqueConstraint('shipment_id', 'berth_id', name='unique_shipmentarrivalberth'),
                       )
 
 
@@ -158,7 +173,7 @@ class Arrival(Base):
     __tablename__ = DB_TABLE_ARRIVAL
 
 
-class Flow(Base):
+class Shipment(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=True)
     arrival_id = Column(BigInteger, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"), unique=True)
@@ -166,7 +181,8 @@ class Flow(Base):
     last_destination_name = Column(String)
     status = Column(String)
 
-    __tablename__ = DB_TABLE_FLOW
+    __tablename__ = DB_TABLE_SHIPMENT
+
 
 
 class Position(Base):
@@ -199,11 +215,11 @@ class Destination(Base):
 
 class Trajectory(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    flow_id = Column(BigInteger, ForeignKey(DB_TABLE_FLOW + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
     geometry = Column(Geometry('LINESTRING', srid=4326))
 
     __tablename__ = DB_TABLE_TRAJECTORY
-    __table_args__ = (Index('idx_trajectory_flow', "flow_id"), )
+    __table_args__ = (Index('idx_trajectory_shipment', "shipment_id"), )
 
 
 class PortCall(Base):
@@ -319,3 +335,29 @@ class Price(Base):
 
     __tablename__ = DB_TABLE_PRICE
     __table_args__ = (UniqueConstraint('date', 'commodity', name='unique_price'),)
+
+
+class PipelineFlow(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    commodity = Column(String)
+    departure_iso2 = Column(String)
+    destination_iso2 = Column(String)
+    date = Column(DateTime(timezone=False))
+    value_tonne = Column(Numeric)
+    value_mwh = Column(Numeric)
+
+    __tablename__ = DB_TABLE_PIPELINEFLOW
+    __table_args__ = (UniqueConstraint('date', 'commodity', 'departure_iso2',
+                                       'destination_iso2', name='unique_pipelineflow'),)
+
+
+class Counter(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    commodity = Column(String)
+    destination_region = Column(String)
+    date = Column(DateTime(timezone=False))
+    value_tonne = Column(Numeric)
+    value_eur = Column(Numeric)
+
+    __tablename__ = DB_TABLE_COUNTER
+    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_region', name='unique_counter'),)

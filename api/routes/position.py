@@ -10,7 +10,7 @@ from sqlalchemy.orm import aliased
 
 
 import base
-from base.models import Flow, Position, FlowDepartureBerth, FlowArrivalBerth, Departure, Arrival, Ship, Berth
+from base.models import Shipment, Position, ShipmentDepartureBerth, ShipmentArrivalBerth, Departure, Arrival, Ship, Berth
 from base.encoder import JsonEncoder
 from base.db import session
 from base.utils import to_datetime, update_geometry_from_wkb
@@ -107,8 +107,8 @@ class PositionResource(Resource):
         DepartureBerth = aliased(Berth)
         ArrivalBerth = aliased(Berth)
 
-        query = session.query(Flow.id.label("voyage_id"),
-                              Flow.status,
+        query = session.query(Shipment.id.label("voyage_id"),
+                              Shipment.status,
                               Position.date_utc.label("date_utc"),
                               Departure.date_utc.label("departure_date_utc"),
                               Arrival.date_utc.label("arrival_date_utc"),
@@ -125,9 +125,9 @@ class PositionResource(Resource):
                               ArrivalBerth.name.label("arrival_berth_name"),
                               ArrivalBerth.commodity.label("arrival_berth_commodity")
                               ) \
-            .join(Departure, Flow.departure_id == Departure.id) \
+            .join(Departure, Shipment.departure_id == Departure.id) \
             .join(Ship, Departure.ship_imo == Ship.imo) \
-            .join(Arrival, Flow.arrival_id == Arrival.id) \
+            .join(Arrival, Shipment.arrival_id == Arrival.id) \
             .join(Position, Position.ship_imo == Departure.ship_imo) \
             .filter(
                 sa.and_(
@@ -135,10 +135,10 @@ class PositionResource(Resource):
                     sa.or_(Arrival.date_utc == sa.null(),
                            Position.date_utc < Arrival.date_utc + dt.timedelta(hours=buffer_hour))
                 )) \
-            .outerjoin(FlowDepartureBerth, FlowDepartureBerth.flow_id == Flow.id) \
-            .outerjoin(FlowArrivalBerth, FlowArrivalBerth.flow_id == Flow.id) \
-            .outerjoin(DepartureBerth, FlowDepartureBerth.berth_id == DepartureBerth.id) \
-            .outerjoin(ArrivalBerth, FlowArrivalBerth.berth_id == ArrivalBerth.id)
+            .outerjoin(ShipmentDepartureBerth, ShipmentDepartureBerth.shipment_id == Shipment.id) \
+            .outerjoin(ShipmentArrivalBerth, ShipmentArrivalBerth.shipment_id == Shipment.id) \
+            .outerjoin(DepartureBerth, ShipmentDepartureBerth.berth_id == DepartureBerth.id) \
+            .outerjoin(ArrivalBerth, ShipmentArrivalBerth.berth_id == ArrivalBerth.id)
 
         if ship_imo is not None:
             query = query.filter(Position.ship_imo.in_(ship_imo))
@@ -150,16 +150,16 @@ class PositionResource(Resource):
             query = query.filter(Position.date_utc <= to_datetime(date_to))
 
         if status is not None:
-            query = query.filter(Flow.status.in_(status))
+            query = query.filter(Shipment.status.in_(status))
 
         if commodities is not None:
             query = query.filter(Ship.commodity.in_(commodities))
 
         if has_departure_berth is not None:
-            query = query.filter(sa.not_((FlowDepartureBerth.id == sa.null()) == has_departure_berth))
+            query = query.filter(sa.not_((ShipmentDepartureBerth.id == sa.null()) == has_departure_berth))
 
         if has_arrival_berth is not None:
-            query = query.filter(sa.not_((FlowArrivalBerth.id == sa.null()) == has_arrival_berth))
+            query = query.filter(sa.not_((ShipmentArrivalBerth.id == sa.null()) == has_arrival_berth))
 
         if speed_max is not None:
             query = query.filter(sa.or_(Position.speed == sa.null(),
@@ -205,7 +205,7 @@ class PositionResource(Resource):
                 headers=headers)
 
         positions_df = update_geometry_from_wkb(positions_df)
-        result_gdf = gpd.GeoDataFrame(positions_df.rename(columns={'flow_id': 'id'}), geometry='geometry')
+        result_gdf = gpd.GeoDataFrame(positions_df.rename(columns={'shipment_id': 'id'}), geometry='geometry')
         if format == "geojson":
             result_geojson = result_gdf.to_json(cls=JsonEncoder)
             if nest_in_data:

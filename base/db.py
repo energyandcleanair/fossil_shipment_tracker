@@ -49,6 +49,10 @@ def init_db(drop_first=False):
     Base.metadata.create_all(bind=engine)
 
 
+# For upsert: https://stackovershipment.com/questions/55187884/insert-into-postgresql-table-from-pandas-with-on-conflict-update
+meta = None
+
+# For old counter data
 from pymongo import MongoClient
 import pymongo
 mongo_client = MongoClient(get_env("CREA_MONGODB_URL"))

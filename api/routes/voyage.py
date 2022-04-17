@@ -8,8 +8,8 @@ from . import routes_api
 from flask_restx import inputs
 
 
-from base.models import Flow, Ship, Arrival, Departure, Port, Berth,\
-    FlowDepartureBerth, FlowArrivalBerth, Position, Trajectory, Destination, Price
+from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
+    ShipmentDepartureBerth, ShipmentArrivalBerth, Position, Trajectory, Destination, Price, Country
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list
@@ -38,7 +38,7 @@ class VoyageResource(Resource):
                         default=None, action='split', required=False)
     parser.add_argument('commodity', help='commodity(ies) of interest. Default: returns all of them',
                         default=None, action='split', required=False)
-    parser.add_argument('status', help='status of flows. Could be any or several of completed, ongoing, undetected_arrival. Default: returns all of them',
+    parser.add_argument('status', help='status of shipments. Could be any or several of completed, ongoing, undetected_arrival. Default: returns all of them',
                         default=None, action='split', required=False)
     parser.add_argument('date_from', help='start date for departure or arrival (format 2020-01-15)',
                         default="2022-01-01", required=False)
@@ -50,11 +50,14 @@ class VoyageResource(Resource):
     parser.add_argument('destination_iso2', action='split', help='iso2(s) of destination',
                         required=False,
                         default=None)
+    parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
+                        required=False,
+                        default=None)
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
                         help='which variables to aggregate by. Could be any of commodity, status, departure_date, arrival_date, departure_port, departure_country,'
-                             'destination_port, destination_country')
+                             'destination_port, destination_country, destination_region')
     parser.add_argument('rolling_days', type=int, help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=None)
 
@@ -69,17 +72,20 @@ class VoyageResource(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-
         params = VoyageResource.parser.parse_args()
+        return self.get_from_params(params)
+
+    def get_from_params(self, params):
         id = params.get("id")
         commodity = params.get("commodity")
         status = params.get("status")
         date_from = params.get("date_from")
         departure_iso2 = params.get("departure_iso2")
         destination_iso2 = params.get("destination_iso2")
+        destination_region = params.get("destination_region")
         date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
-        format = params.get("format")
+        format = params.get("format", "json")
         nest_in_data = params.get("nest_in_data")
         download = params.get("download")
         rolling_days = params.get("rolling_days")
@@ -92,6 +98,7 @@ class VoyageResource(Resource):
         ArrivalBerth = aliased(Berth)
 
         DestinationPort = aliased(Port)
+        DestinationCountry = aliased(Country)
 
 
         # Commodity
@@ -110,7 +117,7 @@ class VoyageResource(Resource):
         ).label('value_eur')
 
         # Technically, we could pivot long -> wide
-        # but since we know there's a single ship per flow
+        # but since we know there's a single ship per shipment
         # a rename will be faster
         value_tonne_field = case(
             [
@@ -130,8 +137,8 @@ class VoyageResource(Resource):
                                      .label('destination_iso2')
 
         # Query with joined information
-        flows_rich = (session.query(Flow.id,
-                                    Flow.status,
+        shipments_rich = (session.query(Shipment.id,
+                                    Shipment.status,
                                     Departure.date_utc.label("departure_date_utc"),
                                     DeparturePort.unlocode.label("departure_unlocode"),
                                     DeparturePort.iso2.label("departure_iso2"),
@@ -142,6 +149,7 @@ class VoyageResource(Resource):
                                     ArrivalPort.name.label("arrival_port_name"),
                                     Destination.name.label("destination_name"),
                                     destination_iso2_field,
+                                    DestinationCountry.region.label("destination_region"),
                                     Ship.imo.label("ship_imo"),
                                     Ship.mmsi.label("ship_mmsi"),
                                     Ship.type.label("ship_type"),
@@ -159,52 +167,56 @@ class VoyageResource(Resource):
                                     ArrivalBerth.name.label("arrival_berth_name"),
                                     ArrivalBerth.commodity.label("arrival_berth_commodity"),
                                     ArrivalBerth.port_unlocode.label("arrival_berth_unlocode"))
-             .join(Departure, Flow.departure_id == Departure.id)
+             .join(Departure, Shipment.departure_id == Departure.id)
              .join(DeparturePort, Departure.port_id == DeparturePort.id)
-             .outerjoin(Arrival, Flow.arrival_id == Arrival.id)
+             .outerjoin(Arrival, Shipment.arrival_id == Arrival.id)
              .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id)
-             .join(Ship, Departure.ship_imo == Ship.imo)) \
-             .outerjoin(FlowDepartureBerth, Flow.id == FlowDepartureBerth.flow_id) \
-             .outerjoin(FlowArrivalBerth, Flow.id == FlowArrivalBerth.flow_id) \
-             .outerjoin(DepartureBerth, DepartureBerth.id == FlowDepartureBerth.berth_id) \
-             .outerjoin(ArrivalBerth, ArrivalBerth.id == FlowArrivalBerth.berth_id) \
-             .outerjoin(Destination, Flow.last_destination_name == Destination.name) \
-             .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id) \
+             .join(Ship, Departure.ship_imo == Ship.imo)
+             .outerjoin(ShipmentDepartureBerth, Shipment.id == ShipmentDepartureBerth.shipment_id)
+             .outerjoin(ShipmentArrivalBerth, Shipment.id == ShipmentArrivalBerth.shipment_id)
+             .outerjoin(DepartureBerth, DepartureBerth.id == ShipmentDepartureBerth.berth_id)
+             .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
+             .outerjoin(Destination, Shipment.last_destination_name == Destination.name)
+             .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
              .outerjoin(Price, sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
-                                       Price.commodity == commodity_field)) \
-             .filter(destination_iso2_field != "RU")
+                                       Price.commodity == commodity_field))
+             .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
+             .filter(destination_iso2_field != "RU"))
 
         if id is not None:
-            flows_rich = flows_rich.filter(Flow.id.in_(id))
+            shipments_rich = shipments_rich.filter(Shipment.id.in_(id))
 
         if commodity is not None:
-            flows_rich = flows_rich.filter(commodity_field.in_(to_list(commodity)))
+            shipments_rich = shipments_rich.filter(commodity_field.in_(to_list(commodity)))
 
         if status is not None:
-            flows_rich = flows_rich.filter(Flow.status.in_(status))
+            shipments_rich = shipments_rich.filter(Shipment.status.in_(status))
 
         if date_from is not None:
-            flows_rich = flows_rich.filter(
+            shipments_rich = shipments_rich.filter(
                 sa.or_(
                     # Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"),
                     Departure.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d")
                 ))
 
         if date_to is not None:
-            flows_rich = flows_rich.filter(
+            shipments_rich = shipments_rich.filter(
                 sa.or_(
                     # Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
                     Departure.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d")
                 ))
 
         if departure_iso2 is not None:
-            flows_rich = flows_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
+            shipments_rich = shipments_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
 
         if destination_iso2 is not None:
-            flows_rich = flows_rich.filter(destination_iso2_field.in_(to_list(destination_iso2)))
+            shipments_rich = shipments_rich.filter(destination_iso2_field.in_(to_list(destination_iso2)))
+
+        if destination_region is not None:
+            shipments_rich = shipments_rich.filter(DestinationCountry.region.in_(to_list(destination_region)))
 
         # Aggregate
-        query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)
+        query = self.aggregate(query=shipments_rich, aggregate_by=aggregate_by)
 
         # Query
         result = pd.read_sql(query.statement, session.bind)
@@ -225,7 +237,7 @@ class VoyageResource(Resource):
         # Rolling average
         result = self.roll_average(result = result, aggregate_by=aggregate_by, rolling_days=rolling_days)
         response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
-                                       aggregate_by=aggregate_by)
+                                       aggregate_by=aggregate_by, download=download)
         return response
 
 
@@ -282,7 +294,8 @@ class VoyageResource(Resource):
             'destination_port': [subquery.c.arrival_port_name, subquery.c.arrival_unlocode,
                                  subquery.c.destination_iso2],
             'destination_country': [subquery.c.destination_iso2],
-            'destination_iso2': [subquery.c.destination_iso2]
+            'destination_iso2': [subquery.c.destination_iso2],
+            'destination_region': [subquery.c.destination_region]
         }
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):
@@ -326,7 +339,7 @@ class VoyageResource(Resource):
         return result
 
 
-    def build_response(self, result, format, nest_in_data, aggregate_by):
+    def build_response(self, result, format, nest_in_data, aggregate_by, download):
 
         result.replace({np.nan: None}, inplace=True)
 
@@ -336,7 +349,7 @@ class VoyageResource(Resource):
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
                 headers={"Content-disposition":
-                             "attachment; filename=flows.csv"})
+                             "attachment; filename=shipments.csv"})
 
         if format == "json":
             if nest_in_data:
@@ -356,15 +369,15 @@ class VoyageResource(Resource):
                     status=HTTPStatus.BAD_REQUEST,
                     mimetype='application/json')
 
-            flow_ids = list([int(x) for x in result.id.unique()])
+            shipment_ids = list([int(x) for x in result.id.unique()])
 
             trajectories = session.query(Trajectory) \
-                .filter(Trajectory.flow_id.in_(flow_ids))
+                .filter(Trajectory.shipment_id.in_(shipment_ids))
 
             trajectories_df = pd.read_sql(trajectories.statement, session.bind)
             trajectories_df = update_geometry_from_wkb(trajectories_df)
             result_gdf = gpd.GeoDataFrame(
-                result.merge(trajectories_df[["flow_id", "geometry"]].rename(columns={'flow_id': 'id'})),
+                result.merge(trajectories_df[["shipment_id", "geometry"]].rename(columns={'shipment_id': 'id'})),
                 geometry='geometry')
             result_geojson = result_gdf.to_json(cls=JsonEncoder)
 
