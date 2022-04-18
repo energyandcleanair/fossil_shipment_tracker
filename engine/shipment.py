@@ -28,7 +28,7 @@ def update(date_from="2022-01-01"):
         sql_content = file.read()
     sql_content = sql_content.replace("date_utc >= '2022-01-01'",
                                       "date_utc >= '%s'" % (to_datetime(date_from).strftime('%Y-%m-%d')))
-    execute_statement(sql_content)
+    execute_statement(sql_content, print_result=True)
 
 
     # # Create a shipment for each dangling departure

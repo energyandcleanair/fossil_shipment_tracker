@@ -2,10 +2,10 @@ WITH completed_departure_portcalls AS (
     SELECT
         departure.portcall_id AS id
     FROM
-        flow
-        LEFT JOIN departure ON flow.departure_id = departure.id
+        shipment
+        LEFT JOIN departure ON shipment.departure_id = departure.id
     WHERE
-        flow.status = 'completed'
+        shipment.status = 'completed'
 ),
 departure_portcalls AS (
     SELECT
@@ -119,7 +119,7 @@ next_departure_full AS (
     FROM
         departures_russia_full d
         LEFT JOIN next_departure nd ON d.id = nd.departure_portcall_id
-    -- very important not to erase or modify previously completed flows
+    -- very important not to erase or modify previously completed shipments
     WHERE d.id NOT IN (
             SELECT
                 id
@@ -150,7 +150,7 @@ previous_arrival AS (
             nextdeparture_portcall_id,
             preva.date_utc DESC
 ),
-completed_flows AS (
+completed_shipments AS (
     SELECT
         *,
         NEXTVAL('departure_id_seq') departure_id,
@@ -159,7 +159,7 @@ completed_flows AS (
 FROM
     previous_arrival
 ),
-uncompleted_flows AS (
+uncompleted_shipments AS (
     SELECT
         *,
         NEXTVAL('departure_id_seq') departure_id,
@@ -178,7 +178,7 @@ FROM
             FROM
                 previous_arrival)
 ),
-flows AS (
+shipments AS (
     SELECT
         departure_portcall_id,
         departure_port_id,
@@ -189,7 +189,7 @@ flows AS (
         arrival_id,
         status
     FROM
-        completed_flows
+        completed_shipments
     UNION ALL
     SELECT
         departure_portcall_id,
@@ -201,7 +201,7 @@ flows AS (
         arrival_id,
         status
     FROM
-        uncompleted_flows
+        uncompleted_shipments
 ),
 inserted_departures AS (
 INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id)
@@ -213,7 +213,7 @@ INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id)
         'postgres',
         departure_portcall_id
     FROM
-        flows
+        shipments
     ON CONFLICT (portcall_id)
         DO UPDATE SET
             port_id = excluded.port_id -- just for id to be returned
@@ -231,8 +231,8 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
         arrival_port_id,
         arrival_portcall_id
     FROM
-        completed_flows
-        LEFT JOIN inserted_departures ON completed_flows.departure_portcall_id = inserted_departures.portcall_id
+        completed_shipments
+        LEFT JOIN inserted_departures ON completed_shipments.departure_portcall_id = inserted_departures.portcall_id
      ON CONFLICT (departure_id)
         DO UPDATE SET
             portcall_id = excluded.portcall_id
@@ -240,7 +240,7 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
             id,
             portcall_id
 ),
-flows_after_insertion AS (
+shipments_after_insertion AS (
     SELECT
         departure_portcall_id,
         inserted_departures.id AS departure_id,
@@ -248,18 +248,18 @@ flows_after_insertion AS (
         inserted_arrivals.id AS arrival_id,
         status
     FROM
-        flows
-        LEFT JOIN inserted_departures ON flows.departure_portcall_id = inserted_departures.portcall_id
-        LEFT JOIN inserted_arrivals ON flows.arrival_portcall_id = inserted_arrivals.portcall_id
+        shipments
+        LEFT JOIN inserted_departures ON shipments.departure_portcall_id = inserted_departures.portcall_id
+        LEFT JOIN inserted_arrivals ON shipments.arrival_portcall_id = inserted_arrivals.portcall_id
 ),
-inserted_flows AS (
-INSERT INTO flow (departure_id, arrival_id, status)
+inserted_shipments AS (
+INSERT INTO shipment (departure_id, arrival_id, status)
     SELECT
         departure_id,
         arrival_id,
         status
     FROM
-        flows_after_insertion
+        shipments_after_insertion
     ON CONFLICT (departure_id)
         DO UPDATE SET
             arrival_id = EXCLUDED.arrival_id,
@@ -273,7 +273,7 @@ INSERT INTO flow (departure_id, arrival_id, status)
         status,
         count(*)
     FROM
-        inserted_flows
+        inserted_shipments
     GROUP BY
         1;
 

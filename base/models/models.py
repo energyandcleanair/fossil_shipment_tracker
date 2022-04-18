@@ -3,6 +3,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import validates
 from sqlalchemy import UniqueConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
+import datetime as dt
+
 
 import base
 from base.db import Base
@@ -242,6 +244,8 @@ class PortCall(Base):
     # To store the whole repsonse in case we missed something
     others = Column(JSONB)
 
+    created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
+
     __tablename__ = DB_TABLE_PORTCALL
     __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
 
@@ -358,6 +362,7 @@ class Counter(Base):
     date = Column(DateTime(timezone=False))
     value_tonne = Column(Numeric)
     value_eur = Column(Numeric)
+    type = Column(String) # observed or estimated
 
     __tablename__ = DB_TABLE_COUNTER
     __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_region', name='unique_counter'),)

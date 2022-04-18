@@ -92,7 +92,8 @@ def update(commodities=None, imo=None, shipment_id=None):
                                    func.min(shipments_positions.c.position_date) > Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
                                    )
                                )
-                )
+                ) \
+        .filter(Shipment.status != base.UNDETECTED_ARRIVAL)
 
     if shipment_id is not None:
         shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))

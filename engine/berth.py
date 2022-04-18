@@ -133,7 +133,7 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4):
     berths_agg_ok = berths_agg_ok[["shipment_id", "berth_id", "position_id", "method_id"]]
     upsert(df=berths_agg_ok,
            table=DB_TABLE_SHIPMENTDEPARTUREBERTH,
-           constraint_name='unique_shipdepartureberth')
+           constraint_name='unique_shipmentdepartureberth')
     return
 
 

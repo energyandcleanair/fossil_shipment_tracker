@@ -22,17 +22,26 @@ def update(min_dwt=base.DWT_MIN,
            commodities=None,
            ship_imo=None,
            unlocode=None,
-           force_for_arrival_to_departure_greater_than=None):
+           force_for_arrival_to_departure_greater_than=None,
+           include_undetected_arrival_shipments=False):
 
     print("=== Arrival update ===")
 
     # We take dangling departures, and try to find the next arrival
+    # As in, the arrival before the next relevant departure (i.e. with discharge)
     dangling_departures = departure.get_departures_without_arrival(min_dwt=min_dwt,
-                                                                       commodities=commodities,
-                                                                       date_from=date_from,
-                                                                       date_to=date_to,
-                                                                       ship_imo=ship_imo,
-                                                                       unlocode=unlocode)
+                                                                   commodities=commodities,
+                                                                   date_from=date_from,
+                                                                   date_to=date_to,
+                                                                   ship_imo=ship_imo,
+                                                                   unlocode=unlocode)
+
+    if not include_undetected_arrival_shipments:
+        undetected_arrival_departures = session.query(Shipment.departure_id) \
+            .filter(Shipment.status == base.UNDETECTED_ARRIVAL).all()
+        dangling_departures = [x for x in dangling_departures if x.id not in
+                               [y[0] for y in undetected_arrival_departures]]
+
     if force_for_arrival_to_departure_greater_than is not None:
         dangling_departures.extend(departure.get_departures_with_arrival_too_remote_from_next_departure(
             min_timedelta=force_for_arrival_to_departure_greater_than,

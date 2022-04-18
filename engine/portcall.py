@@ -361,6 +361,9 @@ def find_arrival(departure_portcall,
                                            use_cache=True,
                                            filter=filter_departure)
 
+        if next_departure is None and next_departure_russia is not None:
+            next_departure = next_departure_russia
+
     if next_departure:
         # Then look backward for a relevant arrival
 

@@ -15,13 +15,15 @@ from tqdm import tqdm
 
 
 
-def execute_statement(stmt, print_result=True):
+def execute_statement(stmt, print_result=False):
     with engine.connect() as con:
         con = con.execution_options(isolation_level="AUTOCOMMIT")
-        con.execute(stmt)
-        # if print_result:
-        #     for row in rs:
-        #         print(row)
+        if print_result:
+            rs = con.execute(stmt)
+            for row in rs:
+                print(row)
+        else:
+            con.execute(stmt)
 
 
 def get_upsert_method(constraint_name):
