@@ -17,6 +17,65 @@ from base.db import session
 from base.models import Counter
 
 
+@routes_api.route('/v0/counter_last', strict_slashes=False)
+class RussiaCounterLastResource(Resource):
+
+    parser = reqparse.RequestParser()
+    parser.add_argument('format', type=str, help='format of returned results (json or csv)',
+                        required=False, default="json")
+
+    @routes_api.expect(parser)
+    def get(self):
+        params = RussiaCounterLastResource.parser.parse_args()
+        format = params.get("format")
+
+        query = Counter.query.filter(Counter.destination_region=="EU")
+        counter = pd.read_sql(query.statement, session.bind)
+        counter.replace({np.nan: None}, inplace=True)
+
+        counter_last = counter.sort_values(['commodity','date']) \
+            .groupby(['commodity']) \
+            .agg(
+                total_tonne=pd.NamedAgg(column='value_tonne', aggfunc=np.sum),
+                 total_eur=pd.NamedAgg(column='value_eur', aggfunc=np.sum),
+                 eur_per_day=pd.NamedAgg(column='value_eur', aggfunc='last'),
+                 date=pd.NamedAgg(column='date', aggfunc='last')) \
+            .reset_index()
+
+        now = dt.datetime.utcnow()
+        counter_last["now"] = now
+        counter_last['total_eur'] = counter_last.total_eur + (now - counter_last.date) / np.timedelta64(1, 'D') * counter_last.eur_per_day
+
+        # Regroup commodities
+        counter_last['commodity'] =  counter_last['commodity'] \
+            .replace(['crude_oil', 'oil_products', 'oil_or_chemical'], 'oil') \
+            .replace(['lng', 'natural_gas'], 'gas') \
+            .replace(['coal'], 'coal')
+
+        counter_last = counter_last.loc[counter_last.commodity.isin(['coal','oil','gas'])]
+
+        counter_last = counter_last.groupby(['commodity']).sum()
+        counter_last.loc["total"] = counter_last.sum()
+        counter_last.reset_index(inplace=True)
+        counter_last['date'] = now
+
+        counter_last['eur_per_sec'] = counter_last['eur_per_day'] / 24 / 3600
+
+        if format == "csv":
+            return Response(
+                response=counter_last.to_csv(index=False),
+                mimetype="text/csv",
+                headers={"Content-disposition":
+                             "attachment; filename=counter_last.csv"})
+
+        if format == "json":
+            return Response(
+                response=json.dumps({"data": counter_last.to_dict(orient="records")}, cls=JsonEncoder),
+                status=200,
+                mimetype='application/json')
+
+
+
 @routes_api.route('/v0/counter', strict_slashes=False)
 class RussiaCounterResource(Resource):
 

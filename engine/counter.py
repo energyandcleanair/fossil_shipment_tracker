@@ -4,7 +4,7 @@ import geopandas as gpd
 from base.logger import logger
 from base.db import session, engine
 from base.db_utils import upsert
-from base.models import Counter, PipelineFlow, Price
+from base.models import Counter, PipelineFlow, Price, Counter
 from base.models import DB_TABLE_COUNTER
 from api.routes.voyage import VoyageResource
 from sqlalchemy import func
@@ -64,19 +64,17 @@ def update():
 
     result["type"] = "observed"
 
-    # Add estimates
-    add_estimates(result)
-
-
-
-
-    # Erase everything
+    # Erase and replace everything
+    Counter.query.delete()
+    session.commit()
     result.to_sql(DB_TABLE_COUNTER,
               con=engine,
-              if_exists="replace",
+              if_exists="append",
               index=False)
+    session.commit()
 
-
+    # Add estimates
+    add_estimates(result)
 
 
 def add_estimates(result):

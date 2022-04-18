@@ -242,6 +242,17 @@ def test_counter(app):
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
         params = {"format": "json"}
+        response = test_client.get('/v0/counter_last?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) >= 4
+        data_df = pd.DataFrame(data)
+
+        expected_columns = set(['date', 'commodity', 'eur_per_sec', 'total_eur'])
+        assert set(data_df.columns) > expected_columns
+
+
+        params = {"format": "json"}
         response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
