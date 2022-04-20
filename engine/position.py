@@ -7,9 +7,14 @@ from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Dest
 import sqlalchemy as sa
 from sqlalchemy import func, or_
 from tqdm import tqdm
-from base.db_utils import execute_statement
 from difflib import SequenceMatcher
 import numpy as np
+import pandas as pd
+
+
+from base.db_utils import execute_statement, upsert
+from base.models import DB_TABLE_POSITION
+
 
 
 def get(imo, date_from, date_to):
@@ -44,7 +49,8 @@ def update_shipment_last_position():
     execute_statement(update)
 
 
-def update(commodities=None, imo=None, shipment_id=None):
+def update(commodities=None, imo=None, shipment_id=None,
+           force_for_those_without_destination=False):
 
     print("=== Position update ===")
     buffer = dt.timedelta(hours=24)
@@ -67,6 +73,9 @@ def update(commodities=None, imo=None, shipment_id=None):
         .filter(sa.or_(
             Arrival.date_utc == sa.null(),
             Position.date_utc <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL) + buffer)) \
+        .filter(sa.or_(
+            not force_for_those_without_destination,
+            Position.destination_name != sa.null())) \
         .subquery()
 
 
@@ -131,11 +140,9 @@ def update(commodities=None, imo=None, shipment_id=None):
         for date in dates:
             positions = get(imo=ship_imo, **date)
             if positions:
-                print("Uploading %d positions" % (len(positions),))
-                for p in positions:
-                    p.shipment_id = shipment.id
-                    session.add(p)
-            session.commit()
+                positions_df = pd.DataFrame([x.__dict__ for x in positions])
+                positions_df.drop('_sa_instance_state', axis=1, inplace=True)
+                upsert(positions_df, table=DB_TABLE_POSITION, constraint_name='unique_position')
 
     update_shipment_last_position()
 

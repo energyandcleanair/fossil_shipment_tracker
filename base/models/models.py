@@ -198,7 +198,9 @@ class Position(Base):
     destination_port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id', onupdate="CASCADE"))
 
     __tablename__ = DB_TABLE_POSITION
-    __table_args__ = (Index('idx_position_ship_imo', "ship_imo"),)
+    __table_args__ = (Index('idx_position_ship_imo', "ship_imo"),
+                      UniqueConstraint('ship_imo', 'date_utc', name='unique_position')
+                      )
 
 
 class Destination(Base):

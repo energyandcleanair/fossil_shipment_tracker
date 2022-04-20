@@ -20,6 +20,7 @@ def update():
 
 
 def update_matching():
+
         # Insert missing ones
         new_destinations = session.query(Shipment.last_destination_name) \
             .filter(Shipment.last_destination_name.notin_(session.query(Destination.name))) \
@@ -54,6 +55,9 @@ def update_matching():
             .join(Shipment, Shipment.last_destination_name == Destination.name) \
             .filter(sa.and_(Shipment.status == base.ONGOING,
                             Destination.iso2 == sa.null())).all()
+
+        still_missings = Destination.query \
+            .filter(Destination.iso2 == sa.null()).all()
 
         for still_missing in tqdm(still_missings):
             looking_name = still_missing.name.replace(" OPL","")
@@ -112,13 +116,8 @@ def update_matching():
 
 
         # "For orders" should be unknown
-        update = Destination.__table__.update().values(type="for_order", iso2=None) \
-            .where(or_(
-            Destination.__table__.c.name.ilike('%FOR ORDER%'),
-            Destination.__table__.c.name.ilike('%FOR...ORDER%'),
-            Destination.__table__.c.name.ilike('%FOR_ORDER%'),
-        ))
-        execute_statement(update)
+      
+      
 
 
 def update_from_positions():

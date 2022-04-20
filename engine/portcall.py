@@ -401,6 +401,7 @@ def fill_departure_gaps(imo=None,
                             base.BULK],
                         date_from=None,
                         date_to=None,
+                        unlocode=None,
                         min_dwt=base.DWT_MIN):
 
     """
@@ -416,21 +417,20 @@ def fill_departure_gaps(imo=None,
     originally_checked_port_ids = [x for x, in session.query(Port.id).filter(Port.check_departure).all()]
     originally_checked_port_unlocodes = [x for x, in session.query(Port.unlocode).filter(Port.check_departure).all()]
 
+    if unlocode is not None:
+        originally_checked_port_unlocodes = [x for x in originally_checked_port_unlocodes if x in to_list(unlocode)]
     # 1/2: update port departures from Russia
-    # filter_impossible = lambda x: False # To force continuing
-    # for unlocode in tqdm(originally_checked_port_unlocodes):
-    #     print(unlocode)
-    #     next_departure = get_next_portcall(date_from=date_from,
-    #                                        date_to=date_to,
-    #                                        arrival_or_departure="departure",
-    #                                        unlocode=unlocode,
-    #                                        cache_only=False,
-    #                                        filter=filter_impossible)
-    #
-    #
-    #
-    #
-    #
+    filter_impossible = lambda x: False # To force continuing
+    for unlocode in tqdm(originally_checked_port_unlocodes):
+        print(unlocode)
+        next_departure = get_next_portcall(date_from=date_from,
+                                           date_to=date_to,
+                                           imo=imo,
+                                           arrival_or_departure="departure",
+                                           unlocode=unlocode,
+                                           cache_only=False,
+                                           filter=filter_impossible)
+
 
     # 2/2: update subsequent departure calls for ships leaving
     query = PortCall.query.filter(
