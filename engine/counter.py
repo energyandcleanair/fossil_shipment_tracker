@@ -18,7 +18,7 @@ def update():
     :return:
     """
     print("=== Counter update ===")
-    date_from = "2022-02-24"
+    date_from = "2022-01-01"
 
     # Get voyage
     pipelineflows = session.query(
@@ -96,8 +96,8 @@ def add_estimates(result):
         x = x.set_index("date") \
             .resample("D").sum() \
             .fillna(0)
-        # cut 3 last days and take the 7-day mean
-        means = x[["value_tonne", "value_eur"]].shift(3).tail(7).mean()
+        # cut 2 last days and take the 7-day mean
+        means = x[["value_tonne", "value_eur"]].shift(2).tail(7).mean()
         x = x.reindex(daterange) \
             .fillna(means)
         return x

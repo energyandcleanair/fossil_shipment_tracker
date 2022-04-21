@@ -76,36 +76,42 @@ def update_matching():
         # Looking for country names in destination.name
         country_regexps = {
             'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$','^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$',
-                   '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$'],
+                   '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$', 'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|^RU |KAV?KAZ$'],
             'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$', '^TOROS$', 'CANAKALE$'],
-            'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$'],
-            'BR': ['[ |,|_]{1}BRAZIL$'],
+            'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$', ' SKAW$|SKGEN$'],
+            'BR': ['[ |,|_]{1}BRAZIL$', '^BR ?PRM|BRPEE'],
             'SE': ['[ |,|_]{1}SWEDEN$'],
-            'IN': ['[ |,|_]{1}INDIA$'],
+            'IN': ['[ |,|_]{1}INDIA$','^INDIA$'],
             'IT': ['[ |,|_]{1}ITALY$'],
-            'GR': ['[ |,|_]{1}GRE[E]?CE$','^VATIKA$'],
+            'GR': ['[ |,|_]{1}GRE[E]?CE$','^VATIKA$','^KALAMATA$'],
             'EG': ['[ |,|_]{1}EGYPT$'],
-            'FR': ['[ |,|_]{1}FRANCE'],
+            'FR': ['[ |,|_]{1}FRANCE','FRFOS'],
             'EE': ['[ |,|_]{1}ESTONIA','TALLIN[\s|\w]*', '^TALLNN$', '^EETIL OPL$'],
             'SG': ['[\s|\w]*SINGAPORE[\s|\w]*'],
             'GB': ['[ |,|_]{1}UK$'],
             'RO': ['[ |,|_]{1}ROMANIA', 'CONSTANTA[\s|\w]*'],
             'ZA': ['[ |,|_]{1}ZA'],
-            'NL': ['^NL [\s|\w]*$', '[ |,|_|\.]{1}NL[\s]?[\w]{3}$'],
-            'KR': ['[ |,|_]{1}S[\.]?KOREA$','^KR [\s|\w]*$'],
+            'NL': ['^NL [\s|\w]*$', '[ |,|_|\.]{1}NL[\s]?[\w]{3}$', 'BORS+ELE'],
+            'KR': ['[ |,|_]{1}S[\.]?KOREA$','^KR [\s|\w]*$', '( |,)KOREA|S\\.KOREA| KR$|KOR |KR_USN'],
             'JP': ['^JP [\s|\w]*$','[ |,|_]{1}JP$'],
-            'CN': ['[ |,|_]{1}CHINA$','^CN[\w]{3}$', '^CN [\s|\w]*$','^HUANG DAO$','^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$'],
-            'MY': ['[ |,|_|/]{1}MALAYSIA$'],
+            'CN': ['[ |,|_]{1}CHINA$','^CN[\w]{3}$', '^CN [\s|\w]*$','^HUANG DAO$','^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$', ' CN$|LAN QIAO$'],
+            'MY': ['[ |,|_|/]{1}MALAYSIA$', 'PELEPAS$'],
             'TW': ['^TW[\s|\w]*','[ |,|_]{1}TW$'],
             'OM': ['[ |,|_|-]{1}OMAN'],
             'ES': ['[ |,|_|-]{1}SPAIN$', '^SP [\s|\w]*$'],
             'LY': ['[ |,|_|-|/]{1}LYBIA$', '^LYBIA$'],
-            'MT': ['[ |,|_|-]{1}MALTA$'],
+            'MT': ['[ |,|_|-]{1}MALTA$','^MALTA OPL$'],
             'IR': ['ANZALI', 'BIK '],
             'YE': ['^YE [\s|\w]*$'],
             'AE': ['[ |,|_]{1}UAE$'],
-            'US': ["^USA$"],
-            'AR': ['ARGENTINA$']
+            'US': ["^USA$|^US "],
+            'AR': ['ARGENTINA$'],
+            'DE': [',GERMA'],
+            'BE': [' BE$'],
+            'NO': ['^NOSGE$'],
+            'FI': ['^KOTKA$'],
+            'BG': [' BG$'],
+            'SK': ['^SK [\s|\w]*$']
         }
 
         for key, regexps in country_regexps.items():
@@ -116,7 +122,18 @@ def update_matching():
 
 
         # "For orders" should be unknown
-      
+        fororders_regexps = [' ORDER|MALTA FOR|GR ORD']
+        condition = or_(*[Destination.name.op('~')(regexp) for regexp in fororders_regexps])
+        update = Destination.__table__.update().values(iso2=base.FOR_ORDERS) \
+            .where(condition)
+        execute_statement(update)
+
+        unknown_regexps = ['BOSP.?ORUS|DRIFTING AREA|GOGLAND|NW EUROPE|GREAT BELT|NW BLACK SEA|NW ?BS|I.?STANBUL|^TR ?IST$']
+        condition = or_(*[Destination.name.op('~')(regexp) for regexp in unknown_regexps])
+        update = Destination.__table__.update().values(iso2=sa.null()) \
+            .where(condition)
+        execute_statement(update)
+
       
 
 

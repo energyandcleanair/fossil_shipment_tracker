@@ -24,3 +24,18 @@ def test_voyage(app):
 
         problematic = v.loc[(v.former_arrival_date_utc > v.departure_date_utc) & (v.status != base.UNDETECTED_ARRIVAL)]
         assert len(problematic) == 0
+
+
+def test_no_coal_in_tanker(app):
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {"format": "json", "commodity": "coal"}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+
+
+        voyages = pd.DataFrame(data)
+        assert voyages.duplicated(subset=['id']).any() == False
+        assert not any(['tanker' in y for y in voyages.ship_type.str.lower().unique()])

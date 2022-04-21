@@ -25,7 +25,7 @@ from sqlalchemy import or_
 from sqlalchemy import func
 from base.utils import update_geometry_from_wkb
 import country_converter as coco
-
+import base
 
 
 @routes_api.route('/v0/voyage', strict_slashes=False)
@@ -90,7 +90,6 @@ class VoyageResource(Resource):
         download = params.get("download")
         rolling_days = params.get("rolling_days")
 
-
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
 
@@ -105,8 +104,10 @@ class VoyageResource(Resource):
         from sqlalchemy import case
         commodity_field = case(
             [
-                (DepartureBerth.commodity.ilike('%coal%'), 'coal'),
-                (ArrivalBerth.commodity.ilike('%coal%'), 'coal'),
+                (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
+                        DepartureBerth.commodity.ilike('%coal%')), 'coal'),
+                (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
+                         ArrivalBerth.commodity.ilike('%coal%')), 'coal'),
                 (Ship.commodity.ilike('%bulk%'), 'bulk_not_coal')
             ],
             else_ = Ship.commodity
@@ -308,7 +309,6 @@ class VoyageResource(Resource):
 
         query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
         return query
-
 
     def roll_average(self, result, aggregate_by, rolling_days):
 

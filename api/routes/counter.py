@@ -15,6 +15,7 @@ from . import routes_api
 from base.encoder import JsonEncoder
 from base.db import session
 from base.models import Counter
+from base.utils import to_datetime
 
 
 @routes_api.route('/v0/counter_last', strict_slashes=False)
@@ -23,7 +24,6 @@ class RussiaCounterLastResource(Resource):
     parser = reqparse.RequestParser()
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
-
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterLastResource.parser.parse_args()
@@ -88,6 +88,8 @@ class RussiaCounterResource(Resource):
                         required=False, default=None)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
+    parser.add_argument('date_from', help='start date for counter data (format 2020-01-15)',
+                        default="2022-02-24", required=False)
 
     @routes_api.expect(parser)
     def get(self):
@@ -96,8 +98,9 @@ class RussiaCounterResource(Resource):
         format = params.get("format")
         cumulate = params.get("cumulate")
         rolling_days = params.get("rolling_days")
+        date_from = params.get("date_from")
 
-        query = Counter.query
+        query = Counter.query.filter(Counter.date >= to_datetime(date_from))
         counter = pd.read_sql(query.statement, session.bind)
         counter.replace({np.nan: None}, inplace=True)
         counter.drop(["id"], axis=1, inplace=True)
