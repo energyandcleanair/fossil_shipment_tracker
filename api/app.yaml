@@ -7,3 +7,9 @@ env_variables:
 entrypoint: gunicorn --log-level debug -b :$PORT -w 8 -t 120 app:app
 automatic_scaling:
   min_instances: 1
+
+handlers:
+- url: /.*
+  secure: always
+  redirect_http_response_code: 301
+  script: auto
