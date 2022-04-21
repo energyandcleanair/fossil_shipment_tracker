@@ -16,7 +16,6 @@ from base.db_utils import execute_statement, upsert
 from base.models import DB_TABLE_POSITION
 
 
-
 def get(imo, date_from, date_to):
     positions = Datalastic.get_positions(imo=imo, date_from=date_from, date_to=date_to)
     return positions
@@ -25,12 +24,22 @@ def get(imo, date_from, date_to):
 def update_shipment_last_position():
 
     # add last_position to shipment table for faster retrieval
+
+    shipment_next_departure_date = session.query(
+        Shipment.id,
+        func.lead(Departure.date_utc).over(
+            Departure.ship_imo,
+            Departure.date_utc).label('date_utc')) \
+    .join(Departure, Departure.id == Shipment.departure_id).subquery()
+
+
     shipments_w_last_position = session.query(Shipment.id,
                                           Position.id.label('position_id'),
                                           Position.destination_name,
                                           Position.destination_port_id
                                           ) \
         .join(Departure, Departure.id == Shipment.departure_id) \
+        .outerjoin(shipment_next_departure_date, shipment_next_departure_date.c.id == Shipment.id) \
         .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
@@ -38,7 +47,8 @@ def update_shipment_last_position():
                 Position.date_utc >= Departure.date_utc,
                 sa.or_(Arrival.date_utc == sa.null(),
                        Position.date_utc < Arrival.date_utc),
-                Shipment.status != base.UNDETECTED_ARRIVAL,
+                sa.or_(shipment_next_departure_date.c.date_utc == sa.null(),
+                       Position.date_utc < shipment_next_departure_date.c.date_utc)
             )) \
         .distinct(Shipment.id) \
         .order_by(Shipment.id, Position.date_utc.desc()) \

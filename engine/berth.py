@@ -73,11 +73,14 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4):
             Position.speed < 0.5)) \
         .join(Departure, Shipment.departure_id == Departure.id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
-        .join(Arrival, Shipment.arrival_id == Arrival.id) \
+        .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
         .join(Berth, func.ST_Contains(Berth.geometry, Position.geometry)) \
         .filter(Position.date_utc >= Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)) \
-        .filter(Position.date_utc <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL)) \
-        .filter((Arrival.date_utc - Position.date_utc) > (Position.date_utc - Departure.date_utc)) \
+        .filter(sa.or_(
+                    sa.and_(Arrival.date_utc == sa.null(),
+                            Position.date_utc <= Departure.date_utc + dt.timedelta(hours=base.BERTH_MAX_HOURS_AFTER_DEPARTURE)),
+                    sa.and_(Arrival.date_utc != sa.null(),
+                            (Arrival.date_utc - Position.date_utc) > (Position.date_utc - Departure.date_utc)))) \
         .order_by(Shipment.id, Berth.id, Position.date_utc) \
         .distinct(Shipment.id, Berth.id, Position.id, Position.date_utc)
 
