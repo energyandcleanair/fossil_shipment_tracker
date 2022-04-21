@@ -92,10 +92,6 @@ def add_estimates(result):
     import datetime as dt
     daterange = pd.date_range(min(result.date), dt.datetime.today()).rename("date")
 
-    import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(8, 6))
-    bp = result.groupby('commodity').plot(x='date', y='value_tonne', ax=ax)
-
     def resample_and_fill(x):
         x = x.set_index("date") \
             .resample("D").sum() \
