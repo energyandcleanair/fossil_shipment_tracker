@@ -1,8 +1,8 @@
  delete from trajectory;
- delete from flowdepartureberth;
- delete from flowarrivalberth;
- delete from flow;
+ delete from shipmentdepartureberth;
+ delete from shipmentarrivalberth;
+ delete from shipment;
  delete from arrival;
  delete from departure;
 
--- then insert flow_refresh.sql
+

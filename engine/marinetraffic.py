@@ -242,7 +242,7 @@ class Marinetraffic:
         :param filter:
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
-        delta_time = "12H"
+        delta_time = dt.timedelta(hours=12)
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
         if date_to is None:
@@ -257,15 +257,21 @@ class Marinetraffic:
 
         portcalls = []
         filtered_portcalls = []
-        import pandas as pd
 
-        intervals = list(pd.interval_range(start=min(date_from, date_to), end=max(date_from, date_to), freq=delta_time))
+        # Splitting in intervals
+        intervals = []
+        start = min(date_from, date_to)
+        end = max(date_from, date_to)
+        while start < end:
+            intervals.append((start, min(start + delta_time, end)))
+            start += delta_time
+
         if go_backward:
             intervals.reverse()
 
         for interval in intervals:
-            date_from_call = interval.left.to_pydatetime()
-            date_to_call = interval.right.to_pydatetime()
+            date_from_call = interval[0]
+            date_to_call = interval[1]
 
             period_portcalls = cls.get_portcalls_between_dates(imo=imo,
                                                                unlocode=unlocode,

@@ -26,12 +26,17 @@ def execute_statement(stmt, print_result=False):
             con.execute(stmt)
 
 
-def get_upsert_method(constraint_name):
+def get_upsert_method(constraint_name, show_progress=True):
     def upsert(table, conn, keys, data_iter):
         upsert_args = {"constraint": constraint_name}
         data_list = list(data_iter)
         global meta
-        for data in tqdm(data_list):
+        if show_progress:
+            data_iterator = tqdm(data_list)
+        else:
+            data_iterator = data_list
+
+        for data in data_iterator:
             data = {k: data[i] for i, k in enumerate(keys)}
             upsert_args["set_"] = data
             insert_stmt = insert(meta.tables[table.name]).values(**data)
@@ -41,7 +46,7 @@ def get_upsert_method(constraint_name):
     return upsert
 
 
-def upsert(df, table, constraint_name, dtype={}): 
+def upsert(df, table, constraint_name, dtype={}, show_progress=True):
     global meta
     if meta is None:
         meta = sqlalchemy.MetaData()
@@ -62,5 +67,5 @@ def upsert(df, table, constraint_name, dtype={}):
                   con=engine,
                   if_exists="append",
                   index=False,
-                  method=get_upsert_method(constraint_name),
+                  method=get_upsert_method(constraint_name, show_progress=show_progress),
                   dtype=dtype)

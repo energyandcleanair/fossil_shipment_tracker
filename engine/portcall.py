@@ -316,7 +316,8 @@ def update_departures_from_russia(
 
 
 def find_arrival(departure_portcall,
-                 date_to=dt.datetime.utcnow()):
+                 date_to=dt.datetime.utcnow(),
+                 cache_only=False):
     """
     Key function that will keep looking for subsequent portcalls
     to find where the boat stopped by looking at next departure with load_status in ballast
@@ -366,7 +367,6 @@ def find_arrival(departure_portcall,
 
     if next_departure:
         # Then look backward for a relevant arrival
-
         # But only go until the next arrival (backward)
         cached_arrival = get_next_portcall(imo=next_departure.ship_imo,
                                     arrival_or_departure="arrival",
@@ -375,6 +375,10 @@ def find_arrival(departure_portcall,
                                     filter=filter_arrival,
                                     go_backward=True,
                                     cache_only=True)
+
+        # Return this one if we wanted to use cache only
+        if cache_only:
+            return cached_arrival
 
         if cached_arrival:
             date_to = cached_arrival.date_utc + dt.timedelta(minutes=1)

@@ -142,7 +142,7 @@ def update(commodities=None, imo=None, shipment_id=None,
             if positions:
                 positions_df = pd.DataFrame([x.__dict__ for x in positions])
                 positions_df.drop('_sa_instance_state', axis=1, inplace=True)
-                upsert(positions_df, table=DB_TABLE_POSITION, constraint_name='unique_position')
+                upsert(positions_df, table=DB_TABLE_POSITION, constraint_name='unique_position', show_progress=False)
 
     update_shipment_last_position()
 

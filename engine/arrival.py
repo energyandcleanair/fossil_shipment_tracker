@@ -23,7 +23,8 @@ def update(min_dwt=base.DWT_MIN,
            ship_imo=None,
            unlocode=None,
            force_for_arrival_to_departure_greater_than=None,
-           include_undetected_arrival_shipments=False):
+           include_undetected_arrival_shipments=True,
+           cache_only=False):
 
     print("=== Arrival update ===")
 
@@ -71,7 +72,8 @@ def update(min_dwt=base.DWT_MIN,
     for d in tqdm(dangling_departures):
         departure_portcall = PortCall.query.filter(PortCall.id == d.portcall_id).first()
         imo = departure_portcall.ship_imo
-        arrival_portcall = portcall.find_arrival(departure_portcall=departure_portcall)
+        arrival_portcall = portcall.find_arrival(departure_portcall=departure_portcall,
+                                                 cache_only=cache_only)
 
         if arrival_portcall:
 

@@ -18,7 +18,7 @@ def rebuild():
         sql_content1 = file.read()
     with open('engine/shipment_refresh.sql', 'r') as file:
         sql_content2 = file.read()
-    execute_statement(sql_content1 + sql_content2)
+    execute_statement(sql_content1 + sql_content2, print_result=True)
 
 
 def update(date_from="2022-01-01"):
