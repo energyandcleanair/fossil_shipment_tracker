@@ -72,6 +72,8 @@ def test_voyage(app):
         assert all([x['arrival_date_utc'] is None or x['arrival_date_utc'] > x['departure_date_utc'] for x in data])
         assert all([x['arrival_date_utc'] is not None for x in data if x['status'] == base.COMPLETED])
         assert all([x['arrival_date_utc'] is None for x in data if x['status'] == base.ONGOING])
+        assert len(set([x['id'] for x in data])) == len(data)
+
 
         # Test commodity parameter
         params = {"format": "json", "commodity": "crude_oil"}
