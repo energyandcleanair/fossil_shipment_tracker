@@ -12,6 +12,7 @@ UNKNOWN_COMMODITY = "unknown"
 PIPELINE_GAS = "natural_gas"
 
 
+
 # LOAD STATUS
 FULLY_LADEN = "fully_laden"
 PARTIALLY_LADEN = "partially_laden"
@@ -24,6 +25,9 @@ COMPLETED = "completed"
 UNDETECTED_ARRIVAL = "undetected_arrival"
 UNKNOWN = "unkown"
 
+# COUNTER
+COUNTER_OBSERVED = "observed"
+COUNTER_ESTIMATED = "estimated"
 
 DWT_MIN = 5000
 

@@ -222,10 +222,11 @@ def test_voyage_aggregated(app):
                 expected_columns.update(["destination_port_name", "destination_unlocode", "destination_iso2", "destination_country"])
                 expected_columns.discard("destination_port")
 
-            assert set(data_df.columns) == expected_columns
+            if aggregate_by:
+                assert set(data_df.columns) == expected_columns
 
             if "commodity" in aggregate_by:
-                assert set(data_df.commodity.unique()) < set([base.OIL_PRODUCTS,
+                assert set(data_df.commodity.unique()) <= set([base.OIL_PRODUCTS,
                                                                base.CRUDE_OIL,
                                                                base.COAL,
                                                                # base.BULK,
@@ -253,7 +254,6 @@ def test_counter(app):
         expected_columns = set(['date', 'commodity', 'eur_per_sec', 'total_eur'])
         assert set(data_df.columns) > expected_columns
 
-
         params = {"format": "json"}
         response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
@@ -277,3 +277,27 @@ def test_counter(app):
         data = response.json["data"]
         assert len(data) > 0
         data_df = pd.DataFrame(data)
+
+
+def test_counter_aggregated(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+
+        aggregate_bys = [
+            [],
+            ['destination_region', 'commodity'],
+            ['destination_region'],
+        ]
+
+        for aggregate_by in aggregate_bys:
+            params = {"format": "json", "aggregate_by": ','.join(aggregate_by)}
+            response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
+            assert response.status_code == 200
+            data = response.json["data"]
+            assert len(data) > 0
+            data_df = pd.DataFrame(data)
+
+            expected_columns = set(aggregate_by + ['value_tonne', 'value_eur']) if aggregate_by \
+                else set(['commodity', 'destination_region','date','value_tonne', 'value_eur'])
+            assert set(data_df.columns) == expected_columns

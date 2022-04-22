@@ -1,5 +1,7 @@
 import pandas as pd
-import geopandas as gpd
+from sqlalchemy import func
+import sqlalchemy as sa
+import json
 
 from base.logger import logger
 from base.db import session, engine
@@ -7,9 +9,7 @@ from base.db_utils import upsert
 from base.models import Counter, PipelineFlow, Price, Counter
 from base.models import DB_TABLE_COUNTER
 from api.routes.voyage import VoyageResource
-from sqlalchemy import func
-import sqlalchemy as sa
-import json
+import base
 
 
 def update():
@@ -39,7 +39,6 @@ def update():
         "download": False,
         "date_from": date_from,
         "aggregate_by": ["destination_region", "commodity", "departure_date"],
-        "destination_region": "EU",
         "nest_in_data": False}
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
@@ -62,7 +61,7 @@ def update():
                .fillna(0)) \
     .reset_index()
 
-    result["type"] = "observed"
+    result["type"] = base.COUNTER_OBSERVED
 
     # Erase and replace everything
     Counter.query.delete()
@@ -110,7 +109,7 @@ def add_estimates(result):
 
     m = pd.merge(result[["commodity","date"]], result_estimated, how='outer', indicator=True)
     result_to_upload = m[m['_merge'] == 'right_only'].drop('_merge', axis=1)
-    result_to_upload["type"] = "estimated"
+    result_to_upload["type"] = base.COUNTER_ESTIMATED
     result_to_upload.to_sql(DB_TABLE_COUNTER,
                   con=engine,
                   if_exists="append",

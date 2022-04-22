@@ -99,6 +99,9 @@ class VoyageResource(Resource):
         DestinationPort = aliased(Port)
         DestinationCountry = aliased(Country)
 
+        if '' in aggregate_by:
+            aggregate_by.remove('')
+
 
         # Commodity
         from sqlalchemy import case
@@ -267,7 +270,7 @@ class VoyageResource(Resource):
     def aggregate(self, query, aggregate_by):
         """Perform aggregation based on user agparameters"""
 
-        if aggregate_by is None:
+        if not aggregate_by:
             return query
 
         subquery = query.subquery()
