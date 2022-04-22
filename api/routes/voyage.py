@@ -179,8 +179,14 @@ class VoyageResource(Resource):
              .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
              .outerjoin(Destination, Shipment.last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
-             .outerjoin(Price, sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
-                                       Price.commodity == commodity_field))
+             .outerjoin(Price,
+                        sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
+                                Price.commodity == commodity_field,
+                                sa.or_(
+                                    sa.and_(Price.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
+                                    Price.country_iso2 == destination_iso2_field)
+                                )
+                        )
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
              .filter(destination_iso2_field != "RU"))
 

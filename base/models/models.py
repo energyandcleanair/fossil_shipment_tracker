@@ -335,12 +335,13 @@ class MTVoyageInfo(Base):
 
 class Price(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
+    country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
     commodity = Column(String)
     date = Column(DateTime(timezone=False))
     eur_per_tonne = Column(Numeric)
 
     __tablename__ = DB_TABLE_PRICE
-    __table_args__ = (UniqueConstraint('date', 'commodity', name='unique_price'),)
+    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', name='unique_price'),)
 
 
 class PipelineFlow(Base):
