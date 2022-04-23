@@ -121,15 +121,15 @@ def test_pipelineflow_ukraine(app):
         data = response.json["data"]
         assert len(data) == 1
         assert all([x["value_eur"] > 0 for x in data])
-        assert list(set([x["destination_region"] for x in data])) == ["EU"]
+        assert list(set([x["destination_region"] for x in data])) == ["EU28"]
 
-        params = {"format": "json", "destination_region": "EU", "aggregate_by": "destination_region"}
+        params = {"format": "json", "destination_region": "EU28", "aggregate_by": "destination_region"}
         response = test_client.get('/v0/pipelineflow?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data_eu = response.json["data"]
         assert len(data_eu) == 1
         sum([x["value_eur"] for x in data_eu]) > sum([x["value_eur"] for x in data])
-        assert list(set([x["destination_region"] for x in data_eu])) == ["EU"]
+        assert list(set([x["destination_region"] for x in data_eu])) == ["EU28"]
 
 
 

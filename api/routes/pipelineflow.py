@@ -91,7 +91,7 @@ class PipelineFlowResource(Resource):
         from sqlalchemy import case
         destination_country = session.query(Country.iso2,
                                             Country.name,
-                                            case([(Country.iso2 == "UA", 'EU')],else_=Country.region).label('region')) \
+                                            case([(Country.iso2 == "UA", 'EU28')],else_=Country.region).label('region')) \
             .subquery()
 
 

@@ -8,6 +8,7 @@ from base.models import Country
 from base.models import DB_TABLE_COUNTRY
 import base
 
+
 def fill():
     """
     Fill from countryconvert data

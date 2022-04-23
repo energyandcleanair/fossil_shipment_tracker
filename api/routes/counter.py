@@ -31,7 +31,7 @@ class RussiaCounterLastResource(Resource):
         params = RussiaCounterLastResource.parser.parse_args()
         format = params.get("format")
 
-        query = Counter.query.filter(Counter.destination_region=="EU")
+        query = Counter.query.filter(Counter.destination_region=="EU28")
         counter = pd.read_sql(query.statement, session.bind)
         counter.replace({np.nan: None}, inplace=True)
 
