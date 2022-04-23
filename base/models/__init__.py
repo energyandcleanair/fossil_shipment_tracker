@@ -13,6 +13,8 @@ DB_TABLE_SHIPMENT = "shipment"
 DB_TABLE_SHIPMENTARRIVALBERTH = "shipmentarrivalberth"
 DB_TABLE_SHIPMENTDEPARTUREBERTH = "shipmentdepartureberth"
 DB_TABLE_PRICE = "price"
+DB_TABLE_PRICEDICSOUNT = "pricediscount"
+
 DB_TABLE_PIPELINEFLOW = "pipelineflow"
 DB_TABLE_COUNTER = "counter"
 

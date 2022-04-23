@@ -7,6 +7,8 @@ from base.db_utils import upsert
 from base.models import Port
 from base.models import DB_TABLE_PORT
 from engine.datalastic import Datalastic
+from geoalchemy2 import Geometry
+from base.utils import update_geometry_from_wkb
 
 
 def count():
@@ -45,25 +47,30 @@ def fill():
         ports_df["check_arrival"] = False
 
     ports_gdf = gpd.GeoDataFrame(ports_df, geometry=gpd.points_from_xy(ports_df.lon, ports_df.lat), crs="EPSG:4326")
+    ports_gdf.loc[ports_gdf.lon.isnull(),"geometry"] = None
     ports_gdf = ports_gdf[["unlocode", "name", "iso2", "check_departure", "check_arrival", "geometry"]]
-    # upsert(df=ports_gdf.iloc[0:2], table=DB_TABLE_PORT, constraint_name="unique_port2")
+    ports_df = pd.DataFrame(ports_gdf)
+    ports_df = update_geometry_from_wkb(ports_df, to="wkt")
 
-    # (JUST FOR TRANSITIONING TO NEW PORT ID) Check ports in portcalls that aren't in port
+    upsert(df=ports_df.loc[ports_df.check_departure],
+           table=DB_TABLE_PORT,
+           constraint_name="unique_port",
+           dtype=({'geometry': Geometry('POINT', 4326)}))
+
+    # (JUST FILLING GEOMETRY)
     from base.models import PortCall
-    import sqlalchemy
+    import sqlalchemy as sa
 
-    missing_ports = session.query(PortCall.others) \
-        .filter(PortCall.port_unlocode.notin_(session.query(Port.unlocode).filter(Port.unlocode != sqlalchemy.null()))).all()
-
-    missing_ports = [{'marinetraffic_id': x[0]['marinetraffic']['PORT_ID'],
-                    'name' : x[0]['marinetraffic']['PORT_NAME']} for x in missing_ports]
-    missing_ports = pd.DataFrame(missing_ports).drop_duplicates().to_dict(orient="records")
+    missing_ports = session.query(Port) \
+        .filter(Port.geometry == sa.null()) \
+        .filter(Port.check_departure).all()
 
     for m in missing_ports:
         print(m)
-        ports = Datalastic.get_port_infos(name=m["name"], marinetraffic_id=m["marinetraffic_id"])
-        for port in ports:
-            session.add(port)
+        found_ports = Datalastic.get_port_infos(name=m.name, fuzzy=False)
+        for found_port in found_ports:
+            if found_port.unlocode == m.unlocode:
+                m.geometry = found_port.geometry
 
     session.commit()
     return

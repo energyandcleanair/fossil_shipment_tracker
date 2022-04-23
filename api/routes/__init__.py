@@ -12,3 +12,4 @@ from .berth import *
 from .portcall import *
 from .departure import *
 from .counter import *
+from .pipelineflow import *

@@ -9,7 +9,7 @@ from flask_restx import inputs
 
 
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
-    ShipmentDepartureBerth, ShipmentArrivalBerth, Position, Trajectory, Destination, Price, Country
+    ShipmentDepartureBerth, ShipmentArrivalBerth, Position, Trajectory, Destination, Price, Country, PriceDiscount
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list
@@ -93,6 +93,8 @@ class VoyageResource(Resource):
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
 
+        DepartureCountry = aliased(Country)
+
         DepartureBerth= aliased(Berth)
         ArrivalBerth = aliased(Berth)
 
@@ -118,8 +120,13 @@ class VoyageResource(Resource):
         # Price for all countries without country-specific price
         default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
 
+        price_eur_per_tonne_field = (
+            func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne) -
+                func.coalesce(PriceDiscount.reduction_eur_per_tonne, 0)
+        ).label('price_eur_per_tonne')
+
         value_eur_field = (
-            Ship.dwt * func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne)
+            Ship.dwt * price_eur_per_tonne_field
         ).label('value_eur')
 
         # Technically, we could pivot long -> wide
@@ -144,14 +151,14 @@ class VoyageResource(Resource):
 
 
 
-
-
         # Query with joined information
         shipments_rich = (session.query(Shipment.id,
                                     Shipment.status,
                                     Departure.date_utc.label("departure_date_utc"),
                                     DeparturePort.unlocode.label("departure_unlocode"),
                                     DeparturePort.iso2.label("departure_iso2"),
+                                    DepartureCountry.name.label("departure_country"),
+                                    DepartureCountry.region.label("departure_region"),
                                     DeparturePort.name.label("departure_port_name"),
                                     Arrival.date_utc.label("arrival_date_utc"),
                                     ArrivalPort.unlocode.label("arrival_unlocode"),
@@ -159,6 +166,7 @@ class VoyageResource(Resource):
                                     ArrivalPort.name.label("arrival_port_name"),
                                     Destination.name.label("destination_name"),
                                     destination_iso2_field,
+                                    DestinationCountry.name.label("destination_country"),
                                     DestinationCountry.region.label("destination_region"),
                                     Ship.imo.label("ship_imo"),
                                     Ship.mmsi.label("ship_mmsi"),
@@ -179,6 +187,7 @@ class VoyageResource(Resource):
                                     ArrivalBerth.port_unlocode.label("arrival_berth_unlocode"))
              .join(Departure, Shipment.departure_id == Departure.id)
              .join(DeparturePort, Departure.port_id == DeparturePort.id)
+             .join(DepartureCountry, DeparturePort.iso2 == DepartureCountry.iso2)
              .outerjoin(Arrival, Shipment.arrival_id == Arrival.id)
              .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id)
              .join(Ship, Departure.ship_imo == Ship.imo)
@@ -201,6 +210,12 @@ class VoyageResource(Resource):
                                  default_price.c.commodity == commodity_field
                                  )
                         )
+             .outerjoin(PriceDiscount,
+                        sa.and_(
+                            PriceDiscount.port_id == DeparturePort.id,
+                            PriceDiscount.commodity == commodity_field,
+                            PriceDiscount.date == func.date_trunc('day', Departure.date_utc)
+                        ))
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
              .filter(destination_iso2_field != "RU"))
 
@@ -248,34 +263,12 @@ class VoyageResource(Resource):
                 response="empty",
                 mimetype='application/json')
 
-        # Some modifications aorund countries, commodities etc.
-        if "departure_iso2" in result.columns:
-            result = self.fill_country(result, iso2_column="departure_iso2", country_column='departure_country')
-
-        if "destination_iso2" in result.columns:
-            result = self.fill_country(result, iso2_column="destination_iso2", country_column='destination_country')
 
         # Rolling average
         result = self.roll_average(result = result, aggregate_by=aggregate_by, rolling_days=rolling_days)
         response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
                                        aggregate_by=aggregate_by, download=download)
         return response
-
-
-    def fill_country(self, result, iso2_column, country_column):
-
-        cc = coco.CountryConverter()
-
-        def country_convert(x):
-            return cc.convert(names=x.iloc[0], to='name_short', not_found=None)
-
-        result[country_column] = result[[iso2_column]] \
-            .fillna("NULL_COUNTRY_PLACEHOLDER") \
-            .groupby(iso2_column)[iso2_column] \
-            .transform(country_convert)
-
-        result.replace({'NULL_COUNTRY_PLACEHOLDER': None}, inplace=True)
-        return result
 
 
     def aggregate(self, query, aggregate_by):
@@ -308,14 +301,14 @@ class VoyageResource(Resource):
             'arrival_date': [func.date_trunc('day', subquery.c.arrival_date_utc).label('arrival_date')],
 
             'departure_port': [subquery.c.departure_port_name, subquery.c.departure_unlocode,
-                               subquery.c.departure_iso2],
-            'departure_country': [subquery.c.departure_iso2],
-            'departure_iso2': [subquery.c.departure_iso2],
+                               subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
+            'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
+            'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
 
             'destination_port': [subquery.c.arrival_port_name, subquery.c.arrival_unlocode,
-                                 subquery.c.destination_iso2],
-            'destination_country': [subquery.c.destination_iso2],
-            'destination_iso2': [subquery.c.destination_iso2],
+                                 subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
+            'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
+            'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region]
         }
 

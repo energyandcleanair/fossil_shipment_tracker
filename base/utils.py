@@ -39,6 +39,8 @@ def to_datetime(d):
 
 def wkb_to_shape(geom):
     from shapely import wkb
+    if isinstance(geom, shapely.geometry.base.BaseGeometry):
+        return geom
     try:
         return wkb.loads(bytes(geom.data))
     except (shapely.errors.WKBReadingError,AttributeError):

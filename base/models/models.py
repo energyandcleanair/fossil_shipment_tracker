@@ -27,6 +27,7 @@ from . import DB_TABLE_SHIPMENTARRIVALBERTH
 from . import DB_TABLE_SHIPMENTDEPARTUREBERTH
 from . import DB_TABLE_MTVOYAGEINFO
 from . import DB_TABLE_PRICE
+from . import DB_TABLE_PRICEDICSOUNT
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
 
@@ -81,7 +82,8 @@ class Port(Base):
 
     __tablename__ = DB_TABLE_PORT
     __table_args__ = (Index('idx_port_unlocode', "unlocode"),
-                      Index('idx_port_name_lower', func.lower(name))
+                      Index('idx_port_name_lower', func.lower(name)),
+                      UniqueConstraint('unlocode', name='unique_port')
                       )
 
 
@@ -352,6 +354,17 @@ class Price(Base):
                           postgresql_where=country_iso2.is_(None)
                       )
                       )
+
+
+class PriceDiscount(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'), nullable=False)
+    commodity = Column(String)
+    date = Column(DateTime(timezone=False))
+    reduction_eur_per_tonne = Column(Numeric)
+
+    __tablename__ = DB_TABLE_PRICEDICSOUNT
+    __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', name='unique_price_discount'),)
 
 
 class PipelineFlow(Base):

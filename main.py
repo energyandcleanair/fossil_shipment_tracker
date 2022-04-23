@@ -16,23 +16,26 @@ import datetime as dt
 
 def update():
     # portcall.update_departures_from_russia()
-    # # portcall.fill_departure_gaps(date_from="2021-12-01", date_to="2022-01-01")
+    # # portcall.fill_departure_gaps(date_from="2022-04-17",
+    # #                              unlocode='RUAZO')
     # departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
     #                      base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
-    # departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN'], commodities=base.GENERAL_CARGO)
+    # departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN',
+    #                            'RUAZO'], commodities=base.GENERAL_CARGO)
     # arrival.update(force_for_arrival_to_departure_greater_than=dt.timedelta(hours=24*10))
-    # arrival.update(date_from="2022-02-24", include_undetected_arrival_shipments=False)
+    # arrival.update(date_from="2022-04-01", include_undetected_arrival_shipments=True)
     # shipment.update()
-    position.update()
-    destination.update()
-    berth.update()
-    trajectory.update()
+    # position.update()
+    # destination.update()
+    # berth.update()
+    # trajectory.update()
     counter.update()
     return
 
 
 if __name__ == "__main__":
-    from base.db import init_db
+    # from base.db import init_db
     init_db()
+    # port.fill()
     # country.fill()
-    update()
+    # update()
