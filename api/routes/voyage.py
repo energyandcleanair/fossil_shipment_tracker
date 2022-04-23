@@ -99,9 +99,8 @@ class VoyageResource(Resource):
         DestinationPort = aliased(Port)
         DestinationCountry = aliased(Country)
 
-        if '' in aggregate_by:
+        if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
-
 
         # Commodity
         from sqlalchemy import case
@@ -116,8 +115,11 @@ class VoyageResource(Resource):
             else_ = Ship.commodity
         ).label('commodity')
 
+        # Price for all countries without country-specific price
+        default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
+
         value_eur_field = (
-            Ship.dwt * Price.eur_per_tonne
+            Ship.dwt * func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne)
         ).label('value_eur')
 
         # Technically, we could pivot long -> wide
@@ -139,6 +141,10 @@ class VoyageResource(Resource):
 
         destination_iso2_field = func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2) \
                                      .label('destination_iso2')
+
+
+
+
 
         # Query with joined information
         shipments_rich = (session.query(Shipment.id,
@@ -189,6 +195,11 @@ class VoyageResource(Resource):
                                     sa.and_(Price.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
                                     Price.country_iso2 == destination_iso2_field)
                                 )
+                        )
+             .outerjoin(default_price,
+                         sa.and_(default_price.c.date == func.date_trunc('day', Departure.date_utc),
+                                 default_price.c.commodity == commodity_field
+                                 )
                         )
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
              .filter(destination_iso2_field != "RU"))

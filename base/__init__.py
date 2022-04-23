@@ -10,6 +10,7 @@ GENERAL_CARGO = "general_cargo"
 BULK_NOT_COAL = "bulk_not_coal"
 UNKNOWN_COMMODITY = "unknown"
 PIPELINE_GAS = "natural_gas"
+PIPELINE_OIL = "pipeline_oil"
 
 
 

@@ -4,6 +4,7 @@ from sqlalchemy.orm import validates
 from sqlalchemy import UniqueConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
 import datetime as dt
+from sqlalchemy.sql.expression import text
 
 
 import base
@@ -341,7 +342,16 @@ class Price(Base):
     eur_per_tonne = Column(Numeric)
 
     __tablename__ = DB_TABLE_PRICE
-    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', name='unique_price'),)
+    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', name='unique_price'),
+                      # We add a unique index to be sure because the constraint above doesn't work if country_iso2 is null
+                      Index(
+                          "unique_price_additional_constraint",
+                          "date",
+                          "commodity",
+                          unique=True,
+                          postgresql_where=country_iso2.is_(None)
+                      )
+                      )
 
 
 class PipelineFlow(Base):
@@ -352,6 +362,7 @@ class PipelineFlow(Base):
     date = Column(DateTime(timezone=False))
     value_tonne = Column(Numeric)
     value_mwh = Column(Numeric)
+    value_m3 = Column(Numeric)
 
     __tablename__ = DB_TABLE_PIPELINEFLOW
     __table_args__ = (UniqueConstraint('date', 'commodity', 'departure_iso2',

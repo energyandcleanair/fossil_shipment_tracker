@@ -181,6 +181,21 @@ def test_berth(app):
         assert "geometry" in gdf.columns
 
 
+def test_voyage_pricing(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {"format": "json", "commodity": ",".join([base.COAL, base.CRUDE_OIL,
+                                                          base.LNG, base.OIL_PRODUCTS, base.OIL_OR_CHEMICAL])}
+
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        assert all([x["value_eur"] > 0 for x in data])
+        assert len(set([x['id'] for x in data])) == len(data)
+
+
 
 def test_voyage_aggregated(app):
 
@@ -244,6 +259,10 @@ def test_counter(app):
 
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
+        response = test_client.get('/v0/counter')
+        assert response.status_code == 200
+
+
         params = {"format": "json"}
         response = test_client.get('/v0/counter_last?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
@@ -264,12 +283,24 @@ def test_counter(app):
         expected_columns = set(['commodity', 'date', 'destination_region', 'value_tonne', 'value_eur'])
         assert set(data_df.columns) == expected_columns
 
+
+def test_counter_cumulate(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
         params = {"format": "json", "cumulate": True}
         response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
         data_df = pd.DataFrame(data)
+
+
+def test_counter_rolling(app):
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        response = test_client.get('/v0/counter')
+        assert response.status_code == 200
 
         params = {"format": "json", "rolling_days": 7}
         response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))

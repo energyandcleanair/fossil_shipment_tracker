@@ -6,7 +6,7 @@ import json
 from base.logger import logger
 from base.db import session, engine
 from base.db_utils import upsert
-from base.models import Counter, PipelineFlow, Price, Counter
+from base.models import Counter, PipelineFlow, Price, Counter, Country
 from base.models import DB_TABLE_COUNTER
 from api.routes.voyage import VoyageResource
 import base
@@ -20,14 +20,23 @@ def update():
     print("=== Counter update ===")
     date_from = "2022-01-01"
 
-    # Get voyage
+    # Get pipeline flows
+    # Price is actually the same for every european country. Taking the average here
+    # but would be equivalent to take any country
+    european_pipeline_price = session.query(Price.commodity, Price.date, func.avg(Price.eur_per_tonne).label('eur_per_tonne')) \
+        .join(Country, Price.country_iso2 == Country.iso2) \
+        .group_by(Price.commodity, Price.date) \
+        .filter(Country.region == "EU") \
+        .filter(Price.commodity == base.PIPELINE_GAS).subquery()
+
     pipelineflows = session.query(
         PipelineFlow.date,
         PipelineFlow.commodity,
-        func.sum(PipelineFlow.value_tonne * Price.eur_per_tonne) \
+        func.sum(PipelineFlow.value_tonne * european_pipeline_price.c.eur_per_tonne) \
             .label('value_eur')) \
-        .join(Price, sa.and_(Price.date == PipelineFlow.date,
-                                  Price.commodity == PipelineFlow.commodity)) \
+        .join(european_pipeline_price,
+              sa.and_(european_pipeline_price.c.date == PipelineFlow.date,
+                      european_pipeline_price.c.commodity == PipelineFlow.commodity)) \
         .filter(PipelineFlow.date >= date_from) \
         .group_by(PipelineFlow.commodity, PipelineFlow.date)
     pipelineflows = pd.read_sql(pipelineflows.statement, session.bind)

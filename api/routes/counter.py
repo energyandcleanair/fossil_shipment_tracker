@@ -113,7 +113,7 @@ class RussiaCounterResource(Resource):
         destination_region = params.get("destination_region")
         fill_with_estimates = params.get("fill_with_estimates")
 
-        if '' in aggregate_by:
+        if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
 
         query = Counter.query \
@@ -145,7 +145,7 @@ class RussiaCounterResource(Resource):
 
 
         if cumulate and "date" in counter:
-            groupby_cols = [x for x in ['commodity', 'destination_region'] if x in aggregate_by or not aggregate_by]
+            groupby_cols = [x for x in ['commodity', 'destination_region'] if aggregate_by is not None or not aggregate_by or x in aggregate_by]
             counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
             counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
 
