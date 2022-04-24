@@ -75,17 +75,17 @@ def update_matching():
 
         # Looking for country names in destination.name
         country_regexps = {
-            'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$','^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$',
-                   '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$', 'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|^RU |KAV?KAZ$'],
-            'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$', '^TOROS$', 'CANAKALE$'],
-            'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$', ' SKAW$|SKGEN$'],
+            'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$','^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$', '^RU[\w]{3}$'
+                   '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$', 'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|^RU |KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$'],
+            'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$', '^TOROS$', 'CANAKALE$', 'IZMIT$'],
+            'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$', ' SKAW$|SKGEN$|^SKAW$'],
             'BR': ['[ |,|_]{1}BRAZIL$', '^BR ?PRM|BRPEE'],
             'SE': ['[ |,|_]{1}SWEDEN$'],
             'IN': ['[ |,|_]{1}INDIA$','^INDIA$'],
             'IT': ['[ |,|_]{1}ITALY$'],
-            'GR': ['[ |,|_]{1}GRE[E]?CE$','^VATIKA$','^KALAMATA$'],
+            'GR': ['[ |,|_]{1}GRE[E]?CE$','^VATIKA$','^KALAMATA$', 'LACONIA BAY$'],
             'EG': ['[ |,|_]{1}EGYPT$'],
-            'FR': ['[ |,|_]{1}FRANCE','FRFOS'],
+            'FR': ['[ |,|_]{1}FRANCE','FRFOS$','FRLEH$'],
             'EE': ['[ |,|_]{1}ESTONIA','TALLIN[\s|\w]*', '^TALLNN$', '^EETIL OPL$'],
             'SG': ['[\s|\w]*SINGAPORE[\s|\w]*'],
             'GB': ['[ |,|_]{1}UK$'],
@@ -94,7 +94,8 @@ def update_matching():
             'NL': ['^NL [\s|\w]*$', '[ |,|_|\.]{1}NL[\s]?[\w]{3}$', 'BORS+ELE'],
             'KR': ['[ |,|_]{1}S[\.]?KOREA$','^KR [\s|\w]*$', '( |,)KOREA|S\\.KOREA| KR$|KOR |KR_USN'],
             'JP': ['^JP [\s|\w]*$','[ |,|_]{1}JP$'],
-            'CN': ['[ |,|_]{1}CHINA$','^CN[\w]{3}$', '^CN [\s|\w]*$','^HUANG DAO$','^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$', ' CN$|LAN QIAO$'],
+            'CN': ['[ |,|_]{1}CHINA$','^CN[_]?[\w]{3}$', '^CN [\s|\w]*$','^HUANG DAO$',
+                   '^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$', ' CN$|LAN QIAO$', 'CH LNS'],
             'MY': ['[ |,|_|/]{1}MALAYSIA$', 'PELEPAS$'],
             'TW': ['^TW[\s|\w]*','[ |,|_]{1}TW$'],
             'OM': ['[ |,|_|-]{1}OMAN'],

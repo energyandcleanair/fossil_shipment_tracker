@@ -285,7 +285,8 @@ def update_departures_from_russia(
     for port in tqdm(ports.all()):
         last_portcall = session.query(PortCall) \
             .filter(PortCall.port_id==port.id,
-                    PortCall.move_type=="departure") \
+                    PortCall.move_type=="departure",
+                    PortCall.date_utc <= to_datetime(date_to)) \
             .order_by(PortCall.date_utc.desc()) \
             .first()
 
@@ -295,7 +296,7 @@ def update_departures_from_russia(
         portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
                                                               unlocode=port.unlocode,
                                                               date_from=to_datetime(date_from),
-                                                              date_to=date_to)
+                                                              date_to=to_datetime(date_to))
 
         # Store them in db so that we won't query them
         for portcall in portcalls:

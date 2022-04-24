@@ -11,7 +11,6 @@ import datetime as dt
 
 
 def test_pipelineflow_pricing(app):
-
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
         params = {"format": "json"}
