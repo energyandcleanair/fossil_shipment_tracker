@@ -9,7 +9,7 @@ from flask_restx import inputs
 
 
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
-    ShipmentDepartureBerth, ShipmentArrivalBerth, Position, Trajectory, Destination, Price, Country, PriceDiscount
+    ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, Destination, Price, Country, PriceDiscount
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list
@@ -106,6 +106,7 @@ class VoyageResource(Resource):
 
         # Commodity
         from sqlalchemy import case
+
         commodity_field = case(
             [
                 (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
@@ -197,9 +198,10 @@ class VoyageResource(Resource):
              .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
              .outerjoin(Destination, Shipment.last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
+             .outerjoin(Commodity, Commodity.id == commodity_field)
              .outerjoin(Price,
                         sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
-                                Price.commodity == commodity_field,
+                                Price.commodity == Commodity.pricing_commodity,
                                 sa.or_(
                                     sa.and_(Price.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
                                     Price.country_iso2 == destination_iso2_field)
@@ -207,13 +209,13 @@ class VoyageResource(Resource):
                         )
              .outerjoin(default_price,
                          sa.and_(default_price.c.date == func.date_trunc('day', Departure.date_utc),
-                                 default_price.c.commodity == commodity_field
+                                 default_price.c.commodity == Commodity.pricing_commodity
                                  )
                         )
              .outerjoin(PriceDiscount,
                         sa.and_(
                             PriceDiscount.port_id == DeparturePort.id,
-                            PriceDiscount.commodity == commodity_field,
+                            PriceDiscount.commodity == Commodity.pricing_commodity,
                             PriceDiscount.date == func.date_trunc('day', Departure.date_utc)
                         ))
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)

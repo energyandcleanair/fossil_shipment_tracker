@@ -9,7 +9,7 @@ from base.db_utils import upsert
 from base.models import Counter, PipelineFlow, Price, Counter, Country
 from base.models import DB_TABLE_COUNTER
 from api.routes.voyage import VoyageResource
-from api.routes.pipelineflow import PipelineFlowResource
+from api.routes.overland import PipelineFlowResource
 import base
 
 

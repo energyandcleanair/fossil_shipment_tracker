@@ -30,6 +30,7 @@ from . import DB_TABLE_PRICE
 from . import DB_TABLE_PRICEDICSOUNT
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
+from . import DB_TABLE_COMMODITY
 
 
 class Ship(Base):
@@ -339,7 +340,7 @@ class MTVoyageInfo(Base):
 class Price(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
-    commodity = Column(String)
+    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
     date = Column(DateTime(timezone=False))
     eur_per_tonne = Column(Numeric)
 
@@ -359,7 +360,7 @@ class Price(Base):
 class PriceDiscount(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'), nullable=False)
-    commodity = Column(String)
+    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
     date = Column(DateTime(timezone=False))
     reduction_eur_per_tonne = Column(Numeric)
 
@@ -369,7 +370,7 @@ class PriceDiscount(Base):
 
 class PipelineFlow(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    commodity = Column(String)
+    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
     departure_iso2 = Column(String)
     destination_iso2 = Column(String)
     date = Column(DateTime(timezone=False))
@@ -393,3 +394,13 @@ class Counter(Base):
 
     __tablename__ = DB_TABLE_COUNTER
     __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_region', name='unique_counter'),)
+
+
+class Commodity(Base):
+    id = Column(String, primary_key=True)
+    transport = Column(String)
+    name = Column(String)
+    group = Column(String) # Coal, Oil, Gas
+    pricing_commodity = Column(String)
+
+    __tablename__ = DB_TABLE_COMMODITY

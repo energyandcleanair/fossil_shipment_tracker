@@ -8,7 +8,7 @@ from . import routes_api
 from flask_restx import inputs
 
 
-from base.models import PipelineFlow, Price, Country
+from base.models import PipelineFlow, Price, Country, Commodity
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list
@@ -23,7 +23,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import func
 
 
-@routes_api.route('/v0/pipelineflow', strict_slashes=False)
+@routes_api.route('/v0/overland', strict_slashes=False)
 class PipelineFlowResource(Resource):
 
     parser = reqparse.RequestParser()
@@ -107,9 +107,10 @@ class PipelineFlowResource(Resource):
                                     PipelineFlow.value_m3,
                                     value_eur_field)
              .outerjoin(destination_country, PipelineFlow.destination_iso2 == destination_country.c.iso2)
+             .outerjoin(Commodity, PipelineFlow.commodity == Commodity.id)
              .outerjoin(Price,
                         sa.and_(Price.date == PipelineFlow.date,
-                                Price.commodity == PipelineFlow.commodity,
+                                Price.commodity == Commodity.pricing_commodity,
                                 sa.or_(
                                     sa.and_(Price.country_iso2 == sa.null(), PipelineFlow.destination_iso2 == sa.null()),
                                     Price.country_iso2 == PipelineFlow.destination_iso2)
@@ -117,7 +118,7 @@ class PipelineFlowResource(Resource):
                         )
              .outerjoin(default_price,
                          sa.and_(default_price.c.date == PipelineFlow.date,
-                                 default_price.c.commodity == PipelineFlow.commodity
+                                 default_price.c.commodity == Commodity.pricing_commodity
                                  )
                         )
              .filter(PipelineFlow.destination_iso2 != "RU"))
