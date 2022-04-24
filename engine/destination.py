@@ -76,8 +76,10 @@ def update_matching():
         # Looking for country names in destination.name
         country_regexps = {
             'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$','^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$', '^RU[\w]{3}$'
-                   '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$', 'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|^RU |KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$'],
-            'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$', '^TOROS$', 'CANAKALE$', 'IZMIT$'],
+                   '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$',
+                   'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|^RU |KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$'],
+            'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$',
+                   '^TOROS$', 'CANAKALE$', 'IZMIT$'],
             'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$', ' SKAW$|SKGEN$|^SKAW$'],
             'BR': ['[ |,|_]{1}BRAZIL$', '^BR ?PRM|BRPEE'],
             'SE': ['[ |,|_]{1}SWEDEN$'],
@@ -95,7 +97,7 @@ def update_matching():
             'KR': ['[ |,|_]{1}S[\.]?KOREA$','^KR [\s|\w]*$', '( |,)KOREA|S\\.KOREA| KR$|KOR |KR_USN'],
             'JP': ['^JP [\s|\w]*$','[ |,|_]{1}JP$'],
             'CN': ['[ |,|_]{1}CHINA$','^CN[_]?[\w]{3}$', '^CN [\s|\w]*$','^HUANG DAO$',
-                   '^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$', ' CN$|LAN QIAO$', 'CH LNS'],
+                   '^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$', ' CN$|LAN QIAO$', 'CH LNS', 'CH TAG', 'C J K'],
             'MY': ['[ |,|_|/]{1}MALAYSIA$', 'PELEPAS$'],
             'TW': ['^TW[\s|\w]*','[ |,|_]{1}TW$'],
             'OM': ['[ |,|_|-]{1}OMAN'],
@@ -122,13 +124,14 @@ def update_matching():
             execute_statement(update)
 
 
-        # "For orders" should be unknown
-        fororders_regexps = [' ORDER|MALTA FOR|GR ORD']
+        # "For orders" should be set as such
+        fororders_regexps = [' ORDER|MALTA FOR|GR ORD|^DUNKERQUE FO$']
         condition = or_(*[Destination.name.op('~')(regexp) for regexp in fororders_regexps])
         update = Destination.__table__.update().values(iso2=base.FOR_ORDERS) \
             .where(condition)
         execute_statement(update)
 
+        # When transit ports only, should be set as null
         unknown_regexps = ['BOSP.?ORUS|DRIFTING AREA|GOGLAND|NW EUROPE|GREAT BELT|NW BLACK SEA|NW ?BS|I.?STANBUL|^TR ?IST$']
         condition = or_(*[Destination.name.op('~')(regexp) for regexp in unknown_regexps])
         update = Destination.__table__.update().values(iso2=sa.null()) \
