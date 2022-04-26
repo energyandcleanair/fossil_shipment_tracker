@@ -92,7 +92,7 @@ def update(shipment_id=None, rebuild_all=False):
     # .group_by(segmented_positions2.c.shipment_id, text("coalesce(segment, -1)")) \
 
     trajectories = session.query(ordered_positions.c.shipment_id.label("shipment_id"),
-                                 ST_Multi(ST_MakeLine(ordered_positions.c.geometry).label("geometry"))) \
+                                 ST_Multi(ST_MakeLine(ordered_positions.c.geometry)).label("geometry")) \
                     .group_by(ordered_positions.c.shipment_id)
 
     #
@@ -106,6 +106,7 @@ def update(shipment_id=None, rebuild_all=False):
     trajectories_df = gpd.GeoDataFrame(trajectories_df, geometry="geometry")
     trajectories_df = trajectories_df.loc[~trajectories_df.is_empty]
     trajectories_df = pd.DataFrame(trajectories_df)
+    trajectories_df = update_geometry_from_wkb(trajectories_df, to="wkt")
     upsert(df=trajectories_df,
            table=DB_TABLE_TRAJECTORY,
            constraint_name="trajectory_shipment_id_key",
