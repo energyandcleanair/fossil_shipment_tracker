@@ -2,7 +2,7 @@ from engine.datalastic import Datalastic
 from base.db import session
 import datetime as dt
 import base
-from base.utils import to_list
+from base.utils import to_list, to_datetime
 from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination
 import sqlalchemy as sa
 from sqlalchemy import func, or_
@@ -59,7 +59,11 @@ def update_shipment_last_position():
     execute_statement(update)
 
 
-def update(commodities=None, imo=None, shipment_id=None,
+def update(commodities=None,
+           imo=None,
+           shipment_id=None,
+           date_from=None,
+           shipment_status=None,
            force_for_those_without_destination=False):
 
     print("=== Position update ===")
@@ -122,6 +126,12 @@ def update(commodities=None, imo=None, shipment_id=None,
 
     if commodities is not None:
         shipments_to_update = shipments_to_update.filter(Ship.commodity.in_(to_list(commodities)))
+
+    if shipment_status is not None:
+        shipments_to_update = shipments_to_update.filter(Shipment.status.in_(to_list(shipment_status)))
+
+    if date_from is not None:
+        shipments_to_update = shipments_to_update.filter(Departure.date_utc >= (to_datetime(date_from)))
 
     shipments_to_update = shipments_to_update.order_by(Departure.date_utc.desc()).all()
     # Add positions

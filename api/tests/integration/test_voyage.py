@@ -28,10 +28,11 @@ def test_voyage_pricing(app):
         data_df = pd.DataFrame(data)
         data_df["eur_per_tonne"] = round(data_df.value_eur / data_df.value_tonne)
         data_df["date"] = pd.to_datetime(data_df.departure_date_utc).dt.date
-        prices = data_df.loc[data_df.commodity==base.CRUDE_OIL][["destination_iso2","commodity","date","eur_per_tonne"]]
+        prices = data_df.loc[data_df.commodity==base.CRUDE_OIL][["destination_iso2", "commodity", "date", "eur_per_tonne"]]
         prices = prices.drop_duplicates()
         unique_prices = prices.groupby(["destination_iso2","commodity","date"]).eur_per_tonne.nunique().reset_index()
         assert max(unique_prices.eur_per_tonne) > 1
+
 
 def test_voyage_aggregated(app):
 
@@ -42,7 +43,7 @@ def test_voyage_aggregated(app):
             [],
             ['destination_country', 'departure_date'],
             ['departure_port', 'departure_date', 'commodity', 'status'],
-            ['departure_port', 'arrival_date', 'commodity', 'status'],
+            ['departure_port', 'arrival_date', 'commodity_group', 'status'],
             ['departure_country', 'departure_date', 'commodity', 'status'],
             ['destination_country', 'departure_date', 'commodity', 'status']
         ]
@@ -72,6 +73,9 @@ def test_voyage_aggregated(app):
             if "arrival_port" in aggregate_by:
                 expected_columns.update(["destination_port_name", "destination_unlocode", "destination_iso2", "destination_country", "destination_region"])
                 expected_columns.discard("destination_port")
+
+            if "commodity" in aggregate_by:
+                expected_columns.update(["commodity_group"])
 
             if aggregate_by:
                 assert set(data_df.columns) == expected_columns

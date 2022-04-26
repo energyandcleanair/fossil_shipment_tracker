@@ -22,26 +22,26 @@ def test_pipelineflow_pricing(app):
         assert len(set([x['id'] for x in data])) == len(data)
 
 
-def test_pipelineflow_ukraine(app):
-    # We assume gas is transiting through Ukraine,
-    # So Ukraine must be considered as part of EU
-    # Create a test client using the Flask application configured for testing
-    with app.test_client() as test_client:
-        params = {"format": "json", "destination_iso2": "UA", "aggregate_by": "destination_region"}
-        response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        data = response.json["data"]
-        assert len(data) == 1
-        assert all([x["value_eur"] > 0 for x in data])
-        assert list(set([x["destination_region"] for x in data])) == ["EU28"]
-
-        params = {"format": "json", "destination_region": "EU28", "aggregate_by": "destination_region"}
-        response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        data_eu = response.json["data"]
-        assert len(data_eu) == 1
-        sum([x["value_eur"] for x in data_eu]) > sum([x["value_eur"] for x in data])
-        assert list(set([x["destination_region"] for x in data_eu])) == ["EU28"]
+# def test_pipelineflow_ukraine(app):
+#     # We assume gas is transiting through Ukraine,
+#     # So Ukraine must be considered as part of EU
+#     # Create a test client using the Flask application configured for testing
+#     with app.test_client() as test_client:
+#         params = {"format": "json", "destination_iso2": "UA", "aggregate_by": "destination_region"}
+#         response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
+#         assert response.status_code == 200
+#         data = response.json["data"]
+#         assert len(data) == 1
+#         assert all([x["value_eur"] > 0 for x in data])
+#         assert list(set([x["destination_region"] for x in data])) == ["EU28"]
+#
+#         params = {"format": "json", "destination_region": "EU28", "aggregate_by": "destination_region"}
+#         response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
+#         assert response.status_code == 200
+#         data_eu = response.json["data"]
+#         assert len(data_eu) == 1
+#         sum([x["value_eur"] for x in data_eu]) > sum([x["value_eur"] for x in data])
+#         assert list(set([x["destination_region"] for x in data_eu])) == ["EU28"]
 
 
 def test_pipelineflow_aggregation(app):
@@ -51,6 +51,7 @@ def test_pipelineflow_aggregation(app):
         aggregate_bys = [
             [],
             ['destination_region', 'commodity'],
+            ['destination_region', 'commodity_group'],
             ['destination_region', 'commodity', 'date'],
         ]
 
@@ -63,6 +64,11 @@ def test_pipelineflow_aggregation(app):
             data_df = pd.DataFrame(data)
 
             expected_columns = set(aggregate_by + ['value_tonne', 'value_eur', 'value_m3']) if aggregate_by \
-                else set(['id', 'commodity', 'destination_iso2', 'destination_country', 'destination_region',
+                else set(['id', 'commodity', 'commodity_group',
+                          'destination_iso2', 'destination_country', 'destination_region',
                           'date', 'value_tonne', 'value_eur', 'value_m3'])
+
+            if "commodity" in aggregate_by:
+                expected_columns.update(["commodity_group"])
+
             assert set(data_df.columns) == expected_columns

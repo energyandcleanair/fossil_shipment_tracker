@@ -43,6 +43,7 @@ def update(min_dwt=base.DWT_MIN,
         dangling_departures = [x for x in dangling_departures if x.id not in
                                [y[0] for y in undetected_arrival_departures]]
 
+
     if force_for_arrival_to_departure_greater_than is not None:
         dangling_departures.extend(departure.get_departures_with_arrival_too_remote_from_next_departure(
             min_timedelta=force_for_arrival_to_departure_greater_than,

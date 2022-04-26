@@ -22,7 +22,7 @@ def fill():
     countries.rename(columns={'ISO2':'iso2','ISO3':'iso3','name_official':'name_official','name_short':'name'}, inplace=True)
 
     def to_region(row):
-        if row.iso2 in ["US", "TR", "KR", "CN"]:
+        if row.iso2 in ["US", "TR", "KR", "CN", "IN"]:
             return row["name"]
         if row.EU28 == "EU28":
             return "EU28"

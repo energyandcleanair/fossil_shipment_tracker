@@ -2,9 +2,19 @@ import base
 
 from base.db import session
 from base.logger import logger
-from base.models import Ship
+from base.models import Ship, PortCall
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
+
+import sqlalchemy as sa
+
+def fill_missing():
+
+    others = session.query(PortCall.others).filter(PortCall.ship_imo == '',
+                                                   PortCall.others != sa.null())
+
+    others = others.all()
+
 
 
 def fill(imos=[], mmsis=[]):

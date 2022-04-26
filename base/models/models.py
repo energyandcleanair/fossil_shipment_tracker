@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Numeric, BigInteger, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import validates
-from sqlalchemy import UniqueConstraint, ForeignKey, Index, func
+from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
 import datetime as dt
 from sqlalchemy.sql.expression import text
@@ -27,7 +27,7 @@ from . import DB_TABLE_SHIPMENTARRIVALBERTH
 from . import DB_TABLE_SHIPMENTDEPARTUREBERTH
 from . import DB_TABLE_MTVOYAGEINFO
 from . import DB_TABLE_PRICE
-from . import DB_TABLE_PRICEDICSOUNT
+from . import DB_TABLE_PORTPRICE
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
 from . import DB_TABLE_COMMODITY
@@ -190,7 +190,6 @@ class Shipment(Base):
     __tablename__ = DB_TABLE_SHIPMENT
 
 
-
 class Position(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
@@ -224,7 +223,7 @@ class Destination(Base):
 class Trajectory(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
-    geometry = Column(Geometry('LINESTRING', srid=4326))
+    geometry = Column(Geometry('MULTILINESTRING', srid=4326))
 
     __tablename__ = DB_TABLE_TRAJECTORY
     __table_args__ = (Index('idx_trajectory_shipment', "shipment_id"), )
@@ -346,6 +345,7 @@ class Price(Base):
 
     __tablename__ = DB_TABLE_PRICE
     __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', name='unique_price'),
+                      CheckConstraint("eur_per_tonne >= 0", name="price_positive"),
                       # We add a unique index to be sure because the constraint above doesn't work if country_iso2 is null
                       Index(
                           "unique_price_additional_constraint",
@@ -357,15 +357,16 @@ class Price(Base):
                       )
 
 
-class PriceDiscount(Base):
+class PortPrice(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'), nullable=False)
     commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
     date = Column(DateTime(timezone=False))
-    reduction_eur_per_tonne = Column(Numeric)
+    eur_per_tonne = Column(Numeric)
 
-    __tablename__ = DB_TABLE_PRICEDICSOUNT
-    __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', name='unique_price_discount'),)
+    __tablename__ = DB_TABLE_PORTPRICE
+    __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', name='unique_portprice'),
+                      CheckConstraint("eur_per_tonne >= 0", name="portprice_positive"))
 
 
 class PipelineFlow(Base):

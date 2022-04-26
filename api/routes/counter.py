@@ -16,51 +16,95 @@ from . import routes_api
 from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
-from base.models import Counter
-from base.utils import to_datetime, to_list
+from base.models import Counter, Commodity
+from base.utils import to_datetime, to_list, intersect
 
 
 @routes_api.route('/v0/counter_last', strict_slashes=False)
 class RussiaCounterLastResource(Resource):
 
     parser = reqparse.RequestParser()
+    parser.add_argument('destination_region', type=str, help='EU28,China etc.',
+                        required=False, default=None)
+    parser.add_argument('date_from', type=str, help='date at which counter should start',
+                        required=False, default='2022-02-24')
+    parser.add_argument('date_to', type=str, help='date at which counter should stop',
+                        required=False, default=None)
+    parser.add_argument('aggregate_by', help='aggregation e.g. commodity_group,destination_region',
+                        required=False, default=None, action='split')
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
+
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterLastResource.parser.parse_args()
+        destination_region = params.get("destination_region")
+        date_from = params.get("date_from")
+        date_to = params.get("date_to")
+        aggregate_by = params.get("aggregate_by")
         format = params.get("format")
 
-        query = Counter.query.filter(Counter.destination_region=="EU28")
+        query = session.query(
+            Counter.commodity,
+            Commodity.group.label("commodity_group"),
+            Counter.destination_region,
+            Counter.date,
+            func.sum(Counter.value_tonne).label("value_tonne"),
+            func.sum(Counter.value_eur).label("value_eur")
+        ) \
+            .outerjoin(Commodity, Counter.commodity == Commodity.id) \
+            .group_by(Counter.commodity, Counter.destination_region, Counter.date, Commodity.group)
+
+        if destination_region:
+            query = query.filter(Counter.destination_region == destination_region)
+
+        if date_from:
+            query = query.filter(Counter.date >= to_datetime(date_from))
+
+        if date_to:
+            query = query.filter(Counter.date <= to_datetime(date_to))
+
+        # Important to force this
+        query = query.filter(Counter.date <= dt.date.today())
+
+
+        # Aggregate
+        query = self.aggregate(query=query, aggregate_by=aggregate_by)
+
         counter = pd.read_sql(query.statement, session.bind)
         counter.replace({np.nan: None}, inplace=True)
 
-        counter_last = counter.sort_values(['commodity','date']) \
-            .groupby(['commodity']) \
-            .agg(
-                total_tonne=pd.NamedAgg(column='value_tonne', aggfunc=np.sum),
-                 total_eur=pd.NamedAgg(column='value_eur', aggfunc=np.sum),
-                 eur_per_day=pd.NamedAgg(column='value_eur', aggfunc='last'),
-                 date=pd.NamedAgg(column='date', aggfunc='last')) \
-            .reset_index()
+        groupby_cols = [x for x in ['destination_region', 'commodity', 'commodity_group'] if
+                        aggregate_by is None or not aggregate_by or x in aggregate_by]
+
+        counter_last = self.get_last(counter=counter, groupby_cols=groupby_cols)
+
 
         now = dt.datetime.utcnow()
         counter_last["now"] = now
         counter_last['total_eur'] = counter_last.total_eur + (now - counter_last.date) / np.timedelta64(1, 'D') * counter_last.eur_per_day
 
         # Regroup commodities
-        counter_last['commodity'] =  counter_last['commodity'] \
-            .replace(['crude_oil', 'oil_products', 'oil_or_chemical'], 'oil') \
-            .replace(['lng', 'natural_gas'], 'gas') \
-            .replace(['coal'], 'coal')
+        # counter_last['commodity'] =  counter_last['commodity'] \
+        #     .replace(['crude_oil', 'oil_products', 'oil_or_chemical'], 'oil') \
+        #     .replace(['lng', 'natural_gas'], 'gas') \
+        #     .replace(['coal'], 'coal')
 
-        counter_last = counter_last.loc[counter_last.commodity.isin(['coal','oil','gas'])]
+        counter_last = counter_last.loc[~counter_last.commodity_group.isna()]
+        counter_last = counter_last.groupby(groupby_cols).sum()
 
-        counter_last = counter_last.groupby(['commodity']).sum()
-        counter_last.loc["total"] = counter_last.sum()
-        counter_last.reset_index(inplace=True)
+        if not aggregate_by or 'destination_region' in aggregate_by:
+            total = counter_last.groupby(['destination_region']).sum()
+            total[groupby_cols] = "total"
+            counter_last = pd.concat([
+                counter_last.reset_index(),
+                total
+            ]).reset_index()
+        else:
+            counter_last.loc["total"] = counter_last.sum()
+            counter_last.reset_index(inplace=True)
+
         counter_last['date'] = now
-
         counter_last['eur_per_sec'] = counter_last['eur_per_day'] / 24 / 3600
 
         if format == "csv":
@@ -75,6 +119,87 @@ class RussiaCounterLastResource(Resource):
                 response=json.dumps({"data": counter_last.to_dict(orient="records")}, cls=JsonEncoder),
                 status=200,
                 mimetype='application/json')
+
+
+    def get_last(self, counter, groupby_cols):
+
+        counter_last = counter.sort_values(['date']) \
+            .groupby(groupby_cols) \
+            .agg(
+            total_tonne=pd.NamedAgg(column='value_tonne', aggfunc=np.sum),
+            total_eur=pd.NamedAgg(column='value_eur', aggfunc=np.sum),
+            date=pd.NamedAgg(column='date', aggfunc='last')) \
+            .reset_index()
+
+        n_days = 7
+        shift_days = 2
+        daterange = pd.date_range(dt.datetime.today() - dt.timedelta(days=n_days+1),
+                                  dt.datetime.today()).rename("date")
+
+        def resample_and_fill(x):
+            x = x.set_index("date") \
+                .resample("D").sum() \
+                .fillna(0)
+            # cut 2 last days and take the 7-day mean
+            means = x[["value_tonne", "value_eur"]].shift(shift_days).tail(7).mean()
+
+            x = x.reindex(daterange) \
+                .fillna(means)
+            return x
+
+        counter_last_increment = counter \
+            .sort_values(['date']) \
+            .groupby(groupby_cols) \
+            .apply(resample_and_fill) \
+            .reset_index() \
+            .rename(columns={"value_tonne": "tonne_per_day",
+                             "value_eur": "eur_per_day"}) \
+            .drop(['date'], axis=1) \
+            .drop_duplicates()
+
+        counter_last_merged = counter_last.merge(counter_last_increment,
+                                       how='left', on=groupby_cols)
+        return counter_last_merged
+
+
+    def aggregate(self, query, aggregate_by):
+        """Perform aggregation based on user agparameters"""
+
+        if not aggregate_by:
+            return query
+
+        subquery = query.subquery()
+
+        # Aggregate
+        value_cols = [
+            func.sum(subquery.c.value_tonne).label("value_tonne"),
+            func.sum(subquery.c.value_eur).label("value_eur")
+        ]
+
+        # Adding must have grouping columns
+        must_group_by = ['date']
+        aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
+        if '' in aggregate_by:
+            aggregate_by.remove('')
+
+        # Aggregating
+        aggregateby_cols_dict = {
+            'date': [subquery.c.date],
+            'destination_region': [subquery.c.destination_region],
+            'commodity_group': [subquery.c.commodity_group],
+            'commodity': [subquery.c.commodity, subquery.c.commodity_group]
+        }
+
+        if any([x not in aggregateby_cols_dict for x in aggregate_by]):
+            logger.warning("aggregate_by can only be a selection of %s" % (",".join(aggregateby_cols_dict.keys())))
+            aggregate_by = [x for x in aggregate_by if x in aggregateby_cols_dict]
+
+        groupby_cols = []
+        for x in aggregate_by:
+            groupby_cols.extend(aggregateby_cols_dict[x])
+
+        query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
+        return query
 
 
 @routes_api.route('/v0/counter', strict_slashes=False)
@@ -116,7 +241,16 @@ class RussiaCounterResource(Resource):
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
 
-        query = Counter.query \
+        query = session.query(
+                Counter.commodity,
+                Commodity.group.label("commodity_group"),
+                Counter.destination_region,
+                Counter.date,
+                Counter.value_tonne,
+                Counter.value_eur,
+                Counter.type
+            ) \
+            .outerjoin(Commodity, Counter.commodity == Commodity.id) \
             .filter(Counter.date >= to_datetime(date_from)) \
             .filter(sa.or_(fill_with_estimates, Counter.type != base.COUNTER_ESTIMATED))
 
@@ -135,23 +269,23 @@ class RussiaCounterResource(Resource):
             daterange = pd.date_range(min(counter.date), dt.datetime.today()).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor('D')  # Should have been done already
             counter = counter \
-                .groupby(["commodity", "destination_region"]) \
+                .groupby(intersect(["commodity", "commodity_group", "destination_region"], counter.columns)) \
                 .apply(lambda x: x.set_index("date") \
                        .resample("D").sum() \
                        .reindex(daterange) \
                        .fillna(0)) \
                 .reset_index() \
-                .sort_values(['commodity', 'date'])
+                .sort_values(intersect(['commodity', 'date'], counter.columns))
 
 
         if cumulate and "date" in counter:
-            groupby_cols = [x for x in ['commodity', 'destination_region'] if aggregate_by is not None or not aggregate_by or x in aggregate_by]
+            groupby_cols = [x for x in ['commodity', 'commodity_group', 'destination_region'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
             counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
             counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
 
         if rolling_days is not None and rolling_days > 1:
             counter = counter \
-                .groupby(["commodity", "destination_region"]) \
+                .groupby(["commodity", "commodity_group", "destination_region"]) \
                 .apply(lambda x: x.set_index('date') \
                        .resample("D").sum() \
                        .reindex(daterange) \
@@ -196,7 +330,8 @@ class RussiaCounterResource(Resource):
         # Aggregating
         aggregateby_cols_dict = {
             'date': [subquery.c.date],
-            'commodity': [subquery.c.commodity],
+            'commodity': [subquery.c.commodity, subquery.c.commodity_group],
+            'commodity_group': [subquery.c.commodity_group],
             'destination_region': [subquery.c.destination_region],
             'type': [subquery.c.type]
         }
@@ -211,6 +346,11 @@ class RussiaCounterResource(Resource):
 
         query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
         return query
+
+
+
+
+
 # def get_counter_prices():
 #     from base.db import mongo_client
 #     db = mongo_client['russian_fossil']

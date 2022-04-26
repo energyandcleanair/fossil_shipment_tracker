@@ -47,15 +47,20 @@ def wkb_to_shape(geom):
         return None
 
 
+def to_wkt(x):
+    shape = wkb_to_shape(x)
+    if shape is not None:
+        return WKTElement(shape.wkt, srid=4326)
+    else:
+        return None
+
 def update_geometry_from_wkb(df, to="shape"):
     if to == "shape":
         df["geometry"] = df.geometry.apply(wkb_to_shape)
     if to == "wkt":
-        def to_wkt(x):
-            shape = wkb_to_shape(x)
-            if shape is not None:
-                return WKTElement(shape.wkt, srid=4326)
-            else:
-                return None
         df["geometry"] = df.geometry.apply(to_wkt)
     return df
+
+
+def intersect(lst1, lst2):
+    return list(set(lst1) & set(lst2))

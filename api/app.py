@@ -5,6 +5,7 @@ from flask import Flask, request
 from flask import jsonify
 from flask_cors import CORS
 from routes import routes
+from flask import Response
 
 try:
     import googleclouddebugger
@@ -48,6 +49,23 @@ def exception_handler(err):
             'message': err.args[0]
         }
     return jsonify(response), code
+
+
+@app.route('/v0/counter_update', methods=['POST'])
+def post():
+    from engine import counter
+    try:
+        counter.update()
+        return Response(
+            response="Counter updated",
+            status=200,
+            mimetype='application/json')
+    except Exception as e:
+        return Response(
+            response="Failed: %s"%(str(e)),
+            status=500,
+            mimetype='application/json')
+
 
 
 

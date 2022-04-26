@@ -2,7 +2,7 @@ import datetime as dt
 from sqlalchemy import func
 from sqlalchemy import or_
 import sqlalchemy as sa
-from geoalchemy2.functions import ST_MakeLine
+from geoalchemy2.functions import ST_MakeLine, ST_Multi, ST_Union, ST_Distance
 
 from sqlalchemy.orm import aliased
 
@@ -49,7 +49,17 @@ def update(shipment_id=None, rebuild_all=False):
         shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))
 
     shipments_to_update = shipments_to_update.subquery()
-    ordered_positions = session.query(shipments_to_update.c.shipment_id, Position) \
+    ordered_positions = session.query(shipments_to_update.c.shipment_id,
+                                      Position,
+                                      # func.lag(Position.date_utc).over(
+                                      #     Position.ship_imo,
+                                      #     Position.date_utc
+                                      # ).label('previous_date_utc'),
+                                      # func.lag(Position.geometry).over(
+                                      #     Position.ship_imo,
+                                      #     Position.date_utc
+                                      # ).label('previous_geometry')
+                                      ) \
         .join(Position, Position.ship_imo == shipments_to_update.c.ship_imo) \
         .filter(
               sa.and_(
@@ -59,14 +69,44 @@ def update(shipment_id=None, rebuild_all=False):
         .order_by(shipments_to_update.c.shipment_id, Position.date_utc) \
         .subquery()
 
+    # We split in different segments if two points are two distant (timewise for now)
+    # max_hours = 48
+    # max_deg = 5
+    # segmented_positions = session.query(ordered_positions,
+    #                                     ST_Distance(ordered_positions.c.geometry, ordered_positions.c.previous_geometry).label('distance'),
+    #                                     sa.and_(
+    #                                     ordered_positions.c.date_utc - ordered_positions.c.previous_date_utc > dt.timedelta(hours=max_hours),
+    #                                     ST_Distance(ordered_positions.c.geometry, ordered_positions.c.previous_geometry) > max_deg
+    #                                      ).label('new_segment')
+    #
+    #                                     ) \
+    # .subquery()
+    #
+    # from sqlalchemy.sql.expression import text
+    # segmented_positions2 = session.query(segmented_positions,
+    #                                     text("""sum(new_segment::integer) over
+    #                                     (order by shipment_id, date_utc
+    #                                     rows between unbounded preceding and current row) as segment""")) \
+    #     .subquery()
+
+    # .group_by(segmented_positions2.c.shipment_id, text("coalesce(segment, -1)")) \
+
     trajectories = session.query(ordered_positions.c.shipment_id.label("shipment_id"),
-                                 ST_MakeLine(ordered_positions.c.geometry).label("geometry")) \
+                                 ST_Multi(ST_MakeLine(ordered_positions.c.geometry).label("geometry"))) \
                     .group_by(ordered_positions.c.shipment_id)
+
+    #
+    # trajectories_combined = session.query(trajectories.c.shipment_id,
+    #                                       ST_Multi(ST_Union(trajectories.c.geometry)).label('geometry')) \
+    #     .group_by(trajectories.c.shipment_id)
 
 
     trajectories_df = pd.read_sql(trajectories.statement, session.bind)
-    trajectories_df = update_geometry_from_wkb(trajectories_df, to="wkt")
+    trajectories_df = update_geometry_from_wkb(trajectories_df, to="shape")
+    trajectories_df = gpd.GeoDataFrame(trajectories_df, geometry="geometry")
+    trajectories_df = trajectories_df.loc[~trajectories_df.is_empty]
+    trajectories_df = pd.DataFrame(trajectories_df)
     upsert(df=trajectories_df,
            table=DB_TABLE_TRAJECTORY,
            constraint_name="trajectory_shipment_id_key",
-           dtype=({'geometry': Geometry('LINESTRING', 4326)}))
+           dtype=({'geometry': Geometry('MULTILINESTRING', 4326)}))

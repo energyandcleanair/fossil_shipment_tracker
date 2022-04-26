@@ -1,15 +1,17 @@
 import pandas as pd
-from sqlalchemy import func
-import sqlalchemy as sa
 import json
 
-from base.logger import logger
 from base.db import session, engine
-from base.db_utils import upsert
-from base.models import Counter, PipelineFlow, Price, Counter, Country
+from base.models import Counter
 from base.models import DB_TABLE_COUNTER
-from api.routes.voyage import VoyageResource
-from api.routes.overland import PipelineFlowResource
+
+try:
+    from api.routes.voyage import VoyageResource
+    from api.routes.overland import PipelineFlowResource
+except ImportError:
+    from routes.voyage import VoyageResource
+    from routes.overland import PipelineFlowResource
+
 import base
 
 
@@ -38,12 +40,13 @@ def update():
         "format": "json",
         "download": False,
         "date_from": date_from,
-        "aggregate_by": ["destination_region", "commodity", "departure_date"],
+        "aggregate_by": ["destination_region", "commodity", "arrival_date", "status"],
         "nest_in_data": False}
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
     voyages = pd.DataFrame(voyages)
-    voyages.rename(columns={'departure_date': 'date'}, inplace=True)
+    voyages = voyages.loc[voyages.status==base.COMPLETED]
+    voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
 
     result = pd.concat([pipelineflows, voyages]) \
         .sort_values(['date', 'commodity']) \
@@ -73,7 +76,7 @@ def update():
     session.commit()
 
     # Add estimates
-    add_estimates(result)
+    # add_estimates(result)
 
 
 def add_estimates(result):

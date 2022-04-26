@@ -195,7 +195,6 @@ class Marinetraffic:
         portcalls = []
         for r in response_datas:
             # IMO's missing
-            # imo = session.query(Ship.imo).filter(Ship.mmsi==r["MMSI"]).first()
             if imo is None:
                 # Ship not found, let's add it
                 found = ship.fill(mmsis=[r["MMSI"]])
@@ -205,7 +204,7 @@ class Marinetraffic:
                     session.add(unknown_ship)
                     session.commit()
 
-                imo = session.query(Ship.imo).filter(Ship.mmsi == r["MMSI"]).first()[0]
+                r["IMO"] = session.query(Ship.imo).filter(Ship.mmsi == r["MMSI"]).first()[0]
 
             if imo is not None:
                 r["IMO"] = imo

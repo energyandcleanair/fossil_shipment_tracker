@@ -9,7 +9,7 @@ from flask_restx import inputs
 
 
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
-    ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, Destination, Price, Country, PriceDiscount
+    ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, Destination, Price, Country, PortPrice
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list
@@ -122,8 +122,7 @@ class VoyageResource(Resource):
         default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
 
         price_eur_per_tonne_field = (
-            func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne) -
-                func.coalesce(PriceDiscount.reduction_eur_per_tonne, 0)
+            func.coalesce(PortPrice.eur_per_tonne, Price.eur_per_tonne, default_price.c.eur_per_tonne)
         ).label('price_eur_per_tonne')
 
         value_eur_field = (
@@ -175,6 +174,7 @@ class VoyageResource(Resource):
                                     Ship.subtype.label("ship_subtype"),
                                     Ship.dwt.label("ship_dwt"),
                                     commodity_field,
+                                    Commodity.group.label("commodity_group"),
                                     value_tonne_field,
                                     value_m3_field,
                                     value_eur_field,
@@ -212,11 +212,11 @@ class VoyageResource(Resource):
                                  default_price.c.commodity == Commodity.pricing_commodity
                                  )
                         )
-             .outerjoin(PriceDiscount,
+             .outerjoin(PortPrice,
                         sa.and_(
-                            PriceDiscount.port_id == DeparturePort.id,
-                            PriceDiscount.commodity == Commodity.pricing_commodity,
-                            PriceDiscount.date == func.date_trunc('day', Departure.date_utc)
+                            PortPrice.port_id == DeparturePort.id,
+                            PortPrice.commodity == Commodity.pricing_commodity,
+                            PortPrice.date == func.date_trunc('day', Departure.date_utc)
                         ))
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
              .filter(destination_iso2_field != "RU"))
@@ -296,7 +296,9 @@ class VoyageResource(Resource):
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
-            'commodity': [subquery.c.commodity],
+            'commodity': [subquery.c.commodity, subquery.c.commodity_group],
+            'commodity_group': [subquery.c.commodity_group],
+
             'status': [subquery.c.status],
 
             'departure_date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],

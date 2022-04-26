@@ -293,6 +293,7 @@ def update_departures_from_russia(
         if last_portcall is not None and not force_rebuild:
             date_from = last_portcall.date_utc + dt.timedelta(minutes=1)
 
+
         portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
                                                               unlocode=port.unlocode,
                                                               date_from=to_datetime(date_from),
@@ -314,6 +315,7 @@ def update_departures_from_russia(
                 continue
 
     return
+
 
 
 def find_arrival(departure_portcall,

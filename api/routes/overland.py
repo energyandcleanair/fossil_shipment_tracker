@@ -99,6 +99,7 @@ class PipelineFlowResource(Resource):
         # Query with joined information
         flows_rich = (session.query(PipelineFlow.id,
                                     PipelineFlow.commodity,
+                                    Commodity.group.label('commodity_group'),
                                     PipelineFlow.date,
                                     PipelineFlow.destination_iso2,
                                     destination_country.c.name.label("destination_country"),
@@ -185,7 +186,8 @@ class PipelineFlowResource(Resource):
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
-            'commodity': [subquery.c.commodity],
+            'commodity': [subquery.c.commodity, subquery.c.commodity_group],
+            'commodity_group': [subquery.c.commodity_group],
             'date': [subquery.c.date],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
