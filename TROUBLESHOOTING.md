@@ -15,6 +15,7 @@
 # Backup portcalls
 ```
 pg_dump --file "portcall_backup" -d $DB_URL_DEVELOPMENT --verbose --format=t --blobs --table "public.portcall"
+pg_dump --file "shipment_backup" -d $DB_URL_DEVELOPMENT --verbose --format=t --blobs --table "public.shipment"
 ```
 
 

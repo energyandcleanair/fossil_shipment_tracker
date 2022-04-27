@@ -1,4 +1,5 @@
 import os
+import json
 from base.db import session
 from werkzeug.exceptions import HTTPException
 from flask import Flask, request
@@ -18,9 +19,11 @@ except ImportError:
 app = Flask(__name__)
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.register_blueprint(routes, url_prefix='/')
-# CORS(app)
+
 CORS(app,
      origins=["https://fossil-shipment-tracker.appspot.com",
+              "https://fossil-shipment-tracker.ew.r.appspot.com/",
+              "https://fossil-shipment-tracker.ew.r.appspot.com/",
               "https://fossil-shipment-tracker.ew.r.appspot.com/",
               "http://localhost:8080",
               "http://127.0.0.1",
@@ -51,18 +54,27 @@ def exception_handler(err):
     return jsonify(response), code
 
 
+@app.route('/v0/environment', methods=['GET'])
+def get_environment():
+    from base.db import environment
+    return Response(
+        response=json.dumps({"environment": environment}),
+        status=200,
+        mimetype='application/json')
+
+
 @app.route('/v0/counter_update', methods=['POST'])
 def post():
     from engine import counter
     try:
         counter.update()
         return Response(
-            response="Counter updated",
+            response=json.dumps({"status": "OK", "message": "counter updated"}),
             status=200,
             mimetype='application/json')
     except Exception as e:
         return Response(
-            response="Failed: %s"%(str(e)),
+            response={"status": "ERROR", "message": str(e)},
             status=500,
             mimetype='application/json')
 
