@@ -32,6 +32,9 @@ class RussiaCounterLastResource(Resource):
                         required=False, default=None)
     parser.add_argument('aggregate_by', help='aggregation e.g. commodity_group,destination_region',
                         required=False, default=None, action='split')
+    parser.add_argument('rolling_days', type=int,
+                        help='rolling average window (in days). Default: no rolling averaging',
+                        required=False, default=None)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
 
@@ -43,6 +46,7 @@ class RussiaCounterLastResource(Resource):
         date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
         format = params.get("format")
+        rolling_days = params.get("rolling_days")
 
         query = session.query(
             Counter.commodity,
@@ -83,12 +87,6 @@ class RussiaCounterLastResource(Resource):
         now = dt.datetime.utcnow()
         counter_last["now"] = now
         counter_last['total_eur'] = counter_last.total_eur + (now - counter_last.date) / np.timedelta64(1, 'D') * counter_last.eur_per_day
-
-        # Regroup commodities
-        # counter_last['commodity'] =  counter_last['commodity'] \
-        #     .replace(['crude_oil', 'oil_products', 'oil_or_chemical'], 'oil') \
-        #     .replace(['lng', 'natural_gas'], 'gas') \
-        #     .replace(['coal'], 'coal')
 
         counter_last = counter_last.loc[~counter_last.commodity_group.isna()]
         counter_last = counter_last.groupby(groupby_cols).sum()
@@ -202,6 +200,7 @@ class RussiaCounterLastResource(Resource):
         return query
 
 
+
 @routes_api.route('/v0/counter', strict_slashes=False)
 class RussiaCounterResource(Resource):
 
@@ -261,6 +260,7 @@ class RussiaCounterResource(Resource):
 
         counter = pd.read_sql(query.statement, session.bind)
         counter.replace({np.nan: None}, inplace=True)
+
         if "id" in counter:
             counter.drop(["id"], axis=1, inplace=True)
 
@@ -283,16 +283,18 @@ class RussiaCounterResource(Resource):
             counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
             counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
 
+
         if rolling_days is not None and rolling_days > 1:
             counter = counter \
-                .groupby(["commodity", "commodity_group", "destination_region"]) \
+                .groupby(intersect(["commodity", "commodity_group", "destination_region"], counter.columns)) \
                 .apply(lambda x: x.set_index('date') \
                        .resample("D").sum() \
                        .reindex(daterange) \
                        .fillna(0) \
                        .rolling(rolling_days, min_periods=rolling_days) \
                        .mean()) \
-                .reset_index()
+                .reset_index() \
+                .replace({np.nan: None})
 
         if format == "csv":
             return Response(
@@ -306,6 +308,7 @@ class RussiaCounterResource(Resource):
                 response=json.dumps({"data": counter.to_dict(orient="records")}, cls=JsonEncoder),
                 status=200,
                 mimetype='application/json')
+
 
     def aggregate(self, query, aggregate_by):
         """Perform aggregation based on user agparameters"""
@@ -346,8 +349,6 @@ class RussiaCounterResource(Resource):
 
         query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
         return query
-
-
 
 
 

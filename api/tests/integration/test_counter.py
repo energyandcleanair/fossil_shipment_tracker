@@ -70,7 +70,7 @@ def test_counter(app):
         assert len(data) > 0
         data_df = pd.DataFrame(data)
 
-        expected_columns = set(['commodity', 'date', 'destination_region', 'value_tonne', 'value_eur'])
+        expected_columns = set(['commodity', 'commodity_group', 'date', 'destination_region', 'value_tonne', 'value_eur'])
         assert set(data_df.columns) == expected_columns
 
 
@@ -93,6 +93,13 @@ def test_counter_rolling(app):
         assert response.status_code == 200
 
         params = {"format": "json", "rolling_days": 7}
+        response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        data_df = pd.DataFrame(data)
+
+        params = {"format": "json", "rolling_days": 7, "aggregate_by": "date,destination_region,commodity_group"}
         response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]

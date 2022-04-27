@@ -351,7 +351,8 @@ class VoyageResource(Resource):
                            .fillna(0) \
                            .rolling(rolling_days, min_periods=rolling_days) \
                            .mean()) \
-                    .reset_index()
+                    .reset_index() \
+                    .replace({np.nan: None})
 
         return result
 
