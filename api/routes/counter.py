@@ -30,13 +30,15 @@ class RussiaCounterLastResource(Resource):
                         required=False, default='2022-02-24')
     parser.add_argument('date_to', type=str, help='date at which counter should stop',
                         required=False, default=None)
+    parser.add_argument('fill_with_estimates', type=inputs.boolean,
+                        help='whether or not to fill late days with estimates',
+                        required=False,
+                        default=False)
     parser.add_argument('aggregate_by', help='aggregation e.g. commodity_group,destination_region',
                         required=False, default=None, action='split')
-    parser.add_argument('rolling_days', type=int,
-                        help='rolling average window (in days). Default: no rolling averaging',
-                        required=False, default=None)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
+
 
     @routes_api.expect(parser)
     def get(self):
@@ -45,8 +47,8 @@ class RussiaCounterLastResource(Resource):
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
+        fill_with_estimates = params.get("fill_with_estimates")
         format = params.get("format")
-        rolling_days = params.get("rolling_days")
 
         query = session.query(
             Counter.commodity,
@@ -68,6 +70,9 @@ class RussiaCounterLastResource(Resource):
         if date_to:
             query = query.filter(Counter.date <= to_datetime(date_to))
 
+        if not fill_with_estimates:
+            query = query.filter(Counter.type != base.COUNTER_ESTIMATED)
+
         # Important to force this
         query = query.filter(Counter.date <= dt.date.today())
 
@@ -88,7 +93,9 @@ class RussiaCounterLastResource(Resource):
         counter_last["now"] = now
         counter_last['total_eur'] = counter_last.total_eur + (now - counter_last.date) / np.timedelta64(1, 'D') * counter_last.eur_per_day
 
-        counter_last = counter_last.loc[~counter_last.commodity_group.isna()]
+        if "commodity_group" in counter_last.columns:
+            counter_last = counter_last.loc[~counter_last.commodity_group.isna()]
+
         counter_last = counter_last.groupby(groupby_cols).sum()
 
         if not aggregate_by or 'destination_region' in aggregate_by:

@@ -65,7 +65,18 @@ def upload_ships(ships):
         if ship and ship.imo is not None:
             ship = set_commodity(ship)
             session.add(ship)
-    session.commit()
+        try:
+            session.commit()
+        except sa.exc.IntegrityError as e:
+            session.rollback()
+            # Ship with this IMO probably already exists.
+            n_imo_ships = Ship.query.filter(Ship.imo==ship.imo).count()
+            if n_imo_ships > 0:
+                ship.imo = "%s_v%d"%(ship.imo, n_imo_ships+1)
+                session.add(ship)
+                session.commit()
+            else:
+                raise ValueError("Problem inserting ship: %s"%(str(e),))
 
 
 def ship_to_commodity(ship):

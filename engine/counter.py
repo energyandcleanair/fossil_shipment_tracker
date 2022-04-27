@@ -110,7 +110,7 @@ def add_estimates(result):
         .apply(resample_and_fill) \
         .reset_index()
 
-    m = pd.merge(result[["commodity","date"]], result_estimated, how='outer', indicator=True)
+    m = pd.merge(result[["commodity", "date"]], result_estimated, how='outer', indicator=True)
     result_to_upload = m[m['_merge'] == 'right_only'].drop('_merge', axis=1)
     result_to_upload["type"] = base.COUNTER_ESTIMATED
     result_to_upload.to_sql(DB_TABLE_COUNTER,
