@@ -28,7 +28,8 @@ CORS(app,
               "http://localhost:8080",
               "http://127.0.0.1",
               "https://energyandcleanair.github.io",
-              "https://energyandcleanair.org"],
+              "https://energyandcleanair.org",
+              "https://beyond-coal.eu"],
      supports_credentials=True)
 
 

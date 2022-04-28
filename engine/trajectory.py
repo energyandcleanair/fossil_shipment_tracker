@@ -2,7 +2,7 @@ import datetime as dt
 from sqlalchemy import func
 from sqlalchemy import or_
 import sqlalchemy as sa
-from geoalchemy2.functions import ST_MakeLine, ST_Multi, ST_Union, ST_Distance
+from geoalchemy2.functions import ST_MakeLine, ST_Multi, ST_Union, ST_Distance, ST_ClusterDBSCAN, ST_Centroid
 
 from sqlalchemy.orm import aliased
 
@@ -19,7 +19,7 @@ import geopandas as gpd
 from geoalchemy2 import Geometry
 
 
-def update(shipment_id=None, rebuild_all=False):
+def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.005):
     print("=== Trajectory update ===")
     DepartureBerthPosition = aliased(Position)
     ArrivalBerthPosition = aliased(Position)
@@ -69,6 +69,13 @@ def update(shipment_id=None, rebuild_all=False):
         .order_by(shipments_to_update.c.shipment_id, Position.date_utc) \
         .subquery()
 
+    if do_cluster:
+        trajectories = cluster(ordered_positions, buffer_deg=cluster_deg)
+    else:
+        trajectories = session.query(ordered_positions.c.shipment_id.label("shipment_id"),
+                                     ST_Multi(ST_MakeLine(ordered_positions.c.geometry)).label("geometry")) \
+            .group_by(ordered_positions.c.shipment_id)
+
     # We split in different segments if two points are two distant (timewise for now)
     # max_hours = 48
     # max_deg = 5
@@ -91,9 +98,6 @@ def update(shipment_id=None, rebuild_all=False):
 
     # .group_by(segmented_positions2.c.shipment_id, text("coalesce(segment, -1)")) \
 
-    trajectories = session.query(ordered_positions.c.shipment_id.label("shipment_id"),
-                                 ST_Multi(ST_MakeLine(ordered_positions.c.geometry)).label("geometry")) \
-                    .group_by(ordered_positions.c.shipment_id)
 
     #
     # trajectories_combined = session.query(trajectories.c.shipment_id,
@@ -111,3 +115,53 @@ def update(shipment_id=None, rebuild_all=False):
            table=DB_TABLE_TRAJECTORY,
            constraint_name="trajectory_shipment_id_key",
            dtype=({'geometry': Geometry('MULTILINESTRING', 4326)}))
+
+
+def cluster(ordered_positions, buffer_deg=0.005):
+    # buffer_deg=0.005 roughly divide the number of points by 2
+    clustered_points = session.query(
+        ordered_positions.c.shipment_id,
+        ordered_positions.c.date_utc,
+        ordered_positions.c.geometry,
+        ST_ClusterDBSCAN(ordered_positions.c.geometry, buffer_deg, 1) \
+            .over(partition_by=ordered_positions.c.shipment_id) \
+            .label('cluster')) \
+    .subquery()
+
+    clustered_points2 = session.query(clustered_points.c.shipment_id,
+                                      func.min(clustered_points.c.date_utc).label("date_utc"),
+                                      ST_Centroid(ST_Union(clustered_points.c.geometry)).label("geometry")) \
+    .group_by(clustered_points.c.shipment_id, clustered_points.c.cluster) \
+    .subquery()
+
+    clustered_points3 = session.query(clustered_points2) \
+        .order_by(clustered_points2.c.shipment_id, clustered_points2.c.date_utc) \
+        .subquery()
+
+    trajectories = session.query(clustered_points3.c.shipment_id.label("shipment_id"),
+                                 ST_Multi(ST_MakeLine(clustered_points3.c.geometry)) \
+                                 .label("geometry")) \
+        .group_by(clustered_points3.c.shipment_id)
+
+    return trajectories
+
+
+
+# clustered_points as (select shipment_id, geometry, date_utc,
+# 					 ST_ClusterDBSCAN(geometry, eps := 0.01, minpoints := 1)
+# 					 over (partition by (shipment_id, ship_imo)) as cluster
+# from points),
+#
+# clustered_points2 as (
+# 	select shipment_id, min(date_utc) as date_utc, st_centroid(st_union(geometry)) as geometry
+# 	from clustered_points
+# 	group by shipment_id, cluster
+# 	order by date_utc
+# )
+#
+#
+#
+# select shipment_id, st_makeline(geometry ORDER BY date_utc) from clustered_points
+# group by shipment_id
+
+
