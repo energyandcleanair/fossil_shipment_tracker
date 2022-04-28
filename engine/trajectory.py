@@ -20,19 +20,22 @@ import geopandas as gpd
 from geoalchemy2 import Geometry
 
 
-def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.005):
+def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.005, extend_beyond=False):
     print("=== Trajectory update ===")
     DepartureBerthPosition = aliased(Position)
     ArrivalBerthPosition = aliased(Position)
 
+    buffer_before_hours = base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE if extend_beyond else 0
+    buffer_after_hours = base.QUERY_POSITION_HOURS_AFTER_ARRIVAL if extend_beyond else 0
+
     shipments_to_update = session.query(Shipment.id.label('shipment_id'),
                                     sa.func.greatest(
-                                        Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE),
+                                        Departure.date_utc - dt.timedelta(hours=buffer_before_hours),
                                         DepartureBerthPosition.date_utc
                                     ).label('departure_date'),
                                     Departure.ship_imo.label('ship_imo'),
                                     sa.func.least(
-                                        Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
+                                        Arrival.date_utc + dt.timedelta(hours=buffer_after_hours),
                                         ArrivalBerthPosition.date_utc
                                     ).label('arrival_date'),
                                     Trajectory.shipment_id
