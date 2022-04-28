@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from geoalchemy2.functions import ST_MakeLine, ST_Multi, ST_Union, ST_Distance, ST_ClusterDBSCAN, ST_Centroid
 
 from sqlalchemy.orm import aliased
+from sqlalchemy.sql.expression import text
 
 import base
 from base.models import Position, Trajectory, Shipment, Departure, Arrival, Ship, ShipmentArrivalBerth, ShipmentDepartureBerth
@@ -128,20 +129,36 @@ def cluster(ordered_positions, buffer_deg=0.005):
             .label('cluster')) \
     .subquery()
 
-    clustered_points2 = session.query(clustered_points.c.shipment_id,
-                                      func.min(clustered_points.c.date_utc).label("date_utc"),
-                                      ST_Centroid(ST_Union(clustered_points.c.geometry)).label("geometry")) \
-    .group_by(clustered_points.c.shipment_id, clustered_points.c.cluster) \
-    .subquery()
 
-    clustered_points3 = session.query(clustered_points2) \
-        .order_by(clustered_points2.c.shipment_id, clustered_points2.c.date_utc) \
+    # Cluster can only happen with consecutive points
+    # we force another cluster if this is not the case
+    clustered_points2 = session.query(clustered_points.c.shipment_id,
+                                      clustered_points.c.geometry,
+                                      clustered_points.c.date_utc,
+                                      sa.case([
+                                          (func.lag(clustered_points.c.cluster).over(
+                                          partition_by=clustered_points.c.shipment_id,
+                                          order_by=clustered_points.c.date_utc) <= clustered_points.c.cluster, clustered_points.c.cluster)],
+                                           else_= -1 * clustered_points.c.cluster).label('cluster')) \
         .subquery()
 
-    trajectories = session.query(clustered_points3.c.shipment_id.label("shipment_id"),
-                                 ST_Multi(ST_MakeLine(clustered_points3.c.geometry)) \
+
+    clustered_points3 = session.query(clustered_points2.c.shipment_id,
+                                      func.min(clustered_points2.c.date_utc).label("date_utc"),
+                                      ST_Centroid(ST_Union(clustered_points2.c.geometry)).label("geometry")) \
+    .group_by(clustered_points2.c.shipment_id, clustered_points2.c.cluster) \
+    .subquery()
+
+    clustered_points4 = session.query(clustered_points3) \
+        .order_by(clustered_points3.c.shipment_id, clustered_points3.c.date_utc) \
+        .subquery()
+
+    #text('ST_Multi(st_makeline(geometry ORDER BY date_utc)) as geometry')
+
+    trajectories = session.query(clustered_points4.c.shipment_id.label("shipment_id"),
+                                 ST_Multi(ST_MakeLine(clustered_points4.c.geometry)) \
                                  .label("geometry")) \
-        .group_by(clustered_points3.c.shipment_id)
+        .group_by(clustered_points4.c.shipment_id)
 
     return trajectories
 
