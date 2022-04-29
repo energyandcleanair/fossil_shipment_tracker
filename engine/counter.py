@@ -4,6 +4,8 @@ import json
 from base.db import session, engine
 from base.models import Counter
 from base.models import DB_TABLE_COUNTER
+from base.utils import to_datetime
+from base.logger import logger_slack
 
 try:
     from api.routes.voyage import VoyageResource
@@ -66,14 +68,29 @@ def update():
 
     result["type"] = base.COUNTER_OBSERVED
 
-    # Erase and replace everything
-    Counter.query.delete()
-    session.commit()
-    result.to_sql(DB_TABLE_COUNTER,
-              con=engine,
-              if_exists="append",
-              index=False)
-    session.commit()
+
+    # Some sanity checking before updating the counter
+    old_data = pd.read_sql(Counter.query.statement, session.bind)
+    eu_old = old_data.loc[(old_data.destination_region == 'EU28') & (old_data.date >= to_datetime('2022-02-24'))] \
+                    .value_eur.sum()
+
+    eu_new = result.loc[(result.destination_region == 'EU28') & (result.date >= to_datetime('2022-02-24'))] \
+                    .value_eur.sum()
+
+    ok = (eu_new >= eu_old) and (eu_new < eu_old + 2e9)
+    if not ok:
+        logger_slack.error("[ERROR] New EU counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (eu_new / 1e9, eu_old / 1e9))
+    else:
+        logger_slack.info("[COUNTER UPDATE] New EU counter: EUR %.1fB vs EUR %.1fB." % (eu_new / 1e9, eu_old / 1e9))
+
+        # Erase and replace everything
+        Counter.query.delete()
+        session.commit()
+        result.to_sql(DB_TABLE_COUNTER,
+                  con=engine,
+                  if_exists="append",
+                  index=False)
+        session.commit()
 
     # Add estimates
     # add_estimates(result)

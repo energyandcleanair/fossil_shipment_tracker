@@ -112,6 +112,9 @@ class RussiaCounterLastResource(Resource):
         counter_last['date'] = now
         counter_last['eur_per_sec'] = counter_last['eur_per_day'] / 24 / 3600
 
+        if "index" in counter_last.columns:
+            counter_last.drop(["index"], axis=1, inplace=True)
+
         if format == "csv":
             return Response(
                 response=counter_last.to_csv(index=False),
