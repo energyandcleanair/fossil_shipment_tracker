@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy import or_
 import sqlalchemy as sa
 from geoalchemy2.functions import ST_MakeLine, ST_Multi, ST_Union, ST_Distance, ST_ClusterDBSCAN, ST_Centroid
-
+from base.logger import logger_slack
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.expression import text
 
@@ -21,7 +21,7 @@ from geoalchemy2 import Geometry
 
 
 def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.005, extend_beyond=False):
-    print("=== Trajectory update ===")
+    logger_slack.info("=== Trajectory update ===")
     DepartureBerthPosition = aliased(Position)
     ArrivalBerthPosition = aliased(Position)
 

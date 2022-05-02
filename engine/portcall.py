@@ -4,7 +4,7 @@ import sqlalchemy
 from tqdm import tqdm
 
 import base
-from base.logger import logger
+from base.logger import logger, logger_slack
 from base.db import session
 from base.db_utils import upsert
 from base.models import DB_TABLE_PORTCALL
@@ -276,7 +276,7 @@ def update_departures_from_russia(
     :param force_rebuild:
     :return:
     """
-    print("=== Update departures (Portcall) ===")
+    logger_slack.info("=== Update departures (Portcall) ===")
     ports = Port.query.filter(Port.check_departure)\
 
     if unlocode is not None:

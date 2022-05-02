@@ -7,5 +7,5 @@ os.environ["ENVIRONMENT"] = "development"
 
 @pytest.fixture
 def app():
-    from api.app import app
+    from app import app
     return app

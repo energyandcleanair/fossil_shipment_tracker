@@ -5,20 +5,14 @@ from werkzeug.exceptions import HTTPException
 from flask import Flask, request
 from flask import jsonify
 from flask_cors import CORS
-from routes import routes
+from api.routes import routes
 from flask import Response
 
-try:
-    import googleclouddebugger
-    googleclouddebugger.enable(
-        breakpoint_enable_canary=True
-    )
-except ImportError:
-    pass
 
 app = Flask(__name__)
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.register_blueprint(routes, url_prefix='/')
+
 
 CORS(app,
      origins=["https://fossil-shipment-tracker.appspot.com",
@@ -65,7 +59,7 @@ def get_environment():
 
 
 @app.route('/v0/counter_update', methods=['POST'])
-def post():
+def counter_update():
     from engine import counter
     try:
         counter.update()
@@ -80,6 +74,20 @@ def post():
             mimetype='application/json')
 
 
+@app.route('/v0/update', methods=['POST'])
+def update():
+    from update import update
+    try:
+        update()
+        return Response(
+            response=json.dumps({"status": "OK", "message": "everything updated"}),
+            status=200,
+            mimetype='application/json')
+    except Exception as e:
+        return Response(
+            response={"status": "ERROR", "message": str(e)},
+            status=500,
+            mimetype='application/json')
 
 
 if __name__ == "__main__":

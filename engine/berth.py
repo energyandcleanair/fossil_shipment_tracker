@@ -7,7 +7,7 @@ import datetime as dt
 
 import base
 from base.db import session, engine
-from base.logger import logger
+from base.logger import logger, logger_slack
 from base.db_utils import upsert
 from base.models import Berth, Port, Shipment, ShipmentArrivalBerth, ShipmentDepartureBerth, Position, Arrival, Departure
 from base.models import DB_TABLE_BERTH, DB_TABLE_SHIPMENTARRIVALBERTH, DB_TABLE_SHIPMENTDEPARTUREBERTH
@@ -17,7 +17,7 @@ from engine import port
 
 
 def update(shipment_id=None):
-    print("=== Berth update ===")
+    logger_slack.info("=== Berth update ===")
     detect_departure_berths(shipment_id=shipment_id)
     detect_arrival_berths(shipment_id=shipment_id)
     return

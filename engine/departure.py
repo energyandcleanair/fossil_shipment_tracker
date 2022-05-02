@@ -2,6 +2,7 @@
 from base.db import session
 from base.utils import to_datetime, to_list
 import base
+from base.logger import logger_slack
 import sqlalchemy as sa
 from sqlalchemy import func
 from base.models import PortCall, Departure, Arrival, Ship, Port, Shipment
@@ -124,7 +125,7 @@ def update(date_from="2022-01-01",
            ship_imo=None,
            unlocode=None
            ):
-    print("=== Update departures ===")
+    logger_slack.info("=== Update departures ===")
     # Look for relevant PortCalls without associated departure
     subquery_ports = session.query(Port.id).filter(Port.check_departure)
     subquery = session.query(Departure.portcall_id)

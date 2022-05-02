@@ -37,7 +37,7 @@ logger_slack.setLevel(logging.INFO)
 if slack_webhook_ok(get_env('SLACK_WEBHOOK')):
     sh = SlackHandler(get_env('SLACK_WEBHOOK'))
     sh.setFormatter(SlackFormatter())
-    sh.setLevel(level=logging.WARNING)
+    sh.setLevel(level=logging.ERROR)
     logger.addHandler(sh)
 
     sh2 = SlackHandler(get_env('SLACK_WEBHOOK'))

@@ -22,7 +22,7 @@ def update():
     Fill counter
     :return:
     """
-    print("=== Counter update ===")
+    logger_slack.info("=== Counter update ===")
     date_from = "2022-01-01"
 
     # Get pipeline flows
@@ -38,6 +38,7 @@ def update():
 
 
     # Get shipments
+    # Very important: we aggregate by ARRIVAL_DATE for counter pricing.
     params_voyage = {
         "format": "json",
         "download": False,
@@ -56,7 +57,6 @@ def update():
 
     # Fill missing dates so that we're sure we're erasing everything
     # But only within commodity, to keep the last date available
-    import datetime as dt
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
     result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
     result = result \

@@ -2,13 +2,13 @@ from engine.datalastic import Datalastic
 from base.db import session
 import datetime as dt
 import base
+from base.logger import logger_slack
 from base.utils import to_list, to_datetime
 from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination
 import sqlalchemy as sa
 from sqlalchemy import func, or_
 from tqdm import tqdm
 from difflib import SequenceMatcher
-import numpy as np
 import pandas as pd
 
 
@@ -66,7 +66,7 @@ def update(commodities=None,
            shipment_status=None,
            force_for_those_without_destination=False):
 
-    print("=== Position update ===")
+    logger_slack.info("=== Position update ===")
     buffer = dt.timedelta(hours=24)
     # We update position which are still ongoing (no arrival yet)
     # or who are still missing some positions (should have til Arrival + n hours, and from Departure - n_hours)

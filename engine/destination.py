@@ -3,7 +3,7 @@ from engine.marinetraffic import Marinetraffic
 from base.db import session, engine
 import datetime as dt
 import base
-from base.utils import to_list
+from base.logger import logger_slack
 from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, MTVoyageInfo
 import sqlalchemy as sa
 from sqlalchemy import func, or_
@@ -12,8 +12,9 @@ from difflib import SequenceMatcher
 import numpy as np
 from base.db_utils import execute_statement
 
+
 def update():
-    print("=== Destination update ===")
+    logger_slack.info("=== Destination update ===")
     update_from_positions()
     update_from_voyageinfo()
     update_matching()

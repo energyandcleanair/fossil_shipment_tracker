@@ -5,7 +5,7 @@ from tqdm import tqdm
 import base
 from engine import departure
 from engine import portcall
-from base.logger import logger
+from base.logger import logger, logger_slack
 from base.db import session
 from base.models import Arrival, Shipment, Port, PortCall, Departure, ShipmentArrivalBerth, Trajectory
 
@@ -26,7 +26,7 @@ def update(min_dwt=base.DWT_MIN,
            include_undetected_arrival_shipments=True,
            cache_only=False):
 
-    print("=== Arrival update ===")
+    logger_slack.info("=== Arrival update ===")
 
     # We take dangling departures, and try to find the next arrival
     # As in, the arrival before the next relevant departure (i.e. with discharge)

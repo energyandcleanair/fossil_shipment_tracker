@@ -1,19 +1,9 @@
-import datetime as dt
-
-import base
-from base.db import session
-from base.models import Ship, Departure, Shipment, Position, Arrival
-from engine.arrival import get_dangling_arrivals
-from engine.departure import get_departures_without_shipment
-from engine import position
-from tqdm import tqdm
-from base.db import engine
 from base.db_utils import execute_statement
 from base.utils import to_list, to_datetime
-
+from base.logger import logger_slack
 
 def rebuild():
-    print("=== Shipment rebuild ===")
+    logger_slack.info("=== Shipment rebuild ===")
     with open('engine/shipment_rebuild.sql', 'r') as file:
         sql_content1 = file.read()
     with open('engine/shipment_refresh.sql', 'r') as file:
@@ -22,7 +12,7 @@ def rebuild():
 
 
 def update(date_from="2022-01-01"):
-    print("=== Shipment update ===")
+    logger_slack.info("=== Shipment update ===")
 
     with open('engine/shipment_refresh.sql', 'r') as file:
         sql_content = file.read()

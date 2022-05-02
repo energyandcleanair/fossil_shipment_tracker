@@ -22,22 +22,22 @@ def update():
     #                                        date_from='2022-04-14',
     #                                        date_to='2022-04-15',
     #                                        force_rebuild=True)
-    portcall.update_departures_from_russia()
-
-    # portcall.fill_departure_gaps(date_from="2022-04-10", unlocode='RUULU')
-    departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
-                           base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
-
-    departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
-                     commodities=base.GENERAL_CARGO)
-
-    # # arrival.update(force_for_arrival_to_departure_greater_than=dt.timedelta(hours=24*10))
-    arrival.update(date_from="2022-04-21", include_undetected_arrival_shipments=True)
+    # portcall.update_departures_from_russia()
+    #
+    # # portcall.fill_departure_gaps(date_from="2022-04-10", unlocode='RUULU')
+    # departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
+    #                        base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
+    #
+    # departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
+    #                  commodities=base.GENERAL_CARGO)
+    #
+    # # # arrival.update(force_for_arrival_to_departure_greater_than=dt.timedelta(hours=24*10))
+    # arrival.update(date_from="2021-12-01", date_to='2022-01-31', include_undetected_arrival_shipments=True)
     shipment.update()
-    position.update()
-    destination.update()
-    berth.update()
-    trajectory.update()
+    # # position.update()
+    # # destination.update()
+    # # berth.update()
+    # trajectory.update(shipment_id=130117, rebuild_all=True)
     counter.update()
     return
 
