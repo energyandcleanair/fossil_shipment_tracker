@@ -210,7 +210,7 @@ class Datalastic:
             datas = [manual_matches[str(marinetraffic_id)]]
 
         if len(datas) == 0:
-            logger.warning("No port found matching name %s" % (name,))
+            logger.debug("No port found matching name %s" % (name,))
             return None
 
         if len(datas) > 1:
@@ -225,7 +225,7 @@ class Datalastic:
             if marinetraffic_id and str(marinetraffic_id) in fixes:
                 datas = [x for x in datas if x[list(fixes[str(marinetraffic_id)].keys())[0]] == list(fixes[str(marinetraffic_id)].values())[0]]
             else:
-                logger.warning("More than one port found matching name %s" % (name,))
+                logger.debug("More than one port found matching name %s" % (name,))
 
         ports = []
         for data in datas:

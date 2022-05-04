@@ -74,8 +74,8 @@ class RussiaCounterLastResource(Resource):
             query = query.filter(Counter.type != base.COUNTER_ESTIMATED)
 
         # Important to force this
+        # so that future flows (e.g. fixed pipeline) aren't included
         query = query.filter(Counter.date <= dt.date.today())
-
 
         # Aggregate
         query = self.aggregate(query=query, aggregate_by=aggregate_by)

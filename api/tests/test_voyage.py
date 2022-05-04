@@ -32,7 +32,8 @@ def test_voyage_pricing(app):
         prices = prices.drop_duplicates()
         unique_prices = prices.groupby(["destination_iso2", "commodity", "date"]).eur_per_tonne.nunique().reset_index()
         #TODO add a test that is not relying on
-        # having two arrivals on same day... assert max(unique_prices.eur_per_tonne) > 1
+        # having two arrivals on same day...
+        # assert max(unique_prices.eur_per_tonne) > 1
 
 
 def test_voyage_aggregated(app):
