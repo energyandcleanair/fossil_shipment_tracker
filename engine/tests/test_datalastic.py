@@ -4,6 +4,11 @@ from base.models import Position
 from engine.datalastic import Datalastic
 
 
+def test_query_ship():
+    ship = Datalastic.get_ship(mmsi="538008212")
+
+
+
 def test_query_position():
     # This will cost few credits each time...
     # We took an actual port call from Russia

@@ -21,7 +21,8 @@ class Datalastic:
 
     api_base = 'https://api.datalastic.com/api/v0/'
     api_key = None
-    cache_ships = load_cache('cache/datalastic/ships.json')
+    cache_ships_file = 'cache/datalastic/ships.json'
+    cache_ships = load_cache(cache_ships_file)
 
 
     @classmethod
@@ -40,17 +41,20 @@ class Datalastic:
         :return:
         """
         cls.cache_ships.append(response_data)
-        with open(cls.cache_file_ship, 'w') as outfile:
+        with open(cls.cache_ships_file, 'w') as outfile:
             json.dump(cls.cache_ships, outfile)
 
     @classmethod
-    def get_ship(cls, imo=None, mmsi=None, query_if_not_in_cache=True):
+    def get_ship(cls, imo=None, mmsi=None, query_if_not_in_cache=True, use_cache=True):
 
         if not cls.api_key:
             cls.api_key = get_env("KEY_DATALASTIC")
 
         # First look in cache to save query credits
-        response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi)
+        if use_cache:
+            response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi)
+        else:
+            response_data = None
 
         # Otherwise query datalastic (and cache it as well)
         if not response_data:
@@ -72,7 +76,12 @@ class Datalastic:
                 logger.warning("Datalastic: Failed to query vessel %s: %s"%(imo, api_result))
                 return None
             response_data = api_result.json()["data"]
-            cls.cache_ship(response_data)
+
+            if response_data["imo"] == '':
+                return None
+
+            if use_cache:
+                cls.cache_ship(response_data)
 
         data = {
             "mmsi": response_data["mmsi"],

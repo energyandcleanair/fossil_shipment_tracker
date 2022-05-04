@@ -17,6 +17,7 @@ import base
 import datetime as dt
 
 def update():
+    ship.fix_mmsi_imo_discrepancy(date_from="2022-01-01")
     # ship.fill_missing()
     # portcall.update_departures_from_russia(unlocode='RUULU',
     #                                        date_from='2022-04-14',
@@ -32,12 +33,13 @@ def update():
     #                  commodities=base.GENERAL_CARGO)
     #
     # # # arrival.update(force_for_arrival_to_departure_greater_than=dt.timedelta(hours=24*10))
-    # arrival.update(date_from="2021-12-01", date_to='2022-01-31', include_undetected_arrival_shipments=True)
-    shipment.update()
-    # # position.update()
-    # # destination.update()
-    # # berth.update()
-    # trajectory.update(shipment_id=130117, rebuild_all=True)
+    arrival.update(date_from="2022-02-24", include_undetected_arrival_shipments=True)
+    shipment.rebuild()
+    destination.update()
+    berth.update()
+    counter.update()
+    position.update()
+    trajectory.update()
     counter.update()
     return
 

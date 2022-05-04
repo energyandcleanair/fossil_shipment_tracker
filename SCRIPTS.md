@@ -11,6 +11,15 @@ PGPASSWORD=$PGPASSWORD_PRODUCTION pg_restore -h $PGHOST_PRODUCTION -U $PGUSER_PR
 
 ```
 
+```bash
+pg_dump $DB_URL_PRODUCTION -F custom > "bkp/production_dump.out"
+
+# Recreate development DB
+PGPASSWORD=$PGPASSWORD_DEVELOPMENT dropdb -h $PGHOST_DEVELOPMENT -U $PGUSER_DEVELOPMENT -p $PGPORT_DEVELOPMENT --no-password "development"
+PGPASSWORD=$PGPASSWORD_DEVELOPMENT createdb -h $PGHOST_DEVELOPMENT -U $PGUSER_DEVELOPMENT -p $PGPORT_DEVELOPMENT --no-password -T template0 "development"
+PGPASSWORD=$PGPASSWORD_DEVELOPMENT pg_restore -h $PGHOST_DEVELOPMENT -U $PGUSER_DEVELOPMENT -p $PGPORT_DEVELOPMENT --no-password -d "development" "bkp/production_dump.out"
+``````
+
 ## Purpose
 Create a data platform that provides decision-makers (political, business, financial), journalists and campaigning organizations with information that helps identify fossil fuel shipments from Russia, scandalize them and create momentum to stop purchases.
 

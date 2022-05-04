@@ -156,7 +156,7 @@ class ShipmentArrivalBerth(Base):
 class Departure(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'))
-    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo'))
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE", ondelete="CASCADE"))
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String) # Method through which we detected the departure
     portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=True)

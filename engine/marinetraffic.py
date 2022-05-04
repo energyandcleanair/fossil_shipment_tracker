@@ -78,12 +78,15 @@ class Marinetraffic:
 
 
     @classmethod
-    def get_ship(cls, imo=None, mmsi=None):
+    def get_ship(cls, imo=None, mmsi=None, use_cache=True):
 
         api_key = get_env("KEY_MARINETRAFFIC_VD02")
 
         # First look in cache to save query credits
-        response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi)
+        if use_cache:
+            response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi)
+        else:
+            response_data = None
 
         # Otherwise query datalastic (and cache it as well)
         if not response_data:
@@ -129,7 +132,8 @@ class Marinetraffic:
                                      }]
 
             response_data = response_data[0]
-            cls.do_cache_ship(response_data)
+            if use_cache:
+                cls.do_cache_ship(response_data)
 
 
         data = {
