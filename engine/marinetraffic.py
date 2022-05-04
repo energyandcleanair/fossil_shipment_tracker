@@ -212,7 +212,8 @@ class Marinetraffic:
 
             if imo is not None:
                 r["IMO"] = imo
-                portcalls.append(cls.parse_portcall(r))
+
+            portcalls.append(cls.parse_portcall(r))
 
         return portcalls
 
