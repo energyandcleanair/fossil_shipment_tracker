@@ -64,6 +64,7 @@ def initial_fill(limit=None):
     session.commit()
     return
 
+
 def fill_missing_port_operation():
     """
     We queried initially with MT v1, which misses PORT_OPERATION field.
@@ -440,33 +441,33 @@ def fill_departure_gaps(imo=None,
 
 
     # 2/2: update subsequent departure calls for ships leaving
-    query = PortCall.query.filter(
-        PortCall.move_type == "departure",
-        PortCall.load_status.in_([base.FULLY_LADEN]),
-        PortCall.port_operation.in_(["load"])) \
-        .join(Ship, Port).filter(Port.check_departure)
-
-    if min_dwt is not None:
-        query = query.filter(Ship.dwt >= min_dwt)
-
-    if date_from is not None:
-        query = query.filter(PortCall.date_utc >= to_datetime(date_from))
-
-    if date_to is not None:
-        query = query.filter(PortCall.date_utc <= to_datetime(date_to))
-
-    if commodities:
-        query = query.filter(Ship.commodity.in_(commodities))
-
-    if imo:
-        query = query.filter(Ship.imo.in_(to_list(imo)))
-
-    portcall_russia = query.all()
-
-    portcall_russia.sort(key=lambda x: x.date_utc)
-
-    for p in tqdm(portcall_russia):
-        find_arrival(departure_portcall=p, date_to=date_to)
+    # query = PortCall.query.filter(
+    #     PortCall.move_type == "departure",
+    #     PortCall.load_status.in_([base.FULLY_LADEN]),
+    #     PortCall.port_operation.in_(["load"])) \
+    #     .join(Ship, Port).filter(Port.check_departure)
+    #
+    # if min_dwt is not None:
+    #     query = query.filter(Ship.dwt >= min_dwt)
+    #
+    # if date_from is not None:
+    #     query = query.filter(PortCall.date_utc >= to_datetime(date_from))
+    #
+    # if date_to is not None:
+    #     query = query.filter(PortCall.date_utc <= to_datetime(date_to))
+    #
+    # if commodities:
+    #     query = query.filter(Ship.commodity.in_(commodities))
+    #
+    # if imo:
+    #     query = query.filter(Ship.imo.in_(to_list(imo)))
+    #
+    # portcall_russia = query.all()
+    #
+    # portcall_russia.sort(key=lambda x: x.date_utc)
+    #
+    # for p in tqdm(portcall_russia):
+    #     find_arrival(departure_portcall=p, date_to=date_to)
 
 
 def fill_arrival_gaps(imo = None, date_from=None, min_dwt=base.DWT_MIN):

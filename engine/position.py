@@ -108,7 +108,7 @@ def update(commodities=None,
         .group_by(Shipment.id, Departure.ship_imo, Departure.date_utc, Arrival.date_utc, Ship.commodity) \
         .having(sa.or_(
                         sa.and_(Arrival.date_utc == sa.null(),
-                                func.max(shipments_positions.c.position_date) < dt.datetime.utcnow()-dt.timedelta(hours=12)), # To prevent too much refreshing
+                                func.max(shipments_positions.c.position_date) < dt.datetime.utcnow() - dt.timedelta(hours=12)), # To prevent too much refreshing
                         sa.or_(
                                    func.min(shipments_positions.c.position_date) == sa.null(),
                                    func.max(shipments_positions.c.position_date) < Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
