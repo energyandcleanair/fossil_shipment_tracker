@@ -65,6 +65,7 @@ def test_pipelineflow_aggregation(app):
 
             expected_columns = set(aggregate_by + ['value_tonne', 'value_eur', 'value_m3']) if aggregate_by \
                 else set(['id', 'commodity', 'commodity_group',
+                          'departure_iso2', 'departure_country', 'departure_region',
                           'destination_iso2', 'destination_country', 'destination_region',
                           'date', 'value_tonne', 'value_eur', 'value_m3'])
 

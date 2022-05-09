@@ -42,8 +42,8 @@ class PortResource(Resource):
 
         from base.utils import update_geometry_from_wkb
         ports_df = update_geometry_from_wkb(ports_df, to='shape')
-        ports_df["lon"] = ports_df.geometry.apply(lambda geom: geom.x if not geom.is_empty else None)
-        ports_df["lat"] = ports_df.geometry.apply(lambda geom: geom.y if not geom.is_empty else None)
+        ports_df["lon"] = ports_df.geometry.apply(lambda geom: geom.x if geom is not None and not geom.is_empty else None)
+        ports_df["lat"] = ports_df.geometry.apply(lambda geom: geom.y if geom is not None and not geom.is_empty else None)
         ports_df.replace({np.nan: None}, inplace=True)
         ports_df.drop(["geometry"], axis=1, inplace=True)
 

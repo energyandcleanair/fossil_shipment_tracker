@@ -87,6 +87,10 @@ class PipelineFlowResource(Resource):
             PipelineFlow.value_tonne * func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne)
         ).label('value_eur')
 
+
+        DepartureCountry = aliased(Country)
+
+
         # Gas transits through Ukraine for EU
         from sqlalchemy import case
         destination_country = session.query(Country.iso2,
@@ -101,12 +105,16 @@ class PipelineFlowResource(Resource):
                                     PipelineFlow.commodity,
                                     Commodity.group.label('commodity_group'),
                                     PipelineFlow.date,
+                                    PipelineFlow.departure_iso2,
+                                    DepartureCountry.name.label('departure_country'),
+                                    DepartureCountry.region.label('departure_region'),
                                     PipelineFlow.destination_iso2,
                                     destination_country.c.name.label("destination_country"),
                                     destination_country.c.region.label("destination_region"),
                                     PipelineFlow.value_tonne,
                                     PipelineFlow.value_m3,
                                     value_eur_field)
+             .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
              .outerjoin(destination_country, PipelineFlow.destination_iso2 == destination_country.c.iso2)
              .outerjoin(Commodity, PipelineFlow.commodity == Commodity.id)
              .outerjoin(Price,
@@ -189,6 +197,8 @@ class PipelineFlowResource(Resource):
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
             'date': [subquery.c.date],
+            'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country,
+                                    subquery.c.departure_region],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region]

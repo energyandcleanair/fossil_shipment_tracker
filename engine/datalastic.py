@@ -209,7 +209,7 @@ class Datalastic:
         if marinetraffic_id in manual_matches:
             datas = [manual_matches[str(marinetraffic_id)]]
 
-        if len(datas) == 0:
+        if len(datgas) == 0:
             logger.debug("No port found matching name %s" % (name,))
             return None
 

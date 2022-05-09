@@ -9,22 +9,13 @@ def test_interconnections():
     return
 
 
-def test_get_flows(test_db):
-    get_flows(date_from='2022-01-01')
+def test_get_crossborder_flows(test_db):
+    flows = get_crossborder_flows(date_from='2020-01-01')
+
+    total = flows.groupby(['to_country', 'from_country']).agg(value=('value', np.nansum)) \
+        .reset_index()
+
+    assert abs(np.sum(total.loc[total.from_country == 'Norway'].value)/1e9 - 42) < 4
+    assert abs(np.sum(total.loc[total.from_country == 'Russia'].value) / 1e9 - 53) < 3
+
     return
-#
-# def test_departure(test_db):
-#     departure.update()
-#     return
-#
-#
-# def test_arrival(test_db):
-#     arrival.update()
-#     return
-#
-#
-# def test_shipment(test_db):
-#     # shipment.update()
-#     # shipment.update_positions()
-#     berth.detect_arrival_berth()
-#     return

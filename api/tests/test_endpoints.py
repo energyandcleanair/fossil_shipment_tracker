@@ -59,6 +59,26 @@ def test_port(app):
 
 
 
+
+def test_price(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {}
+        response = test_client.get('/v0/price?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+
+        params = {'commodity': base.PIPELINE_GAS}
+        response = test_client.get('/v0/price?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data2 = response.json["data"]
+        assert set([x['commodity'] for x in data2]) == set([base.PIPELINE_GAS])
+
+
+
+
 def test_position(app):
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
@@ -102,7 +122,7 @@ def test_pipelineflow_pricing(app):
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
         params = {"format": "json"}
-        response = test_client.get('/v0/pipelineflow?' + urllib.parse.urlencode(params))
+        response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
@@ -116,7 +136,7 @@ def test_pipelineflow_ukraine(app):
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
         params = {"format": "json", "destination_iso2": "UA", "aggregate_by": "destination_region"}
-        response = test_client.get('/v0/pipelineflow?' + urllib.parse.urlencode(params))
+        response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) == 1
@@ -124,7 +144,7 @@ def test_pipelineflow_ukraine(app):
         assert list(set([x["destination_region"] for x in data])) == ["EU28"]
 
         params = {"format": "json", "destination_region": "EU28", "aggregate_by": "destination_region"}
-        response = test_client.get('/v0/pipelineflow?' + urllib.parse.urlencode(params))
+        response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data_eu = response.json["data"]
         assert len(data_eu) == 1
