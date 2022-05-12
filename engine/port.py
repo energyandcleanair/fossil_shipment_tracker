@@ -1,5 +1,8 @@
 import pandas as pd
 import geopandas as gpd
+import sqlalchemy as sa
+from tqdm import tqdm
+
 
 from base.logger import logger
 from base.db import session
@@ -36,6 +39,36 @@ def get_id(unlocode=None, marinetraffic_id=None):
     return found[0][0]
 
 
+def add_check_departure_to_anchorage():
+    """Ports with check_departure set to True
+    are the legitimate ports with UNLOCODE. We want to also check departure
+    from related anchorages
+    """
+    ports_checked = Port.query.filter(Port.check_departure).all()
+    for port in tqdm(ports_checked):
+
+        regexps = [port.name + ' ANCH',
+                   port.name.split("-")[0] + ' ANCH',
+                   port.name.replace("'", "") + ' ANCH',
+                   port.name.replace("`", "") + ' ANCH'
+                   ]
+
+        found = False
+        for regexp in regexps:
+            port_anchorages = Port.query.filter(sa.and_(Port.name.op('~*')(regexp),
+                                                       Port.iso2 == port.iso2))
+            if port_anchorages.count() > 0:
+                found = True
+                for port_anchorage in port_anchorages.all():
+                    port_anchorage.check_departure = True
+                    session.commit()
+
+        if not found:
+            logger.info(f"Didn't find anchorage for port {port.name}")
+
+
+
+
 def fill():
     """
     Fill port data from prepared file
@@ -47,7 +80,7 @@ def fill():
         ports_df["check_arrival"] = False
 
     ports_gdf = gpd.GeoDataFrame(ports_df, geometry=gpd.points_from_xy(ports_df.lon, ports_df.lat), crs="EPSG:4326")
-    ports_gdf.loc[ports_gdf.lon.isnull(),"geometry"] = None
+    ports_gdf.loc[ports_gdf.lon.isnull(), "geometry"] = None
     ports_gdf = ports_gdf[["unlocode", "name", "iso2", "check_departure", "check_arrival", "geometry"]]
     ports_df = pd.DataFrame(ports_gdf)
     ports_df = update_geometry_from_wkb(ports_df, to="wkt")

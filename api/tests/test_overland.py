@@ -21,6 +21,14 @@ def test_pipelineflow_pricing(app):
         assert all([x["value_tonne"] == 0 or x["value_tonne"]/x["value_eur"] > 0 for x in data])
         assert len(set([x['id'] for x in data])) == len(data)
 
+        params = {"format": "json", "date_from": "2021-01-01"}
+        response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        assert all([x["value_tonne"] == 0 or x["value_tonne"] / x["value_eur"] > 0 for x in data])
+        assert len(set([x['id'] for x in data])) == len(data)
+
 
 # def test_pipelineflow_ukraine(app):
 #     # We assume gas is transiting through Ukraine,

@@ -11,7 +11,7 @@ from flask_restx import inputs
 from base.models import PipelineFlow, Price, Country, Commodity
 from base.db import session
 from base.encoder import JsonEncoder
-from base.utils import to_list
+from base.utils import to_list, to_datetime
 from base.logger import logger
 
 
@@ -37,6 +37,9 @@ class PipelineFlowResource(Resource):
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure',
+                        required=False,
+                        default=None)
     parser.add_argument('destination_iso2', action='split', help='iso2(s) of destination',
                         required=False,
                         default=None)
@@ -68,6 +71,7 @@ class PipelineFlowResource(Resource):
         id = params.get("id")
         commodity = params.get("commodity")
         date_from = params.get("date_from")
+        departure_iso2 = params.get("departure_iso2")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         date_to = params.get("date_to")
@@ -95,7 +99,8 @@ class PipelineFlowResource(Resource):
         from sqlalchemy import case
         destination_country = session.query(Country.iso2,
                                             Country.name,
-                                            case([(Country.iso2 == "UA", 'EU28')],else_=Country.region).label('region')) \
+                                            case([(Country.iso2 == "UA", 'EU28')],
+                                                 else_=Country.region).label('region')) \
             .subquery()
 
 
@@ -132,6 +137,10 @@ class PipelineFlowResource(Resource):
                         )
              .filter(PipelineFlow.destination_iso2 != "RU"))
 
+
+        # Return only >0 values. Otherwise we hit response size limit
+        flows_rich = flows_rich.filter(PipelineFlow.value_tonne > 0)
+
         if id is not None:
             flows_rich = flows_rich.filter(PipelineFlow.id.in_(to_list(id)))
 
@@ -139,13 +148,13 @@ class PipelineFlowResource(Resource):
             flows_rich = flows_rich.filter(PipelineFlow.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
-            flows_rich = flows_rich.filter(PipelineFlow.date >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
+            flows_rich = flows_rich.filter(PipelineFlow.date >= to_datetime(date_from))
 
         if date_to is not None:
-            flows_rich = flows_rich.filter(PipelineFlow.date <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
+            flows_rich = flows_rich.filter(PipelineFlow.date <= to_datetime(date_to))
 
-        # if departure_iso2 is not None:
-        #     flows_rich = flows_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
+        if departure_iso2 is not None:
+            flows_rich = flows_rich.filter(PipelineFlow.departure_iso2.in_(to_list(departure_iso2)))
 
         if destination_iso2 is not None:
             flows_rich = flows_rich.filter(PipelineFlow.destination_iso2.in_(to_list(destination_iso2)))
@@ -199,6 +208,8 @@ class PipelineFlowResource(Resource):
             'date': [subquery.c.date],
             'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country,
                                     subquery.c.departure_region],
+            'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country,
+                                  subquery.c.departure_region],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region]

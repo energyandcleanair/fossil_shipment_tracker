@@ -30,7 +30,8 @@ def update():
         "format": "json",
         "download": False,
         "date_from": date_from,
-        "aggregate_by": ["destination_region", "commodity", "date"],
+        "departure_iso2": ["RU", "BY", "TR"],
+        "aggregate_by": ["departure_iso2", "destination_region", "commodity", "date"],
         "nest_in_data": False}
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
