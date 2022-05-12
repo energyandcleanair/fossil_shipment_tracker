@@ -269,6 +269,7 @@ def update_departures_from_russia(
         date_from="2022-01-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         unlocode=None,
+        marinetraffic_port_id=None,
         force_rebuild=False):
     """
     If force rebuild, we ignore cache port calls. Should only be used if we suspect
@@ -282,6 +283,9 @@ def update_departures_from_russia(
 
     if unlocode is not None:
         ports = ports.filter(Port.unlocode.in_(to_list(unlocode)))
+
+    if marinetraffic_port_id is not None:
+        ports = ports.filter(Port.marinetraffic_id.in_(to_list(marinetraffic_port_id)))
 
     for port in tqdm(ports.all()):
         last_portcall = session.query(PortCall) \
@@ -297,6 +301,7 @@ def update_departures_from_russia(
 
         portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
                                                               unlocode=port.unlocode,
+                                                              marinetraffic_port_id=port.marinetraffic_id,
                                                               date_from=to_datetime(date_from),
                                                               date_to=to_datetime(date_to))
 
@@ -427,6 +432,7 @@ def fill_departure_gaps(imo=None,
 
     if unlocode is not None:
         originally_checked_port_unlocodes = [x for x in originally_checked_port_unlocodes if x in to_list(unlocode)]
+
     # 1/2: update port departures from Russia
     filter_impossible = lambda x: False # To force continuing
     for unlocode in tqdm(originally_checked_port_unlocodes):

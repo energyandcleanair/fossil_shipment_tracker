@@ -22,10 +22,19 @@ def update():
     # ship.fix_mmsi_imo_discrepancy(date_from="2022-01-01")
     # ship.fill_missing_commodity()
     # port.add_check_departure_to_anchorage()
-    # portcall.update_departures_from_russia(date_from='2022-04-10',
-    #                                         force_rebuild=True)
+    from base.models import Port
+    from base.db import session
+    import sqlalchemy as sa
+    anc_ports = session.query(Port.marinetraffic_id).filter(sa.and_(
+        Port.name.op('~*')(' ANCH'),
+        Port.check_departure
+    )).all()
+    anc_ports = [x[0] for x in anc_ports]
+    portcall.update_departures_from_russia(date_from='2022-01-01',
+                                           force_rebuild=True,
+                                           marinetraffic_port_id=anc_ports)
     # portcall.fill_departure_gaps(date_from='2022-04-10')
-    portcall.update_departures_from_russia(date_from='2022-01-01')
+    # portcall.update_departures_from_russia(date_from='2022-01-01')
     # # #
     # # # # portcall.fill_departure_gaps(date_from="2022-04-10", unlocode='RUULU')
     departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,

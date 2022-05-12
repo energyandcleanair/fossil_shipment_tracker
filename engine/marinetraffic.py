@@ -157,10 +157,11 @@ class Marinetraffic:
     def get_portcalls_between_dates(cls, date_from, date_to,
                                     unlocode=None,
                                     imo=None,
+                                    marinetraffic_port_id=None,
                                     arrival_or_departure=None):
 
-        if imo is None and unlocode is None:
-            raise ValueError("Need to specify either imo or unlocode")
+        if imo is None and unlocode is None and marinetraffic_port_id is None:
+            raise ValueError("Need to specify either imo, unlocode or marinetraffic_port_id")
 
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
@@ -183,8 +184,11 @@ class Marinetraffic:
         if imo:
             params["imo"] = imo
 
+        if marinetraffic_port_id:
+            params["portid"] = marinetraffic_port_id
+
         if arrival_or_departure:
-            params["movetype"] = {"departure":1, "arrival":0}[arrival_or_departure]
+            params["movetype"] = {"departure": 1, "arrival":0}[arrival_or_departure]
 
         method = 'portcalls/'
         api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
@@ -372,3 +376,5 @@ class Marinetraffic:
 
 
 
+    # @classmethod
+    # def get_port_anchorage(cls, unlocode=None, name=None):
