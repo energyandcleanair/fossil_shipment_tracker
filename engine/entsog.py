@@ -40,7 +40,7 @@ def api_req(url, params={}, limit=-1):
         return None
 
     try:
-        if res["meta"]["total"] > res["meta"]["count"] * 1.05:
+        if res["meta"]["total"] > res["meta"]["count"] * 1.2:
             # +2: for some reason, sometimes total is +1 or +2
             logger.warning("More data available (%d/%d). Increase limit or implement a loop here...",
                            res["meta"]["total"], res["meta"]["count"])
