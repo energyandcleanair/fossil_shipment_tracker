@@ -221,7 +221,12 @@ def get_aggregated_physical_flows(date_from="2021-01-01",
 def get_crossborder_flows_raw(date_from='2022-01-01',
                           date_to=dt.date.today(),
                           country_iso2=None,
-                          remove_pipe_in_pipe=True):
+                          remove_pipe_in_pipe=True,
+                          remove_operators=[],
+                          remove_point_labels=['Dornum GASPOOL',
+                                               'VIP Waidhaus NCG',
+                                               'Haiming 2 7F/bn'],
+                              ):
 
     opd = get_operator_point_directions()
     ic = get_interconnections()
@@ -230,9 +235,14 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         opd = opd.loc[opd.tSOCountry.isin(to_list(country_iso2))]
 
     if remove_pipe_in_pipe:
-        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe |
-                        (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
+        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe | \
+        (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
 
+    if remove_operators:
+        opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
+
+    if remove_point_labels:
+        opd = opd.loc[~opd.pointLabel.isin(to_list(remove_point_labels))]
 
     entry_points = opd.loc[
         opd.pointType.str.contains('Cross-Border') \
@@ -350,40 +360,16 @@ def process_crossborder_flows_raw(ic,
                                   flows_export_raw,
                                   flows_export_lng_raw,
                                   flows_production_raw,
-                                  keep_opd_only=False, keep_confirmed_only=False, auto_confirmed_only=True,
+                                  keep_confirmed_only=False,
+                                  auto_confirmed_only=True,
                                   flows_import_agg_cols=None,
                                   flows_export_agg_cols=None,
-                                  flows_import_on=['importPointKey', 'date', 'importOperatorKey', 'exportOperatorKey'],
-                                  flows_export_on=['exportPointKey', 'date', 'importOperatorKey', 'exportOperatorKey'],
                                   remove_operators=[],
                                   save_to_file=False,
                                   filename=None):
 
 
-    # points_import = ic[
-    #     ["toPointKey", "toOperatorKey", "toCountryLabel", 'fromCountryKey', "fromCountryLabel", 'fromOperatorKey']] \
-    #     .rename(columns={'toPointKey': 'pointKey',
-    #                      'toOperatorKey': 'operatorKey',
-    #                      'toCountryLabel': 'country',
-    #                      'fromCountryKey': 'adjacentCountry',
-    #                      'fromCountryLabel': 'partner',
-    #                      'fromOperatorKey': 'partner_operatorKey',
-    #                      }) \
-    #     [['pointKey', 'operatorKey', 'country', 'partner']] \
-    #     .drop_duplicates()
-
-
-
-
-    # if keep_opd_only:
-    #     # Try to only keep feasible connections
-    #     points_import = points_import.merge(opd[['pointKey', 'operatorKey', 'adjacentCountry']].drop_duplicates(),
-    #                                         how='inner')
-
     flows_import = flows_import_raw
-                        # pd.merge(flows_import_raw, points_import,
-                        #     on=['pointKey', 'operatorKey'],
-                        #     how='left')
 
     # Adding LNG
     if flows_import_lng_raw is not None:
@@ -399,16 +385,6 @@ def process_crossborder_flows_raw(ic,
     if keep_confirmed_only:
         flows_import = flows_import.loc[flows_import.flowStatus == 'Confirmed']
 
-    # points_export = ic[["fromPointKey", "fromOperatorKey", "fromCountryLabel", "toCountryLabel"]] \
-    #     .drop_duplicates() \
-    #     .rename(columns={'fromPointKey': 'pointKey',
-    #                      'fromOperatorKey': 'operatorKey',
-    #                      'fromCountryLabel': 'country',
-    #                      'toCountryLabel': 'partner'
-    #                      }) \
-    #     [['pointKey', 'operatorKey', 'country', 'partner']] \
-    #     .drop_duplicates()
-
     if flows_export_raw is None:
         flows_export_raw = pd.DataFrame({'pointKey': pd.Series(dtype='str'),
                                          'operatorKey': pd.Series(dtype='int'),
@@ -417,15 +393,9 @@ def process_crossborder_flows_raw(ic,
                                          'date': pd.Series(dtype='str')})
 
     flows_export = flows_export_raw
-    # pd.merge(flows_export_raw, points_export,
-    #                         on=['pointKey', 'operatorKey'],
-    #                         how='left')
 
     if flows_export_lng_raw is not None:
         flows_export_lng = flows_export_lng_raw
-        # pd.merge(flows_export_lng_raw, points_export,
-        #                             on=['pointKey', 'operatorKey'],
-        #                             how='left')
 
         flows_export_lng['country'] = 'lng'  # Making LNG a country
         flows_export = pd.concat([flows_export, flows_export_lng], axis=0)
@@ -438,49 +408,6 @@ def process_crossborder_flows_raw(ic,
         flows_export = flows_export.groupby(flows_export_agg_cols, dropna=False) \
             .agg(value=('value', np.nanmean)).reset_index()
 
-    # if join_flows_on_operator:
-    #     left_on = ['pointKey', 'date', 'partner', 'partner_operatorKey']
-    #     right_on = ['pointKey', 'date', 'country', 'operatorKey']
-    # else:
-    #     left_on = ['pointKey', 'date', 'partner']
-    #     right_on = ['pointKey', 'date', 'country']
-    flows_import_cols = ['pointKey', 'operatorKey', 'tsoItemIdentifier', 'value', 'date', 'country', 'partner',
-                         'partner_operatorKey', 'flowStatus'] \
-        if not flows_import_agg_cols else [*flows_import_agg_cols, 'value']
-    flows_export_cols = ['pointKey', 'operatorKey', 'tsoItemIdentifier', 'value', 'date', 'country', 'partner',
-                         'flowStatus'] \
-        if not flows_export_agg_cols else [*flows_export_agg_cols, 'value']
-
-
-    # Make point keys match
-    # a = flows_import.rename(columns={'pointKey': 'importPointKey',
-    #                             'operatorKey': 'importOperatorKey',
-    #                                  'date': 'importDate'})
-    #
-    # b = flows_export.rename(columns={'pointKey': 'exportPointKey',
-    #                             'operatorKey': 'exportOperatorKey',
-    #                                  'date': 'exportDate'})
-    #
-    #
-    # opd_merger = opd[['pointKey', 'directionKey', 'operatorKey', 'adjacentOperatorKey']]
-    #
-    # ic_merger = ic.loc[ic.toDirectionKey=='entry'][['toPointKey', 'toOperatorKey',
-    #                                                 'fromPointKey', 'fromOperatorKey']] \
-    #             .drop_duplicates() \
-    #             .rename(columns={'toPointKey': 'importPointKey',
-    #                              'toOperatorKey': 'importOperatorKey',
-    #                              'fromPointKey': 'exportPointKey',
-    #                              'fromOperatorKey': 'exportOperatorKey'})
-    #
-    # flows = a.merge(ic_merger,
-    #         on=['importPointKey', 'importOperatorKey'],
-    #         how='left') \
-    #     .merge(b,
-    #            left_on=['exportPointKey', 'exportOperatorKey', 'importDate', 'country', 'partner'],
-    #            right_on=['exportPointKey', 'exportOperatorKey', 'exportDate', 'partner', 'country'],
-    #            how='inner',
-    #            suffixes=['_import', '_export'])
-
 
     flows = flows_import.merge(flows_export,
                                left_on=['pointKey', 'date', 'country', 'partner'],
@@ -488,19 +415,6 @@ def process_crossborder_flows_raw(ic,
                                how='outer',
                                suffixes=['_import', '_export']
                                )
-
-    # d = b.merge(ic_merger,
-    #         on=['exportPointKey', 'exportOperatorKey'],
-    #         how='left')
-
-    # flows = pd.merge(
-    #     flows_import[set(flows_import_cols).intersection(flows_import.columns)],
-    #     flows_export[set(flows_export_cols).intersection(flows_export.columns)],
-    #     left_on=flows_import_on,
-    #     right_on=flows_export_on,
-    #     suffixes=['_import', '_export'],
-    #     how='outer') \
-    #     .dropna(subset=['country_import'])
 
     if remove_operators:
         flows = flows.loc[~flows.operatorKey_import.isin(remove_operators)]
@@ -550,10 +464,8 @@ def process_crossborder_flows_raw(ic,
         df['partner'] = np.where(df['country_export'].isnull(), df['partner_import'], df['country_export'])
         return df.reset_index()
 
-    # flows_scaled = flows.groupby(groupby_cols).apply(process_pt_op_date)
     flows_scaled = flows.groupby(['pointKey', 'operatorKey_import', 'date']).apply(process_pt_op_date)
     flows_scaled = flows_scaled.reset_index(drop=True)
-    # flows_scaled = flows_scaled.rename(columns={'importDate':'date'})
     flows_agg = flows_scaled.groupby(['country_import', 'partner', 'date']) \
         .agg(value=('value', np.nansum)) \
         .reset_index() \
@@ -589,18 +501,6 @@ def get_crossborder_flows(date_from='2022-01-01',
     ##########################
     # Combine, aggregate, etc
     ##########################
-    keep_opd_only = False
-    keep_confirmed_only = False
-    join_flows_on_operator = False
-    auto_confirmed_only = True
-    remove_operators = []
-
-    # remove_operators = ['DE-TSO-0009', 'DE-TSO-0002',  # FOR DOUBLE COUNTING WITH NORWAY
-    #                     'DE-TSO-0016', 'DE-TSO-0017', 'DE-TSO-0018' # FOR DOUBLE COUNTING WITH RUSSIA
-    #                     ]
-
-
-
     flows_agg = process_crossborder_flows_raw(ic=ic,
                                               opd=opd,
                                               flows_import_raw=flows_import_raw,
