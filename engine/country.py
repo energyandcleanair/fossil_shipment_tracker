@@ -35,5 +35,8 @@ def fill():
     # Adding for_orders
     countries.loc[len(countries)] = [base.FOR_ORDERS, base.FOR_ORDERS, 'For orders', 'For orders', 'For orders']
 
+    # Adding LNG
+    countries.loc[len(countries)] = [base.LNG, base.LNG, 'LNG', 'LNG', 'LNG']
+
     upsert(countries, DB_TABLE_COUNTRY, 'unique_country')
     session.commit()

@@ -2,10 +2,14 @@ import os
 import pytest
 
 
-os.environ["ENVIRONMENT"] = "test"
+# os.environ["ENVIRONMENT"] = "test"
 from base.db import init_db
 
 
+@pytest.fixture
+def app():
+    from app import app
+    return app
 
 
 @pytest.fixture

@@ -31,6 +31,7 @@ from . import DB_TABLE_PORTPRICE
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
 from . import DB_TABLE_COMMODITY
+from . import DB_TABLE_ENTSOGFLOW
 
 
 class Ship(Base):
@@ -368,6 +369,24 @@ class PortPrice(Base):
     __tablename__ = DB_TABLE_PORTPRICE
     __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', name='unique_portprice'),
                       CheckConstraint("eur_per_tonne >= 0", name="portprice_positive"))
+
+
+# Entsog flows: before processing
+# Mainly used to communicate between Python and R
+# And also avoid recollecting everytime
+class EntsogFlow(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
+    departure_iso2 = Column(String)
+    destination_iso2 = Column(String)
+    date = Column(DateTime(timezone=False))
+    value_tonne = Column(Numeric)
+    value_mwh = Column(Numeric)
+    value_m3 = Column(Numeric)
+
+    __tablename__ = DB_TABLE_ENTSOGFLOW
+    __table_args__ = (UniqueConstraint('date', 'commodity', 'departure_iso2',
+                                       'destination_iso2', name='unique_entsogflow'),)
 
 
 class PipelineFlow(Base):

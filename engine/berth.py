@@ -4,6 +4,7 @@ import shapely
 from geoalchemy2 import func
 import sqlalchemy as sa
 import datetime as dt
+from geoalchemy2 import Geometry
 
 import base
 from base.db import session, engine
@@ -12,7 +13,7 @@ from base.db_utils import upsert
 from base.models import Berth, Port, Shipment, ShipmentArrivalBerth, ShipmentDepartureBerth, Position, Arrival, Departure
 from base.models import DB_TABLE_BERTH, DB_TABLE_SHIPMENTARRIVALBERTH, DB_TABLE_SHIPMENTDEPARTUREBERTH
 from base.utils import to_list
-
+from base.utils import update_geometry_from_wkb
 from engine import port
 
 
@@ -50,7 +51,13 @@ def fill():
         port.insert_new_port(iso2=missing_port[0:2],
                              unlocode=missing_port)
 
-    upsert(df=berths_gdf, table=DB_TABLE_BERTH, constraint_name="berth_pkey")
+    berths_df = pd.DataFrame(berths_gdf)
+    berths_df = update_geometry_from_wkb(berths_df, to="wkt")
+
+    upsert(df=berths_df,
+           table=DB_TABLE_BERTH,
+           constraint_name="berth_pkey",
+           dtype={'geometry': Geometry('GEOMETRY', 4326)})
     return
 
 
