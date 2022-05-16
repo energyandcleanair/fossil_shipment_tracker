@@ -634,9 +634,9 @@ def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=Fals
                                   save_to_file=save_to_file,
                                   filename=filename)
 
-    flows = flows.rename(columns={'from_country':'departure_iso2',
-                          'to_country':'destination_iso2',
-                          'value':'value_kwh'})
+    flows = flows.rename(columns={'from_country': 'departure_iso2',
+                          'to_country': 'destination_iso2',
+                          'value': 'value_kwh'})
 
     flows['value_m3'] = flows.value_kwh / base.GCV_KWH_PER_M3
     flows['value_tonne'] = flows.value_kwh / base.GCV_KWH_PER_M3 * base.KG_PER_M3 / 1000
@@ -644,8 +644,6 @@ def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=Fals
     flows['commodity'] = 'natural_gas'
 
     flows.drop(['value_kwh'], axis=1, inplace=True)
-    flows.drop(['index'], axis=1, inplace=True)
-
     flows.drop(['index'], axis=1, inplace=True)
     flows.replace({'departure_iso2': {'UK': 'GB'},
                    'destination_iso2': {'UK': 'GB'}},
