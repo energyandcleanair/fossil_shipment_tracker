@@ -388,7 +388,7 @@ def process_crossborder_flows_raw(ic,
     # Adding LNG
     if flows_import_lng_raw is not None:
         flows_import_lng = flows_import_lng_raw
-        flows_import_lng['partner'] = 'LNG'  # Making LNG a country
+        flows_import_lng['partner'] = 'lng'  # Making LNG a country
         flows_import = pd.concat([flows_import, flows_import_lng], axis=0)
 
     # Adding Production
@@ -427,7 +427,7 @@ def process_crossborder_flows_raw(ic,
         #                             on=['pointKey', 'operatorKey'],
         #                             how='left')
 
-        flows_export_lng['country'] = 'LNG'  # Making LNG a country
+        flows_export_lng['country'] = 'lng'  # Making LNG a country
         flows_export = pd.concat([flows_export, flows_export_lng], axis=0)
 
     if flows_import_agg_cols:
