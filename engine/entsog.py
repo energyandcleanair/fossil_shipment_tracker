@@ -646,6 +646,10 @@ def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=Fals
     flows.drop(['value_kwh'], axis=1, inplace=True)
     flows.drop(['index'], axis=1, inplace=True)
 
+    flows.drop(['index'], axis=1, inplace=True)
+    flows.replace({'departure_iso2': {'UK': 'GB'},
+                   'destination_iso2': {'UK': 'GB'}},
+                  inplace=True)
     return flows
 
 
