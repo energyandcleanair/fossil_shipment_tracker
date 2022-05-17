@@ -23,7 +23,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import func
 
 
-@routes_api.route('/v0/entsogflow', strict_slashes=False)
+@routes_api.route('/v0/entsogflow', strict_slashes=False, doc=False)
 class EntsogFlowResource(Resource):
 
     parser = reqparse.RequestParser()

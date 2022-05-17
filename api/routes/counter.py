@@ -149,7 +149,11 @@ class RussiaCounterLastResource(Resource):
                 .resample("D").sum() \
                 .fillna(0)
             # cut 2 last days and take the 7-day mean
-            means = x[["value_tonne", "value_eur"]].shift(shift_days).tail(7).mean()
+            # but only on last ten days to avoid old shipments (like US)
+            means = x.loc[x.index>=dt.datetime.today() - dt.timedelta(days=10)] \
+                          [["value_tonne", "value_eur"]].shift(shift_days).tail(7) \
+                .mean() \
+                .fillna(0)
 
             x = x.reindex(daterange) \
                 .fillna(means)

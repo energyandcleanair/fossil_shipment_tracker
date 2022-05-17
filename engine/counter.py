@@ -78,7 +78,7 @@ def update():
     eu_new = result.loc[(result.destination_region == 'EU28') & (result.date >= to_datetime('2022-02-24'))] \
                     .value_eur.sum()
 
-    ok = (eu_new >= eu_old) and (eu_new < eu_old + 2e9)
+    ok = (eu_new >= eu_old - 0.4e9) and (eu_new < eu_old + 2e9)
     if not ok:
         logger_slack.error("[ERROR] New EU counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (eu_new / 1e9, eu_old / 1e9))
     else:

@@ -52,10 +52,10 @@ def update():
     # berth.update()
     # country.fill()
     # counter.update()
-    entsog.update(date_from='2020-01-01', date_to='2020-01-03', save_to_file=False)
+    # entsog.update()
     # position.update()
     # trajectory.update()
-    # counter.update()
+    counter.update()
     return
 
 
