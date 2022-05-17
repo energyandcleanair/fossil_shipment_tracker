@@ -10,7 +10,7 @@ from base.db import session
 from base.logger import logger
 from base.utils import to_list, to_datetime
 from base.db_utils import upsert
-from base.models import DB_TABLE_ENTSOGFLOW
+from base.models import DB_TABLE_ENTSOGFLOW, EntsogFlow
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
 
@@ -550,7 +550,14 @@ def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=Fals
     return flows
 
 
-def update(date_from="2021-01-01", date_to=dt.date.today(), filename=None, save_to_file=True):
+def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=True):
+
+    if isinstance(date_from, int):
+        import sqlalchemy as sa
+        last_date = session.query(sa.func.max(EntsogFlow.date)).filter(EntsogFlow.value_m3 > 0).first()[0]
+        date_from = to_datetime(last_date) + dt.timedelta(days=date_from)
+
+
     flows = get_flows(date_from=date_from,
                       date_to=date_to,
                       save_to_file=save_to_file,
