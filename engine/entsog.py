@@ -11,8 +11,6 @@ from base.logger import logger
 from base.utils import to_list, to_datetime
 from base.db_utils import upsert
 from base.models import DB_TABLE_ENTSOGFLOW, EntsogFlow
-from engine.datalastic import Datalastic
-from engine.marinetraffic import Marinetraffic
 
 import sqlalchemy as sa
 import requests
@@ -553,7 +551,6 @@ def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=Fals
 def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=True):
 
     if isinstance(date_from, int):
-        import sqlalchemy as sa
         last_date = session.query(sa.func.max(EntsogFlow.date)).filter(EntsogFlow.value_m3 > 0).first()[0]
         date_from = to_datetime(last_date) + dt.timedelta(days=date_from)
 

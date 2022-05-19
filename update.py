@@ -10,8 +10,7 @@ from engine import berth
 from engine import ship
 from engine import country
 from engine import counter
-from engine import commodity
-from base.db import init_db
+from engine import entsog
 import base
 
 import datetime as dt
@@ -25,10 +24,18 @@ def update():
     departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
                      commodities=base.GENERAL_CARGO)
 
-    arrival.update(date_from = dt.date.today() - dt.timedelta(days=7))
+    arrival.update(date_from = dt.date.today() - dt.timedelta(days=30))
     shipment.update()
     position.update()
     destination.update()
     berth.update()
+    entsog.update(date_fro=-7)
+    trajectory.update()
     counter.update()
     return
+
+
+
+if __name__ == "__main__":
+    print("=== Using %s environment ===" %(base.db.environment,))
+    update()
