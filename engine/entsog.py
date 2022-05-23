@@ -227,7 +227,6 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
                               ):
 
     opd = get_operator_point_directions()
-    ic = get_interconnections()
 
     if country_iso2:
         opd = opd.loc[opd.tSOCountry.isin(to_list(country_iso2))]
@@ -351,9 +350,7 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
             add_countries(flows_production_raw))
 
 
-def process_crossborder_flows_raw(ic,
-                                  opd,
-                                  flows_import_raw,
+def process_crossborder_flows_raw(flows_import_raw,
                                   flows_import_lng_raw,
                                   flows_export_raw,
                                   flows_export_lng_raw,
@@ -493,15 +490,10 @@ def get_crossborder_flows(date_from='2022-01-01',
                                                        country_iso2=country_iso2,
                                                        remove_pipe_in_pipe=remove_pipe_in_pipe)
 
-    ic = get_interconnections()
-    opd = get_operator_point_directions()
-
     ##########################
     # Combine, aggregate, etc
     ##########################
-    flows_agg = process_crossborder_flows_raw(ic=ic,
-                                              opd=opd,
-                                              flows_import_raw=flows_import_raw,
+    flows_agg = process_crossborder_flows_raw(flows_import_raw=flows_import_raw,
                                               flows_export_raw=flows_export_raw,
                                               flows_import_lng_raw=flows_import_lng_raw,
                                               flows_export_lng_raw=flows_export_lng_raw,
