@@ -30,7 +30,7 @@ def update():
     position.update()
     destination.update()
     berth.update()
-    entsog.update(date_from=-7)
+    entsog.update(date_from=-14)
     rscript.update()
     trajectory.update()
     counter.update()
