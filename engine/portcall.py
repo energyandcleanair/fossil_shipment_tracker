@@ -270,7 +270,8 @@ def update_departures_from_russia(
         date_to=dt.date.today() + dt.timedelta(days=1),
         unlocode=None,
         marinetraffic_port_id=None,
-        force_rebuild=False):
+        force_rebuild=False,
+        between_existing_only=False):
     """
     If force rebuild, we ignore cache port calls. Should only be used if we suspect
     we missed some port calls (e.g. in the initial fill using manually downloaded data)
@@ -288,37 +289,68 @@ def update_departures_from_russia(
         ports = ports.filter(Port.marinetraffic_id.in_(to_list(marinetraffic_port_id)))
 
     for port in tqdm(ports.all()):
-        last_portcall = session.query(PortCall) \
-            .filter(PortCall.port_id==port.id,
-                    PortCall.move_type=="departure",
-                    PortCall.date_utc <= to_datetime(date_to)) \
-            .order_by(PortCall.date_utc.desc()) \
-            .first()
 
-        if last_portcall is not None and not force_rebuild:
-            date_from = last_portcall.date_utc + dt.timedelta(minutes=1)
+        # Three cases:
+        # - only from last (force_rebuild=False)
+        # - force rebuild between existing ones
+        # - force rebuild all of them
+        if not force_rebuild:
+            last_portcall = session.query(PortCall) \
+                .filter(PortCall.port_id==port.id,
+                        PortCall.move_type=="departure",
+                        PortCall.date_utc <= to_datetime(date_to)) \
+                .order_by(PortCall.date_utc.desc()) \
+                .first()
 
 
-        portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
-                                                              unlocode=port.unlocode,
-                                                              marinetraffic_port_id=port.marinetraffic_id,
-                                                              date_from=to_datetime(date_from),
-                                                              date_to=to_datetime(date_to))
+            if last_portcall is not None:
+                port_date_from = last_portcall.date_utc + dt.timedelta(minutes=1)
+            else:
+                port_date_from = date_from
 
-        # Store them in db so that we won't query them
-        for portcall in portcalls:
-            try:
-                session.add(portcall)
-                session.commit()
-                if force_rebuild:
-                    logger.info("Found a missing port call")
-            except sqlalchemy.exc.IntegrityError as e:
-                if "psycopg2.errors.UniqueViolation" in str(e):
-                    logger.warning("Failed to upload portcall: duplicated port call")
-                else:
-                    logger.warning("Failed to upload portcall: %s" % (str(e),))
-                session.rollback()
-                continue
+            date_bounds = [(port_date_from, to_datetime(date_to))]
+
+        if force_rebuild and not between_existing_only:
+            date_bounds = [(date_from, date_to)]
+
+        if force_rebuild and between_existing_only:
+            # Query existing portcalls, and use MT between existing portcalls only
+            port_portcalls = session.query(PortCall) \
+                .filter(PortCall.port_id == port.id,
+                        PortCall.move_type == "departure",
+                        PortCall.date_utc >= to_datetime(date_from),
+                        PortCall.date_utc <= to_datetime(date_to)) \
+                .order_by(PortCall.date_utc) \
+                .all()
+
+            port_date_froms = [to_datetime(date_from)] + [x.date_utc + dt.timedelta(minutes=1)for x in port_portcalls]
+            port_date_tos = [x.date_utc - dt.timedelta(minutes=1) for x in port_portcalls] + [to_datetime(date_to)]
+            date_bounds = list(zip(port_date_froms, port_date_tos))
+
+        for dates in date_bounds:
+            query_date_from = dates[0]
+            query_date_to = dates[1]
+
+            portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
+                                                                  unlocode=port.unlocode,
+                                                                  marinetraffic_port_id=port.marinetraffic_id,
+                                                                  date_from=to_datetime(query_date_from),
+                                                                  date_to=to_datetime(query_date_to))
+
+            # Store them in db so that we won't query them
+            for portcall in portcalls:
+                try:
+                    session.add(portcall)
+                    session.commit()
+                    if force_rebuild:
+                        logger.info("Found a missing port call")
+                except sqlalchemy.exc.IntegrityError as e:
+                    if "psycopg2.errors.UniqueViolation" in str(e):
+                        logger.warning("Failed to upload portcall: duplicated port call")
+                    else:
+                        logger.warning("Failed to upload portcall: %s" % (str(e),))
+                    session.rollback()
+                    continue
 
     return
 

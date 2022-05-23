@@ -10,6 +10,7 @@ from engine import berth
 from engine import ship
 from engine import country
 from engine import counter
+from engine import rscript
 from engine import commodity
 from engine import entsog
 from base.db import init_db
@@ -30,9 +31,11 @@ def update():
     #     Port.check_departure
     # )).all()
     # anc_ports = [x[0] for x in anc_ports]
-    # portcall.update_departures_from_russia(date_from='2022-01-01',
-    #                                        force_rebuild=True,
-    #                                        marinetraffic_port_id=anc_ports)
+    portcall.update_departures_from_russia(date_from='2021-12-01',
+                                           date_to='2022-01-01',
+                                           force_rebuild=True,
+                                           between_existing_only=True
+                                           )
     # portcall.fill_departure_gaps(date_from='2022-04-10')
     # portcall.update_departures_from_russia(date_from='2022-01-01')
     # # #
@@ -55,7 +58,8 @@ def update():
     # entsog.update()
     # position.update()
     # trajectory.update()
-    counter.update()
+    # rscript.update()
+    # counter.update()
     return
 
 
