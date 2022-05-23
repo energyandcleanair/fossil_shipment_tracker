@@ -18,17 +18,19 @@ def update():
                 "library(russiacounter)",
                 "print(packageVersion('russiacounter'))",
                 "print(russiacounter::update_counter2)",
-                "russiacounter::update_counter2()"
+                "library(tidyverse);library(lubridate);library(magrittr);library(countrycode)",
+                "russiacounter::price.update_portprices(production=T)"
+                # "russiacounter::update_counter2()"
             ]
         },
         "environment_variables": [
             "FOSSIL_DB_DEVELOPMENT",
             "FOSSIL_DB_PRODUCTION",
-            "GITHUB_PAT"
+            "GITHUB_PAT",
+            "CREA_MONGODB_URL"
         ]
     }
 
-    url = "https://engine.crea-aq-data.appspot.com"
-
-    res = requests.post(url=url,
-                  data=payload)
+    url = "http://engine.crea-aq-data.appspot.com"
+    # url = "http://localhost:8080"
+    res = requests.post(url=url, json=payload)

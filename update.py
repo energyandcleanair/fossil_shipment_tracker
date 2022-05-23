@@ -9,6 +9,7 @@ from engine import destination
 from engine import berth
 from engine import ship
 from engine import country
+from engine import rscript
 from engine import counter
 from engine import entsog
 import base
@@ -29,7 +30,8 @@ def update():
     position.update()
     destination.update()
     berth.update()
-    entsog.update(date_fro=-7)
+    entsog.update(date_from=-7)
+    rscript.update()
     trajectory.update()
     counter.update()
     return

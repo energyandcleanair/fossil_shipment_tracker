@@ -7,7 +7,8 @@ from flask_restx import Resource, reqparse, inputs
 import pandas as pd
 import shapely
 from sqlalchemy.orm import aliased
-
+from sqlalchemy import case
+from sqlalchemy import func
 
 import base
 from base.models import Shipment, Position, ShipmentDepartureBerth, ShipmentArrivalBerth, Departure, Arrival, Ship, Berth
@@ -72,6 +73,18 @@ class PositionResource(Resource):
                         required=False,
                         default=0)
 
+    parser.add_argument('around_departure_only',
+                        help='only keep around departure (using buffer_hour argument)',
+                        type=inputs.boolean,
+                        required=False,
+                        default=False)
+
+    parser.add_argument('around_arrival_only',
+                        help='only keep around arrival (using buffer_hour argument)',
+                        type=inputs.boolean,
+                        required=False,
+                        default=False)
+
     # Others
     parser.add_argument('format', type=str, help='format of returned results (json, csv, geojson, or kml)',
                         required=False, default="json")
@@ -102,43 +115,51 @@ class PositionResource(Resource):
         nest_in_data = params.get("nest_in_data")
         download = params.get("download")
         buffer_hour = params.get("buffer_hour")
+        around_departure_only = params.get("around_departure_only")
+        around_arrival_only = params.get("around_arrival_only")
         geometry_only = params.get("geometry_only")
 
         DepartureBerth = aliased(Berth)
         ArrivalBerth = aliased(Berth)
 
+        if around_arrival_only:
+            date_from_field = func.coalesce(Arrival.date_utc, dt.datetime.now()) - dt.timedelta(hours=buffer_hour)
+        else:
+            date_from_field = Departure.date_utc - dt.timedelta(hours=buffer_hour)
+
+        if around_departure_only:
+            date_to_field = Departure.date_utc + dt.timedelta(hours=buffer_hour)
+        else:
+            date_to_field = func.coalesce(Arrival.date_utc, dt.datetime.now()) + dt.timedelta(days=1)
+
+
         query = session.query(Shipment.id.label("voyage_id"),
-                              Shipment.status,
+                              # Shipment.status,
                               Position.date_utc.label("date_utc"),
-                              Departure.date_utc.label("departure_date_utc"),
-                              Arrival.date_utc.label("arrival_date_utc"),
+                              # Departure.date_utc.label("departure_date_utc"),
+                              # Arrival.date_utc.label("arrival_date_utc"),
                               Ship.imo,
                               Ship.commodity,
-                              Ship.type.label("ship_type"),
-                              Ship.subtype.label("ship_subtype"),
+                              # Ship.type.label("ship_type"),
+                              # Ship.subtype.label("ship_subtype"),
                               Position.speed,
                               Position.navigation_status,
                               Position.geometry,
-                              Position.date_utc,
-                              DepartureBerth.name.label("departure_berth_name"),
-                              DepartureBerth.commodity.label("departure_berth_commodity"),
-                              ArrivalBerth.name.label("arrival_berth_name"),
-                              ArrivalBerth.commodity.label("arrival_berth_commodity")
+                              # DepartureBerth.name.label("departure_berth_name"),
+                              # DepartureBerth.commodity.label("departure_berth_commodity"),
+                              # ArrivalBerth.name.label("arrival_berth_name"),
+                              # ArrivalBerth.commodity.label("arrival_berth_commodity")
                               ) \
             .join(Departure, Shipment.departure_id == Departure.id) \
             .join(Ship, Departure.ship_imo == Ship.imo) \
             .join(Arrival, Shipment.arrival_id == Arrival.id) \
             .join(Position, Position.ship_imo == Departure.ship_imo) \
-            .filter(
-                sa.and_(
-                    Position.date_utc >= Departure.date_utc - dt.timedelta(hours=buffer_hour),
-                    sa.or_(Arrival.date_utc == sa.null(),
-                           Position.date_utc < Arrival.date_utc + dt.timedelta(hours=buffer_hour))
-                )) \
+            .filter(sa.and_(Position.date_utc >= date_from_field,
+                            Position.date_utc <= date_to_field)) \
             .outerjoin(ShipmentDepartureBerth, ShipmentDepartureBerth.shipment_id == Shipment.id) \
-            .outerjoin(ShipmentArrivalBerth, ShipmentArrivalBerth.shipment_id == Shipment.id) \
-            .outerjoin(DepartureBerth, ShipmentDepartureBerth.berth_id == DepartureBerth.id) \
-            .outerjoin(ArrivalBerth, ShipmentArrivalBerth.berth_id == ArrivalBerth.id)
+            .outerjoin(ShipmentArrivalBerth, ShipmentArrivalBerth.shipment_id == Shipment.id)
+            # .outerjoin(DepartureBerth, ShipmentDepartureBerth.berth_id == DepartureBerth.id) \
+            # .outerjoin(ArrivalBerth, ShipmentArrivalBerth.berth_id == ArrivalBerth.id)
 
         if ship_imo is not None:
             query = query.filter(Position.ship_imo.in_(ship_imo))
@@ -163,7 +184,8 @@ class PositionResource(Resource):
 
         if speed_max is not None:
             query = query.filter(sa.or_(Position.speed == sa.null(),
-                                        Position.speed <= speed_max))
+                                        Position.speed <= speed_max,
+                                        Position.navigation_status == 'Moored'))
         if navigation_status is not None:
             query = query.filter(Position.navigation_status.in_(navigation_status))
 
