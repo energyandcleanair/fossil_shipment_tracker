@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, DateTime, Numeric, BigInteger, Boolean
+from sqlalchemy import Column, String, DateTime, Integer, Numeric, BigInteger, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import ARRAY
 from sqlalchemy.orm import validates
 from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
@@ -32,6 +33,7 @@ from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
 from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
+from . import DB_TABLE_MARINETRAFFICCALL
 
 
 class Ship(Base):
@@ -48,6 +50,9 @@ class Ship(Base):
     liquid_gas = Column(Numeric)
     liquid_oil = Column(Numeric)
     others = Column(JSONB)
+
+    owner = Column(String)
+    manager = Column(String)
 
     # Estimated commodity, quantity etc
     commodity = Column(String)
@@ -186,8 +191,14 @@ class Shipment(Base):
     departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=True)
     arrival_id = Column(BigInteger, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"), unique=True)
     last_position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"), unique=True)
+
     last_destination_name = Column(String)
     status = Column(String)
+
+    # Storing all distinct destinations
+    destination_names = Column(ARRAY(String))
+    destination_dates = Column(ARRAY(DateTime(timezone=False)))
+    destination_iso2s = Column(ARRAY(String))
 
     __tablename__ = DB_TABLE_SHIPMENT
 
@@ -425,3 +436,14 @@ class Commodity(Base):
     pricing_commodity = Column(String)
 
     __tablename__ = DB_TABLE_COMMODITY
+
+
+class MarineTrafficCall(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    method = Column(String)
+    records = Column(Integer)
+    credits = Column(Integer)
+    queried_date_utc = Column(DateTime(timezone=False))
+    params = Column(JSONB)
+
+    __tablename__ = DB_TABLE_MARINETRAFFICCALL

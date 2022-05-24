@@ -16,6 +16,7 @@ DB_TABLE_PRICE = "price"
 DB_TABLE_PORTPRICE = "portprice"
 DB_TABLE_COMMODITY = "commodity"
 DB_TABLE_ENTSOGFLOW = "entsogflow"
+DB_TABLE_MARINETRAFFICCALL = "mtcall"
 
 DB_TABLE_PIPELINEFLOW = "pipelineflow"
 DB_TABLE_COUNTER = "counter"

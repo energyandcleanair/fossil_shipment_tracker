@@ -168,11 +168,18 @@ class VoyageResource(Resource):
                                     destination_iso2_field,
                                     DestinationCountry.name.label("destination_country"),
                                     DestinationCountry.region.label("destination_region"),
+
+                                    Shipment.destination_names.label("destination_names"),
+                                    Shipment.destination_dates.label("destination_dates"),
+                                    Shipment.destination_iso2s.label("destination_iso2s"),
+
                                     Ship.imo.label("ship_imo"),
                                     Ship.mmsi.label("ship_mmsi"),
                                     Ship.type.label("ship_type"),
                                     Ship.subtype.label("ship_subtype"),
                                     Ship.dwt.label("ship_dwt"),
+                                    Ship.manager.label("ship_manager"),
+                                    Ship.owner.label("ship_owner"),
                                     commodity_field,
                                     Commodity.group.label("commodity_group"),
                                     value_tonne_field,

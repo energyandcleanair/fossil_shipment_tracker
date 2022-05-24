@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from base.db import session
 from base.logger import logger
 from base.env import get_env
-from base.models import Ship, PortCall, MTVoyageInfo
+from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall
 from base.utils import to_datetime
 
 from engine import ship, port
@@ -24,12 +24,32 @@ def load_cache(f):
 class Marinetraffic:
 
     api_base = 'https://services.marinetraffic.com/api/'
-
     cache_file_ship = 'cache/marinetraffic/ships.json'
-    # cache_file_portcall = 'cache/marinetraffic/portcall.json'
-
     cache_ship = load_cache(cache_file_ship)
-    # cache_portcall = load_cache(cache_file_portcall)
+
+    @classmethod
+    def call(cls, method, params, api_key, credits_per_record):
+        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
+
+        call_log = {
+            'method': method,
+            'queried_date_utc': dt.datetime.utcnow(),
+            'params': params
+        }
+
+        if api_result.status_code != 200:
+            call_log['records'] = 0
+            call_log['credits'] = 0
+            result = (None, api_result)
+        else:
+            result = (api_result.json(), api_result)
+            call_log['records'] = len(result)
+            call_log['credits'] = len(result) * credits_per_record
+
+        session.add(MarineTrafficCall(**call_log))
+        session.commit()
+
+        return result
 
 
     @classmethod
@@ -52,30 +72,6 @@ class Marinetraffic:
         cls.cache_ship.append(response_data)
         with open(cls.cache_file_ship, 'w') as outfile:
             json.dump(cls.cache_ship, outfile)
-
-
-    # @classmethod
-    # def get_portcall_cached(cls, imo, date_from):
-    #     #TODO We are not sure the portcall are sorted with time,
-    #     # this system won't work until we do
-    #     try:
-    #         return next(x for x in cls.cache_portcall \
-    #                     if str(x["imo"]) == str(imo) \
-    #                     and x["date_utc"] > date_from)
-    #     except StopIteration:
-    #         return None
-
-    # @classmethod
-    # def do_cache_portcall(cls, response_data):
-    #     """
-    #     Add response data to cache
-    #     :param response_data:
-    #     :return:
-    #     """
-    #     cls.cache_portcall.append(response_data)
-    #     with open(cls.cache_file_portcall, 'w') as outfile:
-    #         json.dump(cls.cache_portcall, outfile)
-
 
     @classmethod
     def get_ship(cls, imo=None, mmsi=None, use_cache=True):
@@ -100,14 +96,16 @@ class Marinetraffic:
             elif mmsi is not None:
                 params["mmsi"] = mmsi
 
-            method = 'vesselmasterdata/'
-            api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
-            if api_result.status_code != 200:
-                logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, api_result))
-                return None
-            response_data = api_result.json()
+            (response_data, response) = cls.call(method='vesselmasterdata/',
+                                                          api_key=api_key,
+                                                          params=params,
+                                                          credits_per_record=3)
 
-            if not response_data:
+            if response_data is None:
+                logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, response))
+                return None
+
+            if response_data == []:
                 logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, "Response is empty"))
                 response_data = [{"MMSI": mmsi,
                                  "IMO": imo,
@@ -153,6 +151,7 @@ class Marinetraffic:
 
         return Ship(**data)
 
+
     @classmethod
     def get_portcalls_between_dates(cls, date_from, date_to,
                                     unlocode=None,
@@ -190,12 +189,14 @@ class Marinetraffic:
         if arrival_or_departure:
             params["movetype"] = {"departure": 1, "arrival":0}[arrival_or_departure]
 
-        method = 'portcalls/'
-        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
-        if api_result.status_code != 200:
-            logger.warning("Marinetraffic: Failed to query portcall %s: %s %s" % (unlocode, api_result, api_result.content))
+        (response_datas, response) = cls.call(method='portcalls/',
+                                              api_key=api_key,
+                                              params=params,
+                                              credits_per_record=4)
+
+        if response_datas is None:
+            logger.warning("Marinetraffic: Failed to query portcall %s: %s" % (unlocode, response))
             return []
-        response_datas = api_result.json()
 
         if not response_datas:
             return []
@@ -257,8 +258,6 @@ class Marinetraffic:
             date_to = to_datetime("2022-01-01") if go_backward else dt.datetime.utcnow()
 
         direction = -1 if go_backward else 1
-        ncredits = 0
-        credit_per_record = 4
 
         if imo is None and unlocode is None:
             raise ValueError("Need to specify either imo or unlocode")
@@ -286,7 +285,6 @@ class Marinetraffic:
                                                                arrival_or_departure=arrival_or_departure,
                                                                date_from=date_from_call,
                                                                date_to=date_to_call)
-            ncredits += len(period_portcalls) * credit_per_record
             portcalls.extend(period_portcalls)
             if filter:
                 filtered_portcalls.extend([x for x in period_portcalls if filter(x)])
@@ -295,9 +293,7 @@ class Marinetraffic:
 
             if filtered_portcalls:
                 break
-        
-        if ncredits > 0:
-            print("%d credits used" % (ncredits,))
+
         if not filtered_portcalls:
             # No arrival portcall arrived yet
             filtered_portcall = None
@@ -307,18 +303,15 @@ class Marinetraffic:
             filtered_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
             filtered_portcall = filtered_portcalls[0]
 
-
         return filtered_portcall, portcalls
 
     @classmethod
     def get_voyage_info(cls, imo, date_from):
 
-        credit_per_record = 4
-
         # First look in cache to save query credits
         cached_info = MTVoyageInfo.query.filter(
             sa.and_(
-                MTVoyageInfo.ship_imo==imo,
+                MTVoyageInfo.ship_imo == imo,
                 MTVoyageInfo.queried_date_utc >= date_from)
             ).first()
 
@@ -334,15 +327,16 @@ class Marinetraffic:
             'msgtype': 'simple',
             'imo': imo,
         }
-        method = 'voyageforecast/'
-        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
-        if api_result.status_code != 200:
-            logger.warning(
-                "Marinetraffic: Failed to query voyageforecast %s: %s %s" % (imo, api_result, api_result.content))
-            return []
-        response_datas = api_result.json()
+        (response_datas, response) = cls.call(method='voyageforecast/',
+                                              params=params,
+                                              api_key=api_key,
+                                              credits_per_record=4)
 
-        if not response_datas:
+        if response_datas is None:
+            logger.warning("Marinetraffic: Failed to query voyageforecast %s: %s" % (imo, response))
+            return []
+
+        if response_datas == []:
             logger.info("Didn't find any voyage infos for imo %s" % (imo,))
             return []
 
@@ -353,7 +347,7 @@ class Marinetraffic:
 
         # Cache them
         logger.info("Found %d voyage infos for imo %s (%d credits used)" % (len(voyageinfos), imo,
-                                                                            len(voyageinfos) * credit_per_record))
+                                                                            len(voyageinfos) * 4))
 
         for v in voyageinfos:
             session.add(v)
@@ -377,4 +371,5 @@ class Marinetraffic:
 
 
     # @classmethod
+    # #TODO
     # def get_port_anchorage(cls, unlocode=None, name=None):

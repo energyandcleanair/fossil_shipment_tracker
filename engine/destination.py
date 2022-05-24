@@ -6,6 +6,7 @@ import base
 from base.logger import logger_slack
 from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, MTVoyageInfo
 import sqlalchemy as sa
+from sqlalchemy import ARRAY, String
 from sqlalchemy import func, or_
 from tqdm import tqdm
 from difflib import SequenceMatcher
@@ -18,18 +19,24 @@ def update():
     update_from_positions()
     update_from_voyageinfo()
     update_matching()
+    # Update once more to have destination_iso2s updated
+    update_from_positions()
 
 
 def update_matching():
 
         # Insert missing ones
-        new_destinations = session.query(Shipment.last_destination_name) \
-            .filter(Shipment.last_destination_name.notin_(session.query(Destination.name))) \
+        dest1 = session.query(Shipment.last_destination_name.label('destination_name'))
+        dest2 = session.query(func.unnest(Shipment.destination_names).label('destination_name'))
+        destinations = dest1.union(dest2).subquery()
+
+        new_destinations = session.query(destinations) \
+            .filter(destinations.c.destination_name.notin_(session.query(Destination.name))) \
             .distinct() \
             .all()
 
         for new_destination in new_destinations:
-            session.add(Destination(name=new_destination.last_destination_name))
+            session.add(Destination(name=new_destination.destination_name))
         session.commit()
 
         # Update based on name or unlocode matching
@@ -155,6 +162,7 @@ def update_from_positions():
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
         sa.and_(
+            Shipment.last_destination_name == sa.null(),
             Position.date_utc >= Departure.date_utc,
             Position.destination_name != sa.null(),
             sa.or_(Arrival.date_utc == sa.null(),
@@ -167,6 +175,53 @@ def update_from_positions():
     update = Shipment.__table__.update().values(last_destination_name=shipments_w_last_position.c.destination_name) \
         .where(Shipment.__table__.c.id == shipments_w_last_position.c.id)
     execute_statement(update)
+
+
+    # List all destinations, after removing consecutive identical ones
+    s1 = session.query(Shipment.id,
+                       Position.date_utc,
+                       Position.destination_name,
+                       func.lag(Position.destination_name).over(
+                           partition_by=Shipment.id,
+                           order_by=Position.date_utc)
+                       .label('previous_destination_name')
+                       ) \
+        .join(Departure, Departure.id == Shipment.departure_id) \
+        .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
+        .join(Position, Position.ship_imo == Departure.ship_imo) \
+        .filter(
+            sa.and_(
+                # Shipment.last_destination_name == sa.null(),
+                Position.date_utc >= Departure.date_utc,
+                Position.destination_name != sa.null(),
+                sa.or_(Arrival.date_utc == sa.null(),
+                       Position.date_utc <= Arrival.date_utc))) \
+        .order_by(Shipment.id, Position.date_utc) \
+        .subquery()
+
+    s2 = session.query(s1,
+                       Destination.iso2).filter(
+        sa.or_(s1.c.previous_destination_name == sa.null(),
+                s1.c.destination_name != s1.c.previous_destination_name)) \
+        .outerjoin(Destination, Destination.name == s1.c.destination_name) \
+        .subquery()
+
+    shipments_destinations = session.query(s2.c.id,
+                                           func.array_agg(s2.c.destination_name,
+                                                          type_=ARRAY(String)).label('destination_names'),
+                                           func.array_agg(s2.c.date_utc,
+                                                          type_=ARRAY(String)).label('destination_dates'),
+                                           func.array_agg(s2.c.iso2,
+                                                          type_=ARRAY(String)).label('destination_iso2s'),
+                                           ) \
+        .group_by(s2.c.id).subquery()
+
+    update = Shipment.__table__.update().values(destination_names=shipments_destinations.c.destination_names,
+                                                destination_dates=shipments_destinations.c.destination_dates,
+                                                destination_iso2s=shipments_destinations.c.destination_iso2s) \
+        .where(Shipment.__table__.c.id == shipments_destinations.c.id)
+    execute_statement(update)
+
 
 
     # For ongoing shipments still missing a destination
@@ -193,9 +248,9 @@ def update_from_voyageinfo(commodities = [base.LNG,
         .filter(sa.and_(
             # Shipment.last_position_id != sa.null(),
             Shipment.last_destination_name == sa.null(),
-            Shipment.status == base.ONGOING,
+            # Shipment.status == base.ONGOING,
         # Cannot be older than a month. No date parameter
-            Departure.date_utc >= dt.datetime.utcnow() - dt.timedelta(days=31)
+        #     Departure.date_utc >= dt.datetime.utcnow() - dt.timedelta(days=31)
         ))
 
     if commodities is not None:

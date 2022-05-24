@@ -9,7 +9,6 @@ from base.models import Position, ShipmentArrivalBerth
 from base.db import session
 
 
-
 def test_voyage_pricing(app):
 
     # Create a test client using the Flask application configured for testing
@@ -62,6 +61,7 @@ def test_voyage_aggregated(app):
 
             expected_columns = set(aggregate_by + ['value_tonne', 'value_m3', 'ship_dwt', 'value_eur'])
 
+
             if "departure_port" in aggregate_by:
                 expected_columns.update(["departure_port_name", "departure_unlocode", "departure_iso2", "departure_country", "departure_region"])
                 expected_columns.discard("departure_port")
@@ -95,8 +95,6 @@ def test_voyage_aggregated(app):
                                                                base.UNKNOWN_COMMODITY,
                                                                base.GENERAL_CARGO
                                                                ])
-
-
 
 
 def test_voyage(app):
