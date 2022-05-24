@@ -93,7 +93,7 @@ def update(commodities=None,
         .subquery()
 
 
-    shipments_to_update = session.query(Shipment,
+    shipments_to_update = session.query(Shipment.id,
                                     Departure.ship_imo,
                                     Departure.date_utc.label('departure_date'),
                                     Arrival.date_utc.label('arrival_date'),
@@ -136,7 +136,7 @@ def update(commodities=None,
     shipments_to_update = shipments_to_update.order_by(Departure.date_utc.desc()).all()
     # Add positions
     for f in tqdm(shipments_to_update):
-        shipment = f[0]
+        shipment_id = f[0]
         ship_imo = f[1]
         departure_date = f[2]
         arrival_date = f[3] if f[3] is not None else dt.datetime.utcnow()
