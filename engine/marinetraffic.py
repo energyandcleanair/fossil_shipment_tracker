@@ -46,8 +46,9 @@ class Marinetraffic:
             call_log['records'] = len(api_result.json())
             call_log['credits'] = len(api_result.json()) * credits_per_record
 
-        session.add(MarineTrafficCall(**call_log))
-        session.commit()
+        if call_log['records'] > 0:
+            session.add(MarineTrafficCall(**call_log))
+            session.commit()
 
         return result
 
