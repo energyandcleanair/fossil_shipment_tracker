@@ -147,6 +147,8 @@ class Marinetraffic:
             # "home_port": None,
             "liquid_gas": response_data.get("LIQUID_GAS"),
             "liquid_oil": response_data.get("LIQUID_OIL"),
+            "owner": response_data.get("OWNER"),
+            "manager": response_data.get("MANAGER"),
             "others": {"marinetraffic": response_data}
         }
 

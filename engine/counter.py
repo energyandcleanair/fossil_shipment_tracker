@@ -31,7 +31,7 @@ def update():
         "download": False,
         "date_from": date_from,
         "departure_iso2": ["RU", "BY", "TR"],
-        "aggregate_by": ["departure_iso2", "destination_region", "commodity", "date"],
+        "aggregate_by": ["departure_iso2", "destination_iso2", "commodity", "date"],
         "nest_in_data": False}
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
@@ -44,7 +44,7 @@ def update():
         "format": "json",
         "download": False,
         "date_from": date_from,
-        "aggregate_by": ["destination_region", "commodity", "arrival_date", "status"],
+        "aggregate_by": ["destination_iso2", "commodity", "arrival_date", "status"],
         "nest_in_data": False}
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
@@ -54,14 +54,14 @@ def update():
 
     result = pd.concat([pipelineflows, voyages]) \
         .sort_values(['date', 'commodity']) \
-        [["commodity", "destination_region", "date", "value_tonne", "value_eur"]]
+        [["commodity", "destination_iso2", "date", "value_tonne", "value_eur"]]
 
     # Fill missing dates so that we're sure we're erasing everything
     # But only within commodity, to keep the last date available
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
     result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
     result = result \
-        .groupby(["commodity", "destination_region"]) \
+        .groupby(["commodity", "destination_iso2"]) \
         .apply(lambda x: x.set_index("date") \
                .resample("D").sum() \
                .fillna(0)) \
@@ -72,17 +72,17 @@ def update():
 
     # Some sanity checking before updating the counter
     old_data = pd.read_sql(Counter.query.statement, session.bind)
-    eu_old = old_data.loc[(old_data.destination_region == 'EU28') & (old_data.date >= to_datetime('2022-02-24'))] \
+    global_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24'))] \
                     .value_eur.sum()
 
-    eu_new = result.loc[(result.destination_region == 'EU28') & (result.date >= to_datetime('2022-02-24'))] \
+    global_new = result.loc[(result.date >= to_datetime('2022-02-24'))] \
                     .value_eur.sum()
 
-    ok = (eu_new >= eu_old - 0.4e9) and (eu_new < eu_old + 2e9)
+    ok = (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
     if not ok:
-        logger_slack.error("[ERROR] New EU counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (eu_new / 1e9, eu_old / 1e9))
+        logger_slack.error("[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (global_new / 1e9, global_old / 1e9))
     else:
-        logger_slack.info("[COUNTER UPDATE] New EU counter: EUR %.1fB vs EUR %.1fB." % (eu_new / 1e9, eu_old / 1e9))
+        logger_slack.info("[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB." % (global_new / 1e9, global_old / 1e9))
 
         # Erase and replace everything
         Counter.query.delete()

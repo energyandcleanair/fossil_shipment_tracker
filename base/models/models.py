@@ -417,15 +417,17 @@ class PipelineFlow(Base):
 
 class Counter(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    commodity = Column(String)
-    destination_region = Column(String)
+    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
+    destination_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
+    # destination_region = Column(String)
+
     date = Column(DateTime(timezone=False))
     value_tonne = Column(Numeric)
     value_eur = Column(Numeric)
     type = Column(String) # observed or estimated
 
     __tablename__ = DB_TABLE_COUNTER
-    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_region', name='unique_counter'),)
+    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_iso2', name='unique_counter_tmp'),)
 
 
 class Commodity(Base):

@@ -19,6 +19,7 @@ import datetime as dt
 
 def update():
     portcall.update_departures_from_russia()
+    ship.update()
     departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
                            base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
 

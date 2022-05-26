@@ -7,9 +7,43 @@ from base.logger import logger
 from base.models import Ship, PortCall, Departure
 from base.utils import to_datetime
 from engine.datalastic import Datalastic
-
+from engine.marinetraffic import Marinetraffic
 
 import sqlalchemy as sa
+
+
+def update():
+    # Not much really. We just confirm crude_oil vs oil_products when necessary
+    return collect_mt_for_large_oil_products()
+
+
+def collect_mt_for_large_oil_products():
+    """
+    Datalastic indicates Oil Products Tanker for certain tankers
+    that are marked as Crude Oil tankers by MT.
+    We trust MT, and recollect MT for 'dubious' ships
+    :return:
+    """
+    ships = Ship.query.filter(Ship.commodity == base.OIL_PRODUCTS,
+                              Ship.dwt >= 40e3,
+                              ).all()
+
+    for ship in tqdm(ships):
+        if ship.type != ship.others.get('marinetraffic', {}).get('VESSEL_TYPE'):
+            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi)
+            if ship_mt is not None and ship.imo == ship_mt.imo:
+                ship_mt.others.update(ship.others)
+                (commodity, quantity, unit) = ship_to_commodity(ship_mt)
+                ship_mt.commodity = commodity
+                ship_mt.quantity = quantity
+                ship_mt.unit = unit
+                ship_mt.subtype = None
+                session.merge(ship_mt)
+                session.commit()
+            else:
+                logger.info("IMOs don't match or ship not found")
+        else:
+            logger.info("Was already using MT")
 
 
 def fill_missing_commodity():
@@ -132,6 +166,12 @@ def ship_to_commodity(ship):
     else:
         unit = "tonne"
         quantity = ship.dwt
+
+
+    # # Heuristic1: if oil_products but dwt > 90,000t, then assume crude_oil
+    if float(ship.dwt) > 90e3 and commodity in [base.OIL_PRODUCTS]:
+        commodity = base.CRUDE_OIL
+
 
     return [commodity, quantity, unit]
 

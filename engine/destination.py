@@ -17,7 +17,7 @@ from base.db_utils import execute_statement
 def update():
     logger_slack.info("=== Destination update ===")
     update_from_positions()
-    update_from_voyageinfo()
+    # update_from_voyageinfo()
     update_matching()
     # Update once more to have destination_iso2s updated
     update_from_positions()

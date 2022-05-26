@@ -16,7 +16,7 @@ from . import routes_api
 from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
-from base.models import Counter, Commodity
+from base.models import Counter, Commodity, Country
 from base.utils import to_datetime, to_list, intersect
 
 
@@ -24,6 +24,8 @@ from base.utils import to_datetime, to_list, intersect
 class RussiaCounterLastResource(Resource):
 
     parser = reqparse.RequestParser()
+    parser.add_argument('destination_iso2', type=str, help='ISO2 of country of interest',
+                        required=False, default=None)
     parser.add_argument('destination_region', type=str, help='EU28,China etc.',
                         required=False, default=None)
     parser.add_argument('date_from', type=str, help='date at which counter should start',
@@ -35,7 +37,7 @@ class RussiaCounterLastResource(Resource):
                         required=False,
                         default=False)
     parser.add_argument('aggregate_by', help='aggregation e.g. commodity_group,destination_region',
-                        required=False, default=None, action='split')
+                        required=False, default=['commodity','destination_region'], action='split')
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
 
@@ -43,6 +45,7 @@ class RussiaCounterLastResource(Resource):
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterLastResource.parser.parse_args()
+        destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
@@ -53,16 +56,22 @@ class RussiaCounterLastResource(Resource):
         query = session.query(
             Counter.commodity,
             Commodity.group.label("commodity_group"),
-            Counter.destination_region,
+            Counter.destination_iso2,
+            Country.name.label('destination_country'),
+            Country.region.label('destination_region'),
             Counter.date,
             func.sum(Counter.value_tonne).label("value_tonne"),
             func.sum(Counter.value_eur).label("value_eur")
         ) \
             .outerjoin(Commodity, Counter.commodity == Commodity.id) \
-            .group_by(Counter.commodity, Counter.destination_region, Counter.date, Commodity.group)
+            .join(Country, Country.iso2 == Counter.destination_iso2) \
+            .group_by(Counter.commodity, Counter.destination_iso2, Country.name, Country.region, Counter.date, Commodity.group)
 
         if destination_region:
-            query = query.filter(Counter.destination_region == destination_region)
+            query = query.filter(Country.region == destination_region)
+
+        if destination_iso2:
+            query = query.filter(Counter.destination_iso2 == destination_iso2)
 
         if date_from:
             query = query.filter(Counter.date >= to_datetime(date_from))
@@ -83,11 +92,18 @@ class RussiaCounterLastResource(Resource):
         counter = pd.read_sql(query.statement, session.bind)
         counter.replace({np.nan: None}, inplace=True)
 
-        groupby_cols = [x for x in ['destination_region', 'commodity', 'commodity_group'] if
-                        aggregate_by is None or not aggregate_by or x in aggregate_by]
+        groupby_cols = set([x for x in ['destination_iso2', 'destination_country', 'destination_region',
+                                    'commodity', 'commodity_group'] if
+                        aggregate_by is None or not aggregate_by or x in aggregate_by])
+
+        if 'commodity' in groupby_cols:
+            groupby_cols.add('commodity_group')
+        if 'destination_iso2' in groupby_cols or 'destination_country' in groupby_cols:
+            groupby_cols.update(['destination_iso2','destination_country'])
+
+        groupby_cols = list(groupby_cols)
 
         counter_last = self.get_last(counter=counter, groupby_cols=groupby_cols)
-
 
         now = dt.datetime.utcnow()
         counter_last["now"] = now
@@ -150,7 +166,7 @@ class RussiaCounterLastResource(Resource):
                 .fillna(0)
             # cut 2 last days and take the 7-day mean
             # but only on last ten days to avoid old shipments (like US)
-            means = x.loc[x.index>=dt.datetime.today() - dt.timedelta(days=10)] \
+            means = x.loc[x.index >= dt.datetime.today() - dt.timedelta(days=10)] \
                           [["value_tonne", "value_eur"]].shift(shift_days).tail(7) \
                 .mean() \
                 .fillna(0)
@@ -197,6 +213,8 @@ class RussiaCounterLastResource(Resource):
         # Aggregating
         aggregateby_cols_dict = {
             'date': [subquery.c.date],
+            'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
+            'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region],
             'commodity_group': [subquery.c.commodity_group],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group]
@@ -235,6 +253,8 @@ class RussiaCounterResource(Resource):
                         required=False, default="json")
     parser.add_argument('date_from', help='start date for counter data (format 2020-01-15)',
                         default="2022-02-24", required=False)
+    parser.add_argument('destination_iso2', type=str, help='ISO2 of country of interest',
+                        required=False, default=None)
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
@@ -248,6 +268,7 @@ class RussiaCounterResource(Resource):
         rolling_days = params.get("rolling_days")
         date_from = params.get("date_from")
         aggregate_by = params.get("aggregate_by")
+        destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         fill_with_estimates = params.get("fill_with_estimates")
 
@@ -257,18 +278,24 @@ class RussiaCounterResource(Resource):
         query = session.query(
                 Counter.commodity,
                 Commodity.group.label("commodity_group"),
-                Counter.destination_region,
+                Counter.destination_iso2,
+                Country.name.label('destination_country'),
+                Country.region.label('destination_region'),
                 Counter.date,
                 Counter.value_tonne,
                 Counter.value_eur,
                 Counter.type
             ) \
             .outerjoin(Commodity, Counter.commodity == Commodity.id) \
+            .join(Country, Counter.destination_iso2 == Country.iso2) \
             .filter(Counter.date >= to_datetime(date_from)) \
             .filter(sa.or_(fill_with_estimates, Counter.type != base.COUNTER_ESTIMATED))
 
+        if destination_iso2:
+            query = query.filter(Counter.destination_iso2.in_(to_list(destination_iso2)))
+
         if destination_region:
-            query = query.filter(Counter.destination_region.in_(to_list(destination_region)))
+            query = query.filter(Country.region.in_(to_list(destination_region)))
 
         query = self.aggregate(query, aggregate_by)
 
@@ -283,7 +310,7 @@ class RussiaCounterResource(Resource):
             daterange = pd.date_range(min(counter.date), dt.datetime.today()).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor('D')  # Should have been done already
             counter = counter \
-                .groupby(intersect(["commodity", "commodity_group", "destination_region"], counter.columns)) \
+                .groupby(intersect(["commodity", "commodity_group", 'destination_iso2', 'destination_country', "destination_region"], counter.columns)) \
                 .apply(lambda x: x.set_index("date") \
                        .resample("D").sum() \
                        .reindex(daterange) \
@@ -293,14 +320,15 @@ class RussiaCounterResource(Resource):
 
 
         if cumulate and "date" in counter:
-            groupby_cols = [x for x in ['commodity', 'commodity_group', 'destination_region'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
+            groupby_cols = [x for x in ['commodity', 'commodity_group', 'destination_iso2', 'destination_country', 'destination_region'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
             counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
             counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
 
 
         if rolling_days is not None and rolling_days > 1:
             counter = counter \
-                .groupby(intersect(["commodity", "commodity_group", "destination_region"], counter.columns)) \
+                .groupby(intersect(["commodity", "commodity_group", 'destination_iso2', 'destination_country',
+                                    "destination_region"], counter.columns)) \
                 .apply(lambda x: x.set_index('date') \
                        .resample("D").sum() \
                        .reindex(daterange) \
@@ -349,6 +377,8 @@ class RussiaCounterResource(Resource):
             'date': [subquery.c.date],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
+            'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
+            'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region],
             'type': [subquery.c.type]
         }
