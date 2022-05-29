@@ -10,6 +10,7 @@ import pymongo
 from sqlalchemy import func
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
+from sqlalchemy import case
 
 import base
 from . import routes_api
@@ -36,6 +37,10 @@ class RussiaCounterLastResource(Resource):
                         help='whether or not to fill late days with estimates',
                         required=False,
                         default=False)
+    parser.add_argument('use_eu', type=inputs.boolean,
+                        help='use EU instead of EU28',
+                        required=False,
+                        default=False)
     parser.add_argument('aggregate_by', help='aggregation e.g. commodity_group,destination_region',
                         required=False, default=['commodity','destination_region'], action='split')
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
@@ -51,24 +56,33 @@ class RussiaCounterLastResource(Resource):
         date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
         fill_with_estimates = params.get("fill_with_estimates")
+        use_eu = params.get("use_eu")
         format = params.get("format")
+
+        destination_region_field = case(
+            [
+                (sa.and_(use_eu, Counter.destination_iso2 == 'GB'), 'United Kingdom'),
+                (sa.and_(use_eu, Country.region=='EU28', Counter.destination_iso2 != 'GB'), 'EU')
+            ],
+            else_ = Country.region
+        ).label('destination_region')
 
         query = session.query(
             Counter.commodity,
             Commodity.group.label("commodity_group"),
             Counter.destination_iso2,
             Country.name.label('destination_country'),
-            Country.region.label('destination_region'),
+            destination_region_field,
             Counter.date,
             func.sum(Counter.value_tonne).label("value_tonne"),
             func.sum(Counter.value_eur).label("value_eur")
         ) \
             .outerjoin(Commodity, Counter.commodity == Commodity.id) \
             .join(Country, Country.iso2 == Counter.destination_iso2) \
-            .group_by(Counter.commodity, Counter.destination_iso2, Country.name, Country.region, Counter.date, Commodity.group)
+            .group_by(Counter.commodity, Counter.destination_iso2, Country.name, destination_region_field, Counter.date, Commodity.group)
 
         if destination_region:
-            query = query.filter(Country.region == destination_region)
+            query = query.filter(destination_region_field.in_(to_list(destination_region)))
 
         if destination_iso2:
             query = query.filter(Counter.destination_iso2 == destination_iso2)
@@ -99,7 +113,7 @@ class RussiaCounterLastResource(Resource):
         if 'commodity' in groupby_cols:
             groupby_cols.add('commodity_group')
         if 'destination_iso2' in groupby_cols or 'destination_country' in groupby_cols:
-            groupby_cols.update(['destination_iso2','destination_country'])
+            groupby_cols.update(['destination_iso2', 'destination_country'])
 
         groupby_cols = list(groupby_cols)
 
@@ -114,16 +128,13 @@ class RussiaCounterLastResource(Resource):
 
         counter_last = counter_last.groupby(groupby_cols).sum()
 
-        if not aggregate_by or 'destination_region' in aggregate_by:
-            total = counter_last.groupby(['destination_region']).sum()
-            total[groupby_cols] = "total"
-            counter_last = pd.concat([
-                counter_last.reset_index(),
-                total
-            ]).reset_index()
-        else:
-            counter_last.loc["total"] = counter_last.sum()
-            counter_last.reset_index(inplace=True)
+        # Add total
+        total = pd.DataFrame(counter_last.sum()).T
+        total[list(counter_last.index.names)] = "total"
+        counter_last = pd.concat([
+            counter_last.reset_index(),
+            total
+        ])
 
         counter_last['date'] = now
         counter_last['eur_per_sec'] = counter_last['eur_per_day'] / 24 / 3600
@@ -243,6 +254,10 @@ class RussiaCounterResource(Resource):
     parser.add_argument('fill_with_estimates', type=inputs.boolean, help='whether or not to fill late days with estimates',
                         required=False,
                         default=False)
+    parser.add_argument('use_eu', type=inputs.boolean,
+                        help='use EU instead of EU28',
+                        required=False,
+                        default=False)
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
                         help='which variables to aggregate by. Could be any of commodity, type, destination_region, date')
@@ -271,16 +286,25 @@ class RussiaCounterResource(Resource):
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         fill_with_estimates = params.get("fill_with_estimates")
+        use_eu = params.get("use_eu")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
+
+        destination_region_field = case(
+            [
+                (sa.and_(use_eu, Counter.destination_iso2 == 'GB'), 'United Kingdom'),
+                (sa.and_(use_eu, Country.region == 'EU28', Counter.destination_iso2 != 'GB'), 'EU')
+            ],
+            else_=Country.region
+        ).label('destination_region')
 
         query = session.query(
                 Counter.commodity,
                 Commodity.group.label("commodity_group"),
                 Counter.destination_iso2,
                 Country.name.label('destination_country'),
-                Country.region.label('destination_region'),
+                destination_region_field,
                 Counter.date,
                 Counter.value_tonne,
                 Counter.value_eur,
@@ -295,7 +319,7 @@ class RussiaCounterResource(Resource):
             query = query.filter(Counter.destination_iso2.in_(to_list(destination_iso2)))
 
         if destination_region:
-            query = query.filter(Country.region.in_(to_list(destination_region)))
+            query = query.filter(destination_region_field.in_(to_list(destination_region)))
 
         query = self.aggregate(query, aggregate_by)
 

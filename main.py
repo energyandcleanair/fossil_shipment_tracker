@@ -31,7 +31,7 @@ def update():
     #     Port.check_departure
     # )).all()
     # anc_ports = [x[0] for x in anc_ports]
-    portcall.update_departures_from_russia(date_from='2021-12-01',
+    portcall.update_departures_from_russia(date_from='2021-11-01',
                                            date_to='2022-01-01',
                                            force_rebuild=True,
                                            between_existing_only=True
@@ -40,32 +40,36 @@ def update():
     # portcall.update_departures_from_russia(date_from='2022-01-01')
     # # #
     # # # # portcall.fill_departure_gaps(date_from="2022-04-10", unlocode='RUULU')
-    # departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
-    #                        base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
-    #
-    # departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
-    #                  commodities=base.GENERAL_CARGO)
+    departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
+                            base.OIL_OR_CHEMICAL, base.COAL, base.BULK],
+                     date_from='2021-11-01')
+
+    departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
+                     commodities=base.GENERAL_CARGO,
+                     date_from='2021-11-01')
     #
     # # # # arrival.update(force_for_arrival_to_departure_greater_than=dt.timedelta(hours=24*10))
-    # arrival.update(date_from="2022-01-01", include_undetected_arrival_shipments=False)
-    # arrival.update(date_from="2022-04-01", include_undetected_arrival_shipments=True)
-    # shipment.update()
-    # destination.update()
+    arrival.update(date_from="2021-11-01", include_undetected_arrival_shipments=True)
+    # arrival.update(date_from=dt.date.today() - dt.timedelta(days=30))
+    shipment.update()
+    destination.update()
     # berth.fill()
-    # berth.update()
+    berth.update()
     # country.fill()
-    # counter.update()
-    # entsog.update()
-    # position.update()
-    # trajectory.update()
-    # rscript.update()
-    # counter.update()
+    counter.update()
+    entsog.update()
+    # ship.collect_mt_for_large_oil_products()
+    position.update()
+    trajectory.update()
+    rscript.update()
+    counter.update()
+    # country.fill()
     return
 
 
 if __name__ == "__main__":
     # from base.db import init_db
-    # init_db(drop_first=False)
+    init_db(drop_first=False)
     # commodity.fill()
     # country.fill()
     print("=== Using %s environment ===" %(base.db.environment,))

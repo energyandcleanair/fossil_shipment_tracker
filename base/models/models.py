@@ -121,6 +121,7 @@ class Country(Base):
     name = Column(String)
     name_local = Column(String)
     region = Column(String)
+    regions = Column(ARRAY(String))
 
     __tablename__ = DB_TABLE_COUNTRY
     __table_args__ = (UniqueConstraint('iso2', name='unique_country'),)

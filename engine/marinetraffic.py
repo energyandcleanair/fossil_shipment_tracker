@@ -88,7 +88,7 @@ class Marinetraffic:
         # Otherwise query datalastic (and cache it as well)
         if not response_data:
             params = {
-                'v': 1,
+                'v': 5,
                 'protocol': 'jsono',
             }
 

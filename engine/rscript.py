@@ -3,9 +3,10 @@
 # We use our Python/R capacity in the air pollution containers. Not ideal...
 
 import requests
-
+from base.logger import logger_slack
 
 def update():
+    logger_slack.info("=== RScript update ===")
     payload = {
         "command": "run_script",
         "rscript": {
