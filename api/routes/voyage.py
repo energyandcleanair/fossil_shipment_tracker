@@ -160,6 +160,7 @@ class VoyageResource(Resource):
                                     DepartureCountry.name.label("departure_country"),
                                     DepartureCountry.region.label("departure_region"),
                                     DeparturePort.name.label("departure_port_name"),
+                                    DeparturePort.id.label("departure_port_id"),
                                     Arrival.date_utc.label("arrival_date_utc"),
                                     ArrivalPort.unlocode.label("arrival_unlocode"),
                                     ArrivalPort.iso2.label("arrival_iso2"),
