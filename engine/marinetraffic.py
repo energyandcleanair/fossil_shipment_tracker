@@ -9,6 +9,16 @@ from base.logger import logger
 from base.env import get_env
 from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall
 from base.utils import to_datetime
+from requests.adapters import HTTPAdapter, Retry
+import urllib.parse
+
+s = requests.Session()
+retries = Retry(total=5,
+                backoff_factor=0.1,
+                status_forcelist=[500, 502, 503, 504])
+s.mount('https://', HTTPAdapter(max_retries=retries))
+
+
 
 from engine import ship, port
 
@@ -29,7 +39,8 @@ class Marinetraffic:
 
     @classmethod
     def call(cls, method, params, api_key, credits_per_record):
-        api_result = requests.get(Marinetraffic.api_base + method + api_key, params)
+        params_string = urllib.parse.urlencode(params)
+        api_result = s.get(Marinetraffic.api_base + method + api_key + '?' + params_string)
 
         call_log = {
             'method': method,

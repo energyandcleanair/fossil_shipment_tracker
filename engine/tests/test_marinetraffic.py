@@ -4,6 +4,11 @@ from base.models import PortCall
 from engine.marinetraffic import Marinetraffic
 
 
+def test_ship():
+    mmsi='642122016'
+    ship = Marinetraffic.get_ship(mmsi=mmsi, use_cache=False)
+    assert ship.mmsi==mmsi
+
 def test_query_portcall():
     # This will cost few credits each time...
     # We took an actual port call from Russia
