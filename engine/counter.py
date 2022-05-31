@@ -17,13 +17,13 @@ except ImportError:
 import base
 
 
-def update():
+def update(date_from='2022-01-01'):
     """
     Fill counter
     :return:
     """
     logger_slack.info("=== Counter update ===")
-    date_from = "2022-01-01"
+    # date_from = "2022-01-01"
 
     # Get pipeline flows
     params_pipelineflows = {

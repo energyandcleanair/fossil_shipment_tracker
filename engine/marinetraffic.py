@@ -118,7 +118,7 @@ class Marinetraffic:
                 return None
 
             if response_data == []:
-                logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, "Response is empty"))
+                # logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, "Response is empty"))
                 response_data = [{"MMSI": mmsi,
                                  "IMO": imo,
                                  "NAME": None
