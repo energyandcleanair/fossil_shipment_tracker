@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import datetime as dt
 
 from base.db import session, engine
 from base.models import Counter
@@ -68,6 +69,15 @@ def update(date_from='2022-01-01'):
     .reset_index()
 
     result["type"] = base.COUNTER_OBSERVED
+
+
+    # Progressively phase out pipeline_lng in n days
+    n_days = 10
+    date_stop = dt.date(2022, 6, 6)
+    result.loc[(result.commodity=='lng_pipeline') & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
+                                    ["value_eur", "value_tonne"]] = 0
+    result.loc[(result.commodity == 'lng_pipeline') & (pd.to_datetime(result.date) <= pd.to_datetime(date_stop)),
+               ["value_eur", "value_tonne"]] *= max(0, 1 - 1/n_days * (dt.date.today()-date_stop).days)
 
 
     # Some sanity checking before updating the counter
