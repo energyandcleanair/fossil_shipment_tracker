@@ -216,6 +216,36 @@ def get_aggregated_physical_flows(date_from="2021-01-01",
     return df
 
 
+def fix_opd_adjacent_country(opd):
+    # Some adjacentCountries are wrong in opd data or simply missing
+    # We trust interconnections better (e.g. it includes Algeria and Albania)
+    len_before = len(opd)
+
+    # Fixing adjacent country for EU - Non EU using interconnections
+    ic = get_interconnections()
+    added_adjacent_entries = ic[['toDirectionKey', 'fromCountryKey', 'fromOperatorKey', 'toPointKey', 'toOperatorKey']] \
+        .rename(columns={'toDirectionKey': 'directionKey',
+                         'fromCountryKey': 'adjacentCountry2',
+                         'fromOperatorKey': 'adjacentOperatorKey',
+                         'toPointKey': 'pointKey',
+                         'toOperatorKey': 'operatorKey'}) \
+        .drop_duplicates()
+
+    opd = opd \
+        .merge(added_adjacent_entries, on=['directionKey',
+                                           'adjacentOperatorKey',
+                                           'pointKey',
+                                           'operatorKey'],
+               how='left')
+    # Use ic country when available
+    opd['adjacentCountry'] = opd[['adjacentCountry2', 'adjacentCountry']].bfill(axis=1).iloc[:, 0]
+    opd.drop(['adjacentCountry2'], axis=1, inplace=True)
+
+    len_after = len(opd)
+    assert len_after == len_before
+    return opd
+
+
 def get_crossborder_flows_raw(date_from='2022-01-01',
                           date_to=dt.date.today(),
                           country_iso2=None,
@@ -227,6 +257,7 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
                               ):
 
     opd = get_operator_point_directions()
+    opd = fix_opd_adjacent_country(opd)
 
     if country_iso2:
         opd = opd.loc[opd.tSOCountry.isin(to_list(country_iso2))]
