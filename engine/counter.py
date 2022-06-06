@@ -18,7 +18,7 @@ except ImportError:
 import base
 
 
-def update(date_from='2022-01-01'):
+def update(date_from='2021-11-01'):
     """
     Fill counter
     :return:
