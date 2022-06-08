@@ -152,7 +152,7 @@ class PositionResource(Resource):
                               ) \
             .join(Departure, Shipment.departure_id == Departure.id) \
             .join(Ship, Departure.ship_imo == Ship.imo) \
-            .join(Arrival, Shipment.arrival_id == Arrival.id) \
+            .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
             .join(Position, Position.ship_imo == Departure.ship_imo) \
             .filter(sa.and_(Position.date_utc >= date_from_field,
                             Position.date_utc <= date_to_field)) \
