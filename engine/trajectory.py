@@ -42,12 +42,13 @@ def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.0
                                     ) \
         .outerjoin(Trajectory, Trajectory.shipment_id == Shipment.id) \
         .join(Departure, Shipment.departure_id == Departure.id) \
-        .join(Arrival, Shipment.arrival_id == Arrival.id) \
+        .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
         .outerjoin(ShipmentDepartureBerth, ShipmentDepartureBerth.shipment_id == Shipment.id) \
         .outerjoin(ShipmentArrivalBerth, ShipmentArrivalBerth.shipment_id == Shipment.id) \
         .outerjoin(DepartureBerthPosition, DepartureBerthPosition.id == ShipmentDepartureBerth.position_id) \
         .outerjoin(ArrivalBerthPosition, ArrivalBerthPosition.id == ShipmentArrivalBerth.position_id) \
-        .filter(sa.or_(rebuild_all, Trajectory.shipment_id.is_(None)), Shipment.status==base.COMPLETED)
+        .filter(sa.or_(rebuild_all, Trajectory.shipment_id.is_(None)),
+                Shipment.status.in_([base.COMPLETED, base.ONGOING]))
 
     if shipment_id is not None:
         shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))
@@ -68,7 +69,10 @@ def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.0
         .filter(
               sa.and_(
                   Position.date_utc >= shipments_to_update.c.departure_date,
-                  Position.date_utc <= shipments_to_update.c.arrival_date
+                  sa.or_(
+                      Position.date_utc <= shipments_to_update.c.arrival_date,
+                      shipments_to_update.c.arrival_date == sa.null()
+                  )
               )) \
         .order_by(shipments_to_update.c.shipment_id, Position.date_utc) \
         .subquery()
