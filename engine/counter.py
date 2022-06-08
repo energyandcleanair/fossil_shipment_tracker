@@ -82,13 +82,28 @@ def update(date_from='2021-11-01'):
 
     # Some sanity checking before updating the counter
     old_data = pd.read_sql(Counter.query.statement, session.bind)
-    global_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24'))] \
+    global_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
+                                (old_data.date <= pd.to_datetime(dt.date.today()))] \
                     .value_eur.sum()
 
-    global_new = result.loc[(result.date >= to_datetime('2022-02-24'))] \
+    global_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
+                            (result.date <= pd.to_datetime(dt.date.today()))] \
                     .value_eur.sum()
+
+    de_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
+                          (old_data.date <= pd.to_datetime(dt.date.today())) &
+                          (old_data.destination_iso2=='DE')] \
+                    .value_eur.sum()
+
+    de_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
+                        (result.date <= pd.to_datetime(dt.date.today())) &
+                        (result.destination_iso2 == 'DE')] \
+        .value_eur.sum()
+
 
     ok = (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
+    ok = ok and (de_new >= de_old - 0.4e9) and (de_new < de_old + 2e9)
+
     if not ok:
         logger_slack.error("[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (global_new / 1e9, global_old / 1e9))
     else:
