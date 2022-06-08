@@ -1,19 +1,46 @@
+"""
+Functions to scrape and aggregate physical flows from ENTSO-G tranpsarency platform
+
+Author: Hubert Thieriot hubert@energyandcleanair.org
+
+MIT License
+
+Copyright (c) 2022 Centre for Research on Energy and Clean Air
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+
 import datetime as dt
 import pandas as pd
 import numpy as np
 from collections import defaultdict
 from tqdm import tqdm
+import sqlalchemy as sa
+import requests
 
 import base
-
 from base.db import session
 from base.logger import logger
 from base.utils import to_list, to_datetime
 from base.db_utils import upsert
 from base.models import DB_TABLE_ENTSOGFLOW, EntsogFlow
-
-import sqlalchemy as sa
-import requests
 
 
 def split(x, f):
@@ -24,7 +51,6 @@ def split(x, f):
 
 
 def api_req(url, params={}, limit=-1):
-    # logger.info(url)
     params['limit'] = limit
     api_result = requests.get(url, params=params)
 
@@ -39,11 +65,11 @@ def api_req(url, params={}, limit=-1):
 
     try:
         if res["meta"]["total"] > res["meta"]["count"] * 1.2:
-            # +2: for some reason, sometimes total is +1 or +2
+            # *1.X: for some reason, sometimes total is slightly superior to actual count
+            # yet inferior to limit
             logger.warning("More data available (%d/%d). Increase limit or implement a loop here...",
                            res["meta"]["total"], res["meta"]["count"])
     except KeyError as e:
-
         logger.warning("May have failed for: %s %s" % (url, params))
         return None
 
@@ -247,13 +273,13 @@ def fix_opd_adjacent_country(opd):
 
 
 def get_crossborder_flows_raw(date_from='2022-01-01',
-                          date_to=dt.date.today(),
-                          country_iso2=None,
-                          remove_pipe_in_pipe=True,
-                          remove_operators=[],
-                          remove_point_labels=['Dornum GASPOOL',
-                                               'VIP Waidhaus NCG',
-                                               'Haiming 2 7F/bn'],
+                              date_to=dt.date.today(),
+                              country_iso2=None,
+                              remove_pipe_in_pipe=True,
+                              remove_operators=[],
+                              remove_point_labels=['Dornum GASPOOL',
+                                                   'VIP Waidhaus NCG',
+                                                   'Haiming 2 7F/bn']
                               ):
 
     opd = get_operator_point_directions()
@@ -263,8 +289,8 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         opd = opd.loc[opd.tSOCountry.isin(to_list(country_iso2))]
 
     if remove_pipe_in_pipe:
-        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe | \
-        (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
+        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
+         | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
 
     if remove_operators:
         opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
@@ -316,13 +342,6 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         date_to=to_datetime(date_to),
     )
 
-
-    # ic_import_lng = ic.loc[ic.fromInfrastructureTypeLabel.notnull() \
-    #                        & ic.fromInfrastructureTypeLabel.str.contains('LNG Terminals') \
-    #                        & (~ic.toPointKey.isnull())]
-
-    # lng_entry_points_unique = lng_entry_points[['pointKey', 'operatorKey']].drop_duplicates()
-
     flows_import_lng_raw = get_physical_flows(
         operator_key=keep_unique(lng_entry_points).operatorKey.to_list(),
         point_key=keep_unique(lng_entry_points).pointKey.to_list(),
@@ -330,8 +349,6 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         date_from=to_datetime(date_from),
         date_to=to_datetime(date_to),
     )
-
-    # production_points_unique = production_points[['pointKey', 'operatorKey']].drop_duplicates()
 
     flows_production_raw = get_physical_flows(
         operator_key=keep_unique(production_points).operatorKey.to_list(),
@@ -341,20 +358,6 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         date_to=to_datetime(date_to),
     )
 
-    # Export side
-    # ic_crossborder_export = ic.loc[(ic.toCountryKey != ic.fromCountryKey) & \
-    #                                (~ic.toOperatorKey.isnull())][['toOperatorKey', 'toPointKey']] \
-    #     .drop_duplicates()
-    #
-    # if remove_pipe_in_pipe:
-    #     keep = opd.loc[(opd.directionKey == 'exit') & \
-    #                    (opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe |
-    #                     (opd.isPipeInPipe & opd.isDoubleReporting.isnull()))][['operatorKey', 'pointKey']] \
-    #         .rename(columns={'operatorKey': 'toOperatorKey',
-    #                          'pointKey': 'toPointKey'}) \
-    #         .drop_duplicates()
-    #     ic_crossborder_export = ic_crossborder_export.merge(keep, how='inner')
-
     flows_export_raw = get_physical_flows(
         operator_key=keep_unique(exit_points).operatorKey.to_list(),
         point_key=keep_unique(exit_points).pointKey.to_list(),
@@ -362,9 +365,6 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         date_from=to_datetime(date_from),
         date_to=to_datetime(date_to),
     )
-
-    # ic_export_lng = ic.loc[ic.toInfrastructureTypeLabel.notnull() \
-    #                        & ic.toInfrastructureTypeLabel.str.contains('LNG Terminals')]
 
     flows_export_lng_raw = get_physical_flows(
         operator_key=keep_unique(lng_exit_points).operatorKey.to_list(),
@@ -394,7 +394,6 @@ def process_crossborder_flows_raw(flows_import_raw,
                                   save_to_file=False,
                                   filename=None):
 
-
     flows_import = flows_import_raw
 
     # Adding LNG
@@ -414,7 +413,6 @@ def process_crossborder_flows_raw(flows_import_raw,
     if flows_export_raw is None:
         flows_export_raw = pd.DataFrame({'pointKey': pd.Series(dtype='str'),
                                          'operatorKey': pd.Series(dtype='int'),
-                                         # 'tsoItemIdentifier': pd.Series(dtype='str'),
                                          'value': pd.Series(dtype='float'),
                                          'date': pd.Series(dtype='str')})
 
@@ -433,7 +431,6 @@ def process_crossborder_flows_raw(flows_import_raw,
     if flows_export_agg_cols:
         flows_export = flows_export.groupby(flows_export_agg_cols, dropna=False) \
             .agg(value=('value', np.nanmean)).reset_index()
-
 
     flows = flows_import.merge(flows_export,
                                left_on=['pointKey', 'date', 'country', 'partner'],
@@ -477,7 +474,6 @@ def process_crossborder_flows_raw(flows_import_raw,
 
         # Keep only confirmed if it is there
         # One import was mathching two exports
-        # We need to
         value_import = np.nanmean(df.value_import)
         value_export_sum = np.nansum(df.value_export)
         if value_export_sum > 0:
@@ -500,8 +496,7 @@ def process_crossborder_flows_raw(flows_import_raw,
         .reset_index()
 
     if save_to_file:
-        if not filename:
-            filename = "entsog_flows.csv" #_{keep_opd_only}_{keep_confirmed_only}_{join_flows_on_operator}_{auto_confirmed_only}.csv"
+        filename = filename or "entsog_flows.csv"
         flows_agg.to_csv(filename, index=False)
     return flows_agg
 
@@ -537,17 +532,7 @@ def get_crossborder_flows(date_from='2022-01-01',
     return flows_agg
 
 
-
-def get_gasprom_exports(date_from='2022-01-01', date_to=dt.date.today()):
-    return
-
-
-def distribute_to_producers_singledate():
-    return
-
-
 def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=False, filename=None):
-
 
     flows = get_crossborder_flows(date_from=date_from,
                                   date_to=date_to,
@@ -576,7 +561,6 @@ def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=Tr
     if isinstance(date_from, int):
         last_date = session.query(sa.func.max(EntsogFlow.date)).filter(EntsogFlow.value_m3 > 0).first()[0]
         date_from = to_datetime(last_date) + dt.timedelta(days=date_from)
-
 
     flows = get_flows(date_from=date_from,
                       date_to=date_to,
