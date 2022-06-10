@@ -53,6 +53,11 @@ class VoyageResource(Resource):
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+
+    parser.add_argument('routed_trajectory', help='whether or not to use (re)routed trajectories for those that go over land (only applicable if format=geojson)',
+                        required=False,
+                        type=inputs.boolean, default=False)
+
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
@@ -89,6 +94,7 @@ class VoyageResource(Resource):
         nest_in_data = params.get("nest_in_data")
         download = params.get("download")
         rolling_days = params.get("rolling_days")
+        routed_trajectory = params.get("routed_trajectory")
 
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
@@ -277,7 +283,7 @@ class VoyageResource(Resource):
         # Rolling average
         result = self.roll_average(result = result, aggregate_by=aggregate_by, rolling_days=rolling_days)
         response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
-                                       aggregate_by=aggregate_by, download=download)
+                                       aggregate_by=aggregate_by, download=download, routed_trajectory=routed_trajectory)
         return response
 
 
@@ -365,7 +371,7 @@ class VoyageResource(Resource):
         return result
 
 
-    def build_response(self, result, format, nest_in_data, aggregate_by, download):
+    def build_response(self, result, format, nest_in_data, aggregate_by, download, routed_trajectory=False):
 
         result.replace({np.nan: None}, inplace=True)
 
@@ -401,6 +407,13 @@ class VoyageResource(Resource):
                 .filter(Trajectory.shipment_id.in_(shipment_ids))
 
             trajectories_df = pd.read_sql(trajectories.statement, session.bind)
+
+            if routed_trajectory:
+                trajectories_df["geometry"] = trajectories_df.geometry_routed.combine_first(trajectories_df.geometry)
+
+            trajectories_df.drop(["geometry_routed"], axis=1)
+
+
             trajectories_df = update_geometry_from_wkb(trajectories_df)
             result_gdf = gpd.GeoDataFrame(
                 result.merge(trajectories_df[["shipment_id", "geometry"]].rename(columns={'shipment_id': 'id'})),

@@ -36,6 +36,7 @@ from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
 
 
+
 class Ship(Base):
     imo = Column(String, primary_key=True)
     mmsi = Column(String)
@@ -238,6 +239,8 @@ class Trajectory(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
     geometry = Column(Geometry('MULTILINESTRING', srid=4326))
+    geometry_routed = Column(Geometry('MULTILINESTRING', srid=4326))
+    routing_date = Column(DateTime(timezone=False))  # time where geometry_routed was built
 
     __tablename__ = DB_TABLE_TRAJECTORY
     __table_args__ = (Index('idx_trajectory_shipment', "shipment_id"), )
@@ -450,3 +453,4 @@ class MarineTrafficCall(Base):
     params = Column(JSONB)
 
     __tablename__ = DB_TABLE_MARINETRAFFICCALL
+
