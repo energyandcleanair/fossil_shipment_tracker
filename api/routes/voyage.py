@@ -55,7 +55,7 @@ class VoyageResource(Resource):
                         default=None)
 
     parser.add_argument('routed_trajectory', help='whether or not to use (re)routed trajectories for those that go over land (only applicable if format=geojson)',
-                        required=False,
+                        required=True,
                         type=inputs.boolean, default=False)
 
     # Query processing
