@@ -183,7 +183,9 @@ def cluster(ordered_positions, buffer_deg=0.005):
 
 
 
-def get_trajectories_over_land(date_from=-31, min_land_distance=5):
+def get_trajectories_over_land(date_from=-31,
+                               min_land_distance=2,
+                               ignore_recent_hours=24):
 
     if isinstance(date_from, int):
         last_date = session.query(sa.func.max(Arrival.date_utc)).first()[0]
@@ -193,17 +195,24 @@ def get_trajectories_over_land(date_from=-31, min_land_distance=5):
     with engine.connect() as con:
 
         data = {"date_from": date_from,
-                "min_land_distance": min_land_distance}
+                "min_land_distance": min_land_distance,
+                "ignore_recent_hours": ignore_recent_hours}
 
         statement = text("""WITH lines as (SELECT t.shipment_id, t.geometry,
-                            ST_LENGTH(ST_Intersection(t.geometry, l.geom)) AS length
+                            SUM(ST_LENGTH(ST_Intersection(t.geometry, l.geom))) AS length
                             FROM ne_110m_land l, trajectory t
                             LEFT JOIN shipment s ON t.shipment_id = s.id
                             LEFT JOIN departure d ON s.departure_id = d.id
                             WHERE ST_Intersects(l.geom, t.geometry)
-                            AND d.date_utc >= :date_from)
+                            AND (
+                                (routing_date IS NULL) OR ((NOW() - routing_date) > ':ignore_recent_hours hours')
+                                )
+                            AND d.date_utc >= :date_from
+                            GROUP BY 1,2)
+                            
                             SELECT shipment_id FROM lines
-                            WHERE length > :min_land_distance;
+                            WHERE length > :min_land_distance
+                            ;
                             """)
 
         rs = con.execute(statement, **data)
@@ -231,9 +240,10 @@ def get_splitted_traj(trajectory_id):
                                 WHERE t.id=:trajectory_id
                             ),
                             overlap as (
-                                SELECT s.id, s.path, ST_LENGTH(ST_Intersection(s.geom, l.geom)) AS length
+                                SELECT s.id, s.path, SUM(ST_LENGTH(ST_Intersection(s.geom, l.geom))) AS length
                                 FROM ne_110m_land l, splitted s
                                 WHERE ST_Intersects(l.geom, s.geom)
+                                GROUP BY 1, 2
                             )
                             SELECT s.id, s.shipment_id, s.path, st_astext(s.geom) as geometry, o.length
                             FROM splitted s
@@ -302,8 +312,11 @@ def remove_intermediary_points(coords):
     return remove_redundant_points(coords)
 
 
-def reroute(date_from=-30, min_land_distance=5,
-            min_segment_land_distance=2,
+def cut_at_globe_side(route):
+    return route
+
+def reroute(date_from=-30, min_land_distance=3,
+            min_segment_land_distance=3,
             max_segment_land_distance=90 # Use to remove segmenta that cross the +180/-180 line
             ):
 
@@ -316,8 +329,17 @@ def reroute(date_from=-30, min_land_distance=5,
         # Split segments and only deal with overlapping ones
         segments_df = get_splitted_traj(trajectory_id=traj.id)
 
+        # Remove those that cross globe extremity
+        for index, segment in segments_df.iterrows():
+            coords_4326 = wkb_to_shape(segment.geometry).coords
+            if coords_4326[0][0] * coords_4326[1][0] < -120 * 120:
+                # if crossing globe 'extremity' (e.g. Japan to US)
+                segments_df.loc[index, 'geometry'] = None
+                continue
+
         overland_segments_df = segments_df.loc[(segments_df.land_distance > min_segment_land_distance) \
-                                                & (segments_df.land_distance < max_segment_land_distance)]
+                                                    & ~segments_df.geometry.isnull()]
+
         for index, segment in overland_segments_df.iterrows():
             geom = wkb_to_shape(segment.geometry)
             coords_3857 = to_3857(geom.coords)
@@ -375,11 +397,12 @@ def reroute(date_from=-30, min_land_distance=5,
 
             segments_df.loc[index, 'geometry'] = geometry_routed
 
-        from base.db import session
-        geometry_routed = MultiLineString(segments_df.sort_values(['path']).geometry.to_list())
+        geometry_routed = MultiLineString(segments_df.loc[~segments_df.geometry.isnull()] \
+            .geometry.to_list())
         traj.geometry_routed = 'SRID=4326;' + geometry_routed.wkt
         traj.routing_date = dt.datetime.now()
         session.commit()
+
 
 def push_ne_10m_land():
     # On server only, just run once
