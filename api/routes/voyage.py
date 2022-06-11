@@ -54,9 +54,10 @@ class VoyageResource(Resource):
                         required=False,
                         default=None)
 
-    parser.add_argument('routed_trajectory', help='whether or not to use (re)routed trajectories for those that go over land (only applicable if format=geojson)',
-                        required=True,
-                        type=inputs.boolean, default=False)
+    parser.add_argument('routed_trajectory',
+                        help='whether or not to use (re)routed trajectories for those that go over land (only applicable if format=geojson)',
+                        required=False,
+                        type=inputs.boolean, default=True)
 
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
