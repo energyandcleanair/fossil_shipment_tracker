@@ -194,7 +194,7 @@ def get_physical_flows(operator_key,
 
     d = api_req(url, params=params, limit=limit)
 
-    if d is None:
+    if d is None or not d.get("operationalData"):
         return None
 
     df = pd.DataFrame(d.get("operationalData"))
