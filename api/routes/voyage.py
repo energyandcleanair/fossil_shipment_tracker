@@ -188,6 +188,7 @@ class VoyageResource(Resource):
                                     Ship.dwt.label("ship_dwt"),
                                     Ship.manager.label("ship_manager"),
                                     Ship.owner.label("ship_owner"),
+                                    Ship.insurer.label("ship_insurer"),
                                     commodity_field,
                                     Commodity.group.label("commodity_group"),
                                     value_tonne_field,

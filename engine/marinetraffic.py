@@ -113,6 +113,9 @@ class Marinetraffic:
                                                           params=params,
                                                           credits_per_record=3)
 
+            if response_data and 'DATA' in response_data:
+                response_data = response_data.get('DATA')
+
             if response_data is None:
                 logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, response))
                 return None
@@ -160,6 +163,7 @@ class Marinetraffic:
             "liquid_oil": response_data.get("LIQUID_OIL"),
             "owner": response_data.get("OWNER"),
             "manager": response_data.get("MANAGER"),
+            "insurer": response_data.get("INSURER"),
             "others": {"marinetraffic": response_data}
         }
 

@@ -54,6 +54,7 @@ class Ship(Base):
 
     owner = Column(String)
     manager = Column(String)
+    insurer = Column(String)
 
     # Estimated commodity, quantity etc
     commodity = Column(String)

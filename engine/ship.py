@@ -4,8 +4,8 @@ import base
 
 from base.db import session
 from base.logger import logger
-from base.models import Ship, PortCall, Departure
-from base.utils import to_datetime
+from base.models import Ship, PortCall, Departure, Shipment
+from base.utils import to_datetime, to_list
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
 
@@ -14,7 +14,10 @@ import sqlalchemy as sa
 
 def update():
     # Not much really. We just confirm crude_oil vs oil_products when necessary
-    return collect_mt_for_large_oil_products()
+    # And use MT for insurance
+    collect_mt_for_large_oil_products()
+    collect_mt_for_insurers()
+    return
 
 
 def collect_mt_for_large_oil_products():
@@ -45,6 +48,29 @@ def collect_mt_for_large_oil_products():
         else:
             logger.info("Was already using MT")
 
+
+def collect_mt_for_insurers(date_from='2022-02-24',
+                         commodity=[base.CRUDE_OIL, base.LNG]):
+
+    ships = session.query(Ship) \
+        .join(Departure, Ship.imo == Departure.ship_imo) \
+        .join(Shipment, Shipment.departure_id == Departure.id) \
+        .filter(Departure.date_utc >= date_from) \
+        .filter(Ship.insurer == sa.null()) \
+        .filter(Ship.commodity.in_(to_list(commodity))) \
+        .distinct() \
+        .all()
+
+    for ship in tqdm(ships):
+        if not 'INSURER' in ship.others.get('marinetraffic', {}).keys():
+            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi, use_cache=False)
+            if ship_mt is not None and ship.imo == ship_mt.imo:
+                if 'datalastic' in ship.others:
+                    ship_mt.others['datalastic'] = ship.others['datalastic']
+                session.merge(ship_mt)
+                session.commit()
+            else:
+                logger.info("IMOs don't match or ship not found")
 
 def fill_missing_commodity():
 
