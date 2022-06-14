@@ -64,7 +64,7 @@ def api_req(url, params={}, limit=-1):
         return None
 
     try:
-        if res["meta"]["total"] > res["meta"]["count"] * 1.2:
+        if res['meta'] is not None and res["meta"]["total"] > res["meta"]["count"] * 1.2:
             # *1.X: for some reason, sometimes total is slightly superior to actual count
             # yet inferior to limit
             logger.warning("More data available (%d/%d). Increase limit or implement a loop here...",
