@@ -53,7 +53,7 @@ def get_departures_with_arrival_too_remote_from_next_departure(min_timedelta,
 
 def get_departures_without_arrival(min_dwt=None, commodities=None,
                                    date_from=None, ship_imo=None, date_to=None,
-                                   unlocode=None):
+                                   unlocode=None, port_id=None):
 
     subquery = session.query(Arrival.departure_id).filter(Arrival.departure_id != sa.null())
     query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
@@ -78,6 +78,9 @@ def get_departures_without_arrival(min_dwt=None, commodities=None,
 
     if unlocode is not None:
         query = query.filter(Port.unlocode.in_(to_list(unlocode)))
+
+    if port_id is not None:
+        query = query.filter(Port.id.in_(to_list(port_id)))
 
     return query.order_by(Departure.date_utc).all()
 
