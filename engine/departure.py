@@ -171,3 +171,31 @@ def update(date_from="2022-01-01",
         }
         session.add(Departure(**departure_data))
     session.commit()
+
+
+
+def remove(commodities, unlocode=None, port_id=None, port_name=None):
+
+    departures = session.query(Departure.id) \
+        .join(Ship, Ship.imo==Departure.ship_imo) \
+        .join(PortCall, PortCall.id == Departure.portcall_id) \
+        .join(Port, PortCall.port_id == Port.id) \
+        .filter(Ship.commodity.in_(to_list(commodities)))
+
+    if unlocode:
+        departures = departures \
+         .filter(Port.unlocode.in_(to_list(unlocode)))
+
+    if port_id:
+        departures = departures \
+            .filter(Port.id.in_(to_list(port_id)))
+
+    if port_name:
+        departures = departures \
+            .filter(Port.name.in_(to_list(port_name)))
+
+    session.query(Departure) \
+        .filter(Departure.id.in_(departures.scalar_subquery().subquery())) \
+        .delete(synchronize_session=False)
+
+    session.commit()

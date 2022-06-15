@@ -63,7 +63,8 @@ def collect_mt_for_insurers(date_from='2022-02-24',
 
     for ship in tqdm(ships):
         if not 'INSURER' in ship.others.get('marinetraffic', {}).keys():
-            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi, use_cache=False)
+            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi, use_cache=True)
+            # ship_mt = Marinetraffic.get_ship(imo=ship.imo, use_cache=False)
             if ship_mt is not None and ship.imo == ship_mt.imo:
                 if 'datalastic' in ship.others:
                     ship_mt.others['datalastic'] = ship.others['datalastic']

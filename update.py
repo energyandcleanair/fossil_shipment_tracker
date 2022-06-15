@@ -26,6 +26,14 @@ def update():
     departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
                      commodities=base.GENERAL_CARGO)
 
+    # Only keep oil related for India
+    departure.remove(unlocode=['INSIK'],
+                     port_id=114313,
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    departure.remove(port_name='SIKKA ANCH',
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
     arrival.update(date_from = dt.date.today() - dt.timedelta(days=30))
     shipment.update()
     position.update()

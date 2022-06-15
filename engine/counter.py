@@ -45,11 +45,13 @@ def update(date_from='2021-11-01'):
         "format": "json",
         "download": False,
         "date_from": date_from,
-        "aggregate_by": ["destination_iso2", "commodity", "arrival_date", "status"],
+        "departure_iso2": ['RU'],
+        "aggregate_by": ['departure_iso2', "destination_iso2", "commodity", "arrival_date", "status"],
         "nest_in_data": False}
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
     voyages = pd.DataFrame(voyages)
+    voyages = voyages.loc[voyages.departure_iso2=='RU'] # Just to confirm
     voyages = voyages.loc[voyages.status==base.COMPLETED]
     voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
 

@@ -68,7 +68,7 @@ def add_check_departure_to_anchorage():
 
 
 
-
+    insert_new_port(iso2='IN', marinetraffic_id=21982, name='SIKKA-ANCH')
 def fill():
     """
     Fill port data from prepared file
