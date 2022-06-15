@@ -126,7 +126,8 @@ def update(date_from="2022-01-01",
                         base.COAL,
                         base.BULK],
            ship_imo=None,
-           unlocode=None
+           unlocode=None,
+           port_id=None
            ):
     logger_slack.info("=== Update departures ===")
     # Look for relevant PortCalls without associated departure
@@ -156,6 +157,9 @@ def update(date_from="2022-01-01",
 
     if unlocode is not None:
         dangling_portcalls = dangling_portcalls.filter(Port.unlocode.in_(to_list(unlocode)))
+
+    if port_id is not None:
+        dangling_portcalls = dangling_portcalls.filter(Port.id.in_(to_list(port_id)))
 
     dangling_portcalls = dangling_portcalls.all()
 
