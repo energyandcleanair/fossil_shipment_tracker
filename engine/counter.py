@@ -87,6 +87,7 @@ def update(date_from='2021-11-01'):
         logger_slack.info("[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB." % (global_new / 1e9, global_old / 1e9))
 
         # Erase and replace everything
+        result.drop(['destination_region'], axis=1, inplace=True)
         Counter.query.delete()
         session.commit()
         result.to_sql(DB_TABLE_COUNTER,
