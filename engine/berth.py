@@ -155,6 +155,21 @@ def detect_arrival_berths(shipment_id=None, min_hours_at_berth=4):
     if shipment_id is not None:
         shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))
 
+    first_position_after_arrival = session.query(Shipment.id, Position.geometry) \
+        .filter(Shipment.id.in_(shipments_to_update)) \
+        .filter(sa.or_(
+            Position.navigation_status == "Moored",
+            Position.speed < 0.5)) \
+        .join(Departure, Shipment.departure_id == Departure.id) \
+        .join(Position, Position.ship_imo == Departure.ship_imo) \
+        .join(Arrival, Shipment.arrival_id == Arrival.id) \
+        .filter(
+            Position.date_utc >= Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)) \
+        .filter(Position.date_utc <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL)) \
+        .filter((Arrival.date_utc - Position.date_utc) < (Position.date_utc - Departure.date_utc)) \
+        .order_by(Shipment.id, Position.date_utc) \
+        .distinct(Shipment.id)
+
     berths = session.query(Shipment.id, Berth.id, Position.id, Position.date_utc, Position.navigation_status,
                  Berth.port_unlocode, Arrival.port_id) \
         .filter(Shipment.id.in_(shipments_to_update)) \
@@ -170,6 +185,7 @@ def detect_arrival_berths(shipment_id=None, min_hours_at_berth=4):
         .filter((Arrival.date_utc - Position.date_utc) < (Position.date_utc - Departure.date_utc)) \
         .order_by(Shipment.id, Berth.id, Position.date_utc) \
         .distinct(Shipment.id, Berth.id, Position.id, Position.date_utc)
+
 
     berths_df = pd.read_sql(berths.statement, session.bind)
 

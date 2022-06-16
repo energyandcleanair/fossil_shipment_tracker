@@ -47,12 +47,21 @@ class VoyageResource(Resource):
     parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure (only RU should be available)',
                         required=False,
                         default=None)
+    parser.add_argument('departure_port_id', action='split',
+                        help='ids (CREA database id) of departure ports to consider',
+                        required=False,
+                        default=None)
+    parser.add_argument('departure_port_unlocode', action='split',
+                        help='unlocode of departure ports to consider',
+                        required=False,
+                        default=None)
     parser.add_argument('destination_iso2', action='split', help='iso2(s) of destination',
                         required=False,
                         default=None)
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+
 
     parser.add_argument('routed_trajectory',
                         help='whether or not to use (re)routed trajectories for those that go over land (only applicable if format=geojson)',
@@ -87,6 +96,8 @@ class VoyageResource(Resource):
         status = params.get("status")
         date_from = params.get("date_from")
         departure_iso2 = params.get("departure_iso2")
+        departure_port_id = params.get("departure_port_id")
+        departure_port_unlocode = params.get("departure_port_unlocode")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         date_to = params.get("date_to")
@@ -262,6 +273,12 @@ class VoyageResource(Resource):
 
         if departure_iso2 is not None:
             shipments_rich = shipments_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
+
+        if departure_port_id is not None:
+            shipments_rich = shipments_rich.filter(DeparturePort.id.in_(to_list(departure_port_id)))
+
+        if departure_port_unlocode is not None:
+            shipments_rich = shipments_rich.filter(DeparturePort.unlocode.in_(to_list(departure_port_unlocode)))
 
         if destination_iso2 is not None:
             shipments_rich = shipments_rich.filter(destination_iso2_field.in_(to_list(destination_iso2)))

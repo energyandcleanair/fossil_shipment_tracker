@@ -3,7 +3,7 @@ import json
 import datetime as dt
 
 from base.db import session, engine
-from base.models import Counter
+from base.models import Counter, Port, Country
 from base.models import DB_TABLE_COUNTER
 from base.utils import to_datetime
 from base.logger import logger_slack
@@ -55,56 +55,31 @@ def update(date_from='2021-11-01'):
     voyages = voyages.loc[voyages.status==base.COMPLETED]
     voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
 
-    result = pd.concat([pipelineflows, voyages]) \
-        .sort_values(['date', 'commodity']) \
-        [["commodity", "destination_iso2", "date", "value_tonne", "value_eur"]]
+    # Remove share of Kazak oil from Novosibirsk
+    voyages_nov = get_novosibirsk_offsets(date_from=date_from)
 
+    # Aggregate
     # Fill missing dates so that we're sure we're erasing everything
     # But only within commodity, to keep the last date available
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
+    result = pd.concat([pipelineflows, voyages, voyages_nov]) \
+        .sort_values(['date', 'commodity']) \
+        [["commodity", 'destination_region', "destination_iso2", "date", "value_tonne", "value_eur"]]
     result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
     result = result \
-        .groupby(["commodity", "destination_iso2"]) \
+        .groupby(["commodity", "destination_iso2", 'destination_region']) \
         .apply(lambda x: x.set_index("date") \
                .resample("D").sum() \
                .fillna(0)) \
-    .reset_index()
+        .reset_index()
 
     result["type"] = base.COUNTER_OBSERVED
 
-
     # Progressively phase out pipeline_lng in n days
-    n_days = 10
-    date_stop = dt.date(2022, 6, 6)
-    result.loc[(result.commodity=='lng_pipeline') & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
-                                    ["value_eur", "value_tonne"]] = 0
-    result.loc[(result.commodity == 'lng_pipeline') & (pd.to_datetime(result.date) <= pd.to_datetime(date_stop)),
-               ["value_eur", "value_tonne"]] *= max(0, 1 - 1/n_days * (dt.date.today()-date_stop).days)
+    result = remove_pipeline_lng(result)
 
-
-    # Some sanity checking before updating the counter
-    old_data = pd.read_sql(Counter.query.statement, session.bind)
-    global_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
-                                (old_data.date <= pd.to_datetime(dt.date.today()))] \
-                    .value_eur.sum()
-
-    global_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
-                            (result.date <= pd.to_datetime(dt.date.today()))] \
-                    .value_eur.sum()
-
-    de_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
-                          (old_data.date <= pd.to_datetime(dt.date.today())) &
-                          (old_data.destination_iso2=='DE')] \
-                    .value_eur.sum()
-
-    de_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
-                        (result.date <= pd.to_datetime(dt.date.today())) &
-                        (result.destination_iso2 == 'DE')] \
-        .value_eur.sum()
-
-
-    ok = (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
-    ok = ok and (de_new >= de_old - 0.4e9) and (de_new < de_old + 2e9)
+    # Sanity check before updating counter
+    ok, global_new, global_old = sanity_check(result)
 
     if not ok:
         logger_slack.error("[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (global_new / 1e9, global_old / 1e9))
@@ -122,6 +97,98 @@ def update(date_from='2021-11-01'):
 
     # Add estimates
     # add_estimates(result)
+
+
+def sanity_check(result):
+    old_data = pd.read_sql(session.query(Counter, Country.region).join(Country, Country.iso2 == Counter.destination_iso2).statement, session.bind)
+    global_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
+                                (old_data.date <= pd.to_datetime(dt.date.today()))] \
+                    .value_eur.sum()
+
+    global_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
+                            (result.date <= pd.to_datetime(dt.date.today()))] \
+                    .value_eur.sum()
+
+    eu_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
+                          (old_data.date <= pd.to_datetime(dt.date.today())) &
+                          (old_data.region == 'EU28') &
+                          (old_data.destination_iso2 != 'GB')] \
+                    .value_eur.sum()
+
+    eu_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
+                        (result.date <= pd.to_datetime(dt.date.today())) &
+                        (result.destination_region == 'EU28') &
+                        (result.destination_iso2 != 'GB')] \
+        .value_eur.sum()
+
+    ok = (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
+    ok = ok and (eu_new >= eu_old - 0.4e9) and (eu_new < eu_old + 2e9)
+    return ok, global_new, global_old
+
+
+def remove_pipeline_lng(result, n_days=10,
+                        date_stop=dt.date(2022, 6, 6)):
+    result.loc[(result.commodity == 'lng_pipeline') & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
+               ["value_eur", "value_tonne"]] = 0
+    result.loc[(result.commodity == 'lng_pipeline') & (pd.to_datetime(result.date) <= pd.to_datetime(date_stop)),
+               ["value_eur", "value_tonne"]] *= max(0, 1 - 1 / n_days * (dt.date.today() - date_stop).days)
+    return result
+
+
+def get_novosibirsk_offsets(date_from,
+                            kazak_share=0.66,
+                            date_stop=dt.datetime(2022, 6, 16),
+                            n_days=20):
+    """
+    In order to remove Novosibirsk crude oil that comes from Kazakstan,
+    we gather voyages from Novosibirsk, consider share from Kazakstan,
+    and add is as negative flow.
+    We didn't do it initially, so we do it progressively to
+    avoid jump in the counter.
+
+    Bruegel: we find that loadings of Kazakh oil historically
+    represent around two thirds of total loadings in Novorossiysk.
+
+    n_days: number of days to phase it out to avoid jumps in counter
+    date_stop: date of immediate cut (everything before will be progressively removed,
+                                      everything after will be removed immediately)
+    :return:
+    """
+    params_voyage_nov = {
+        "format": "json",
+        "download": False,
+        "date_from": date_from,
+        "departure_iso2": ['RU'],
+        "aggregate_by": ['departure_iso2', "destination_iso2", "commodity", "arrival_date", "status"],
+        "nest_in_data": False}
+
+    nov_port_ids = session.query(Port.id).filter(Port.name.op('~*')('Novorossiysk.*')).all()
+    nov_port_ids = [str(x[0]) for x in nov_port_ids]
+
+    params_voyage_nov['departure_port_id'] = nov_port_ids
+    params_voyage_nov['commodity'] = base.CRUDE_OIL
+
+    voyages_nov_resp = VoyageResource().get_from_params(params=params_voyage_nov)
+    voyages_nov = json.loads(voyages_nov_resp.response[0])
+    voyages_nov = pd.DataFrame(voyages_nov)
+    voyages_nov = voyages_nov.loc[voyages_nov.status == base.COMPLETED]
+    voyages_nov.rename(columns={'arrival_date': 'date'}, inplace=True)
+
+    # Remove 90% of it that is from Kazak
+    # But do it progressively
+    idx_after_stop = pd.to_datetime(voyages_nov.date) >= date_stop
+    idx_before_stop = pd.to_datetime(voyages_nov.date) <= date_stop
+
+    factor_after = kazak_share * -1
+    factor_before = kazak_share * -1 * (1 / n_days * (dt.date.today() - date_stop.date()).days)
+
+    voyages_nov.loc[idx_after_stop, 'value_tonne'] = voyages_nov.loc[idx_after_stop, 'value_tonne'] * factor_after
+    voyages_nov.loc[idx_after_stop, 'value_eur'] = voyages_nov.loc[idx_after_stop, 'value_eur'] * factor_after
+
+    voyages_nov.loc[idx_before_stop, 'value_tonne'] = voyages_nov.loc[idx_before_stop, 'value_tonne'] * factor_before
+    voyages_nov.loc[idx_before_stop, 'value_eur'] = voyages_nov.loc[idx_before_stop, 'value_eur'] * factor_before
+
+    return voyages_nov
 
 
 def add_estimates(result):
