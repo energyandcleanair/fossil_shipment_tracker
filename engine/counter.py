@@ -38,6 +38,11 @@ def update(date_from='2021-11-01'):
     pipelineflows = json.loads(pipelineflows_resp.response[0])
     pipelineflows = pd.DataFrame(pipelineflows)
 
+    # Bruegel: Finally, on Turkey, our assumption was to attribute:
+    # • All of Kipi to Azerbaijan,
+    # • All of Strandzha to Russia.
+    # -> we remove TR -> GR
+    pipelineflows = remove_kipi_flows(pipelineflows)
 
     # Get shipments
     # Very important: we aggregate by ARRIVAL_DATE for counter pricing.
@@ -136,13 +141,45 @@ def remove_pipeline_lng(result, n_days=10,
     return result
 
 
+def remove_kipi_flows(pipelineflows,
+                      date_stop=dt.datetime(2022, 6, 16),
+                      n_days=10):
+    """
+        Assuming gas transiting from Turkey through Kipi point
+        is originating in Azerbaidjan.
+
+        n_days: number of days to phase it out to avoid jumps in counter
+        date_stop: date of immediate cut (everything before will be progressively removed,
+                                          everything after will be removed immediately)
+        :return:
+        """
+
+    idx = (pipelineflows.departure_iso2 == 'TR') & (pipelineflows.destination_iso2 == 'GR')
+
+    idx_after = idx & (pd.to_datetime(pipelineflows.date) >= date_stop)
+    idx_before = idx & (pd.to_datetime(pipelineflows.date) <= date_stop)
+
+    factor_after = 0
+    factor_before = max(0, 1 - (1 / n_days * (dt.date.today() - date_stop.date()).days))
+
+    pipelineflows.loc[idx_after, 'value_tonne'] = pipelineflows.loc[idx_after, 'value_tonne'] * factor_after
+    pipelineflows.loc[idx_after, 'value_m3'] = pipelineflows.loc[idx_after, 'value_m3'] * factor_after
+    pipelineflows.loc[idx_after, 'value_eur'] = pipelineflows.loc[idx_after, 'value_eur'] * factor_after
+
+    pipelineflows.loc[idx_before, 'value_tonne'] = pipelineflows.loc[idx_before, 'value_tonne'] * factor_before
+    pipelineflows.loc[idx_before, 'value_m3'] = pipelineflows.loc[idx_before, 'value_m3'] * factor_before
+    pipelineflows.loc[idx_before, 'value_eur'] = pipelineflows.loc[idx_before, 'value_eur'] * factor_before
+
+    return pipelineflows
+
+
 def get_novosibirsk_offsets(date_from,
                             # kazak_share=0.66,
                             date_stop=dt.datetime(2022, 6, 16),
                             n_days=20):
     """
-    In order to remove Novosibirsk crude oil that comes from Kazakstan,
-    we gather voyages from Novosibirsk, consider share from Kazakstan,
+    In order to remove Novosibirsk crude oil that comes from Kazakhstan,
+    we gather voyages from Novosibirsk, consider share from Kazakhstan,
     and add is as negative flow.
     We didn't do it initially, so we do it progressively to
     avoid jump in the counter.
@@ -184,7 +221,7 @@ def get_novosibirsk_offsets(date_from,
     idx_before_stop = pd.to_datetime(voyages_nov.date) <= date_stop
 
     factor_after = -1
-    factor_before = -1 * (1 / n_days * (dt.date.today() - date_stop.date()).days)
+    factor_before = -1 * min((1 / n_days * (dt.date.today() - date_stop.date()).days), 1)
 
     voyages_nov.loc[idx_after_stop, 'value_tonne'] = voyages_nov.loc[idx_after_stop, 'value_tonne'] * factor_after
     voyages_nov.loc[idx_after_stop, 'value_eur'] = voyages_nov.loc[idx_after_stop, 'value_eur'] * factor_after

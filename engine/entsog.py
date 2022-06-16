@@ -242,19 +242,21 @@ def get_aggregated_physical_flows(date_from="2021-01-01",
     return df
 
 
-def fix_opd_adjacent_country(opd):
+def fix_opd_countries(opd):
     # Some adjacentCountries are wrong in opd data or simply missing
     # We trust interconnections better (e.g. it includes Algeria and Albania)
+    # Also, we use tsoCountry by default but use IC to update it when available
     len_before = len(opd)
 
     # Fixing adjacent country for EU - Non EU using interconnections
     ic = get_interconnections()
-    added_adjacent_entries = ic[['toDirectionKey', 'fromCountryKey', 'fromOperatorKey', 'toPointKey', 'toOperatorKey']] \
+    added_adjacent_entries = ic[['toDirectionKey', 'fromCountryKey', 'fromOperatorKey', 'toPointKey', 'toOperatorKey', 'toCountryKey']] \
         .rename(columns={'toDirectionKey': 'directionKey',
-                         'fromCountryKey': 'adjacentCountry2',
+                         'fromCountryKey': 'adjacentCountryFromIc',
                          'fromOperatorKey': 'adjacentOperatorKey',
                          'toPointKey': 'pointKey',
-                         'toOperatorKey': 'operatorKey'}) \
+                         'toOperatorKey': 'operatorKey',
+                         'toCountryKey': 'countryFromIc'}) \
         .drop_duplicates()
 
     opd = opd \
@@ -263,9 +265,11 @@ def fix_opd_adjacent_country(opd):
                                            'pointKey',
                                            'operatorKey'],
                how='left')
+
     # Use ic country when available
-    opd['adjacentCountry'] = opd[['adjacentCountry2', 'adjacentCountry']].bfill(axis=1).iloc[:, 0]
-    opd.drop(['adjacentCountry2'], axis=1, inplace=True)
+    opd['partner'] = opd[['adjacentCountryFromIc', 'adjacentCountry']].bfill(axis=1).iloc[:, 0]
+    opd['country'] = opd[['countryFromIc', 'tSOCountry']].bfill(axis=1).iloc[:, 0]
+    opd.drop(['adjacentCountryFromIc', 'countryFromIc'], axis=1, inplace=True)
 
     len_after = len(opd)
     assert len_after == len_before
@@ -283,10 +287,10 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
                               ):
 
     opd = get_operator_point_directions()
-    opd = fix_opd_adjacent_country(opd)
+    opd = fix_opd_countries(opd)
 
     if country_iso2:
-        opd = opd.loc[opd.tSOCountry.isin(to_list(country_iso2))]
+        opd = opd.loc[opd.country.isin(to_list(country_iso2))]
 
     if remove_pipe_in_pipe:
         opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
@@ -326,10 +330,8 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
             return None
 
         return x.merge(
-            opd[['pointKey', 'operatorKey', 'directionKey', 'tSOCountry', 'adjacentCountry']] \
-                .drop_duplicates() \
-                .rename(columns={'tSOCountry': 'country',
-                                 'adjacentCountry': 'partner'}))
+            opd[['pointKey', 'operatorKey', 'directionKey', 'country', 'partner']] \
+                .drop_duplicates())
 
     #########################
     # Get raw flow data
