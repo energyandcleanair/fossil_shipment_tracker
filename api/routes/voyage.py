@@ -51,6 +51,10 @@ class VoyageResource(Resource):
                         help='ids (CREA database id) of departure ports to consider',
                         required=False,
                         default=None)
+    parser.add_argument('departure_berth_id', action='split',
+                        help='ids (CREA database id) of departure berth to consider',
+                        required=False,
+                        default=None)
     parser.add_argument('departure_port_unlocode', action='split',
                         help='unlocode of departure ports to consider',
                         required=False,
@@ -97,6 +101,7 @@ class VoyageResource(Resource):
         date_from = params.get("date_from")
         departure_iso2 = params.get("departure_iso2")
         departure_port_id = params.get("departure_port_id")
+        departure_berth_id = params.get("departure_berth_id")
         departure_port_unlocode = params.get("departure_port_unlocode")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
@@ -276,6 +281,9 @@ class VoyageResource(Resource):
 
         if departure_port_id is not None:
             shipments_rich = shipments_rich.filter(DeparturePort.id.in_(to_list(departure_port_id)))
+
+        if departure_berth_id is not None:
+            shipments_rich = shipments_rich.filter(DepartureBerth.id.in_(to_list(departure_berth_id)))
 
         if departure_port_unlocode is not None:
             shipments_rich = shipments_rich.filter(DeparturePort.unlocode.in_(to_list(departure_port_unlocode)))

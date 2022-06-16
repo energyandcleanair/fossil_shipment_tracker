@@ -3,7 +3,7 @@ import json
 import datetime as dt
 
 from base.db import session, engine
-from base.models import Counter, Port, Country
+from base.models import Counter, Port, Country, Berth
 from base.models import DB_TABLE_COUNTER
 from base.utils import to_datetime
 from base.logger import logger_slack
@@ -137,7 +137,7 @@ def remove_pipeline_lng(result, n_days=10,
 
 
 def get_novosibirsk_offsets(date_from,
-                            kazak_share=0.66,
+                            # kazak_share=0.66,
                             date_stop=dt.datetime(2022, 6, 16),
                             n_days=20):
     """
@@ -163,10 +163,11 @@ def get_novosibirsk_offsets(date_from,
         "aggregate_by": ['departure_iso2', "destination_iso2", "commodity", "arrival_date", "status"],
         "nest_in_data": False}
 
-    nov_port_ids = session.query(Port.id).filter(Port.name.op('~*')('Novorossiysk.*')).all()
-    nov_port_ids = [str(x[0]) for x in nov_port_ids]
+    nov_berth_ids = session.query(Berth.id).filter(Berth.name.op('~*')('Novorossiysk CPC')).all()
+    nov_berth_ids = [x[0] for x in nov_berth_ids]
+    assert len(nov_berth_ids) == 1
 
-    params_voyage_nov['departure_port_id'] = nov_port_ids
+    params_voyage_nov['departure_berth_id'] = nov_berth_ids
     params_voyage_nov['commodity'] = base.CRUDE_OIL
 
     voyages_nov_resp = VoyageResource().get_from_params(params=params_voyage_nov)
@@ -175,13 +176,15 @@ def get_novosibirsk_offsets(date_from,
     voyages_nov = voyages_nov.loc[voyages_nov.status == base.COMPLETED]
     voyages_nov.rename(columns={'arrival_date': 'date'}, inplace=True)
 
-    # Remove 90% of it that is from Kazak
-    # But do it progressively
+    # assert set(voyages_nov.departure_port_id.unique()) <= set(nov_port_ids)
+
+    # Removing quantity (that is, creating equivalent negative value)
+    # but doing it progressively
     idx_after_stop = pd.to_datetime(voyages_nov.date) >= date_stop
     idx_before_stop = pd.to_datetime(voyages_nov.date) <= date_stop
 
-    factor_after = kazak_share * -1
-    factor_before = kazak_share * -1 * (1 / n_days * (dt.date.today() - date_stop.date()).days)
+    factor_after = -1
+    factor_before = -1 * (1 / n_days * (dt.date.today() - date_stop.date()).days)
 
     voyages_nov.loc[idx_after_stop, 'value_tonne'] = voyages_nov.loc[idx_after_stop, 'value_tonne'] * factor_after
     voyages_nov.loc[idx_after_stop, 'value_eur'] = voyages_nov.loc[idx_after_stop, 'value_eur'] * factor_after
