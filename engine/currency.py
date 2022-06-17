@@ -13,7 +13,7 @@ from base.models import DB_TABLE_CURRENCYEXCHANGE
 import base
 
 
-def update(date_from='2022-01-01'):
+def update(date_from='2022-01-01', force=False):
     """
     Fill from countryconvert data
     :return:
@@ -23,7 +23,7 @@ def update(date_from='2022-01-01'):
     c = CurrencyRates()
 
     last_date = session.query(func.max(CurrencyExchange.date)).first()[0]
-    if last_date:
+    if last_date and not force:
         date_from = max(date_from, last_date)
 
     tqdm.pandas()
