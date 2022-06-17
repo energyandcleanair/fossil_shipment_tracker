@@ -12,6 +12,7 @@ from .berth import *
 from .portcall import *
 from .departure import *
 from .counter import *
+from .counter_last import *
 from .overland import *
 from .price import *
 from .entsogflow import *

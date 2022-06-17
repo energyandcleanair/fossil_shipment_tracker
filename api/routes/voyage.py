@@ -9,7 +9,8 @@ from flask_restx import inputs
 
 
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
-    ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, Destination, Price, Country, PortPrice
+    ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
+    Destination, Price, Country, PortPrice, CurrencyExchange
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list
@@ -152,6 +153,23 @@ class VoyageResource(Resource):
             Ship.dwt * price_eur_per_tonne_field
         ).label('value_eur')
 
+        value_usd_field = (
+                value_eur_field * CurrencyExchange.usd_per_eur
+        ).label('value_usd')
+
+        value_jpy_field = (
+                value_eur_field * CurrencyExchange.jpy_per_eur
+        ).label('value_jpy')
+
+        value_krw_field = (
+                value_eur_field * CurrencyExchange.krw_per_eur
+        ).label('value_krw')
+
+        value_gbp_field = (
+                value_eur_field * CurrencyExchange.gbp_per_eur
+        ).label('value_gbp')
+
+
         # Technically, we could pivot long -> wide
         # but since we know there's a single ship per shipment
         # a rename will be faster
@@ -207,9 +225,15 @@ class VoyageResource(Resource):
                                     Ship.insurer.label("ship_insurer"),
                                     commodity_field,
                                     Commodity.group.label("commodity_group"),
+
                                     value_tonne_field,
                                     value_m3_field,
                                     value_eur_field,
+                                    value_usd_field,
+                                    value_jpy_field,
+                                    value_gbp_field,
+                                    value_krw_field,
+
                                     DepartureBerth.id.label("departure_berth_id"),
                                     DepartureBerth.name.label("departure_berth_name"),
                                     DepartureBerth.commodity.label("departure_berth_commodity"),
@@ -250,6 +274,7 @@ class VoyageResource(Resource):
                             PortPrice.commodity == Commodity.pricing_commodity,
                             PortPrice.date == func.date_trunc('day', Departure.date_utc)
                         ))
+             .outerjoin(CurrencyExchange, CurrencyExchange.date == Price.date)
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
              .filter(destination_iso2_field != "RU"))
 
@@ -327,7 +352,11 @@ class VoyageResource(Resource):
             func.sum(subquery.c.ship_dwt).label("ship_dwt"),
             func.sum(subquery.c.value_tonne).label("value_tonne"),
             func.sum(subquery.c.value_m3).label("value_m3"),
-            func.sum(subquery.c.value_eur).label("value_eur")
+            func.sum(subquery.c.value_eur).label("value_eur"),
+            func.sum(subquery.c.value_usd).label("value_usd"),
+            func.sum(subquery.c.value_usd).label("value_gbp"),
+            func.sum(subquery.c.value_usd).label("value_jpy"),
+            func.sum(subquery.c.value_usd).label("value_krw")
         ]
 
         # Adding must have grouping columns
@@ -385,7 +414,9 @@ class VoyageResource(Resource):
 
                 result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
                 result = result \
-                    .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "value_tonne", "value_m3", "value_eur"]]) \
+                    .groupby([x for x in result.columns if x not in [date_column, 'ship_dwt',
+                                                                     'value_tonne', 'value_m3',
+                                                                     'value_eur', 'value_usd']]) \
                     .apply(lambda x: x.set_index(date_column) \
                            .resample("D").sum() \
                            .reindex(daterange) \

@@ -59,7 +59,8 @@ def test_voyage_aggregated(app):
             assert len(data) > 0
             data_df = pd.DataFrame(data)
 
-            expected_columns = set(aggregate_by + ['value_tonne', 'value_m3', 'ship_dwt', 'value_eur'])
+            expected_columns = set(aggregate_by + ['value_tonne', 'value_m3', 'ship_dwt',
+                                                   'value_eur', 'value_usd'])
 
 
             if "departure_port" in aggregate_by:

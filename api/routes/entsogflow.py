@@ -8,7 +8,7 @@ from . import routes_api
 from flask_restx import inputs
 
 
-from base.models import EntsogFlow, Price, Country, Commodity
+from base.models import EntsogFlow, Price, Country, Commodity, CurrencyExchange
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
@@ -91,6 +91,22 @@ class EntsogFlowResource(Resource):
             EntsogFlow.value_tonne * func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne)
         ).label('value_eur')
 
+        value_usd_field = (
+                value_eur_field * CurrencyExchange.usd_per_eur
+        ).label('value_usd')
+
+        value_jpy_field = (
+                value_eur_field * CurrencyExchange.jpy_per_eur
+        ).label('value_jpy')
+
+        value_krw_field = (
+                value_eur_field * CurrencyExchange.krw_per_eur
+        ).label('value_krw')
+
+        value_gbp_field = (
+                value_eur_field * CurrencyExchange.gbp_per_eur
+        ).label('value_gbp')
+
 
         DepartureCountry = aliased(Country)
 
@@ -118,7 +134,13 @@ class EntsogFlowResource(Resource):
                                     destination_country.c.region.label("destination_region"),
                                     EntsogFlow.value_tonne,
                                     EntsogFlow.value_m3,
-                                    value_eur_field)
+
+                                    value_eur_field,
+                                    value_usd_field,
+                                    value_jpy_field,
+                                    value_gbp_field,
+                                    value_krw_field
+                                    )
              .join(DepartureCountry, DepartureCountry.iso2 == EntsogFlow.departure_iso2)
              .outerjoin(destination_country, EntsogFlow.destination_iso2 == destination_country.c.iso2)
              .outerjoin(Commodity, EntsogFlow.commodity == Commodity.id)
@@ -135,6 +157,7 @@ class EntsogFlowResource(Resource):
                                  default_price.c.commodity == Commodity.pricing_commodity
                                  )
                         )
+             .outerjoin(CurrencyExchange, CurrencyExchange.date == Price.date)
              .filter(EntsogFlow.destination_iso2 != "RU"))
 
 
@@ -193,7 +216,11 @@ class EntsogFlowResource(Resource):
         value_cols = [
             func.sum(subquery.c.value_tonne).label("value_tonne"),
             func.sum(subquery.c.value_m3).label("value_m3"),
-            func.sum(subquery.c.value_eur).label("value_eur")
+            func.sum(subquery.c.value_eur).label("value_eur"),
+            func.sum(subquery.c.value_usd).label("value_usd"),
+            func.sum(subquery.c.value_gbp).label("value_gbp"),
+            func.sum(subquery.c.value_jpy).label("value_jpy"),
+            func.sum(subquery.c.value_krw).label("value_krw"),
         ]
 
         # Adding must have grouping columns
@@ -237,7 +264,8 @@ class EntsogFlowResource(Resource):
 
             result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
             result = result \
-                .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "value_tonne", "value_m3", "value_eur"]]) \
+                .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "value_tonne", "value_m3",
+                                                                 "value_eur", 'value_usd']]) \
                 .apply(lambda x: x.set_index(date_column) \
                        .resample("D").sum() \
                        .reindex(daterange) \

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, Numeric, BigInteger, Boolean
+from sqlalchemy import Column, String, Date, DateTime, Integer, Numeric, BigInteger, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import ARRAY
 from sqlalchemy.orm import validates
@@ -34,6 +34,7 @@ from . import DB_TABLE_COUNTER
 from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
+from . import DB_TABLE_CURRENCYEXCHANGE
 
 
 
@@ -400,6 +401,8 @@ class EntsogFlow(Base):
     value_mwh = Column(Numeric)
     value_m3 = Column(Numeric)
 
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
     __tablename__ = DB_TABLE_ENTSOGFLOW
     __table_args__ = (UniqueConstraint('date', 'commodity', 'departure_iso2',
                                        'destination_iso2', name='unique_entsogflow'),)
@@ -455,3 +458,15 @@ class MarineTrafficCall(Base):
 
     __tablename__ = DB_TABLE_MARINETRAFFICCALL
 
+
+class CurrencyExchange(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    usd_per_eur = Column(Numeric)
+    gbp_per_eur = Column(Numeric)
+    jpy_per_eur = Column(Numeric)
+    krw_per_eur = Column(Numeric)
+    php_per_eur = Column(Numeric)
+    date = Column(Date)
+
+    __table_args__ = (UniqueConstraint('date', name='unique_currencyexchange'),)
+    __tablename__ = DB_TABLE_CURRENCYEXCHANGE

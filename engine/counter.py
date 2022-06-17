@@ -127,6 +127,16 @@ def sanity_check(result):
                         (result.destination_iso2 != 'GB')] \
         .value_eur.sum()
 
+    de_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
+                          (old_data.date <= pd.to_datetime(dt.date.today())) &
+                          (old_data.destination_iso2 == 'DE')] \
+        .value_eur.sum()
+
+    de_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
+                        (result.date <= pd.to_datetime(dt.date.today())) &
+                        (result.destination_iso2 == 'DE')] \
+        .value_eur.sum()
+
     ok = (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
     ok = ok and (eu_new >= eu_old - 0.4e9) and (eu_new < eu_old + 2e9)
     return ok, global_new, global_old
