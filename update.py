@@ -9,7 +9,6 @@ from engine import destination
 from engine import berth
 from engine import ship
 from engine import country
-from engine import currency
 from engine import rscript
 from engine import counter
 from engine import entsog
@@ -35,11 +34,10 @@ def update():
     departure.remove(port_name='SIKKA ANCH',
                      commodities=[base.LNG, base.COAL, base.BULK])
 
-    arrival.update(date_from = dt.date.today() - dt.timedelta(days=60))
+    arrival.update(date_from = dt.date.today() - dt.timedelta(days=30))
     shipment.update()
     position.update()
     destination.update()
-    currency.update()
     berth.update()
     entsog.update(date_from=-14)
     rscript.update()
