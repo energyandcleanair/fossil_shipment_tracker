@@ -13,7 +13,7 @@ from base.models import DB_TABLE_CURRENCYEXCHANGE
 import base
 
 
-def update(date_from='2022-01-01', force=False):
+def update(date_from=dt.date(2022,1,1), force=False):
     """
     Fill from countryconvert data
     :return:
