@@ -65,10 +65,11 @@ class Marinetraffic:
 
 
     @classmethod
-    def get_ship_cached(cls, imo=None, mmsi=None):
+    def get_ship_cached(cls, imo=None, mmsi=None, mt_id=None):
         try:
-            filter = lambda x: (imo is not None and str(x["IMO"]) == str(imo)) or (
-                        mmsi is not None and str(x["MMSI"]) == str(mmsi))
+            filter = lambda x: (imo is not None and str(x["IMO"]) == str(imo)) \
+                               or (mmsi is not None and str(x["MMSI"]) == str(mmsi)) \
+                               or (mt_id is not None and str(x.get("SHIPID", "---")) == str(mt_id))
             return next(x for x in cls.cache_ship if filter(x))
         except StopIteration:
             return None
@@ -86,13 +87,13 @@ class Marinetraffic:
             json.dump(cls.cache_ship, outfile)
 
     @classmethod
-    def get_ship(cls, imo=None, mmsi=None, use_cache=True):
+    def get_ship(cls, imo=None, mmsi=None, mt_id=None, use_cache=True):
 
         api_key = get_env("KEY_MARINETRAFFIC_VD02")
 
         # First look in cache to save query credits
         if use_cache:
-            response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi)
+            response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi, mt_id=mt_id)
         else:
             response_data = None
 
@@ -107,6 +108,8 @@ class Marinetraffic:
                 params["imo"] = imo
             elif mmsi is not None:
                 params["mmsi"] = mmsi
+            elif mt_id is not None:
+                params['shipid'] = mt_id
 
             (response_data, response) = cls.call(method='vesselmasterdata/',
                                                           api_key=api_key,
@@ -124,6 +127,7 @@ class Marinetraffic:
                 # logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, "Response is empty"))
                 response_data = [{"MMSI": mmsi,
                                  "IMO": imo,
+                                 "SHIPID": mt_id,
                                  "NAME": None
                                  }]
 
@@ -136,15 +140,20 @@ class Marinetraffic:
                             "Two ships available with this mmsi: %s" % (response_data,))
                         response_data = [{"MMSI": mmsi,
                                           "IMO": imo,
+                                          "SHIPID": mt_id,
                                           "NAME": None
                                           }]
                 except Exception as e:
                     response_data = [{"MMSI": mmsi,
                                      "IMO": imo,
+                                     "SHIPID": mt_id,
                                      "NAME": None
                                      }]
 
             response_data = response_data[0]
+            if mt_id:
+                response_data['SHIPID'] = mt_id
+
             if use_cache:
                 cls.do_cache_ship(response_data)
 

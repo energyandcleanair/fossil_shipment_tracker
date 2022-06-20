@@ -1,5 +1,5 @@
 from tqdm import tqdm
-
+from sqlalchemy.exc import IntegrityError
 import base
 
 from base.db import session
@@ -311,10 +311,58 @@ def fix_mmsi_imo_discrepancy(date_from=None):
         #     others_imo = others.get("marinetraffic",{}).get("IMO")
         #     if others_imo and others_imo != found_ship.imo:
         #         print(2)
-
-
-
-
-
-
     print(f"=== Correct: {len(correct)} | Wrong: {len(wrong)} | Unknown: {len(unknown)} ===")
+
+
+def fix_not_found():
+    ships = Ship.query.filter(Ship.imo.op('~*')('NOTFOUND.*|.*_v.*')).all()
+
+    from engine.marinetraffic import Marinetraffic
+    from engine.datalastic import Datalastic
+
+    # portcalls = PortCall.query.filter(PortCall.ship_imo.op('~*')('NOTFOUND.*')).all()
+
+    for ship in tqdm(ships):
+        portcall = PortCall.query.filter(PortCall.ship_imo==ship.imo).first()
+        if portcall:
+            ship_mt_id = portcall.others.get('marinetraffic', {}).get('SHIP_ID')
+            new_ship = Marinetraffic.get_ship(mt_id=ship_mt_id, use_cache=True)
+
+            # Add existing ship if not in db
+            if new_ship:
+                existing_ship = Ship.query.filter(sa.and_(
+                    Ship.imo == new_ship.imo,
+                    sa.or_(
+                        Ship.mmsi == new_ship.mmsi,
+                        Ship.name == new_ship.name,
+                        Ship.dwt == new_ship.dwt
+                    )
+                )).first()
+
+                if not existing_ship and new_ship.imo is not None:
+                    try:
+                        session.add(new_ship)
+                        session.commit()
+                    except IntegrityError:
+                        session.rollback() # Do manual edit here for now
+
+                if new_ship and new_ship.name == ship.name:
+                    try:
+                        session.query(PortCall) \
+                            .filter(PortCall.ship_imo == ship.imo) \
+                            .update({'ship_imo': new_ship.imo})
+                        session.commit()
+                    except IntegrityError as e:
+                        session.rollback()  # Do manual delete here for now
+
+                    session.query(Departure) \
+                        .filter(Departure.ship_imo == ship.imo) \
+                        .update({'ship_imo': new_ship.imo})
+                    session.commit()
+
+                    Ship.query.filter(Ship.imo == ship.imo).delete()
+                    session.commit()
+                else:
+                    # What to do?
+                    logger.info("%s \n vs. \n %s " %(str(new_ship.others),
+                                                     str(ship.others)))

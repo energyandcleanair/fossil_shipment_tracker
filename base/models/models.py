@@ -418,6 +418,8 @@ class PipelineFlow(Base):
     value_mwh = Column(Numeric)
     value_m3 = Column(Numeric)
 
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
     __tablename__ = DB_TABLE_PIPELINEFLOW
     __table_args__ = (UniqueConstraint('date', 'commodity', 'departure_iso2',
                                        'destination_iso2', name='unique_pipelineflow'),)
