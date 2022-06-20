@@ -11,17 +11,19 @@ def update():
         "command": "run_script",
         "rscript": {
             "content": [
-                "install.packages('tidyverse',repos='http://cran.us.r-project.org')",
-                "library(tidyverse)",
+                # "install.packages('tidyverse',repos='http://cran.us.r-project.org')",
+                # "library(tidyverse)",
                 "library(remotes)",
-                "remotes::install_github('energyandcleanair/entsog', upgrade=F)",
-                "remotes::install_github('energyandcleanair/202203_russian_gas', upgrade=F, force=T)",
+                # "remotes::install_github('energyandcleanair/entsog', upgrade=F)",
+                "remotes::install_github('energyandcleanair/202203_russian_gas', upgrade=F, force=F)",
                 "library(russiacounter)",
-                "print(packageVersion('russiacounter'))",
-                "print(russiacounter::update_counter2)",
-                "library(tidyverse);library(lubridate);library(magrittr);library(countrycode)",
-                "russiacounter::price.update_portprices(production=T)"
-                # "russiacounter::update_counter2()"
+                # "library(devtools)",
+                # "devtools::reload(pkgload::inst('russiacounter'))",
+                # "print(packageVersion('russiacounter'))",
+                # "print(russiacounter::update_counter_new)",
+                # "library(tidyverse);library(lubridate);library(magrittr);library(countrycode)",
+                # # "russiacounter::price.update_portprices(production=T)"
+                "russiacounter::update_counter_new()"
             ]
         },
         "environment_variables": [
