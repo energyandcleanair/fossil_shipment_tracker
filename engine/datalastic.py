@@ -125,7 +125,7 @@ class Datalastic:
             return positions
 
         method = 'vessel_history'
-        api_result = requests.get(Datalastic.api_base + method, params)
+        api_result = requests.get(Datalastic.api_base + method, params, verify=False)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query vessel position %s: %s" % (imo, api_result))
             return None
