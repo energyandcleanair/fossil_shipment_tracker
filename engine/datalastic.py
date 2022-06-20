@@ -71,7 +71,7 @@ class Datalastic:
                 params["mmsi"] = mmsi
 
             method = 'vessel_info'
-            api_result = requests.get(Datalastic.api_base + method, params)
+            api_result = requests.get(Datalastic.api_base + method, params, verify=False)
             if api_result.status_code != 200:
                 logger.warning("Datalastic: Failed to query vessel %s: %s"%(imo, api_result))
                 return None
@@ -172,7 +172,7 @@ class Datalastic:
         }
 
         method = 'port_find'
-        api_result = requests.get(Datalastic.api_base + method, params)
+        api_result = requests.get(Datalastic.api_base + method, params, verify=False)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query port %s: %s" % (name, api_result))
             return None
