@@ -240,6 +240,7 @@ class VoyageResource(Resource):
                                     DepartureBerth.port_unlocode.label("departure_berth_unlocode"),
                                     ArrivalBerth.id.label("arrival_berth_id"),
                                     ArrivalBerth.name.label("arrival_berth_name"),
+                                    ArrivalBerth.owner.label("arrival_berth_owner"),
                                     ArrivalBerth.commodity.label("arrival_berth_commodity"),
                                     ArrivalBerth.port_unlocode.label("arrival_berth_unlocode"))
              .join(Departure, Shipment.departure_id == Departure.id)

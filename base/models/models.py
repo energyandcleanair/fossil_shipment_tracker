@@ -112,6 +112,7 @@ class Berth(Base):
     port_unlocode = Column(String, ForeignKey(DB_TABLE_PORT + '.unlocode'))
     name = Column(String)
     commodity = Column(String)
+    owner = Column(String)
     geometry = Column(Geometry('GEOMETRY', srid=4326))
 
     __tablename__ = DB_TABLE_BERTH
