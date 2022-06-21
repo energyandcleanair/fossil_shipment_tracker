@@ -35,7 +35,7 @@ def fill():
     berths_gdf = gpd.read_file("assets/berths/berths_joined.geojson")
 
     # ports_gdf = gpd.GeoDataFrame(ports_df, geometry=gpd.points_from_xy(ports_df.lon, ports_df.lat), crs="EPSG:4326")
-    berths_gdf = berths_gdf[["id", "name", "port_unlocode", "commodity", "geometry"]]
+    berths_gdf = berths_gdf[["id", "name", "port_unlocode", "commodity", "owner", "geometry"]]
 
     # Remove z dimension
     def remove_z(geom):
