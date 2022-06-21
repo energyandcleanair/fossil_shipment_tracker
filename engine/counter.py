@@ -42,7 +42,7 @@ def update(date_from='2021-11-01'):
     # • All of Kipi to Azerbaijan,
     # • All of Strandzha to Russia.
     # -> we remove TR -> GR
-    pipelineflows = remove_kipi_flows(pipelineflows)
+    pipelineflows = remove_kipi_flows(pipelineflows, n_days=1)
 
     # Get shipments
     # Very important: we aggregate by ARRIVAL_DATE for counter pricing.
@@ -61,7 +61,7 @@ def update(date_from='2021-11-01'):
     voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
 
     # Remove share of Kazak oil from Novosibirsk
-    voyages_nov = get_novosibirsk_offsets(date_from=date_from)
+    voyages_nov = get_novosibirsk_offsets(date_from=date_from, n_days=1)
 
     # Aggregate
     # Fill missing dates so that we're sure we're erasing everything
@@ -106,6 +106,20 @@ def update(date_from='2021-11-01'):
 
 
 def sanity_check(result):
+
+    ok = True
+
+    missing_price = result.loc[
+        (result.value_tonne > 0) &
+        (result.value_eur <= 0) &
+        (result.commodity != 'bulk_not_coal') &
+        (result.commodity != 'general_cargo') &
+        (pd.to_datetime(result.date) <= dt.datetime.now())]
+
+    if len(missing_price) > 0:
+        logger_slack.error("Missing prices")
+        ok = False
+
     old_data = pd.read_sql(session.query(Counter, Country.region).join(Country, Country.iso2 == Counter.destination_iso2).statement, session.bind)
     global_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
                                 (old_data.date <= pd.to_datetime(dt.date.today()))] \
@@ -137,7 +151,7 @@ def sanity_check(result):
                         (result.destination_iso2 == 'DE')] \
         .value_eur.sum()
 
-    ok = (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
+    ok = ok and (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
     ok = ok and (eu_new >= eu_old - 0.4e9) and (eu_new < eu_old + 2e9)
     return ok, global_new, global_old
 
