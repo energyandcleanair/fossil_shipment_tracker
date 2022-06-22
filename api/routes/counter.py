@@ -50,6 +50,9 @@ class RussiaCounterResource(Resource):
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+    parser.add_argument('commodity_group', action='split', help='commodity group(s) to include e.g. oil,coal,gas Defaults to all.',
+                        required=False,
+                        default=None)
 
     @routes_api.expect(parser)
     def get(self):
@@ -62,6 +65,7 @@ class RussiaCounterResource(Resource):
         aggregate_by = params.get("aggregate_by")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
+        commodity_group = params.get("commodity_group")
         fill_with_estimates = params.get("fill_with_estimates")
         use_eu = params.get("use_eu")
 
@@ -118,6 +122,9 @@ class RussiaCounterResource(Resource):
 
         if destination_region:
             query = query.filter(destination_region_field.in_(to_list(destination_region)))
+
+        if commodity_group:
+            query = query.filter(Commodity.group.in_(to_list(commodity_group)))
 
         query = self.aggregate(query, aggregate_by)
 
