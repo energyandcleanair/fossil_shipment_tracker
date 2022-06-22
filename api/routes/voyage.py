@@ -187,6 +187,13 @@ class VoyageResource(Resource):
             else_=sa.null()
         ).label('value_m3')
 
+
+        # To remove Kazak oil
+        departure_iso2_field = case(
+            [(DepartureBerth.name.ilike('Novorossiysk CPC%'), 'KZ')],
+            else_=DeparturePort.iso2
+        ).label('departure_iso2')
+
         destination_iso2_field = func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2) \
                                      .label('destination_iso2')
 
@@ -197,7 +204,7 @@ class VoyageResource(Resource):
                                     Shipment.status,
                                     Departure.date_utc.label("departure_date_utc"),
                                     DeparturePort.unlocode.label("departure_unlocode"),
-                                    DeparturePort.iso2.label("departure_iso2"),
+                                    departure_iso2_field,
                                     DepartureCountry.name.label("departure_country"),
                                     DepartureCountry.region.label("departure_region"),
                                     DeparturePort.name.label("departure_port_name"),
@@ -245,7 +252,6 @@ class VoyageResource(Resource):
                                     ArrivalBerth.port_unlocode.label("arrival_berth_unlocode"))
              .join(Departure, Shipment.departure_id == Departure.id)
              .join(DeparturePort, Departure.port_id == DeparturePort.id)
-             .join(DepartureCountry, DeparturePort.iso2 == DepartureCountry.iso2)
              .outerjoin(Arrival, Shipment.arrival_id == Arrival.id)
              .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id)
              .join(Ship, Departure.ship_imo == Ship.imo)
@@ -277,6 +283,7 @@ class VoyageResource(Resource):
                         ))
              .outerjoin(CurrencyExchange, CurrencyExchange.date == Price.date)
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
+             .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .filter(destination_iso2_field != "RU"))
 
         if id is not None:
@@ -325,6 +332,7 @@ class VoyageResource(Resource):
 
         # Query
         result = pd.read_sql(query.statement, session.bind)
+
 
         if len(result) == 0:
             return Response(

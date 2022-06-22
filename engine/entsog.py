@@ -503,6 +503,15 @@ def process_crossborder_flows_raw(flows_import_raw,
     return flows_agg
 
 
+def fix_kipi_flows(flows):
+    # Bruegel: Finally, on Turkey, our assumption was to attribute:
+    # • All of Kipi to Azerbaijan,
+    # • All of Strandzha to Russia.
+    # -> we remove TR -> GR
+    idx = (flows.departure_iso2 == 'TR') & (flows.destination_iso2 == 'GR')
+    flows.loc[idx, 'departure_iso2'] = 'AZ'
+    return flows
+
 def get_crossborder_flows(date_from='2022-01-01',
                           date_to=dt.date.today(),
                           country_iso2=None,
@@ -544,6 +553,8 @@ def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=Fals
     flows = flows.rename(columns={'from_country': 'departure_iso2',
                           'to_country': 'destination_iso2',
                           'value': 'value_kwh'})
+
+    flows = fix_kipi_flows(flows)
 
     flows['value_m3'] = flows.value_kwh / base.GCV_KWH_PER_M3
     flows['value_tonne'] = flows.value_kwh / base.GCV_KWH_PER_M3 * base.KG_PER_M3 / 1000

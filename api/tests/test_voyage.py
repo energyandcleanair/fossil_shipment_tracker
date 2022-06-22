@@ -98,6 +98,17 @@ def test_voyage_aggregated(app):
                                                                ])
 
 
+def test_kazak_oil(app):
+
+    with app.test_client() as test_client:
+        params = {"format": "json"}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        #TODO
+
+
 def test_voyage(app):
 
     # Create a test client using the Flask application configured for testing
