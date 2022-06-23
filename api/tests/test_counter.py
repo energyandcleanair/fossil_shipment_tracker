@@ -83,7 +83,7 @@ def test_counter(app):
 
         expected_columns = set(['commodity', 'commodity_group', 'date',
                                 'destination_iso2', 'destination_country', 'destination_region',
-                                'value_tonne', 'value_eur'])
+                                'value_tonne', 'value_eur', 'value_usd', 'type'])
         assert set(data_df.columns) == expected_columns
 
 
@@ -144,7 +144,7 @@ def test_counter_aggregation(app):
             expected_columns = set(aggregate_by + ['value_tonne', 'value_eur']) if aggregate_by \
                 else set(['commodity', 'commodity_group', 'destination_region',
                           'destination_iso2', 'destination_country',
-                          'date','value_tonne', 'value_eur'])
+                          'date', 'value_tonne', 'value_eur', 'value_usd', 'type'])
 
             if "commodity" in aggregate_by:
                 expected_columns.update(["commodity_group"])
