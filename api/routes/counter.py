@@ -53,6 +53,9 @@ class RussiaCounterResource(Resource):
     parser.add_argument('commodity_group', action='split', help='commodity group(s) to include e.g. oil,coal,gas Defaults to all.',
                         required=False,
                         default=None)
+    parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
+                        required=False,
+                        default=['EUR', 'USD'])
 
     @routes_api.expect(parser)
     def get(self):
@@ -68,6 +71,7 @@ class RussiaCounterResource(Resource):
         commodity_group = params.get("commodity_group")
         fill_with_estimates = params.get("fill_with_estimates")
         use_eu = params.get("use_eu")
+        currency = params.get("currency")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -80,6 +84,7 @@ class RussiaCounterResource(Resource):
             else_=Country.region
         ).label('destination_region')
 
+        value_currency_field = (Counter.value_eur * Currency.per_eur).label('value_currency')
 
         query = session.query(
                 Counter.commodity,
@@ -90,10 +95,13 @@ class RussiaCounterResource(Resource):
                 Counter.date,
                 Counter.value_tonne,
                 Counter.value_eur,
-                Counter.type
+                Counter.type,
+                Currency.currency,
+                value_currency_field
             ) \
             .outerjoin(Commodity, Counter.commodity == Commodity.id) \
             .join(Country, Counter.destination_iso2 == Country.iso2) \
+            .outerjoin(Currency, Counter.date == Currency.date) \
             .filter(Counter.date >= to_datetime(date_from)) \
             .filter(sa.or_(fill_with_estimates, Counter.type != base.COUNTER_ESTIMATED))
 
@@ -105,6 +113,9 @@ class RussiaCounterResource(Resource):
 
         if commodity_group:
             query = query.filter(Commodity.group.in_(to_list(commodity_group)))
+
+        if currency is not None:
+            query = query.filter(Currency.currency.in_(to_list(currency)))
 
         query = self.aggregate(query, aggregate_by)
 
@@ -119,13 +130,14 @@ class RussiaCounterResource(Resource):
             daterange = pd.date_range(min(counter.date), dt.datetime.today()).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor('D')  # Should have been done already
             cols = intersect(["commodity", "commodity_group", 'destination_iso2',
-                                    'destination_country', "destination_region", 'type'], counter.columns)
+                                    'destination_country', "destination_region", 'type', 'currency'], counter.columns)
+
             counter = counter \
                 .groupby(cols) \
                 .apply(lambda x: x.set_index("date") \
                        .resample("D").sum() \
                        .reindex(daterange) \
-                       .drop(cols, axis=1) \
+                       # .drop(cols, axis=1) \
                        .fillna(0)) \
                 .reset_index() \
                 .sort_values(intersect(['commodity', 'date'], counter.columns))
@@ -133,16 +145,17 @@ class RussiaCounterResource(Resource):
 
 
         if cumulate and "date" in counter:
-            groupby_cols = [x for x in ['commodity', 'commodity_group', 'destination_iso2', 'destination_country', 'destination_region'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
+            groupby_cols = [x for x in ['commodity', 'commodity_group', 'destination_iso2', 'destination_country', 'destination_region', 'currency'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
             counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
             counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
+            counter['value_currency'] = counter.groupby(groupby_cols)['value_currency'].transform(pd.Series.cumsum)
 
 
         if rolling_days is not None and rolling_days > 1:
             counter = counter \
                 .groupby(intersect(["commodity", "commodity_group", 'destination_iso2',
                                     'destination_country',
-                                    "destination_region"], counter.columns)) \
+                                    "destination_region", 'currency'], counter.columns)) \
                 .apply(lambda x: x.set_index('date') \
                        .resample("D").sum() \
                        .reindex(daterange) \
@@ -151,6 +164,9 @@ class RussiaCounterResource(Resource):
                        .mean()) \
                 .reset_index() \
                 .replace({np.nan: None})
+
+        # Spread currencies
+        counter = self.spread_currencies(result=counter)
 
         if format == "csv":
             return Response(
@@ -177,17 +193,19 @@ class RussiaCounterResource(Resource):
         # Aggregate
         value_cols = [
             func.sum(subquery.c.value_tonne).label("value_tonne"),
-            func.sum(subquery.c.value_eur).label("value_eur")
+            func.sum(subquery.c.value_eur).label("value_eur"),
+            func.sum(subquery.c.value_currency).label("value_currency"),
         ]
 
         # Adding must have grouping columns
-        must_group_by = []
+        must_group_by = ['currency']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
 
         # Aggregating
         aggregateby_cols_dict = {
+            'currency': [subquery.c.currency],
             'date': [subquery.c.date],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
@@ -207,3 +225,22 @@ class RussiaCounterResource(Resource):
 
         query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
         return query
+
+
+    def spread_currencies(self, result):
+        len_before = len(result)
+        n_currencies = len(result.currency.unique())
+
+        result['currency'] = 'value_' + result.currency.str.lower()
+        index_cols = list(set(result.columns) - set(['currency', 'value_currency', 'value_eur']))
+
+        result = result[index_cols + ['currency', 'value_currency']] \
+            .set_index(index_cols + ['currency'])['value_currency'] \
+            .unstack(-1) \
+            .reset_index()
+
+        # Quick sanity check
+        len_after = len(result)
+        assert len_after == len_before / n_currencies
+
+        return result

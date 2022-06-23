@@ -10,7 +10,7 @@ def test_currency(app):
 
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
-        endpoints = ['voyage', 'overland', 'entsogflow']
+        endpoints = ['counter', 'voyage', 'overland', 'entsogflow']
         aggregate_bys = ['date', 'destination_region', 'commodity,destination_region']
 
         for endpoint in endpoints:
@@ -21,13 +21,13 @@ def test_currency(app):
                 response = test_client.get('/v0/' + endpoint + '?' + urllib.parse.urlencode(params))
                 data1 = pd.DataFrame(response.json["data"])
                 value_cols = [x for x in data1.columns.to_list() if x.startswith('value_')]
-                assert set(value_cols) == set(['value_m3', 'value_tonne', 'value_eur'])
+                assert set(value_cols + ['value_m3']) == set(['value_m3', 'value_tonne', 'value_eur'])
 
                 params['currency'] = 'EUR,USD,JPY,CNY'
                 response = test_client.get('/v0/' + endpoint + '?' + urllib.parse.urlencode(params))
                 data2 = pd.DataFrame(response.json["data"])
                 value_cols = [x for x in data2.columns.to_list() if x.startswith('value_')]
-                assert set(value_cols) == set(['value_m3', 'value_tonne', 'value_eur',
+                assert set(value_cols + ['value_m3']) == set(['value_m3', 'value_tonne', 'value_eur',
                                                'value_usd', 'value_jpy', 'value_cny'])
 
                 assert data1.value_eur.sum() > 0
