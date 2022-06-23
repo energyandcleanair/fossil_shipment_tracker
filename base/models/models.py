@@ -34,7 +34,7 @@ from . import DB_TABLE_COUNTER
 from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
-from . import DB_TABLE_CURRENCYEXCHANGE
+from . import DB_TABLE_CURRENCY
 
 
 
@@ -462,14 +462,11 @@ class MarineTrafficCall(Base):
     __tablename__ = DB_TABLE_MARINETRAFFICCALL
 
 
-class CurrencyExchange(Base):
+class Currency(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    usd_per_eur = Column(Numeric)
-    gbp_per_eur = Column(Numeric)
-    jpy_per_eur = Column(Numeric)
-    krw_per_eur = Column(Numeric)
-    php_per_eur = Column(Numeric)
     date = Column(Date)
+    currency = Column(String)
+    per_eur = Column(Numeric) # All currencies
 
-    __table_args__ = (UniqueConstraint('date', name='unique_currencyexchange'),)
-    __tablename__ = DB_TABLE_CURRENCYEXCHANGE
+    __table_args__ = (UniqueConstraint('date', 'currency', name='unique_currency'),)
+    __tablename__ = DB_TABLE_CURRENCY

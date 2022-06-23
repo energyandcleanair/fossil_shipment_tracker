@@ -97,6 +97,15 @@ def test_voyage_aggregated(app):
                                                                base.GENERAL_CARGO
                                                                ])
 
+def test_currency(app):
+
+    with app.test_client() as test_client:
+        params = {"format": "json", "date_from": '2022-06-01', 'currency': 'EUR,JPY'}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        #TODO
 
 def test_kazak_oil(app):
 

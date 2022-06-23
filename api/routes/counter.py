@@ -17,7 +17,7 @@ from . import routes_api
 from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
-from base.models import Counter, Commodity, Country, CurrencyExchange
+from base.models import Counter, Commodity, Country, Currency
 from base.utils import to_datetime, to_list, intersect
 
 
@@ -80,21 +80,6 @@ class RussiaCounterResource(Resource):
             else_=Country.region
         ).label('destination_region')
 
-        value_usd_field = (
-                Counter.value_eur * CurrencyExchange.usd_per_eur
-        ).label('value_usd')
-
-        value_gbp_field = (
-                Counter.value_eur * CurrencyExchange.gbp_per_eur
-        ).label('value_gbp')
-
-        value_jpy_field = (
-                Counter.value_eur * CurrencyExchange.jpy_per_eur
-        ).label('value_jpy')
-
-        value_krw_field = (
-                Counter.value_eur * CurrencyExchange.krw_per_eur
-        ).label('value_krw')
 
         query = session.query(
                 Counter.commodity,
@@ -105,14 +90,9 @@ class RussiaCounterResource(Resource):
                 Counter.date,
                 Counter.value_tonne,
                 Counter.value_eur,
-                value_usd_field,
-                value_gbp_field,
-                value_jpy_field,
-                value_krw_field,
                 Counter.type
             ) \
             .outerjoin(Commodity, Counter.commodity == Commodity.id) \
-            .outerjoin(CurrencyExchange, CurrencyExchange.date == Counter.date) \
             .join(Country, Counter.destination_iso2 == Country.iso2) \
             .filter(Counter.date >= to_datetime(date_from)) \
             .filter(sa.or_(fill_with_estimates, Counter.type != base.COUNTER_ESTIMATED))
@@ -155,10 +135,6 @@ class RussiaCounterResource(Resource):
         if cumulate and "date" in counter:
             groupby_cols = [x for x in ['commodity', 'commodity_group', 'destination_iso2', 'destination_country', 'destination_region'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
             counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
-            counter['value_usd'] = counter.groupby(groupby_cols)['value_usd'].transform(pd.Series.cumsum)
-            counter['value_jpy'] = counter.groupby(groupby_cols)['value_jpy'].transform(pd.Series.cumsum)
-            counter['value_gbp'] = counter.groupby(groupby_cols)['value_gbp'].transform(pd.Series.cumsum)
-            counter['value_krw'] = counter.groupby(groupby_cols)['value_krw'].transform(pd.Series.cumsum)
             counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
 
 
@@ -201,11 +177,7 @@ class RussiaCounterResource(Resource):
         # Aggregate
         value_cols = [
             func.sum(subquery.c.value_tonne).label("value_tonne"),
-            func.sum(subquery.c.value_eur).label("value_eur"),
-            func.sum(subquery.c.value_usd).label("value_usd"),
-            func.sum(subquery.c.value_gbp).label("value_gbp"),
-            func.sum(subquery.c.value_krw).label("value_krw"),
-            func.sum(subquery.c.value_jpy).label("value_jpy"),
+            func.sum(subquery.c.value_eur).label("value_eur")
         ]
 
         # Adding must have grouping columns

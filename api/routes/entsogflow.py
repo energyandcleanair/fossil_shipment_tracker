@@ -8,7 +8,7 @@ from . import routes_api
 from flask_restx import inputs
 
 
-from base.models import EntsogFlow, Price, Country, Commodity, CurrencyExchange
+from base.models import EntsogFlow, Price, Country, Commodity, Currency
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
@@ -46,6 +46,9 @@ class EntsogFlowResource(Resource):
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+    parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
+                        required=False,
+                        default=['EUR', 'USD'])
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
@@ -80,6 +83,8 @@ class EntsogFlowResource(Resource):
         nest_in_data = params.get("nest_in_data")
         download = params.get("download")
         rolling_days = params.get("rolling_days")
+        currency = params.get("currency")
+
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -91,22 +96,7 @@ class EntsogFlowResource(Resource):
             EntsogFlow.value_tonne * func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne)
         ).label('value_eur')
 
-        value_usd_field = (
-                value_eur_field * CurrencyExchange.usd_per_eur
-        ).label('value_usd')
-
-        value_jpy_field = (
-                value_eur_field * CurrencyExchange.jpy_per_eur
-        ).label('value_jpy')
-
-        value_krw_field = (
-                value_eur_field * CurrencyExchange.krw_per_eur
-        ).label('value_krw')
-
-        value_gbp_field = (
-                value_eur_field * CurrencyExchange.gbp_per_eur
-        ).label('value_gbp')
-
+        value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
         DepartureCountry = aliased(Country)
 
@@ -134,12 +124,9 @@ class EntsogFlowResource(Resource):
                                     destination_country.c.region.label("destination_region"),
                                     EntsogFlow.value_tonne,
                                     EntsogFlow.value_m3,
-
                                     value_eur_field,
-                                    value_usd_field,
-                                    value_jpy_field,
-                                    value_gbp_field,
-                                    value_krw_field
+                                    Currency.currency,
+                                    value_currency_field
                                     )
              .join(DepartureCountry, DepartureCountry.iso2 == EntsogFlow.departure_iso2)
              .outerjoin(destination_country, EntsogFlow.destination_iso2 == destination_country.c.iso2)
@@ -157,7 +144,7 @@ class EntsogFlowResource(Resource):
                                  default_price.c.commodity == Commodity.pricing_commodity
                                  )
                         )
-             .outerjoin(CurrencyExchange, CurrencyExchange.date == Price.date)
+             .outerjoin(Currency, Currency.date == EntsogFlow.date)
              .filter(EntsogFlow.destination_iso2 != "RU"))
 
 
@@ -185,6 +172,9 @@ class EntsogFlowResource(Resource):
         if destination_region is not None:
             flows_rich = flows_rich.filter(destination_country.c.region.in_(to_list(destination_region)))
 
+        if currency is not None:
+            flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
+
         # Aggregate
         query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)
 
@@ -199,6 +189,10 @@ class EntsogFlowResource(Resource):
 
         # Rolling average
         result = self.roll_average(result=result, aggregate_by=aggregate_by, rolling_days=rolling_days)
+
+        # Spread currencies
+        result = self.spread_currencies(result=result)
+
         response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
                                        aggregate_by=aggregate_by, download=download)
         return response
@@ -217,19 +211,17 @@ class EntsogFlowResource(Resource):
             func.sum(subquery.c.value_tonne).label("value_tonne"),
             func.sum(subquery.c.value_m3).label("value_m3"),
             func.sum(subquery.c.value_eur).label("value_eur"),
-            func.sum(subquery.c.value_usd).label("value_usd"),
-            func.sum(subquery.c.value_gbp).label("value_gbp"),
-            func.sum(subquery.c.value_jpy).label("value_jpy"),
-            func.sum(subquery.c.value_krw).label("value_krw"),
+            func.sum(subquery.c.value_currency).label("value_currency")
         ]
 
         # Adding must have grouping columns
-        must_group_by = []
+        must_group_by = ['currency']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
+            'currency': [subquery.c.currency],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
             'date': [subquery.c.date],
@@ -265,7 +257,7 @@ class EntsogFlowResource(Resource):
             result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
             result = result \
                 .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "value_tonne", "value_m3",
-                                                                 "value_eur", 'value_usd']]) \
+                                                                 "value_eur", 'value_currency']]) \
                 .apply(lambda x: x.set_index(date_column) \
                        .resample("D").sum() \
                        .reindex(daterange) \
@@ -273,6 +265,25 @@ class EntsogFlowResource(Resource):
                        .rolling(rolling_days, min_periods=rolling_days) \
                        .mean()) \
                 .reset_index()
+
+        return result
+
+
+    def spread_currencies(self, result):
+        len_before = len(result)
+        n_currencies = len(result.currency.unique())
+
+        result['currency'] = 'value_' + result.currency.str.lower()
+        index_cols = list(set(result.columns) - set(['currency', 'value_currency', 'value_eur']))
+
+        result = result[index_cols + ['currency', 'value_currency']] \
+            .set_index(index_cols + ['currency'])['value_currency'] \
+            .unstack(-1) \
+            .reset_index()
+
+        # Quick sanity check
+        len_after = len(result)
+        assert len_after == len_before / n_currencies
 
         return result
 

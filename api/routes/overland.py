@@ -7,8 +7,7 @@ import numpy as np
 from . import routes_api
 from flask_restx import inputs
 
-
-from base.models import PipelineFlow, Price, Country, Commodity
+from base.models import PipelineFlow, Price, Country, Commodity, Currency
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
@@ -46,6 +45,10 @@ class PipelineFlowResource(Resource):
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+    parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
+                        required=False,
+                        default=['EUR', 'USD'])
+
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
@@ -80,6 +83,7 @@ class PipelineFlowResource(Resource):
         nest_in_data = params.get("nest_in_data")
         download = params.get("download")
         rolling_days = params.get("rolling_days")
+        currency = params.get("currency")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -91,6 +95,7 @@ class PipelineFlowResource(Resource):
             PipelineFlow.value_tonne * func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne)
         ).label('value_eur')
 
+        value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
         DepartureCountry = aliased(Country)
 
@@ -118,7 +123,9 @@ class PipelineFlowResource(Resource):
                                     destination_country.c.region.label("destination_region"),
                                     PipelineFlow.value_tonne,
                                     PipelineFlow.value_m3,
-                                    value_eur_field)
+                                    value_eur_field,
+                                    Currency.currency,
+                                    value_currency_field)
              .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
              .outerjoin(destination_country, PipelineFlow.destination_iso2 == destination_country.c.iso2)
              .outerjoin(Commodity, PipelineFlow.commodity == Commodity.id)
@@ -135,6 +142,7 @@ class PipelineFlowResource(Resource):
                                  default_price.c.commodity == Commodity.pricing_commodity
                                  )
                         )
+             .outerjoin(Currency, Currency.date == PipelineFlow.date)
              .filter(PipelineFlow.destination_iso2 != "RU"))
 
 
@@ -162,11 +170,16 @@ class PipelineFlowResource(Resource):
         if destination_region is not None:
             flows_rich = flows_rich.filter(destination_country.c.region.in_(to_list(destination_region)))
 
+        if currency is not None:
+            flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
+
         # Aggregate
         query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)
 
         # Query
         result = pd.read_sql(query.statement, session.bind)
+
+        result = self.spread_currencies(result)
 
         if len(result) == 0:
             return Response(
@@ -193,16 +206,18 @@ class PipelineFlowResource(Resource):
         value_cols = [
             func.sum(subquery.c.value_tonne).label("value_tonne"),
             func.sum(subquery.c.value_m3).label("value_m3"),
-            func.sum(subquery.c.value_eur).label("value_eur")
+            func.sum(subquery.c.value_eur).label("value_eur"),
+            func.sum(subquery.c.value_currency).label("value_currency")
         ]
 
         # Adding must have grouping columns
-        must_group_by = []
+        must_group_by = ['currency']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
+            'currency': [subquery.c.currency],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
             'date': [subquery.c.date],
@@ -245,6 +260,24 @@ class PipelineFlowResource(Resource):
                        .rolling(rolling_days, min_periods=rolling_days) \
                        .mean()) \
                 .reset_index()
+
+        return result
+
+    def spread_currencies(self, result):
+        len_before = len(result)
+        n_currencies = len(result.currency.unique())
+
+        result['currency'] = 'value_' + result.currency.str.lower()
+        index_cols = list(set(result.columns) - set(['currency', 'value_currency', 'value_eur']))
+
+        result = result[index_cols + ['currency', 'value_currency']] \
+            .set_index(index_cols + ['currency'])['value_currency'] \
+            .unstack(-1) \
+            .reset_index()
+
+        # Quick sanity check
+        len_after = len(result)
+        assert len_after == len_before / n_currencies
 
         return result
 

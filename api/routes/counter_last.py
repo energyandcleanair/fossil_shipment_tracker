@@ -17,7 +17,7 @@ from . import routes_api
 from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
-from base.models import Counter, Commodity, Country, CurrencyExchange
+from base.models import Counter, Commodity, Country, Currency
 from base.utils import to_datetime, to_list, intersect
 
 

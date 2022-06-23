@@ -33,7 +33,9 @@ def update(date_from='2021-11-01'):
         "date_from": date_from,
         "departure_iso2": ["RU", "BY", "TR"],
         "aggregate_by": ["departure_iso2", "destination_iso2", "commodity", "date"],
-        "nest_in_data": False}
+        "nest_in_data": False,
+        "currency": "EUR"
+    }
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
     pipelineflows = pd.DataFrame(pipelineflows)
@@ -52,7 +54,9 @@ def update(date_from='2021-11-01'):
         "date_from": date_from,
         "departure_iso2": ['RU'],
         "aggregate_by": ['departure_iso2', "destination_iso2", "commodity", "arrival_date", "status"],
-        "nest_in_data": False}
+        "nest_in_data": False,
+        "currency": 'EUR'
+    }
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
     voyages = pd.DataFrame(voyages)
