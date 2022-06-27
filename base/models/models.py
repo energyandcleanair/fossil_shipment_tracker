@@ -470,3 +470,14 @@ class Currency(Base):
 
     __table_args__ = (UniqueConstraint('date', 'currency', name='unique_currency'),)
     __tablename__ = DB_TABLE_CURRENCY
+
+
+# class AlertCriteria(Base):
+#     id = Column(BigInteger, autoincrement=True, primary_key=True)
+#     new_destination_iso2 = Column(String)
+#     commodity = Column(ARRAY(String))
+#     destination_email = Column(ARRAY(String))
+#     destination_slack = Column(ARRAY(String))
+#
+#     __tablename__ = DB_TABLE_ALERTCRITERIA
+#     # __table_args__ = (UniqueConstraint('iso2', name='unique_alertcriteria'),)

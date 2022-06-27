@@ -3,6 +3,9 @@ import shapely
 import datetime as dt
 import pandas as pd
 from geoalchemy2 import WKTElement
+from base.encoder import JsonEncoder
+import json
+import numpy as np
 
 
 def latlon_to_point(lat, lon, wkt=True):
@@ -19,22 +22,29 @@ def to_list(d):
         return d
 
 
-def to_datetime(d):
+def to_datetime(d, date_ref=None):
+    if not date_ref:
+        date_ref = dt.datetime.now()
     if isinstance(d, str):
         try:
             return dt.datetime.strptime(d, "%Y-%m-%d")
         except ValueError:
-            return dt.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
+            try:
+                return to_datetime(int(d), date_ref=date_ref)
+            except ValueError:
+                return dt.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
     if isinstance(d, dt.datetime):
         return d
     if isinstance(d, dt.date):
         return dt.datetime.combine(d, dt.datetime.min.time())
     if isinstance(d, pd.Timestamp):
         return d.to_pydatetime()
+    if isinstance(d, int):
+        return to_datetime(date_ref) + dt.timedelta(days=d)
     if d is None:
         return None
 
-    raise TypeError("d is not a date or datetime")
+    raise TypeError("d is not an int, date or datetime")
 
 
 def wkb_to_shape(geom):
@@ -43,7 +53,7 @@ def wkb_to_shape(geom):
         return geom
     try:
         return wkb.loads(bytes(geom.data))
-    except (shapely.errors.WKBReadingError,AttributeError):
+    except (shapely.errors.WKBReadingError, AttributeError):
         return None
 
 
@@ -53,6 +63,7 @@ def to_wkt(x):
         return WKTElement(shape.wkt, srid=4326)
     else:
         return None
+
 
 def update_geometry_from_wkb(df, to="shape"):
     if to == "shape":
@@ -64,3 +75,13 @@ def update_geometry_from_wkb(df, to="shape"):
 
 def intersect(lst1, lst2):
     return list(set(lst1) & set(lst2))
+
+
+def df_to_json(df, nest_in_data=False):
+    # To be parsable by JS
+    df.replace({np.nan: None}, inplace=True)
+
+    if nest_in_data:
+        return json.dumps({"data": df.to_dict(orient="records")}, cls=JsonEncoder)
+    else:
+        return json.dumps(df.to_dict(orient="records"), cls=JsonEncoder)

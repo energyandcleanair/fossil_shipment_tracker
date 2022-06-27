@@ -14,11 +14,11 @@ from sqlalchemy import case
 
 import base
 from . import routes_api
-from base.encoder import JsonEncoder
+
 from base.logger import logger
 from base.db import session
 from base.models import Counter, Commodity, Country, Currency
-from base.utils import to_datetime, to_list, intersect
+from base.utils import to_datetime, to_list, intersect, df_to_json
 
 
 @routes_api.route('/v0/counter', strict_slashes=False)
@@ -43,8 +43,10 @@ class RussiaCounterResource(Resource):
                         required=False, default=None)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
-    parser.add_argument('date_from', help='start date for counter data (format 2020-01-15)',
+    parser.add_argument('date_from', type=str, help='start date for counter data (format 2020-01-15)',
                         default="2022-02-24", required=False)
+    parser.add_argument('date_to', type=str, help='end date for arrival (format 2020-01-15)', required=False,
+                        default=dt.datetime.today().strftime("%Y-%m-%d"))
     parser.add_argument('destination_iso2', type=str, help='ISO2 of country of interest',
                         required=False, default=None)
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
@@ -56,6 +58,8 @@ class RussiaCounterResource(Resource):
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
+    parser.add_argument('nest_in_data', help='Whether to nest the json content in a data key.',
+                        type=inputs.boolean, default=True)
 
     @routes_api.expect(parser)
     def get(self):
@@ -65,11 +69,13 @@ class RussiaCounterResource(Resource):
         cumulate = params.get("cumulate")
         rolling_days = params.get("rolling_days")
         date_from = params.get("date_from")
+        date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         commodity_group = params.get("commodity_group")
         fill_with_estimates = params.get("fill_with_estimates")
+        nest_in_data = params.get("nest_in_data")
         use_eu = params.get("use_eu")
         currency = params.get("currency")
 
@@ -117,8 +123,10 @@ class RussiaCounterResource(Resource):
         if currency is not None:
             query = query.filter(Currency.currency.in_(to_list(currency)))
 
-        query = self.aggregate(query, aggregate_by)
+        if date_to is not None:
+            query = query.filter(Counter.date <= to_datetime(date_to))
 
+        query = self.aggregate(query, aggregate_by)
         counter = pd.read_sql(query.statement, session.bind)
         counter.replace({np.nan: None}, inplace=True)
 
@@ -127,7 +135,7 @@ class RussiaCounterResource(Resource):
 
         # Resample
         if "date" in counter:
-            daterange = pd.date_range(min(counter.date), dt.datetime.today()).rename("date")
+            daterange = pd.date_range(min(counter.date), max(counter.date)).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor('D')  # Should have been done already
             cols = intersect(["commodity", "commodity_group", 'destination_iso2',
                                     'destination_country', "destination_region", 'type', 'currency'], counter.columns)
@@ -177,7 +185,7 @@ class RussiaCounterResource(Resource):
 
         if format == "json":
             return Response(
-                response=json.dumps({"data": counter.to_dict(orient="records")}, cls=JsonEncoder),
+                response=df_to_json(counter, nest_in_data=nest_in_data),
                 status=200,
                 mimetype='application/json')
 
@@ -242,5 +250,6 @@ class RussiaCounterResource(Resource):
         # Quick sanity check
         len_after = len(result)
         assert len_after == len_before / n_currencies
+        result.replace({np.nan: None}, inplace=True)
 
         return result

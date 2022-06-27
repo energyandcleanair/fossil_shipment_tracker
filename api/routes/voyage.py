@@ -370,7 +370,7 @@ class VoyageResource(Resource):
             'commodity_group': [subquery.c.commodity_group],
 
             'status': [subquery.c.status],
-
+            'date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
             'departure_date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
             'arrival_date': [func.date_trunc('day', subquery.c.arrival_date_utc).label('arrival_date')],
 
@@ -515,9 +515,10 @@ class VoyageResource(Resource):
 
 
             trajectories_df = update_geometry_from_wkb(trajectories_df)
-            result_gdf = gpd.GeoDataFrame(
-                result.merge(trajectories_df[["shipment_id", "geometry"]].rename(columns={'shipment_id': 'id'})),
-                geometry='geometry')
+
+            result_gdf = gpd.GeoDataFrame(trajectories_df[["shipment_id", "geometry"]].rename(columns={'shipment_id': 'id'}),
+                                          geometry='geometry') \
+                            .merge(result)
             result_geojson = result_gdf.to_json(cls=JsonEncoder)
 
             if nest_in_data:
