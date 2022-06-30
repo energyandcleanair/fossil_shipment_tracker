@@ -456,8 +456,9 @@ class MarineTrafficCall(Base):
     method = Column(String)
     records = Column(Integer)
     credits = Column(Integer)
-    queried_date_utc = Column(DateTime(timezone=False))
+    date_utc = Column(DateTime(timezone=False))
     params = Column(JSONB)
+    key = Column(String)
 
     __tablename__ = DB_TABLE_MARINETRAFFICCALL
 
