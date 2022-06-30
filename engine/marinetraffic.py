@@ -44,7 +44,7 @@ class Marinetraffic:
 
         call_log = {
             'method': method,
-            'queried_date_utc': dt.datetime.utcnow(),
+            'date_utc': dt.datetime.utcnow(),
             'params': params,
             'key': api_key
         }
@@ -52,11 +52,13 @@ class Marinetraffic:
         if api_result.status_code != 200:
             call_log['records'] = 0
             call_log['credits'] = 0
+            call_log['status'] = str(api_result.status_code) + " - " + str(api_result.content)
             result = (None, api_result)
         else:
             result = (api_result.json(), api_result)
             call_log['records'] = len(api_result.json())
             call_log['credits'] = len(api_result.json()) * credits_per_record
+            call_log['status'] = str(api_result.status_code)
 
         if True: #call_log['records'] > 0:
             session.add(MarineTrafficCall(**call_log))
