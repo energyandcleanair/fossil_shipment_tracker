@@ -459,6 +459,7 @@ class MarineTrafficCall(Base):
     date_utc = Column(DateTime(timezone=False))
     params = Column(JSONB)
     key = Column(String)
+    status = Column(String)
 
     __tablename__ = DB_TABLE_MARINETRAFFICCALL
 
