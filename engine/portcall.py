@@ -288,7 +288,8 @@ def update_departures_from_russia(
     if marinetraffic_port_id is not None:
         ports = ports.filter(Port.marinetraffic_id.in_(to_list(marinetraffic_port_id)))
 
-    for port in tqdm(ports.all()):
+    ports = ports.all()
+    for port in tqdm(ports):
 
         # Three cases:
         # - only from last (force_rebuild=False)
@@ -508,7 +509,7 @@ def fill_departure_gaps(imo=None,
     #     find_arrival(departure_portcall=p, date_to=date_to)
 
 
-def fill_arrival_gaps(imo = None, date_from=None, min_dwt=base.DWT_MIN):
+def fill_arrival_gaps(imo=None, date_from=None, min_dwt=base.DWT_MIN):
     """
     We missed quite a lot of arrival data in the original filling. Since by default,
      the program is looking at arrivals after last departure, it will never look again

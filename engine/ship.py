@@ -366,3 +366,32 @@ def fix_not_found():
                     # What to do?
                     logger.info("%s \n vs. \n %s " %(str(new_ship.others),
                                                      str(ship.others)))
+
+
+def fill_missing_insurer():
+    ships = Ship.query \
+        .join(Departure, Departure.ship_imo==Ship.imo) \
+        .filter(Ship.insurer == sa.null()) \
+        .filter(sa.or_(
+            Ship.others['equasis'] == sa.null(),
+            Ship.others['equasis']['management'] == [])) \
+        .all()
+
+    from engine.equasis import Equasis
+    equasis = Equasis()
+
+    # imos = [ship.imo for ship in ships]
+    # splitted = list(base.utils.split(imos, 20))
+    for ship in tqdm(ships):
+        equasis_infos = equasis.get_ships_infos(imos=ship.imo)
+        info = equasis_infos[0]
+        if info is not None and len(info.get('management')):
+            insurer = info.get('pni')
+            others = ship.others.copy() if ship.others else {}
+            others.update({'equasis': info})
+            ship.others = others
+            ship.insurer = insurer
+            session.commit()
+        # else:
+        #     break
+

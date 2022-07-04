@@ -13,7 +13,7 @@ from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     Destination, Price, Country, PortPrice, Currency
 from base.db import session
 from base.encoder import JsonEncoder
-from base.utils import to_list
+from base.utils import to_list, df_to_json, to_datetime
 from base.logger import logger
 
 
@@ -43,8 +43,11 @@ class VoyageResource(Resource):
                         default=None, action='split', required=False)
     parser.add_argument('date_from', help='start date for departure or arrival (format 2020-01-15)',
                         default="2022-01-01", required=False)
-    parser.add_argument('date_to', type=str, help='end date for departure or arrival arrival (format 2020-01-15)', required=False,
+    parser.add_argument('date_to', type=str, help='end date for departure or arrival arrival (format 2020-01-15 or -7 for seven days before today)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('ship_imo', action='split', help='IMO identifier(s) of the ship(s)',
+                        required=False,
+                        default=None)
     parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure (only RU should be available)',
                         required=False,
                         default=None)
@@ -110,6 +113,7 @@ class VoyageResource(Resource):
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         date_to = params.get("date_to")
+        ship_imo = params.get("ship_imo")
         aggregate_by = params.get("aggregate_by")
         format = params.get("format", "json")
         nest_in_data = params.get("nest_in_data")
@@ -275,6 +279,9 @@ class VoyageResource(Resource):
         if id is not None:
             shipments_rich = shipments_rich.filter(Shipment.id.in_(id))
 
+        if ship_imo is not None:
+            shipments_rich = shipments_rich.filter(Ship.imo.in_(to_list(ship_imo)))
+
         if commodity is not None:
             shipments_rich = shipments_rich.filter(commodity_field.in_(to_list(commodity)))
 
@@ -292,7 +299,7 @@ class VoyageResource(Resource):
             shipments_rich = shipments_rich.filter(
                 sa.or_(
                     # Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
-                    Departure.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d")
+                    Departure.date_utc <= to_datetime(date_to)
                 ))
 
         if departure_iso2 is not None:
@@ -484,13 +491,8 @@ class VoyageResource(Resource):
                              "attachment; filename=shipments.csv"})
 
         if format == "json":
-            if nest_in_data:
-                resp_content = json.dumps({"data": result.to_dict(orient="records")}, cls=JsonEncoder)
-            else:
-                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
-
             return Response(
-                response=resp_content,
+                response=df_to_json(result, nest_in_data=nest_in_data),
                 status=200,
                 mimetype='application/json')
 

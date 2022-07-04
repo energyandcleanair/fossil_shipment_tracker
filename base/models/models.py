@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, DateTime, Integer, Numeric, BigInteger, Boolean
+from sqlalchemy import Column, String, Date, DateTime, Integer, Numeric, BigInteger, Boolean, Time
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import ARRAY
 from sqlalchemy.orm import validates
@@ -35,6 +35,14 @@ from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
 from . import DB_TABLE_CURRENCY
+
+from . import DB_TABLE_ALERT
+from . import DB_TABLE_ALERT_CONFIG
+from . import DB_TABLE_ALERT_RECIPIENT
+from . import DB_TABLE_ALERT_RECIPIENT_ASSOC
+from . import DB_TABLE_ALERT_CRITERIA
+from . import DB_TABLE_ALERT_CRITERIA_ASSOC
+
 
 
 
@@ -474,12 +482,67 @@ class Currency(Base):
     __tablename__ = DB_TABLE_CURRENCY
 
 
-# class AlertCriteria(Base):
-#     id = Column(BigInteger, autoincrement=True, primary_key=True)
-#     new_destination_iso2 = Column(String)
-#     commodity = Column(ARRAY(String))
-#     destination_email = Column(ARRAY(String))
-#     destination_slack = Column(ARRAY(String))
-#
-#     __tablename__ = DB_TABLE_ALERTCRITERIA
-#     # __table_args__ = (UniqueConstraint('iso2', name='unique_alertcriteria'),)
+#############################
+# Alert related models
+#############################
+
+class AlertConfig(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    name = Column(String)
+    frequency = Column(String)
+    sending_time_utc = Column(Time)
+    sending_day_of_week = Column(Integer) #1: Monday 7: Sunday
+
+    __tablename__ = DB_TABLE_ALERT_CONFIG
+
+
+class AlertRecipient(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    recipient = Column(String)
+    type = Column(String) #MAIL, SMS, SLACK
+    others = Column(JSONB) # In case specific parameters are required
+
+    __tablename__ = DB_TABLE_ALERT_RECIPIENT
+
+
+class AlertRecipientAssociation(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    config = Column(BigInteger, ForeignKey(DB_TABLE_ALERT_CONFIG + '.id', ondelete="CASCADE"), nullable=False)
+    recipient = Column(BigInteger, ForeignKey(DB_TABLE_ALERT_RECIPIENT + '.id', ondelete="CASCADE"), nullable=False)
+
+    __tablename__ = DB_TABLE_ALERT_RECIPIENT_ASSOC
+
+
+class AlertCriteria(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    # List of conditions joined by AND operation
+    # If null, then ignored
+    commodity = Column(ARRAY(String))
+    # commodity_not = Column(ARRAY(String))
+    min_dwt = Column(Numeric)
+
+    new_destination_iso2 = Column(ARRAY(String))
+    new_destination_name_pattern = Column(ARRAY(String))
+
+    # unlocode = Column(ARRAY(String))
+    # unlocode_distance_to = Column(ARRAY(String))
+
+
+    __tablename__ = DB_TABLE_ALERT_CRITERIA
+
+
+class AlertCriteriaAssociation(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    config = Column(BigInteger, ForeignKey(DB_TABLE_ALERT_CONFIG + '.id', ondelete="CASCADE"), nullable=False)
+    criteria = Column(BigInteger, ForeignKey(DB_TABLE_ALERT_CRITERIA + '.id', ondelete="CASCADE"), nullable=False)
+
+    __tablename__ = DB_TABLE_ALERT_CRITERIA_ASSOC
+
+
+class Alert(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    config = Column(BigInteger, ForeignKey(DB_TABLE_ALERT_CONFIG + '.id', ondelete="CASCADE"), nullable=False)
+    construction_date_utc = Column(DateTime(timezone=False))
+    sending_date_utc = Column(DateTime(timezone=False))
+
+    __tablename__ = DB_TABLE_ALERT

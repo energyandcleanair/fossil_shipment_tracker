@@ -25,5 +25,12 @@ DB_TABLE_COUNTER = "counter"
 # Marine Traffic cache
 DB_TABLE_MTVOYAGEINFO = "voyageinfo"
 
+DB_TABLE_ALERT = "alert"
+DB_TABLE_ALERT_CONFIG = "alert_config"
+DB_TABLE_ALERT_RECIPIENT = "alert_recipient"
+DB_TABLE_ALERT_RECIPIENT_ASSOC = "alert_recipient_assoc"
+DB_TABLE_ALERT_CRITERIA = "alert_criteria"
+DB_TABLE_ALERT_CRITERIA_ASSOC = "alert_criteria_assoc"
+
 
 from .models import *
