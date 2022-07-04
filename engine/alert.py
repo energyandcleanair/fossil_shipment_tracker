@@ -85,10 +85,10 @@ def manual_alert(destination_iso2=None,
         query3 = query3.filter(query2.c.destination_date >= to_datetime(date_from))
 
     if min_dwt:
-        query3 = query3.filter(Ship.dwt >= min_dwt)
+        query3 = query3.filter(query2.c.dwt >= min_dwt)
 
     if commodity:
-        query3 = query3.filter(Ship.commodity.in_(to_list(commodity)))
+        query3 = query3.filter(query2.c.commodity.in_(to_list(commodity)))
 
     query3 = query3 \
                 .order_by(query2.c.shipment_id, sa.desc(query2.c.destination_date)) \
