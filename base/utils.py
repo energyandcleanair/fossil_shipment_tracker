@@ -79,9 +79,15 @@ def intersect(lst1, lst2):
 
 def df_to_json(df, nest_in_data=False):
     # To be parsable by JS
-    df.replace({np.nan: None}, inplace=True)
+    df = df.where(pd.notnull(df), None)
 
     if nest_in_data:
         return json.dumps({"data": df.to_dict(orient="records")}, cls=JsonEncoder)
     else:
         return json.dumps(df.to_dict(orient="records"), cls=JsonEncoder)
+
+
+def split(list_, chunk_size):
+
+  for i in range(0, len(list_), chunk_size):
+    yield list_[i:i + chunk_size]
