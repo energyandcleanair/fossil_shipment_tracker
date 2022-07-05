@@ -18,6 +18,7 @@ DB_TABLE_COMMODITY = "commodity"
 DB_TABLE_ENTSOGFLOW = "entsogflow"
 DB_TABLE_MARINETRAFFICCALL = "mtcall"
 DB_TABLE_CURRENCY = "currency"
+DB_TABLE_MTEVENT_TYPE = "mtevent_type"
 
 DB_TABLE_PIPELINEFLOW = "pipelineflow"
 DB_TABLE_COUNTER = "counter"

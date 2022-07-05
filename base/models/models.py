@@ -35,6 +35,7 @@ from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
 from . import DB_TABLE_CURRENCY
+from . import DB_TABLE_MTEVENT_TYPE
 
 
 
@@ -473,6 +474,14 @@ class Currency(Base):
     __table_args__ = (UniqueConstraint('date', 'currency', name='unique_currency'),)
     __tablename__ = DB_TABLE_CURRENCY
 
+class MarineTrafficEventType(Base):
+    id = Column(String, unique=True, primary_key=True)
+    name = Column(String)
+    description = Column(String)
+    availability = Column(String)
+
+    __table_args__ = (UniqueConstraint('id', name='unique_event_type_id'),)
+    __tablename__ = DB_TABLE_MTEVENT_TYPE
 
 # class AlertCriteria(Base):
 #     id = Column(BigInteger, autoincrement=True, primary_key=True)

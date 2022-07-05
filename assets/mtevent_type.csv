@@ -1,0 +1,68 @@
+id,name,description,availability
+1,FIRST_DAILY_POS,First daily position of the vessel (midnight report).,Notifications / API EV02
+2,INTERMEDIATE_DAILY_POS,Intermediate daily position of the vessel (noon report).,Notifications / API EV02
+3,IN_RANGE,The vessel re-appeared within the range of the MarineTraffic Network after being out of range for more than two hours.,Notifications / API EV02
+4,OUT_OF_RANGE,There is no recorded position for the vessel by the MarineTraffic Network for more than one hour.,Notifications / API EV02
+5,STOPPED,"The vessel, previously moving, moves at a speed less than 0.5 knots (the event is not triggered while the ship is in port or anchorage).",Notifications / API EV02
+6,UNDERWAY,"The vessel, previously stopped, moves at a speed over 3.5 knots (the event is not triggered while the ship is in port or anchorage)",Notifications / API EV02
+7,COURSE_CHANGED,The vessel has changed course according to AIS transmissions.,Notifications / API EV02
+9,DRIFTING,"Based on vessel's speed and heading, MarineTraffic suggests that a vessel is Drifting or it is not under command.",Notifications / API EV02
+10,AIS_OFF, ,Notifications / API EV02
+11,NAME_CHANGED,The vessel has changed name according to AIS transmissions.,Notifications / API EV02
+12,FLAG_CHANGED,The vessel has changed flag according to AIS transmissions.,Notifications / API EV02
+13,DESTINATION_CHANGED,The vessel has changed destination according to AIS transmissions.,Notifications / API EV02
+14,DRAUGHT_CHANGED,The vessel has changed draught according to AIS transmissions.,Notifications / API EV02
+15,ETA_CHANGED,The vessel has changed Estimated Time of Arrival (ETA) according to AIS transmissions.,Notifications / API EV02
+16,STATUS_CHANGED,The vessel has changed Navigational Status according to AIS transmissions.,Notifications / API EV02
+17,SHIP_HIGH_WIND,According to wind forecasts the vessel is sailing in a windy area (the wind speed is over 30 knots),Notifications / API EV02
+18,PHOTO_UPLOADED,A new photo of the vessel has been uploaded to the MarineTraffic Photo Gallery.,Notifications / API EV02
+19,PROXIMITY_VESSEL_START,The distance between the vessel and another vessel is less than 2 times the length of the longer vessel.,Notifications / API EV02
+20,TIMEZONE_CHANGED,The vessel has moved to an area with a new time-zone.,Notifications / API EV02
+21,STS_START,Two vessels are very close and moving together (similar speeds and courses),Notifications / API EV02
+22,STS_END, ,Notifications / API EV02
+23,BUNKERING_START, ,Notifications / API EV02
+24,BUNKERING_END, ,Notifications / API EV02
+25,INMARSAT_SUCCESS,Successful positional data retrieval via INMARSAT,Service Owners*
+26,INMARSAT_FAILURE,Positional data retrieval via INMARSAT failed,Service Owners*
+27,FIRST_POSITION, ,Notifications / API EV02
+28,SHIP_LOST, ,Notifications / API EV02
+29,AIS_ON, ,API EV02
+30,SPEED_BELOW_MIN,"Get notified when a vessel's speed drops below a defined minimum limit and, also, when it returns above this limit.",Notifications
+31,SPEED_ABOVE_MIN,"Get notified when a vessel's speed drops below a defined minimum limit and, also, when it returns above this limit.",Notifications
+32,SPEED_ABOVE_MAX,"Get notified when a vessel's speed exceeds a defined maximum limit and, also, when it returns below this limit.",Notifications
+33,SPEED_BELOW_MAX,"Get notified when a vessel's speed exceeds a defined maximum limit and, also, when it returns below this limit.",Notifications
+34,PROXIMITY_VESSEL_END, ,Notifications / API EV02
+35,PROXIMITY_PILOT_OUT, ,Notifications / API EV02
+36,PROXIMITY_PILOT_IN, ,Notifications / API EV02
+37,PROXIMITY_PILOT, ,Notifications / API EV02
+38,PROXIMITY_TUG_START, ,Notifications / API EV02
+39,PROXIMITY_TUG_END, ,Notifications / API EV02
+40,SPEED_AVG_BELOW_MIN, ,Notifications
+41,SPEED_AVG_ABOVE_MIN, ,Notifications
+42,TEMP_BELOW_FROST, ,Notifications
+43,TEMP_ABOVE_FROST, ,Notifications
+100,ARRIVAL,The vessel has arrived at a port.,Notifications / API EV01
+101,DEPARTURE,The vessel has departed from a port.,Notifications / API EV01
+102,PROXIMITY_PORT,Vessel's distance from Port is less than a certain value. Repeat at specified distance intervals until arrival.,Notifications
+103,ETA,The Estimated Time of Arrival (ETA) of the vessel according to the AIS transmissions.,Notifications
+104,ETA_AREA,"ETA to custom user-defined shape.
+First notification X hours before, Repeat every N minutes",Notifications
+105,ARRIVAL_ESTIMATED,Vessel(s) Arrivals to Port(s). Notifications will be generated for a specific pair of Vessel + Port or for a specific Vessel arriving at any Port (Port left empty) or for any Vessel arriving at a specific Port (Vessel left empty).,Notifications
+106,DEPARTURE_ESTIMATED,Vessel(s) departures from Port(s). Notifications will be generated for a specific pair of Vessel + Port or for a specific Vessel departing from any Port (Port left empty) or for any Vessel departing from a specific Port (Vessel left empty),Notifications
+107,DOCKED,The vessel has docked to a Port Berth/Terminal.,Notifications / API EV02
+108,UNDOCKED,The vessel has undocked from a Port Berth/Terminal.,Notifications / API EV02
+109,ENTERED_AREA,The vessel has sailed into a standard or custom area**.,Notifications
+110,LEFT_AREA,The vessel has left a standard or custom area**.,Notifications
+111,CROSSED_AREA,The vessel has crossed a standard or custom area**.,Notifications
+112,CROSSED_STRAIT,The vessel has crossed a common strait or passage.,Notifications / API EV02
+113,ENTERED_ECA,The vessel has entered an Emission Control Area (ECA Zone).,Notifications / API EV02
+114,LEFT_ECA,The vessel has left an Emission Control Area (ECA Zone).,Notifications / API EV02
+115,ENTERED_AREA,Arrival to a custom user-defined shape or to a standard predefined area,Notifications
+116,LEFT_AREA,Departure from a custom user-defined shape or from a standard predefined area,Notifications
+150,COMMODITY_ARRIVAL, ,Notifications
+151,COMMODITY_DEPARTURE, ,Notifications
+200,STATION_OFFLINE, ,Notifications
+201,STATION_ONLINE, ,Notifications
+202,STATION_REQUEST_RECEIVED, ,Notifications
+203,STATION_NEW_ONLINE, ,Notifications
+204,STATION_MONTHLY, ,Notifications
