@@ -154,7 +154,7 @@ def get_new_alerts():
         .join(Departure, Departure.id == query_shipment1.c.departure_id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .join(Commodity, Ship.commodity == Commodity.id) \
-        .filter(Departure.date_utc >= min_date) \
+        .filter(query_shipment1.c.destination_date >= min_date) \
         .subquery()
 
     prev_country = aliased(Country)
@@ -164,11 +164,12 @@ def get_new_alerts():
         .outerjoin(Country, Country.iso2 == query_shipment2.c.destination_iso2) \
         .outerjoin(prev_country, prev_country.iso2 == query_shipment2.c.previous_destination_iso2) \
         .filter(sa.or_(
-        query_shipment2.c.destination_iso2 != query_shipment2.c.previous_destination_iso2,
-        query_shipment2.c.destination_name != query_shipment2.c.previous_destination_name)) \
-    .subquery()
+            query_shipment2.c.destination_iso2 != query_shipment2.c.previous_destination_iso2,
+            query_shipment2.c.destination_name != query_shipment2.c.previous_destination_name))
 
     query_shipment = query_shipment3
+    # shipment_df = pd.read_sql(query_shipment.statement, session.bind)
+    query_shipment = query_shipment.subquery()
 
     # Unnesting and joining alert config, criteria, recipients
     query_alert1 = session.query(
@@ -190,7 +191,7 @@ def get_new_alerts():
         .filter(AlertRecipient.recipient != sa.null()) \
         .filter(AlertRecipient.recipient != '')
 
-    alert1_df = pd.read_sql(query_alert1.statement, session.bind)
+    # alert1_df = pd.read_sql(query_alert1.statement, session.bind)
     query_alert1 = query_alert1.subquery()
 
     query_alert2 = session.query(
@@ -207,7 +208,7 @@ def get_new_alerts():
         query_alert1.c.min_dwt
         )
 
-    alert2_df = pd.read_sql(query_alert2.statement, session.bind)
+    # alert2_df = pd.read_sql(query_alert2.statement, session.bind)
     query_alert2 = query_alert2.subquery()
 
     query_alert3 = session.query(
@@ -224,7 +225,7 @@ def get_new_alerts():
         query_alert2.c.min_dwt
     )
 
-    alert3_df = pd.read_sql(query_alert3.statement, session.bind)
+    # alert3_df = pd.read_sql(query_alert3.statement, session.bind)
     query_alert3 = query_alert3.subquery()
 
     query_alert = query_alert3
@@ -243,17 +244,19 @@ def get_new_alerts():
                       sa.and_(query_alert.c.destination_iso2 == query_shipment.c.destination_iso2,
                               query_shipment.c.destination_iso2 != query_shipment.c.previous_destination_iso2),
                       query_alert.c.destination_iso2 == NULL_ARTIFACT),
-                  sa.or_(query_alert.c.destination_name_pattern == query_shipment.c.destination_name,
-                             query_alert.c.destination_name_pattern == NULL_ARTIFACT),
-                  sa.or_(query_alert.c.commodity == query_shipment.c.commodity,
-                         query_alert.c.commodity == NULL_ARTIFACT),
-                  query_shipment.c.dwt >= query_alert.c.min_dwt
+                  # sa.or_(query_alert.c.destination_name_pattern == query_shipment.c.destination_name,
+                  #            query_alert.c.destination_name_pattern == NULL_ARTIFACT),
+                  # sa.or_(query_alert.c.commodity == query_shipment.c.commodity,
+                  #        query_alert.c.commodity == NULL_ARTIFACT),
+                  # query_shipment.c.dwt >= query_alert.c.min_dwt
               )
         ).distinct(
         query_alert.c.config_id,
         query_alert.c.recipient_email,
         query_shipment.c.shipment_id,
-    ).subquery()
+    )
+    # alert_shipment_df = pd.read_sql(query_alert_shipment.statement, session.bind)
+    query_alert_shipment = query_alert_shipment.subquery()
 
     # Query history alerts to only seek new shipments
     past_alerts = session.query(AlertInstance.config_id,
@@ -343,7 +346,7 @@ def build_email_table(alerts_df):
     table_columns = {
         'ship': 'Ship',
         # 'commodity': 'Commodity',
-        'destination': 'Destination',
+        'destination': 'New destination',
         'previous_destination': 'Previous destination',
         'destination_date': 'Date',
         'links': 'Links'
@@ -381,7 +384,7 @@ def send_emails(emails_df):
 def send_email(recipient_email, shipment_count, content_txt, config_name, content_html, **kwargs):
     from app import app
     with app.app_context():
-        msg = Message('Russia Fossil Tracker: %d new shipment%s for alert %s' % (shipment_count,
+        msg = Message('Russia Fossil Tracker: %d new shipment%s for your alert %s' % (shipment_count,
                                                                                  's' if shipment_count > 1 else '',
                                                                                  config_name),
                       recipients=[recipient_email])

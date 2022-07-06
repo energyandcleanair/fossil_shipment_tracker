@@ -1,7 +1,7 @@
 
 ## Transfer DB
 ```bash
-
+# DON'T DO IT!!!!!!!!!
 pg_dump $DB_URL_DEVELOPMENT -F custom > "development_dump.out"
 
 # Recreate production db
