@@ -36,6 +36,8 @@ from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
 from . import DB_TABLE_CURRENCY
 from . import DB_TABLE_MTEVENT_TYPE
+from . import DB_TABLE_EVENT
+from . import DB_TABLE_EVENT_SHIPMENT
 
 
 
@@ -482,6 +484,31 @@ class MarineTrafficEventType(Base):
 
     __table_args__ = (UniqueConstraint('id', name='unique_event_type_id'),)
     __tablename__ = DB_TABLE_MTEVENT_TYPE
+
+class Event(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_name = Column(String)
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    interacting_ship_name = Column(String)
+    interacting_ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    interacting_ship_details = Column(String) # details about ship from datalastic query
+    date_utc = Column(DateTime(timezone=False))
+    created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
+    type_id = Column(String, ForeignKey(DB_TABLE_MTEVENT_TYPE + '.id', onupdate="CASCADE"))
+    content = Column(String)
+    source = Column(String, default="marinetraffic")
+
+    __table_args__ = (UniqueConstraint('id', name='unique_event_id'),)
+    __tablename__ = DB_TABLE_EVENT
+
+class EventShipment(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    event_id = Column(String, ForeignKey(DB_TABLE_EVENT+'.id', onupdate="CASCADE"), nullable=True)
+    shipment_id = Column(String, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"))
+    created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint('id', name='unique_event_shipment_id'),)
+    __tablename__ = DB_TABLE_EVENT_SHIPMENT
 
 # class AlertCriteria(Base):
 #     id = Column(BigInteger, autoincrement=True, primary_key=True)

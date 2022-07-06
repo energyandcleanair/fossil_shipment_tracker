@@ -6,17 +6,23 @@ from tqdm import tqdm
 import base
 from base.logger import logger, logger_slack
 from base.db import session, engine
-from base.db_utils import upsert
+from base.db_utils import upsert, check_if_table_exists
 from base.models import DB_TABLE_MTEVENT_TYPE
 from base.utils import to_datetime, to_list
 
-from base.models import MarineTrafficEventType
+from base.models import MarineTrafficEventType, Event
 
+def initialise_events_from_cache():
+    # create table if it doesn't exist already
+    if not check_if_table_exists(Event, create_table=True):
+        logger.error("Table does not exist. Create table manually or set create_table=True.")
+        return
 
 def create_mtevent_table(force_rebuild=False):
     """
     This function creates the mtevent_type table which stores information
-    about different event types, ids and descriptions
+    about different event types, ids and descriptions; by default if table exists
+    and force_rebuild=False will only append new rows
 
     Parameters
     ----------
@@ -28,9 +34,9 @@ def create_mtevent_table(force_rebuild=False):
     """
 
     # create table if it doesn't exist already
-    if not sqlalchemy.inspect(engine).has_table(DB_TABLE_MTEVENT_TYPE):
-        logger.info("Table {} doesn't exist yet, we will attempt to create.".format(DB_TABLE_MTEVENT_TYPE))
-        MarineTrafficEventType.__table__.create(engine)
+    if not check_if_table_exists(MarineTrafficEventType, create_table=True):
+        logger.error("Table does not exist. Create table manually or set create_table=True.")
+        return
 
     mtevent_type_df = pd.read_csv('assets/mtevent_type.csv')
 
