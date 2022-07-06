@@ -25,7 +25,7 @@ DB_TABLE_COUNTER = "counter"
 # Marine Traffic cache
 DB_TABLE_MTVOYAGEINFO = "voyageinfo"
 
-DB_TABLE_ALERT = "alert"
+DB_TABLE_ALERT_INSTANCE = "alert_instance"
 DB_TABLE_ALERT_CONFIG = "alert_config"
 DB_TABLE_ALERT_RECIPIENT = "alert_recipient"
 DB_TABLE_ALERT_RECIPIENT_ASSOC = "alert_recipient_assoc"

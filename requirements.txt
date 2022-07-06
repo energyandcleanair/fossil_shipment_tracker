@@ -23,3 +23,4 @@ scikit-image==0.17.2
 rasterio==1.2.10
 forex-python==1.8
 beautifulsoup4==4.11.1
+flask-mail==0.9.1

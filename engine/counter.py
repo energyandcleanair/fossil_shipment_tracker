@@ -115,6 +115,7 @@ def sanity_check(result):
         (result.value_eur <= 0) &
         (result.commodity != 'bulk_not_coal') &
         (result.commodity != 'general_cargo') &
+        (result.commodity != 'lpg') &
         (pd.to_datetime(result.date) <= dt.datetime.now())]
 
     if len(missing_price) > 0:
@@ -142,6 +143,20 @@ def sanity_check(result):
                         (result.destination_iso2 != 'GB')] \
         .value_eur.sum()
 
+    eu_gas_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
+                          (old_data.date <= pd.to_datetime(dt.date.today())) &
+                          (old_data.region == 'EU28') &
+                          (old_data.destination_iso2 != 'GB') &
+                          (old_data.commodity == 'natural_gas')] \
+        .value_eur.sum()
+
+    eu_gas_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
+                        (result.date <= pd.to_datetime(dt.date.today())) &
+                        (result.destination_region == 'EU28') &
+                        (result.destination_iso2 != 'GB') &
+                        (result.commodity == 'natural_gas')] \
+        .value_eur.sum()
+
     de_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
                           (old_data.date <= pd.to_datetime(dt.date.today())) &
                           (old_data.destination_iso2 == 'DE')] \
@@ -154,6 +169,7 @@ def sanity_check(result):
 
     ok = ok and (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
     ok = ok and (eu_new >= eu_old - 0.4e9) and (eu_new < eu_old + 2e9)
+    ok = ok and (eu_gas_new >= eu_gas_old - 0.1e9) and (eu_gas_new < eu_gas_old + 2e9)
     return ok, global_new, global_old
 
 

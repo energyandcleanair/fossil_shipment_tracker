@@ -7,12 +7,13 @@ from flask import jsonify
 from flask_cors import CORS
 from api.routes import routes
 from flask import Response
+from flask_mail import Mail, Message
 
+from base.env import get_env
 
 app = Flask(__name__)
 app.config.SWAGGER_UI_DOC_EXPANSION = 'list'
 app.register_blueprint(routes, url_prefix='/')
-
 
 CORS(app,
      origins=["https://fossil-shipment-tracker.appspot.com",
@@ -26,6 +27,14 @@ CORS(app,
               "https://beyond-coal.eu",
               "*"],
      supports_credentials=True)
+
+app.config['MAIL_SERVER'] = 'smtp.sendgrid.net'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'apikey'
+app.config['MAIL_PASSWORD'] = get_env('SENDGRID_API_KEY')
+app.config['MAIL_DEFAULT_SENDER'] = get_env('MAIL_DEFAULT_SENDER')
+mail = Mail(app)
 
 
 @app.teardown_appcontext

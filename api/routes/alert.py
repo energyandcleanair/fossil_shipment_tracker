@@ -1,19 +1,10 @@
-import json
 from http import HTTPStatus
-from shapely import wkb
-
 from flask import Response
 from flask_restx import Resource, reqparse
 from flask_restx import inputs
 
-from base.models import Berth
-from base.encoder import JsonEncoder
-from base.db import session
 from base.utils import update_geometry_from_wkb, to_datetime, df_to_json
-from engine.alert import manual_alert
 from . import routes_api
-
-import pandas as pd
 
 
 @routes_api.route('/v0/alert_test', strict_slashes=False)
@@ -55,6 +46,7 @@ class AlertTestResource(Resource):
 
     @routes_api.expect(parser)
     def get(self):
+        from engine.alert import manual_alert
 
         params = AlertTestResource.parser.parse_args()
         destination_iso2 = params.get('destination_iso2')
@@ -64,6 +56,17 @@ class AlertTestResource(Resource):
         date_from = params.get('date_from')
         format = params.get("format")
         nest_in_data = params.get('nest_in_data')
+
+        # Retool adds empty arguments
+        if destination_iso2 and '' in destination_iso2:
+            destination_iso2.remove('')
+
+        if destination_name_pattern and '' in destination_name_pattern:
+            destination_name_pattern.remove('')
+
+        if commodity and '' in commodity:
+            commodity.remove('')
+
 
         alerts_df = manual_alert(destination_name_pattern=destination_name_pattern,
                               destination_iso2=destination_iso2,
