@@ -67,27 +67,28 @@ class Marinetraffic:
 
         return result
 
-
     @classmethod
-    def get_ship_cached(cls, imo=None, mmsi=None, mt_id=None):
+    def get_cached_object(cls, object_cache, filter):
         try:
-            filter = lambda x: (imo is not None and str(x["IMO"]) == str(imo)) \
-                               or (mmsi is not None and str(x["MMSI"]) == str(mmsi)) \
-                               or (mt_id is not None and str(x.get("SHIPID", "---")) == str(mt_id))
-            return next(x for x in cls.cache_ship if filter(x))
+            return next(x for x in object_cache if filter(x))
         except StopIteration:
             return None
 
     @classmethod
-    def do_cache_ship(cls, response_data):
+    def do_cache_object(cls, response_data, object_cache, object_cache_file):
         """
         Add response data to cache
         :param response_data:
         :return:
+
+        Parameters
+        ----------
+        object_cache :
+        object_cache_file :
         """
-        cls.cache_ship.append(response_data)
-        with open(cls.cache_file_ship, 'w') as outfile:
-            json.dump(cls.cache_ship, outfile)
+        object_cache.append(response_data)
+        with open(object_cache_file, 'w') as outfile:
+            json.dump(object_cache, outfile)
 
     @classmethod
     def get_ship(cls, imo=None, mmsi=None, mt_id=None, use_cache=True):
@@ -96,7 +97,12 @@ class Marinetraffic:
 
         # First look in cache to save query credits
         if use_cache:
-            response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi, mt_id=mt_id)
+
+            ship_filter = lambda x: (imo is not None and str(x["IMO"]) == str(imo)) \
+                               or (mmsi is not None and str(x["MMSI"]) == str(mmsi)) \
+                               or (mt_id is not None and str(x.get("SHIPID", "---")) == str(mt_id))
+
+            response_data = cls.get_cached_object(cls.cache_ship, ship_filter)
         else:
             response_data = None
 
@@ -158,7 +164,7 @@ class Marinetraffic:
                 response_data['SHIPID'] = mt_id
 
             if use_cache:
-                cls.do_cache_ship(response_data)
+                cls.do_cache_object(response_data, cls.cache_ship, cls.cache_file_ship)
 
 
         data = {
