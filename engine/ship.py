@@ -16,7 +16,7 @@ def update():
     # Not much really. We just confirm crude_oil vs oil_products when necessary
     # And use MT for insurance
     collect_mt_for_large_oil_products()
-    collect_equasis_for_insurers()
+    collect_equasis_for_additional_infos()
     collect_mt_for_insurers()
     return
 
@@ -369,10 +369,14 @@ def fix_not_found():
                                                      str(ship.others)))
 
 
-def collect_equasis_for_insurers():
+def collect_equasis_for_additional_infos():
+    # We use equasis for insurer, manager and owner
     ships = Ship.query \
         .join(Departure, Departure.ship_imo==Ship.imo) \
-        .filter(Ship.insurer == sa.null()) \
+        .filter(sa.or_(
+        Ship.insurer == sa.null(),
+        Ship.manager == sa.null(),
+        Ship.owner == sa.null())) \
         .filter(sa.or_(
             Ship.others['equasis'] == sa.null(),
             Ship.others['equasis']['management'] == [])) \
@@ -386,9 +390,23 @@ def collect_equasis_for_insurers():
         info = equasis_infos[0]
         if info is not None and len(info.get('management')):
             insurer = info.get('pni')
+            if insurer:
+                ship.insurer = insurer
+            try:
+                manager = next(x.get('company') for x in info.get('management')[0] if x['role']=='ISM Manager')
+                ship.manager = manager
+            except StopIteration:
+                continue
+
+            try:
+                owner = next(x.get('company') for x in info.get('management')[0] if x['role']=='Registered owner')
+                ship.owner = owner
+            except StopIteration:
+                continue
+
             others = ship.others.copy() if ship.others else {}
             others.update({'equasis': info})
             ship.others = others
-            ship.insurer = insurer
             session.commit()
+
 
