@@ -3,11 +3,12 @@ import json
 import datetime as dt
 import base
 import sqlalchemy as sa
+import re
 
 from base.db import session
 from base.logger import logger
 from base.env import get_env
-from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall
+from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall, Event
 from base.utils import to_datetime
 from requests.adapters import HTTPAdapter, Retry
 import urllib.parse
@@ -76,7 +77,6 @@ class Marinetraffic:
             return next(x for x in cls.cache_ship if filter(x))
         except StopIteration:
             return None
-
 
     @classmethod
     def do_cache_ship(cls, response_data):
@@ -349,7 +349,7 @@ class Marinetraffic:
             logger.info("Found a cached VoyageInfo: %s from %s: %s" % (imo, date_from, cached_info.destination_name))
             return cached_info
 
-        # Otherwise query datalastic (and cache it as well)
+        # Otherwise query marinetraffic (and cache it as well)
         api_key = get_env("KEY_MARINETRAFFIC_VI01")
 
         params = {
@@ -398,7 +398,78 @@ class Marinetraffic:
         }
         return MTVoyageInfo(**data)
 
+    @classmethod
+    def get_ship_events_between_dates(cls, date_from,
+                                      date_to,
+                                      imo,
+                                      event_filter='21,22'):
+        """
 
+        Parameters
+        ----------
+        date_from :
+        date_to :
+        imo :
+        event_filter : Filter for specific type of events; by default '21,22' which is STS_START and STS_END
+        please see here for documentation or look into mtevent_type table: https://help.marinetraffic.com/hc/en-us/articles/218604297-What-is-the-significance-of-the-MarineTraffic-Events-?flash_digest=0311450e3f0b388436ef20b3840a296cb29ffb10
+
+        Returns
+        -------
+
+        """
+
+        if imo is None:
+            raise ValueError("Need to specify imo.")
+
+        date_from = to_datetime(date_from)
+        date_to = to_datetime(date_to)
+
+        api_key = get_env("KEY_MARINETRAFFIC_EV02")
+
+        params = {
+            'protocol': 'jsono',
+            'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
+            'todate': date_to.strftime("%Y-%m-%d %H:%M")
+        }
+
+        if imo is not None:
+            params["imo"] = imo
+
+        if event_filter:
+            params['event_type'] = event_filter
+
+        (response_datas, response) = cls.call(method='vesselevents/',
+                                              api_key=api_key,
+                                              params=params,
+                                              credits_per_record=2)
+
+        events = []
+        if response_datas is None:
+            logger.warning("Marinetraffic: Failed to query events %s: %s" % (imo, response))
+            return []
+
+        for r in response_datas:
+
+            r["imo"] = imo
+
+            events.append(cls.parse_event(r))
+
+        return events
+
+    @classmethod
+    def parse_event(cls, response_data):
+        data = {
+            "ship_name": response_data["SHIPNAME"],
+            "ship_imo": response_data["imo"],
+            "interacting_ship_name": None,
+            "interacting_ship_imo": None,
+            "interacting_ship_details": None,
+            "date_utc": response_data["TIMESTAMP"],
+            "type_id": response_data["EVENT_ID"],
+            "content": response_data["EVENT_CONTENT"],
+            "source": "marinetraffic"
+        }
+        return Event(**data)
 
     # @classmethod
     # #TODO
