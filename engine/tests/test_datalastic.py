@@ -7,13 +7,18 @@ from engine.datalastic import Datalastic
 def test_query_ship():
     ship = Datalastic.get_ship(mmsi="538008212")
 
+def test_find_position():
+    date_str = "2022-05-23T08:49:00"
+    position = Datalastic.get_position(imo=9723590, date=date_str)
+    print(position.geometry, position.date_utc)
+    return
+
 def test_find_ship():
     ship1 = Datalastic.find_ship(name="YANG MEI HU", fuzzy=False, return_closest=False)
     ship2 = Datalastic.find_ship(name="YANG MEI HU", fuzzy=True, return_closest=True)
     ship3 = Datalastic.find_ship(name="YANG MEI HU", fuzzy=True, return_closest=False)
 
     assert ship1.name == ship2.name == ship3.name
-
 
 def test_query_position():
     # This will cost few credits each time...

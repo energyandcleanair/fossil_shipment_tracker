@@ -66,6 +66,7 @@ class Datalastic:
 
         Returns
         -------
+        Datalastic response and ship object
 
         """
         if not cls.api_key:
@@ -185,18 +186,63 @@ class Datalastic:
         return Ship(**data)
 
     @classmethod
+    def get_position(cls, imo, date, window=1):
+        """
+        Returns the position of the boat at the closest referenced time in datalastic
+
+        Parameters
+        ----------
+        imo :
+        date :
+        window : this is the time window within which to look to find closest position in time
+
+        Returns
+        -------
+
+        """
+        date = to_datetime(date)
+
+        date_from = (date - dt.timedelta(days=window)).strftime("%Y-%m-%d")
+        date_to = (date + dt.timedelta(days=window)).strftime("%Y-%m-%d")
+
+        print(date_from, date_to)
+        positions = cls.get_positions(imo, date_from=date_from, date_to=date_to)
+
+        if len(positions) == 0:
+            logger.warning("No positions found for ship (imo: {}) between dates: {}, {}.".format(imo, date_from, date_to))
+            return None
+
+        return min(positions, key=lambda p: abs(p.date_utc - date))
+
+    @classmethod
     def get_positions(cls, imo, date_from, date_to):
+        """
+        Returns positions of the vessel by imo between the two dates
+
+        Parameters
+        ----------
+        imo :
+        date_from :
+        date_to :
+
+        Returns
+        -------
+
+        """
 
         if not cls.api_key:
             cls.api_key = get_env("KEY_DATALASTIC")
 
+        date_from = to_datetime(date_from)
+        date_to = to_datetime(date_to)
+
         params = {
             'api-key': cls.api_key,
             'imo': imo,
-            'from': to_datetime(date_from).strftime("%Y-%m-%d")
+            'from': date_from.strftime("%Y-%m-%d")
         }
         if date_to is not None:
-            params["to"] = to_datetime(date_to).strftime("%Y-%m-%d")
+            params["to"] = date_to.strftime("%Y-%m-%d")
 
         # Datalastic doesn't accept more than one month
         if date_to - date_from >= dt.timedelta(days=31):
