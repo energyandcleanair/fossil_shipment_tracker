@@ -1,9 +1,10 @@
 import pandas as pd
+import numpy as np
 import json
 import datetime as dt
 
 from base.db import session, engine
-from base.models import Counter, Port, Country, Berth
+from base.models import Counter, Port, Country, Berth, Commodity
 from base.models import DB_TABLE_COUNTER
 from base.utils import to_datetime
 from base.logger import logger_slack
@@ -70,10 +71,10 @@ def update(date_from='2021-11-01'):
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
     result = pd.concat([pipelineflows, voyages]) \
         .sort_values(['date', 'commodity']) \
-        [["commodity", 'destination_region', "destination_iso2", "date", "value_tonne", "value_eur"]]
+        [["commodity", 'commodity_group', 'destination_region', "destination_iso2", "date", "value_tonne", "value_eur"]]
     result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
     result = result \
-        .groupby(["commodity", "destination_iso2", 'destination_region']) \
+        .groupby(["commodity", 'commodity_group', "destination_iso2", 'destination_region']) \
         .apply(lambda x: x.set_index("date") \
                .resample("D").sum() \
                .fillna(0)) \
@@ -93,7 +94,7 @@ def update(date_from='2021-11-01'):
         logger_slack.info("[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB." % (global_new / 1e9, global_old / 1e9))
 
         # Erase and replace everything
-        result.drop(['destination_region'], axis=1, inplace=True)
+        result.drop(['destination_region', 'commodity_group'], axis=1, inplace=True)
         Counter.query.delete()
         session.commit()
         result.to_sql(DB_TABLE_COUNTER,
@@ -122,54 +123,53 @@ def sanity_check(result):
         logger_slack.error("Missing prices")
         ok = False
 
-    old_data = pd.read_sql(session.query(Counter, Country.region).join(Country, Country.iso2 == Counter.destination_iso2).statement, session.bind)
-    global_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
-                                (old_data.date <= pd.to_datetime(dt.date.today()))] \
-                    .value_eur.sum()
+    def get_comparison_df(compared_cols):
+        old_data = pd.read_sql(session.query(Counter, Country.region.label('destination_region'), Commodity.group.label('commodity_group')) \
+                               .join(Country, Country.iso2 == Counter.destination_iso2) \
+                               .join(Commodity, Commodity.id == Counter.commodity).statement,
+                               session.bind)
+        old = old_data \
+            .loc[old_data.date >= '2022-02-24'] \
+            .loc[old_data.date <= pd.to_datetime(dt.date.today())] \
+            .groupby(compared_cols) \
+            .agg(old_eur=('value_eur', np.nansum)) \
+            .replace(np.nan, 0)
 
-    global_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
-                            (result.date <= pd.to_datetime(dt.date.today()))] \
-                    .value_eur.sum()
+        new = result \
+            .loc[result.date >= '2022-02-24'] \
+            .loc[result.date <= pd.to_datetime(dt.date.today())] \
+            .groupby(compared_cols) \
+            .agg(new_eur=('value_eur', np.nansum))
 
-    eu_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
-                          (old_data.date <= pd.to_datetime(dt.date.today())) &
-                          (old_data.region == 'EU28') &
-                          (old_data.destination_iso2 != 'GB')] \
-                    .value_eur.sum()
 
-    eu_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
-                        (result.date <= pd.to_datetime(dt.date.today())) &
-                        (result.destination_region == 'EU28') &
-                        (result.destination_iso2 != 'GB')] \
-        .value_eur.sum()
+        comparison = pd.merge(old, new,
+                 how='outer',
+                 left_on=compared_cols,
+                 right_on=compared_cols) \
+            .replace(np.nan, 0)
 
-    eu_gas_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
-                          (old_data.date <= pd.to_datetime(dt.date.today())) &
-                          (old_data.region == 'EU28') &
-                          (old_data.destination_iso2 != 'GB') &
-                          (old_data.commodity == 'natural_gas')] \
-        .value_eur.sum()
+        comparison['ok'] = comparison.new_eur >= comparison.old_eur
+        return comparison
 
-    eu_gas_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
-                        (result.date <= pd.to_datetime(dt.date.today())) &
-                        (result.destination_region == 'EU28') &
-                        (result.destination_iso2 != 'GB') &
-                        (result.commodity == 'natural_gas')] \
-        .value_eur.sum()
+    comparison = get_comparison_df(compared_cols=['commodity_group', 'destination_region'])
+    ok = comparison.ok.all()
 
-    de_old = old_data.loc[(old_data.date >= to_datetime('2022-02-24')) &
-                          (old_data.date <= pd.to_datetime(dt.date.today())) &
-                          (old_data.destination_iso2 == 'DE')] \
-        .value_eur.sum()
+    logger_slack.info(comparison.reset_index() \
+                      .rename(columns={'destination_region': 'region',
+                                       'commodity_group': 'com.'}) \
+                      .to_string(col_space=10, index=False,
+                                 justify='left'))
+    if not ok:
+        # Print a more detailed version
+        comparison_detailed = get_comparison_df(compared_cols=['commodity_group', 'destination_iso2'])
+        logger_slack.info(comparison_detailed.reset_index() \
+                          .rename(columns={'destination_region': 'region',
+                                           'commodity_group': 'com.'}) \
+                          .to_string(col_space=10, index=False,
+                                     justify='left'))
 
-    de_new = result.loc[(result.date >= to_datetime('2022-02-24')) &
-                        (result.date <= pd.to_datetime(dt.date.today())) &
-                        (result.destination_iso2 == 'DE')] \
-        .value_eur.sum()
-
-    ok = ok and (global_new >= global_old - 0.4e9) and (global_new < global_old + 2e9)
-    ok = ok and (eu_new >= eu_old - 0.4e9) and (eu_new < eu_old + 2e9)
-    ok = ok and (eu_gas_new >= eu_gas_old - 0.1e9) and (eu_gas_new < eu_gas_old + 2e9)
+    global_old = comparison.old_eur.sum()
+    global_new = comparison.new_eur.sum()
     return ok, global_new, global_old
 
 
