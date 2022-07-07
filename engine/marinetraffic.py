@@ -36,7 +36,9 @@ class Marinetraffic:
 
     api_base = 'https://services.marinetraffic.com/api/'
     cache_file_ship = 'cache/marinetraffic/ships.json'
+    cache_file_events = 'cache/marinetraffic/events.json'
     cache_ship = load_cache(cache_file_ship)
+    cache_events = load_cache(cache_file_events)
 
     @classmethod
     def call(cls, method, params, api_key, credits_per_record):
@@ -69,10 +71,7 @@ class Marinetraffic:
 
     @classmethod
     def get_cached_object(cls, object_cache, filter):
-        try:
-            return next(x for x in object_cache if filter(x))
-        except StopIteration:
-            return None
+        return [x for x in object_cache if filter(x)]
 
     @classmethod
     def do_cache_object(cls, response_data, object_cache, object_cache_file):
@@ -103,6 +102,18 @@ class Marinetraffic:
                                or (mt_id is not None and str(x.get("SHIPID", "---")) == str(mt_id))
 
             response_data = cls.get_cached_object(cls.cache_ship, ship_filter)
+
+            if len(response_data) == 1:
+                response_data = response_data[0]
+            elif len(response_data) > 1:
+                logger.warning("Found more than 1 ship in cache with matching critera...")
+
+                response_data = [{"MMSI": mmsi,
+                                  "IMO": imo,
+                                  "SHIPID": mt_id,
+                                  "NAME": None
+                                  }]
+
         else:
             response_data = None
 
@@ -165,7 +176,6 @@ class Marinetraffic:
 
             if use_cache:
                 cls.do_cache_object(response_data, cls.cache_ship, cls.cache_file_ship)
-
 
         data = {
             "mmsi": response_data["MMSI"],
@@ -405,9 +415,10 @@ class Marinetraffic:
         return MTVoyageInfo(**data)
 
     @classmethod
-    def get_ship_events_between_dates(cls, date_from,
-                                      date_to,
-                                      imo,
+    def get_ship_events_between_dates(cls, imo,
+                                      date_from,
+                                      date_to=dt.datetime.utcnow(),
+                                      use_cache=True,
                                       event_filter='21,22'):
         """
 
@@ -424,39 +435,53 @@ class Marinetraffic:
 
         """
 
-        if imo is None:
-            raise ValueError("Need to specify imo.")
+        api_key = get_env("KEY_MARINETRAFFIC_EV02")
 
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
 
-        api_key = get_env("KEY_MARINETRAFFIC_EV02")
+        if use_cache:
+            event_filter = lambda x: (imo is not None and str(x["IMO"]) == str(imo)) \
+                                    and (dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S") >= date_from) \
+                                    and (dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S") <= date_to)
 
-        params = {
-            'protocol': 'jsono',
-            'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
-            'todate': date_to.strftime("%Y-%m-%d %H:%M")
-        }
+            response_datas = cls.get_cached_object(cls.cache_events, event_filter)
 
-        if imo is not None:
-            params["imo"] = imo
+            print("Found {} cached events.".format(len(response_datas)))
+        else:
+            response_datas = None
 
-        if event_filter:
-            params['event_type'] = event_filter
+        if not response_datas:
 
-        (response_datas, response) = cls.call(method='vesselevents/',
-                                              api_key=api_key,
-                                              params=params,
-                                              credits_per_record=2)
+            params = {
+                'protocol': 'jsono',
+                'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
+                'todate': date_to.strftime("%Y-%m-%d %H:%M")
+            }
+
+            if imo is not None:
+                params["imo"] = imo
+
+            if event_filter:
+                params['event_type'] = event_filter
+
+            (response_datas, response) = cls.call(method='vesselevents/',
+                                                  api_key=api_key,
+                                                  params=params,
+                                                  credits_per_record=2)
+
+            if response_datas is None:
+                logger.warning("Marinetraffic: Failed to query events %s: %s" % (imo, response))
+                return []
 
         events = []
-        if response_datas is None:
-            logger.warning("Marinetraffic: Failed to query events %s: %s" % (imo, response))
-            return []
-
         for r in response_datas:
 
-            r["imo"] = imo
+            if use_cache:
+                cls.do_cache_object(r, cls.cache_events, cls.cache_file_events)
+            else:
+                # if it's an MT query return we need to add IMO
+                r["IMO"] = imo
 
             events.append(cls.parse_event(r))
 
@@ -466,7 +491,7 @@ class Marinetraffic:
     def parse_event(cls, response_data):
         data = {
             "ship_name": response_data["SHIPNAME"],
-            "ship_imo": response_data["imo"],
+            "ship_imo": response_data["IMO"],
             "interacting_ship_name": None,
             "interacting_ship_imo": None,
             "interacting_ship_details": None,
