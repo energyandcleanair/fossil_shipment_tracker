@@ -77,7 +77,8 @@ def fill_missing_port_operation():
         PortCall.port_id != sqlalchemy.null()).all()
 
     for pc in tqdm(portcalls_to_update):
-        new_pc = Marinetraffic.get_departure_portcalls_between_dates(port_id=pc.port_id,
+        new_pc = Marinetraffic.get_portcalls_between_dates(marinetraffic_port_id=pc.port_id,
+                                                           arrival_or_departure="departure",
                                                                   date_from=pc.date_utc - dt.timedelta(minutes=1),
                                                                   date_to=pc.date_utc + dt.timedelta(minutes=1))
         if len(new_pc) == 1 \
