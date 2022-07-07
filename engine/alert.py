@@ -244,11 +244,11 @@ def get_new_alerts():
                       sa.and_(query_alert.c.destination_iso2 == query_shipment.c.destination_iso2,
                               query_shipment.c.destination_iso2 != query_shipment.c.previous_destination_iso2),
                       query_alert.c.destination_iso2 == NULL_ARTIFACT),
-                  # sa.or_(query_alert.c.destination_name_pattern == query_shipment.c.destination_name,
-                  #            query_alert.c.destination_name_pattern == NULL_ARTIFACT),
-                  # sa.or_(query_alert.c.commodity == query_shipment.c.commodity,
-                  #        query_alert.c.commodity == NULL_ARTIFACT),
-                  # query_shipment.c.dwt >= query_alert.c.min_dwt
+                  sa.or_(query_alert.c.destination_name_pattern == query_shipment.c.destination_name,
+                             query_alert.c.destination_name_pattern == NULL_ARTIFACT),
+                  sa.or_(query_alert.c.commodity == query_shipment.c.commodity,
+                         query_alert.c.commodity == NULL_ARTIFACT),
+                  query_shipment.c.dwt >= query_alert.c.min_dwt
               )
         ).distinct(
         query_alert.c.config_id,
@@ -345,7 +345,6 @@ def build_email_table(alerts_df):
 
     table_columns = {
         'ship': 'Ship',
-        # 'commodity': 'Commodity',
         'destination': 'New destination',
         'previous_destination': 'Previous destination',
         'destination_date': 'Date',
