@@ -7,6 +7,27 @@ from base.encoder import JsonEncoder
 import json
 import numpy as np
 
+def distance_between_points(p1, p2, wkt=True):
+    """
+    Returns distance in meters between two points; if wkt=False assumed to be shapely Point objects
+
+    Parameters
+    ----------
+    p1 : point 1
+    p2 : point 2
+    wkt : whether p1/p2 are wkt, if false assumed to be shapely Points
+
+    Returns
+    -------
+    Distance in meters
+
+    """
+    try:
+        if wkt:
+            p1, p2 = shapely.wkt.loads(p1), shapely.wkt.loads(p2)
+        return p1.distance(p2)
+    except TypeError:
+        return None
 
 def latlon_to_point(lat, lon, wkt=True):
     try:

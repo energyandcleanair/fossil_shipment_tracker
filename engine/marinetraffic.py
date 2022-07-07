@@ -419,6 +419,7 @@ class Marinetraffic:
                                       date_from,
                                       date_to=dt.datetime.utcnow(),
                                       use_cache=True,
+                                      cache_objects=True,
                                       event_filter='21,22'):
         """
 
@@ -474,14 +475,15 @@ class Marinetraffic:
                 logger.warning("Marinetraffic: Failed to query events %s: %s" % (imo, response))
                 return []
 
+            for r in response_datas:
+
+                # if we are not using cache and queried MT, let's add ship imo to response and then cache object
+                r["IMO"] = imo
+                if cache_objects:
+                    cls.do_cache_object(r, cls.cache_events, cls.cache_file_events)
+
         events = []
         for r in response_datas:
-
-            if use_cache:
-                cls.do_cache_object(r, cls.cache_events, cls.cache_file_events)
-            else:
-                # if it's an MT query return we need to add IMO
-                r["IMO"] = imo
 
             events.append(cls.parse_event(r))
 

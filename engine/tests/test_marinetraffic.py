@@ -3,15 +3,20 @@ from base.models import PortCall
 
 from engine import ship, port
 from engine.marinetraffic import Marinetraffic
+from engine.mtevents import add_interacting_ship_details_to_event
 
 def test_get_ship_events():
-    events = Marinetraffic.get_ship_events_between_dates(imo=9723590, date_from='2022-05-18', date_to='2022-05-24')
+    events = Marinetraffic.get_ship_events_between_dates(imo=9723590, date_from='2022-05-18', date_to='2022-05-24', use_cache=True, cache_objects=False)
     for e in events:
         assert e.ship_imo is not None and e.ship_name is not None and e.content is not None
 
+    event_status = [add_interacting_ship_details_to_event(e) for e in events]
+
+    assert event_status.count(True) == len(event_status)
+
 def test_ship():
     mmsi='642122016'
-    ship = Marinetraffic.get_ship(mmsi=mmsi, use_cache=False)
+    ship = Marinetraffic.get_ship(mmsi=mmsi, use_cache=True)
     assert ship.mmsi==mmsi
     assert ship.insurer is not None
 
