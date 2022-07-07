@@ -16,6 +16,7 @@ def update():
     # Not much really. We just confirm crude_oil vs oil_products when necessary
     # And use MT for insurance
     collect_mt_for_large_oil_products()
+    collect_equasis_for_insurers()
     collect_mt_for_insurers()
     return
 
@@ -368,7 +369,7 @@ def fix_not_found():
                                                      str(ship.others)))
 
 
-def fill_missing_insurer():
+def collect_equasis_for_insurers():
     ships = Ship.query \
         .join(Departure, Departure.ship_imo==Ship.imo) \
         .filter(Ship.insurer == sa.null()) \
@@ -380,8 +381,6 @@ def fill_missing_insurer():
     from engine.equasis import Equasis
     equasis = Equasis()
 
-    # imos = [ship.imo for ship in ships]
-    # splitted = list(base.utils.split(imos, 20))
     for ship in tqdm(ships):
         equasis_infos = equasis.get_ships_infos(imos=ship.imo)
         info = equasis_infos[0]
@@ -392,6 +391,4 @@ def fill_missing_insurer():
             ship.others = others
             ship.insurer = insurer
             session.commit()
-        # else:
-        #     break
 
