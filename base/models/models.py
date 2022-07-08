@@ -502,12 +502,11 @@ class Event(Base):
     __tablename__ = DB_TABLE_EVENT
 
 class EventShipment(Base):
-    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"), primary_key=True)
     event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT+'.id', onupdate="CASCADE"), nullable=True)
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"))
     created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
 
-    __table_args__ = (UniqueConstraint('id', name='unique_event_shipment_id'),)
+    __table_args__ = (UniqueConstraint('shipment_id', name='unique_event_shipment_id'),)
     __tablename__ = DB_TABLE_EVENT_SHIPMENT
 
 # class AlertCriteria(Base):

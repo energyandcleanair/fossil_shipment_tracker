@@ -417,7 +417,7 @@ class Marinetraffic:
     @classmethod
     def get_ship_events_between_dates(cls, imo,
                                       date_from,
-                                      date_to=dt.datetime.utcnow(),
+                                      date_to,
                                       use_cache=True,
                                       cache_objects=True,
                                       event_filter='21,22'):
@@ -457,7 +457,7 @@ class Marinetraffic:
             params = {
                 'protocol': 'jsono',
                 'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
-                'todate': date_to.strftime("%Y-%m-%d %H:%M")
+                'todate': date_to.strftime("%Y-%m-%d %H:%M"),
             }
 
             if imo is not None:
