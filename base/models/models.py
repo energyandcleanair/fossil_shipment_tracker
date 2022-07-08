@@ -503,8 +503,8 @@ class Event(Base):
 
 class EventShipment(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    event_id = Column(String, ForeignKey(DB_TABLE_EVENT+'.id', onupdate="CASCADE"), nullable=True)
-    shipment_id = Column(String, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"))
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT+'.id', onupdate="CASCADE"), nullable=True)
+    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"))
     created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
 
     __table_args__ = (UniqueConstraint('id', name='unique_event_shipment_id'),)
