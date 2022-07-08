@@ -11,26 +11,30 @@ from base.models import DB_TABLE_MTEVENT_TYPE
 from base.utils import distance_between_points, to_list, to_datetime
 
 from engine.datalastic import Datalastic
-from engine.marinetraffic import Marinetraffic
+from engine.marinetraffic import Marinetraffic, load_cache
+from engine.ship import fill
 
 import datetime as dt
 
 import re
 import json
 
-from base.models import MarineTrafficEventType, Event, EventShipment, Shipment, Departure
+from base.models import MarineTrafficEventType, Event, EventShipment, Shipment, Departure, Ship
 
 def update(
-        date_from="2022-01-01",
+        date_from="2022-02-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         ship_imo=None,
+        use_cache=False,
+        cache_objects=True,
         only_ongoing=True,
         force_rebuild=False,
         upload_unprocessed_events=True):
     logger_slack.info("=== Updating events for ships ===")
 
-    ships = Shipment.query.distinct(
-            Departure.ship_imo
+    ships = session.query(
+            Departure.ship_imo.distinct().label("ship_imo"),
+            Shipment.status
          ) \
         .join(Departure, Shipment.departure_id == Departure.id)
 
@@ -41,9 +45,16 @@ def update(
 
     for ship in tqdm(ships.all()):
 
+        # convert SQLAlchemy.row object
+        ship = ship._asdict()
+
+        # we do not want to iterate twice over same ship imo if there are completed AND ongoing shipments
+        if not only_ongoing and ship["status"] != 'completed':
+            continue
+
         if not force_rebuild:
             last_event_shipment = session.query(EventShipment) \
-                .filter(Departure.ship_imo == ship.imo,
+                .filter(Departure.ship_imo == ship["ship_imo"],
                         EventShipment.created_at <= to_datetime(date_to)) \
                 .join(Shipment, EventShipment.shipment_id == Shipment.id) \
                 .join(Departure, Shipment.departure_id == Departure.id) \
@@ -65,9 +76,11 @@ def update(
             query_date_to = dates[1]
 
             events = Marinetraffic.get_ship_events_between_dates(
-                date_from=query_date_from,
-                date_to=query_date_to,
-                imo=ship.imo
+                date_from=to_datetime(query_date_from),
+                date_to=to_datetime(query_date_to),
+                imo=ship["ship_imo"],
+                use_cache=use_cache,
+                cache_objects=cache_objects
             )
 
             event_process_state = [add_interacting_ship_details_to_event(e) for e in events]
@@ -75,24 +88,24 @@ def update(
             if event_process_state.count(False) > 0:
                 print("Failed to process {} events out of {}".format(event_process_state.count(False), len(event_process_state)))
 
-                # Store them in db so that we won't query them
-                for event in events:
+            # Store them in db so that we won't query them
+            for event in events:
 
-                    if not upload_unprocessed_events and event.interacting_ship_imo is None:
-                        continue
+                if not upload_unprocessed_events and event.interacting_ship_imo is None:
+                    continue
 
-                    try:
-                        session.add(event)
-                        session.commit()
-                        if force_rebuild:
-                            logger.info("Found a missing event")
-                    except sqlalchemy.exc.IntegrityError as e:
-                        if "psycopg2.errors.UniqueViolation" in str(e):
-                            logger.warning("Failed to upload event: duplicated event")
-                        else:
-                            logger.warning("Failed to upload event: %s" % (str(e),))
-                        session.rollback()
-                        continue
+                try:
+                    session.add(event)
+                    session.commit()
+                    if force_rebuild:
+                        print("Found a missing event")
+                except sqlalchemy.exc.IntegrityError as e:
+                    if "psycopg2.errors.UniqueViolation" in str(e):
+                        print("Failed to upload event: duplicated event")
+                    else:
+                        print("Failed to upload event: %s" % (str(e),))
+                    session.rollback()
+                    continue
 
 def add_interacting_ship_details_to_event(event, distance_check = 5000):
     """
@@ -147,6 +160,13 @@ def add_interacting_ship_details_to_event(event, distance_check = 5000):
             print("No ship imo found and we do not have an mmsi for event: {}".format(event_content))
             return False
 
+    # check if interacting ship exists already
+    # TODO: add ship input option to .fill so we do not have to request twice?
+    found = fill(imos=[intship.imo])
+    if not found:
+        print("Failed to upload misisng ships")
+        return False
+
     ship_position = Datalastic.get_position(imo=ship_imo, date=event_time)
     intship_position = Datalastic.get_position(imo=intship.imo, date=event_time)
 
@@ -154,6 +174,7 @@ def add_interacting_ship_details_to_event(event, distance_check = 5000):
         print("Failed to find ship positions. try increasing time window...")
         return False
 
+    # TODO: is there a better way to handle the SRID section?
     d = distance_between_points(ship_position.geometry.replace("SRID=4326;",""), intship_position.geometry.replace("SRID=4326;",""))
 
     if d:
@@ -165,13 +186,6 @@ def add_interacting_ship_details_to_event(event, distance_check = 5000):
             return True
 
     return False
-
-
-def initialise_events_from_cache():
-    # create table if it doesn't exist already
-    if not check_if_table_exists(Event, create_table=True):
-        logger.error("Table does not exist. Create table manually or set create_table=True.")
-        return
 
 def create_mtevent_table(force_rebuild=False):
     """
