@@ -148,7 +148,7 @@ def sanity_check(result):
                  right_on=compared_cols) \
             .replace(np.nan, 0)
 
-        comparison['ok'] = comparison.new_eur >= comparison.old_eur
+        comparison['ok'] = comparison.new_eur >= comparison.old_eur * 0.95
         return comparison
 
     comparison = get_comparison_df(compared_cols=['commodity_group', 'destination_region'])
@@ -162,6 +162,7 @@ def sanity_check(result):
     if not ok:
         # Print a more detailed version
         comparison_detailed = get_comparison_df(compared_cols=['commodity_group', 'destination_iso2'])
+        comparison_detailed = comparison_detailed.loc[~comparison_detailed.ok]
         logger_slack.info(comparison_detailed.reset_index() \
                           .rename(columns={'destination_region': 'region',
                                            'commodity_group': 'com.'}) \
