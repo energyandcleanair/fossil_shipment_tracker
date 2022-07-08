@@ -498,7 +498,7 @@ class Event(Base):
     content = Column(String)
     source = Column(String, default="marinetraffic")
 
-    __table_args__ = (UniqueConstraint('id', name='unique_event_id'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'interacting_ship_imo', 'date_utc', name='unique_event'),)
     __tablename__ = DB_TABLE_EVENT
 
 class EventShipment(Base):
