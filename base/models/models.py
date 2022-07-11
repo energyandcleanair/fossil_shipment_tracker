@@ -491,22 +491,37 @@ class Event(Base):
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
     interacting_ship_name = Column(String)
     interacting_ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
-    interacting_ship_details = Column(String) # details about ship from datalastic query
+    interacting_ship_details = Column(JSONB) # details about ship from datalastic query
     date_utc = Column(DateTime(timezone=False))
     created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
     type_id = Column(String, ForeignKey(DB_TABLE_MTEVENT_TYPE + '.id', onupdate="CASCADE"))
-    content = Column(String)
+    content = Column(JSONB)
     source = Column(String, default="marinetraffic")
 
     __table_args__ = (UniqueConstraint('ship_imo', 'interacting_ship_imo', 'date_utc', name='unique_event'),)
     __tablename__ = DB_TABLE_EVENT
 
 class EventShipment(Base):
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"), primary_key=True)
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"), nullable=False)
     event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT+'.id', onupdate="CASCADE"), nullable=True)
-    created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
+    created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow, nullable=False)
 
-    __table_args__ = (UniqueConstraint('shipment_id', name='unique_event_shipment_id'),)
+    __table_args__ = (
+        Index(
+            "unique_event_shipment",
+            "shipment_id",
+            "event_id",
+            unique=True,
+            postgresql_where=event_id.isnot(None)
+        ),
+        Index(
+            "unique_shipment",
+            "shipment_id",
+            unique=True,
+            postgresql_where=event_id.is_(None)
+        ),
+    )
     __tablename__ = DB_TABLE_EVENT_SHIPMENT
 
 # class AlertCriteria(Base):

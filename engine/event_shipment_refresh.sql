@@ -18,22 +18,19 @@ SELECT
 	FROM shipment
 	LEFT JOIN departure ON departure.id = shipment.departure_id
 	LEFT JOIN arrival ON arrival.id = shipment.arrival_id
-	WHERE shipment.status = 'completed'
+	WHERE departure.date_utc > '2021-11-01'
 	ORDER BY departure.ship_imo, departure.date_utc ASC) AS lead_shipment
  	LEFT JOIN (SELECT event.id, event.ship_imo, event.date_utc
 		   FROM event
 		   WHERE event.type_id = '21') AS ev
 		   ON ((ev.date_utc BETWEEN lead_shipment.departure_date AND lead_shipment.next_departure_date_utc)
 		   AND ev.ship_imo = lead_shipment.ship_imo)
-    ON CONFLICT (shipment_id)
-        DO UPDATE SET
-            shipment_id = EXCLUDED.shipment_id,
-            event_id = EXCLUDED.event_id,
-            created_at = timezone('utc', now())
-        RETURNING
-            shipment_id,
-            event_id,
-            created_at
+    ON CONFLICT
+        DO NOTHING
+    RETURNING
+        shipment_id,
+        event_id,
+        created_at
 )
 SELECT count(event_id)
 FROM inserted_shipment_event;
