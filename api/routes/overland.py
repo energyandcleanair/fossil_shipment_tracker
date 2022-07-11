@@ -98,15 +98,8 @@ class PipelineFlowResource(Resource):
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
         DepartureCountry = aliased(Country)
+        DestinationCountry = aliased(Country)
 
-
-        # Gas transits through Ukraine for EU
-        from sqlalchemy import case
-        destination_country = session.query(Country.iso2,
-                                            Country.name,
-                                            case([(Country.iso2 == "UA", 'EU28')],
-                                                 else_=Country.region).label('region')) \
-            .subquery()
 
 
 
@@ -119,15 +112,15 @@ class PipelineFlowResource(Resource):
                                     DepartureCountry.name.label('departure_country'),
                                     DepartureCountry.region.label('departure_region'),
                                     PipelineFlow.destination_iso2,
-                                    destination_country.c.name.label("destination_country"),
-                                    destination_country.c.region.label("destination_region"),
+                                    DestinationCountry.name.label("destination_country"),
+                                    DestinationCountry.region.label("destination_region"),
                                     PipelineFlow.value_tonne,
                                     PipelineFlow.value_m3,
                                     value_eur_field,
                                     Currency.currency,
                                     value_currency_field)
              .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
-             .outerjoin(destination_country, PipelineFlow.destination_iso2 == destination_country.c.iso2)
+             .outerjoin(DestinationCountry, PipelineFlow.destination_iso2 == DestinationCountry.iso2)
              .outerjoin(Commodity, PipelineFlow.commodity == Commodity.id)
              .outerjoin(Price,
                         sa.and_(Price.date == PipelineFlow.date,
@@ -168,7 +161,7 @@ class PipelineFlowResource(Resource):
             flows_rich = flows_rich.filter(PipelineFlow.destination_iso2.in_(to_list(destination_iso2)))
 
         if destination_region is not None:
-            flows_rich = flows_rich.filter(destination_country.c.region.in_(to_list(destination_region)))
+            flows_rich = flows_rich.filter(DestinationCountry.region.in_(to_list(destination_region)))
 
         if currency is not None:
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))

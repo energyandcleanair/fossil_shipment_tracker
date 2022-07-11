@@ -99,17 +99,7 @@ class EntsogFlowResource(Resource):
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
         DepartureCountry = aliased(Country)
-
-
-        # Gas transits through Ukraine for EU
-        from sqlalchemy import case
-        destination_country = session.query(Country.iso2,
-                                            Country.name,
-                                            case([(Country.iso2 == "UA", 'EU28')],
-                                                 else_=Country.region).label('region')) \
-            .subquery()
-
-
+        DestinationCountry = aliased(Country)
 
         # Query with joined information
         flows_rich = (session.query(EntsogFlow.id,
@@ -120,8 +110,8 @@ class EntsogFlowResource(Resource):
                                     DepartureCountry.name.label('departure_country'),
                                     DepartureCountry.region.label('departure_region'),
                                     EntsogFlow.destination_iso2,
-                                    destination_country.c.name.label("destination_country"),
-                                    destination_country.c.region.label("destination_region"),
+                                    DestinationCountry.name.label("destination_country"),
+                                    DestinationCountry.region.label("destination_region"),
                                     EntsogFlow.value_tonne,
                                     EntsogFlow.value_m3,
                                     value_eur_field,
@@ -129,7 +119,7 @@ class EntsogFlowResource(Resource):
                                     value_currency_field
                                     )
              .join(DepartureCountry, DepartureCountry.iso2 == EntsogFlow.departure_iso2)
-             .outerjoin(destination_country, EntsogFlow.destination_iso2 == destination_country.c.iso2)
+             .outerjoin(DestinationCountry, EntsogFlow.destination_iso2 == DestinationCountry.iso2)
              .outerjoin(Commodity, EntsogFlow.commodity == Commodity.id)
              .outerjoin(Price,
                         sa.and_(Price.date == EntsogFlow.date,
@@ -170,7 +160,7 @@ class EntsogFlowResource(Resource):
             flows_rich = flows_rich.filter(EntsogFlow.destination_iso2.in_(to_list(destination_iso2)))
 
         if destination_region is not None:
-            flows_rich = flows_rich.filter(destination_country.c.region.in_(to_list(destination_region)))
+            flows_rich = flows_rich.filter(DestinationCountry.region.in_(to_list(destination_region)))
 
         if currency is not None:
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
