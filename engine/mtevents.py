@@ -3,6 +3,7 @@ import numpy as np
 import sqlalchemy
 from tqdm import tqdm
 
+import base
 from base.logger import logger, logger_slack
 from base.db import session
 from base.db_utils import upsert
@@ -29,7 +30,8 @@ def update(
         cache_objects=True,
         only_ongoing=True,
         force_rebuild=False,
-        upload_unprocessed_events=True):
+        upload_unprocessed_events=True,
+        limit=None):
     logger_slack.info("=== Updating events for ships ===")
 
     ships = session.query(
@@ -41,20 +43,28 @@ def update(
     if ship_imo:
         ships = ships.filter(Departure.ship_imo.in_(to_list(ship_imo)))
     if only_ongoing:
-        ships = ships.filter(Shipment.status != "completed")
+        ships = ships.filter(Shipment.status != base.COMPLETED)
+    if limit:
+        ships = ships.limit(limit)
+
+    processed_ships = []
 
     for ship in tqdm(ships.all()):
+
+        ship_imo = ship["ship_imo"]
+
+        if ship_imo in processed_ships:
+            continue
+
+        # add ship to processed
+        processed_ships.append(ship_imo)
 
         # convert SQLAlchemy.row object
         ship = ship._asdict()
 
-        # we do not want to iterate twice over same ship imo if there are completed AND ongoing shipments
-        if not only_ongoing and ship["status"] != 'completed':
-            continue
-
         if not force_rebuild:
             last_event_shipment = session.query(EventShipment) \
-                .filter(Departure.ship_imo == ship["ship_imo"],
+                .filter(Departure.ship_imo == ship_imo,
                         EventShipment.created_at <= to_datetime(date_to)) \
                 .join(Shipment, EventShipment.shipment_id == Shipment.id) \
                 .join(Departure, Shipment.departure_id == Departure.id) \
@@ -107,7 +117,8 @@ def update(
                     session.rollback()
                     continue
 
-def add_interacting_ship_details_to_event(event, distance_check = 5000):
+
+def add_interacting_ship_details_to_event(event, distance_check = 10000):
     """
     This function adds the interacting ship details to an mt event by:
         - finding the vessel using fuzzy search on datalastic
@@ -145,26 +156,39 @@ def add_interacting_ship_details_to_event(event, distance_check = 5000):
         print("Error in finding ship in Datalastic for event: {}".format(event_content))
         return False
 
+    event.interacting_ship_name = intship.name
+
     # fill imo where necessary from MT
     if intship.imo is None:
         if intship.mmsi is not None:
-            mt_intship = Marinetraffic.get_ship(mmsi=intship.mmsi)
-            if not mt_intship:
+            mt_intship_check = fill(mmsis=[intship.mmsi])
+
+            if not mt_intship_check:
+                return False
+
+            mt_ship = session.query(Ship).filter(Ship.mmsi == intship.mmsi).all()
+
+            if len(mt_ship) > 1:
+                return False
+
+            if not mt_ship:
                 print("Failed to find imo in MT for event: {}".format(event_content))
                 return False
-            if intship.name == mt_intship.name:
-                intship.imo = mt_intship.imo
+
+            mt_ship = mt_ship[0]
+
+            if intship.name == mt_ship.name:
+                intship.imo = mt_ship.imo
             else:
                 print("Found match for ship with mmsi, but names do not match for event {}".format(event_content))
         else:
             print("No ship imo found and we do not have an mmsi for event: {}".format(event_content))
             return False
 
-    # check if interacting ship exists already
-    # TODO: add ship input option to .fill so we do not have to request twice?
+    # check if interacting ship is in db
     found = fill(imos=[intship.imo])
     if not found:
-        print("Failed to upload misisng ships")
+        print("Failed to upload missing ships")
         return False
 
     ship_position = Datalastic.get_position(imo=ship_imo, date=event_time)
@@ -180,14 +204,13 @@ def add_interacting_ship_details_to_event(event, distance_check = 5000):
     if d:
         print("Distance between ships was {} at {}".format(d, event_time))
         if d < distance_check:
-            event.interacting_ship_name = intship.name
             event.interacting_ship_imo = intship.imo
-            event.interacting_ship_details = json.dumps(dict((col, getattr(intship, col)) for col in intship.__table__.columns.keys()))
+            event.interacting_ship_details = {"distance_meters": int(d)}
             return True
 
     return False
 
-def create_mtevent_table(force_rebuild=False):
+def create_mtevent_type_table(force_rebuild=False):
     """
     This function creates the mtevent_type table which stores information
     about different event types, ids and descriptions; by default if table exists
