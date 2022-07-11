@@ -3,7 +3,6 @@ import json
 import datetime as dt
 import base
 import sqlalchemy as sa
-import re
 
 from base.db import session
 from base.logger import logger
@@ -19,10 +18,7 @@ retries = Retry(total=5,
                 status_forcelist=[500, 502, 503, 504])
 s.mount('https://', HTTPAdapter(max_retries=retries))
 
-
-
 from engine import ship, port
-
 
 def load_cache(f):
     try:
@@ -106,13 +102,9 @@ class Marinetraffic:
             if len(response_data) == 1:
                 response_data = response_data[0]
             elif len(response_data) > 1:
-                logger.warning("Found more than 1 ship in cache with matching critera...")
+                logger.warning("Found more than 1 ship in cache with matching criteria...")
 
-                response_data = [{"MMSI": mmsi,
-                                  "IMO": imo,
-                                  "SHIPID": mt_id,
-                                  "NAME": None
-                                  }]
+                return None
 
         else:
             response_data = None
@@ -139,17 +131,9 @@ class Marinetraffic:
             if response_data and 'DATA' in response_data:
                 response_data = response_data.get('DATA')
 
-            if response_data is None:
+            if not response_data:
                 logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, response))
                 return None
-
-            if response_data == []:
-                # logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, "Response is empty"))
-                response_data = [{"MMSI": mmsi,
-                                 "IMO": imo,
-                                 "SHIPID": mt_id,
-                                 "NAME": None
-                                 }]
 
             if len(response_data) > 1:
                 # We assume only ships higher than base.DWT_MIN have been queried
@@ -158,11 +142,8 @@ class Marinetraffic:
                     if len(response_data) > 1:
                         logger.warning(
                             "Two ships available with this mmsi: %s" % (response_data,))
-                        response_data = [{"MMSI": mmsi,
-                                          "IMO": imo,
-                                          "SHIPID": mt_id,
-                                          "NAME": None
-                                          }]
+                        return None
+
                 except Exception as e:
                     response_data = [{"MMSI": mmsi,
                                      "IMO": imo,

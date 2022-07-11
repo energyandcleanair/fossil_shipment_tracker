@@ -2,22 +2,13 @@ import datetime as dt
 from base.models import PortCall
 
 from engine import ship, port
-from engine.marinetraffic import Marinetraffic
-from engine.mtevents import add_interacting_ship_details_to_event, update
 
-def test_upload_events():
-    update(ship_imo="9417177",use_cache=True, cache_objects=False, only_ongoing=False,
-           force_rebuild=False, upload_unprocessed_events=False)
-    return
+from engine.marinetraffic import Marinetraffic
 
 def test_get_ship_events():
     events = Marinetraffic.get_ship_events_between_dates(imo="9417177", date_from='2022-05-18', date_to='2022-05-24', use_cache=True, cache_objects=False)
     for e in events:
         assert e.ship_imo is not None and e.ship_name is not None and e.content is not None
-
-    event_status = [add_interacting_ship_details_to_event(e) for e in events]
-
-    assert event_status.count(True) == len(event_status)
 
 def test_ship():
     mmsi='642122016'
