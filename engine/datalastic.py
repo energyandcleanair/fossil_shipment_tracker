@@ -125,7 +125,7 @@ class Datalastic:
             return positions
 
         method = 'vessel_history'
-        api_result = requests.get(Datalastic.api_base + method, params, verify=False)
+        api_result = requests.get(Datalastic.api_base + method, params)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query vessel position %s: %s" % (imo, api_result))
             return None
@@ -172,7 +172,7 @@ class Datalastic:
         }
 
         method = 'port_find'
-        api_result = requests.get(Datalastic.api_base + method, params, verify=False)
+        api_result = requests.get(Datalastic.api_base + method, params)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query port %s: %s" % (name, api_result))
             return None
