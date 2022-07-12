@@ -20,7 +20,7 @@ import datetime as dt
 import re
 import json
 
-from base.models import MarineTrafficEventType, Event, EventShipment, Shipment, Departure, Ship
+from base.models import MarineTrafficEventType, Event, EventShipment, Shipment, Departure, Ship, MarineTrafficCall
 
 def update(
         date_from="2022-02-01",
@@ -51,6 +51,10 @@ def update(
 
     for ship in tqdm(ships.all()):
 
+        # convert SQLAlchemy.row object
+        ship = ship._asdict()
+
+        # get ship imo
         ship_imo = ship["ship_imo"]
 
         if ship_imo in processed_ships:
@@ -59,20 +63,17 @@ def update(
         # add ship to processed
         processed_ships.append(ship_imo)
 
-        # convert SQLAlchemy.row object
-        ship = ship._asdict()
-
         if not force_rebuild:
-            last_event_shipment = session.query(EventShipment) \
-                .filter(Departure.ship_imo == ship_imo,
-                        EventShipment.created_at <= to_datetime(date_to)) \
-                .join(Shipment, EventShipment.shipment_id == Shipment.id) \
-                .join(Departure, Shipment.departure_id == Departure.id) \
-                .order_by(EventShipment.created_at.desc()) \
+
+            last_event_call = session.query(MarineTrafficCall) \
+                .filter(MarineTrafficCall.method == base.VESSEL_EVENTS,
+                        MarineTrafficCall.params['imo'].astext == ship_imo,
+                        MarineTrafficCall.status == base.HTTP_OK) \
+                .order_by(MarineTrafficCall.params['todate'].desc()) \
                 .first()
 
-            if last_event_shipment is not None:
-                es_date_from = last_event_shipment.created_at + dt.timedelta(minutes=1)
+            if last_event_call is not None:
+                es_date_from = to_datetime(last_event_call.params['todate']) + dt.timedelta(minutes=1)
             else:
                 es_date_from = date_from
 
@@ -88,10 +89,13 @@ def update(
             events = Marinetraffic.get_ship_events_between_dates(
                 date_from=to_datetime(query_date_from),
                 date_to=to_datetime(query_date_to),
-                imo=ship["ship_imo"],
+                imo=ship_imo,
                 use_cache=use_cache,
                 cache_objects=cache_objects
             )
+
+            if not events:
+                print("No vessel events found for ship_imo: {}.".format(ship_imo))
 
             event_process_state = [add_interacting_ship_details_to_event(e) for e in events]
 
@@ -164,13 +168,22 @@ def add_interacting_ship_details_to_event(event, distance_check = 10000):
             mt_intship_check = fill(mmsis=[intship.mmsi])
 
             if not mt_intship_check:
+
+                # add unknown ship to db so we don't repeatedly query MT
+                unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi, mmsi=intship.mmsi, type=intship.type,
+                                    name=intship.name)
+                session.add(unknown_ship)
+                session.commit()
+
                 return False
 
             mt_ship = session.query(Ship).filter(Ship.mmsi == intship.mmsi).all()
 
+            # check if we find more than 1 ship
             if len(mt_ship) > 1:
                 return False
 
+            # if we don't find any in db by mmsi we failed to upload...
             if not mt_ship:
                 print("Failed to find imo in MT for event: {}".format(event_content))
                 return False

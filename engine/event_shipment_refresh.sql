@@ -25,6 +25,7 @@ SELECT
 		   WHERE event.type_id = '21') AS ev
 		   ON ((ev.date_utc BETWEEN lead_shipment.departure_date AND lead_shipment.next_departure_date_utc)
 		   AND ev.ship_imo = lead_shipment.ship_imo)
+		   WHERE ev.id IS NOT NULL
     ON CONFLICT
         DO NOTHING
     RETURNING
