@@ -48,6 +48,9 @@ class VoyageResource(Resource):
     parser.add_argument('ship_imo', action='split', help='IMO identifier(s) of the ship(s)',
                         required=False,
                         default=None)
+    parser.add_argument('commodity_origin_iso2', action='split', help='iso2(s) of origin of commodity (only RU should be available)',
+                        required=False,
+                        default=None)
     parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure (only RU should be available)',
                         required=False,
                         default=None)
@@ -106,6 +109,7 @@ class VoyageResource(Resource):
         commodity = params.get("commodity")
         status = params.get("status")
         date_from = params.get("date_from")
+        commodity_origin_iso2 = params.get("commodity_origin_iso2")
         departure_iso2 = params.get("departure_iso2")
         departure_port_id = params.get("departure_port_id")
         departure_berth_id = params.get("departure_berth_id")
@@ -124,6 +128,9 @@ class VoyageResource(Resource):
 
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
+
+        CommodityOriginCountry = aliased(Country)
+        CommodityDestinationCountry = aliased(Country)
 
         DepartureCountry = aliased(Country)
 
@@ -178,6 +185,20 @@ class VoyageResource(Resource):
             else_=sa.null()
         ).label('value_m3')
 
+        # Commodity origin and destination field
+        commodity_origin_iso2_field = case(
+            [(DepartureBerth.name.ilike('Novorossiysk CPC%'), 'KZ')],
+            else_=DeparturePort.iso2
+        ).label('commodity_origin_iso2')
+
+        commodity_destination_iso2_field = case(
+            # Lauri: My heuristic is that all tankers that discharge cargo
+            # in Yeosu but don't go to one of the identified berths are s2s
+            [(sa.and_(
+                ArrivalPort.name.ilike('Yeosu%'),
+                ShipmentArrivalBerth.id == sa.null()), 'CN')],
+            else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
+        ).label('commodity_destination_iso2')
 
         # To remove Kazak oil
         departure_iso2_field = case(
@@ -193,6 +214,16 @@ class VoyageResource(Resource):
         # Query with joined information
         shipments_rich = (session.query(Shipment.id,
                                     Shipment.status,
+
+                                    # Commodity origin and destination
+                                    commodity_origin_iso2_field,
+                                    CommodityOriginCountry.name.label('commodity_origin_country'),
+                                    CommodityOriginCountry.region.label('commodity_origin_region'),
+                                    commodity_destination_iso2_field,
+                                    CommodityDestinationCountry.name.label('commodity_destination_country'),
+                                    CommodityDestinationCountry.region.label('commodity_destination_region'),
+
+                                    # Departure
                                     Departure.date_utc.label("departure_date_utc"),
                                     DeparturePort.unlocode.label("departure_unlocode"),
                                     departure_iso2_field,
@@ -200,10 +231,14 @@ class VoyageResource(Resource):
                                     DepartureCountry.region.label("departure_region"),
                                     DeparturePort.name.label("departure_port_name"),
                                     DeparturePort.id.label("departure_port_id"),
+
+                                    # Arrival
                                     Arrival.date_utc.label("arrival_date_utc"),
                                     ArrivalPort.unlocode.label("arrival_unlocode"),
                                     ArrivalPort.iso2.label("arrival_iso2"),
                                     ArrivalPort.name.label("arrival_port_name"),
+
+                                    # Intermediary destinations
                                     Destination.name.label("destination_name"),
                                     destination_iso2_field,
                                     DestinationCountry.name.label("destination_country"),
@@ -272,6 +307,8 @@ class VoyageResource(Resource):
                             PortPrice.date == func.date_trunc('day', Departure.date_utc)
                         ))
              .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
+             .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
+             .outerjoin(CommodityDestinationCountry, CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .filter(destination_iso2_field != "RU"))
@@ -301,6 +338,9 @@ class VoyageResource(Resource):
                     # Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
                     Departure.date_utc <= to_datetime(date_to)
                 ))
+
+        if commodity_origin_iso2 is not None:
+            shipments_rich = shipments_rich.filter(commodity_origin_iso2_field.in_(to_list(commodity_origin_iso2)))
 
         if departure_iso2 is not None:
             shipments_rich = shipments_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
@@ -375,6 +415,9 @@ class VoyageResource(Resource):
             'currency': [subquery.c.currency],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
+
+            'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country, subquery.c.commodity_origin_region],
+            'commodity_destination_iso2': [subquery.c.commodity_destination_iso2, subquery.c.commodity_destination_country, subquery.c.commodity_destination_region],
 
             'status': [subquery.c.status],
             'date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],

@@ -32,8 +32,8 @@ def update(date_from='2021-11-01'):
         "format": "json",
         "download": False,
         "date_from": date_from,
-        "departure_iso2": ["RU", "BY", "TR"],
-        "aggregate_by": ["departure_iso2", "destination_iso2", "commodity", "date"],
+        "commodity_origin_iso2": ["RU"],
+        "aggregate_by": ["commodity_origin_iso2", "commodity_destination_iso2", "commodity", "date"],
         "nest_in_data": False,
         "currency": "EUR"
     }
@@ -53,16 +53,16 @@ def update(date_from='2021-11-01'):
         "format": "json",
         "download": False,
         "date_from": date_from,
-        "departure_iso2": ['RU'],
-        "aggregate_by": ['departure_iso2', "destination_iso2", "commodity", "arrival_date", "status"],
+        "commodity_origin_iso2": ['RU'],
+        "aggregate_by": ['commodity_origin_iso2', "commodity_destination_iso2", "commodity", "arrival_date", "status"],
         "nest_in_data": False,
         "currency": 'EUR'
     }
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
     voyages = pd.DataFrame(voyages)
-    voyages = voyages.loc[voyages.departure_iso2=='RU'] # Just to confirm
-    voyages = voyages.loc[voyages.status==base.COMPLETED]
+    voyages = voyages.loc[voyages.commodity_origin_iso2 == 'RU'] # Just to confirm
+    voyages = voyages.loc[voyages.status == base.COMPLETED]
     voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
 
     # Aggregate
@@ -71,10 +71,10 @@ def update(date_from='2021-11-01'):
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
     result = pd.concat([pipelineflows, voyages]) \
         .sort_values(['date', 'commodity']) \
-        [["commodity", 'commodity_group', 'destination_region', "destination_iso2", "date", "value_tonne", "value_eur"]]
+        [["commodity", 'commodity_group', 'commodity_destination_region', "commodity_destination_iso2", "date", "value_tonne", "value_eur"]]
     result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
     result = result \
-        .groupby(["commodity", 'commodity_group', "destination_iso2", 'destination_region']) \
+        .groupby(["commodity", 'commodity_group', "commodity_destination_iso2", 'commodity_destination_region']) \
         .apply(lambda x: x.set_index("date") \
                .resample("D").sum() \
                .fillna(0)) \
@@ -86,15 +86,17 @@ def update(date_from='2021-11-01'):
     result = remove_pipeline_lng(result)
 
     # Sanity check before updating counter
-    ok, global_new, global_old = sanity_check(result)
+    ok, global_new, global_old, eu_new, eu_old = sanity_check(result)
 
     if not ok:
         logger_slack.error("[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (global_new / 1e9, global_old / 1e9))
     else:
-        logger_slack.info("[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB." % (global_new / 1e9, global_old / 1e9))
+        logger_slack.info("[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)" %
+                          (global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9))
 
         # Erase and replace everything
-        result.drop(['destination_region', 'commodity_group'], axis=1, inplace=True)
+        result.drop(['commodity_destination_region', 'commodity_group'], axis=1, inplace=True)
+        result.rename(columns={'commodity_destination_iso2': 'destination_iso2'}, inplace=True)
         Counter.query.delete()
         session.commit()
         result.to_sql(DB_TABLE_COUNTER,
@@ -109,8 +111,6 @@ def update(date_from='2021-11-01'):
 
 def sanity_check(result):
 
-    ok = True
-
     missing_price = result.loc[
         (result.value_tonne > 0) &
         (result.value_eur <= 0) &
@@ -124,7 +124,10 @@ def sanity_check(result):
         ok = False
 
     def get_comparison_df(compared_cols):
-        old_data = pd.read_sql(session.query(Counter, Country.region.label('destination_region'), Commodity.group.label('commodity_group')) \
+        old_data = pd.read_sql(session.query(Counter,
+                                             Counter.destination_iso2.label('commodity_destination_iso2'),
+                                             Country.region.label('commodity_destination_region'),
+                                             Commodity.group.label('commodity_group')) \
                                .join(Country, Country.iso2 == Counter.destination_iso2) \
                                .join(Commodity, Commodity.id == Counter.commodity).statement,
                                session.bind)
@@ -148,30 +151,36 @@ def sanity_check(result):
                  right_on=compared_cols) \
             .replace(np.nan, 0)
 
-        comparison['ok'] = comparison.new_eur >= comparison.old_eur * 0.95
+        comparison['ok'] = (comparison.new_eur >= comparison.old_eur * 0.95) \
+                           & (comparison.new_eur <= comparison.old_eur * 1.1)
+        comparison = comparison.reset_index()
         return comparison
 
-    comparison = get_comparison_df(compared_cols=['commodity_group', 'destination_region'])
+    comparison = get_comparison_df(compared_cols=['commodity_group', 'commodity_destination_region'])
     ok = comparison.ok.all()
 
     logger_slack.info(comparison.reset_index() \
-                      .rename(columns={'destination_region': 'region',
+                      .rename(columns={'commodity_destination_region': 'region',
                                        'commodity_group': 'com.'}) \
                       .to_string(col_space=10, index=False,
                                  justify='left'))
     if not ok:
         # Print a more detailed version
-        comparison_detailed = get_comparison_df(compared_cols=['commodity_group', 'destination_iso2'])
+        comparison_detailed = get_comparison_df(compared_cols=['commodity_group', 'commodity', 'commodity_destination_iso2', 'commodity_destination_region'])
         comparison_detailed = comparison_detailed.loc[~comparison_detailed.ok]
         logger_slack.info(comparison_detailed.reset_index() \
-                          .rename(columns={'destination_region': 'region',
+                          .rename(columns={'commodity_destination_region': 'region',
                                            'commodity_group': 'com.'}) \
                           .to_string(col_space=10, index=False,
                                      justify='left'))
 
     global_old = comparison.old_eur.sum()
     global_new = comparison.new_eur.sum()
-    return ok, global_new, global_old
+
+    eu_old = comparison.loc[comparison.commodity_destination_region == 'EU28'].old_eur.sum()
+    eu_new = comparison.loc[comparison.commodity_destination_region == 'EU28'].new_eur.sum()
+
+    return ok, global_new, global_old, eu_new, eu_old
 
 
 def remove_pipeline_lng(result, n_days=10,

@@ -4,6 +4,7 @@ import geopandas as gpd
 import json
 import numpy as np
 
+
 from . import routes_api
 from flask_restx import inputs
 
@@ -19,7 +20,7 @@ from flask import Response
 from flask_restx import Resource, reqparse
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 
 @routes_api.route('/v0/overland', strict_slashes=False)
@@ -36,6 +37,9 @@ class PipelineFlowResource(Resource):
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('commodity_origin_iso2', action='split', help='iso2(s) of commodity origin',
+                        required=False,
+                        default=None)
     parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure',
                         required=False,
                         default=None)
@@ -74,6 +78,7 @@ class PipelineFlowResource(Resource):
         id = params.get("id")
         commodity = params.get("commodity")
         date_from = params.get("date_from")
+        commodity_origin_iso2 = params.get("commodity_origin_iso2")
         departure_iso2 = params.get("departure_iso2")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
@@ -97,16 +102,36 @@ class PipelineFlowResource(Resource):
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
+        CommodityOriginCountry = aliased(Country)
+        CommodityDestinationCountry = aliased(Country)
+
         DepartureCountry = aliased(Country)
         DestinationCountry = aliased(Country)
 
+        # commodity_origin_iso2_field = case(
+        #     [(DepartureCountry.iso2.in_(['BY', 'TR']), 'RU'),
+        #      # (DepartureCountry.iso2 == 'TR' and DestinationCountry.iso2 == 'GR', 'AZ'), # Kipoi
+        #      # (DepartureCountry.iso2 == 'TR' and DestinationCountry.iso2 != 'GR', 'RU'),
+        #      ],
+        #     else_=DepartureCountry.iso2
+        # ).label('commodity_origin_iso2')
+        commodity_origin_iso2_field = DepartureCountry.iso2.label('commodity_origin_iso2')
 
-
+        commodity_destination_iso2_field = DestinationCountry.iso2.label('commodity_destination_iso2')
 
         # Query with joined information
         flows_rich = (session.query(PipelineFlow.id,
                                     PipelineFlow.commodity,
                                     Commodity.group.label('commodity_group'),
+
+                                    # Commodity origin and destination
+                                    commodity_origin_iso2_field,
+                                    CommodityOriginCountry.name.label('commodity_origin_country'),
+                                    CommodityOriginCountry.region.label('commodity_origin_region'),
+                                    commodity_destination_iso2_field,
+                                    CommodityDestinationCountry.name.label('commodity_destination_country'),
+                                    CommodityDestinationCountry.region.label('commodity_destination_region'),
+
                                     PipelineFlow.date,
                                     PipelineFlow.departure_iso2,
                                     DepartureCountry.name.label('departure_country'),
@@ -121,6 +146,9 @@ class PipelineFlowResource(Resource):
                                     value_currency_field)
              .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
              .outerjoin(DestinationCountry, PipelineFlow.destination_iso2 == DestinationCountry.iso2)
+             .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
+             .outerjoin(CommodityDestinationCountry,
+                         CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(Commodity, PipelineFlow.commodity == Commodity.id)
              .outerjoin(Price,
                         sa.and_(Price.date == PipelineFlow.date,
@@ -153,6 +181,9 @@ class PipelineFlowResource(Resource):
 
         if date_to is not None:
             flows_rich = flows_rich.filter(PipelineFlow.date <= to_datetime(date_to))
+
+        if commodity_origin_iso2 is not None:
+            flows_rich = flows_rich.filter(commodity_origin_iso2_field.in_(to_list(commodity_origin_iso2)))
 
         if departure_iso2 is not None:
             flows_rich = flows_rich.filter(PipelineFlow.departure_iso2.in_(to_list(departure_iso2)))
@@ -214,6 +245,11 @@ class PipelineFlowResource(Resource):
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
             'date': [subquery.c.date],
+            'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
+                                      subquery.c.commodity_origin_region],
+            'commodity_destination_iso2': [subquery.c.commodity_destination_iso2,
+                                           subquery.c.commodity_destination_country,
+                                           subquery.c.commodity_destination_region],
             'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country,
                                     subquery.c.departure_region],
             'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country,

@@ -20,7 +20,7 @@ from flask import Response
 from flask_restx import Resource, reqparse
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
-from sqlalchemy import func
+from sqlalchemy import func, case
 
 
 @routes_api.route('/v0/entsogflow', strict_slashes=False, doc=False)
@@ -37,6 +37,9 @@ class EntsogFlowResource(Resource):
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('commodity_origin_iso2', action='split', help='iso2(s) of commodity origin',
+                        required=False,
+                        default=None)
     parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure',
                         required=False,
                         default=None)
@@ -74,6 +77,7 @@ class EntsogFlowResource(Resource):
         id = params.get("id")
         commodity = params.get("commodity")
         date_from = params.get("date_from")
+        commodity_origin_iso2 = params.get("commodity_origin_iso2")
         departure_iso2 = params.get("departure_iso2")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
@@ -98,13 +102,36 @@ class EntsogFlowResource(Resource):
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
+        CommodityOriginCountry = aliased(Country)
+        CommodityDestinationCountry = aliased(Country)
+
         DepartureCountry = aliased(Country)
         DestinationCountry = aliased(Country)
+
+        commodity_origin_iso2_field = case(
+            [(DepartureCountry.iso2.in_(['BY', 'TR']), 'RU'),
+             (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 == 'GR'), 'AZ'), # Kipoi
+             (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 != 'GR'), 'RU'),
+             ],
+            else_=DepartureCountry.iso2
+        ).label('commodity_origin_iso2')
+
+        commodity_destination_iso2_field = DestinationCountry.iso2.label('commodity_destination_iso2')
 
         # Query with joined information
         flows_rich = (session.query(EntsogFlow.id,
                                     EntsogFlow.commodity,
                                     Commodity.group.label('commodity_group'),
+
+                                    # Commodity origin and destination
+                                    commodity_origin_iso2_field,
+                                    CommodityOriginCountry.name.label('commodity_origin_country'),
+                                    CommodityOriginCountry.region.label('commodity_origin_region'),
+                                    commodity_destination_iso2_field,
+                                    CommodityDestinationCountry.name.label('commodity_destination_country'),
+                                    CommodityDestinationCountry.region.label('commodity_destination_region'),
+
+
                                     EntsogFlow.date,
                                     EntsogFlow.departure_iso2,
                                     DepartureCountry.name.label('departure_country'),
@@ -120,6 +147,9 @@ class EntsogFlowResource(Resource):
                                     )
              .join(DepartureCountry, DepartureCountry.iso2 == EntsogFlow.departure_iso2)
              .outerjoin(DestinationCountry, EntsogFlow.destination_iso2 == DestinationCountry.iso2)
+              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
+              .outerjoin(CommodityDestinationCountry,
+                         CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(Commodity, EntsogFlow.commodity == Commodity.id)
              .outerjoin(Price,
                         sa.and_(Price.date == EntsogFlow.date,
@@ -137,7 +167,6 @@ class EntsogFlowResource(Resource):
              .outerjoin(Currency, Currency.date == EntsogFlow.date)
              .filter(EntsogFlow.destination_iso2 != "RU"))
 
-
         # Return only >0 values. Otherwise we hit response size limit
         flows_rich = flows_rich.filter(EntsogFlow.value_tonne > 0)
 
@@ -146,6 +175,9 @@ class EntsogFlowResource(Resource):
 
         if commodity is not None:
             flows_rich = flows_rich.filter(EntsogFlow.commodity.in_(to_list(commodity)))
+
+        if commodity_origin_iso2 is not None:
+            flows_rich = flows_rich.filter(commodity_origin_iso2_field.in_(to_list(commodity_origin_iso2)))
 
         if date_from is not None:
             flows_rich = flows_rich.filter(EntsogFlow.date >= to_datetime(date_from))
@@ -215,6 +247,11 @@ class EntsogFlowResource(Resource):
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
             'date': [subquery.c.date],
+            'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
+                                      subquery.c.commodity_origin_region],
+            'commodity_destination_iso2': [subquery.c.commodity_destination_iso2,
+                                           subquery.c.commodity_destination_country,
+                                           subquery.c.commodity_destination_region],
             'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country,
                                     subquery.c.departure_region],
             'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country,

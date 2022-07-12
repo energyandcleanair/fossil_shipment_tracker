@@ -44,8 +44,6 @@ from . import DB_TABLE_ALERT_CRITERIA
 from . import DB_TABLE_ALERT_CRITERIA_ASSOC
 
 
-
-
 class Ship(Base):
     imo = Column(String, primary_key=True)
     mmsi = Column(String)
@@ -420,8 +418,10 @@ class EntsogFlow(Base):
 class PipelineFlow(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
+
     departure_iso2 = Column(String)
     destination_iso2 = Column(String)
+
     date = Column(DateTime(timezone=False))
     value_tonne = Column(Numeric)
     value_mwh = Column(Numeric)
@@ -437,8 +437,8 @@ class PipelineFlow(Base):
 class Counter(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
+
     destination_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
-    # destination_region = Column(String)
 
     date = Column(DateTime(timezone=False))
     value_tonne = Column(Numeric)

@@ -7,6 +7,7 @@ from sqlalchemy import case
 from sqlalchemy.dialects.postgresql import array, ARRAY
 from sqlalchemy import cast, Text
 
+import base
 from base.db import session, engine
 from base.models import AlertInstance, Ship, Country, Shipment, AlertCriteria, Commodity,\
         AlertConfig, AlertCriteriaAssociation, AlertRecipient, AlertRecipientAssociation, Departure
@@ -130,7 +131,9 @@ def get_new_alerts():
                                     func.unnest(Shipment.destination_iso2s).label('destination_iso2'),
                                     func.unnest(Shipment.destination_names).label('destination_name'),
                                     func.unnest(Shipment.destination_dates).label('destination_date'),
-                                    ).subquery()
+                                    ) \
+        .filter(Shipment.status != base.UNDETECTED_ARRIVAL) \
+        .subquery()
 
     query_shipment2 = session.query(
         query_shipment1.c.shipment_id,

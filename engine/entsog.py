@@ -512,6 +512,7 @@ def fix_kipi_flows(flows):
     flows.loc[idx, 'departure_iso2'] = 'AZ'
     return flows
 
+
 def get_crossborder_flows(date_from='2022-01-01',
                           date_to=dt.date.today(),
                           country_iso2=None,

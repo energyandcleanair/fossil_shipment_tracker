@@ -115,5 +115,5 @@ def update(min_dwt=base.DWT_MIN,
                     session.rollback()
 
         else:
-            logger.info(
+            logger.debug(
                 "No relevant arrival found. Should check portcalls for imo %s from date %s." % (imo, d.date_utc))
