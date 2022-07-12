@@ -59,7 +59,7 @@ class Marinetraffic:
             call_log['credits'] = len(api_result.json()) * credits_per_record
             call_log['status'] = str(api_result.status_code)
 
-        if call_log['records'] > 0 or save_empty_record:
+        if  (call_log['records'] > 0) or save_empty_record:
             session.add(MarineTrafficCall(**call_log))
             session.commit()
 
@@ -402,7 +402,7 @@ class Marinetraffic:
                                       date_to,
                                       use_cache=True,
                                       cache_objects=True,
-                                      event_filter='21,22'):
+                                      event_type='21,22'):
         """
 
         Parameters
@@ -445,13 +445,14 @@ class Marinetraffic:
             if imo is not None:
                 params["imo"] = imo
 
-            if event_filter:
-                params['event_type'] = event_filter
+            if event_type:
+                params['event_type'] = event_type
 
             (response_datas, response) = cls.call(method='vesselevents/',
                                                   api_key=api_key,
                                                   params=params,
-                                                  credits_per_record=2)
+                                                  credits_per_record=2,
+                                                  save_empty_record=True)
 
             if response_datas is None:
                 logger.warning("Marinetraffic: Failed to query events %s: %s" % (imo, response))
@@ -476,8 +477,10 @@ class Marinetraffic:
         data = {
             "ship_name": response_data["SHIPNAME"],
             "ship_imo": response_data["IMO"],
+            "ship_closest_position": None,
             "interacting_ship_name": None,
             "interacting_ship_imo": None,
+            "interacting_ship_closest_position": None,
             "interacting_ship_details": None,
             "date_utc": response_data["TIMESTAMP"],
             "type_id": response_data["EVENT_ID"],

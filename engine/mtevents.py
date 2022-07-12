@@ -28,7 +28,7 @@ def update(
         ship_imo=None,
         use_cache=False,
         cache_objects=True,
-        only_ongoing=True,
+        only_ongoing=False,
         force_rebuild=False,
         upload_unprocessed_events=True,
         limit=None):
@@ -108,9 +108,9 @@ def update(
             query_date_to = dates[1]
 
             events = Marinetraffic.get_ship_events_between_dates(
+                imo=ship_imo,
                 date_from=to_datetime(query_date_from),
                 date_to=to_datetime(query_date_to),
-                imo=ship_imo,
                 use_cache=use_cache,
                 cache_objects=cache_objects
             )
@@ -232,8 +232,13 @@ def add_interacting_ship_details_to_event(event, distance_check = 10000):
         print("Failed to find ship positions. try increasing time window...")
         return False
 
+    ship_position, intship_position = ship_position.geometry, intship_position.geometry
+
+    # add positions to details
+    event.ship_closest_position, event.interacting_ship_closest_position = ship_position, intship_position
+
     # TODO: is there a better way to handle the SRID section?
-    d = distance_between_points(ship_position.geometry.replace("SRID=4326;",""), intship_position.geometry.replace("SRID=4326;",""))
+    d = distance_between_points(ship_position.replace("SRID=4326;",""), intship_position.replace("SRID=4326;",""))
 
     if d:
         print("Distance between ships was {} at {}".format(d, event_time))

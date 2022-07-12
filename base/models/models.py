@@ -489,8 +489,10 @@ class Event(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     ship_name = Column(String)
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    ship_closest_position = Column(Geometry('POINT', srid=4326))
     interacting_ship_name = Column(String)
     interacting_ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    interacting_ship_closest_position = Column(Geometry('POINT', srid=4326))
     interacting_ship_details = Column(JSONB) # details about ship from datalastic query
     date_utc = Column(DateTime(timezone=False))
     created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
