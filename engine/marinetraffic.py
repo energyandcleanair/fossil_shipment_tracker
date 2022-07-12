@@ -37,7 +37,7 @@ class Marinetraffic:
     cache_events = load_cache(cache_file_events)
 
     @classmethod
-    def call(cls, method, params, api_key, credits_per_record):
+    def call(cls, method, params, api_key, credits_per_record, save_empty_record=True):
         params_string = urllib.parse.urlencode(params)
         api_result = s.get(Marinetraffic.api_base + method + api_key + '?' + params_string)
 
@@ -59,7 +59,7 @@ class Marinetraffic:
             call_log['credits'] = len(api_result.json()) * credits_per_record
             call_log['status'] = str(api_result.status_code)
 
-        if True: #call_log['records'] > 0:
+        if call_log['records'] > 0 or save_empty_record:
             session.add(MarineTrafficCall(**call_log))
             session.commit()
 
@@ -219,7 +219,8 @@ class Marinetraffic:
         (response_datas, response) = cls.call(method='portcalls/',
                                               api_key=api_key,
                                               params=params,
-                                              credits_per_record=4)
+                                              credits_per_record=4,
+                                              save_empty_record=False)
 
         if response_datas is None:
             logger.warning("Marinetraffic: Failed to query portcall %s: %s" % (unlocode, response))
