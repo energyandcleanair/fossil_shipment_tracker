@@ -32,6 +32,25 @@ def update(
         force_rebuild=False,
         upload_unprocessed_events=True,
         limit=None):
+    """
+    This function retrieves the events for a specific ship imo
+
+    Parameters
+    ----------
+    date_from : date we want to query from
+    date_to : date we want to query to
+    ship_imo : the ship imo(s)
+    use_cache : whether we want to check cache
+    cache_objects : whether we want to cache objects
+    only_ongoing : only query ongoing shipments
+    force_rebuild : force rebuild ignoring previous calls
+    upload_unprocessed_events : whether to upload events where we failed to get some date
+    limit : the limit of the number of ships we want to process
+
+    Returns
+    -------
+
+    """
     logger_slack.info("=== Updating events for ships ===")
 
     ships = session.query(
@@ -65,6 +84,7 @@ def update(
 
         if not force_rebuild:
 
+            # check whether we called this ship imo in the MTCall table and get latest date
             last_event_call = session.query(MarineTrafficCall) \
                 .filter(MarineTrafficCall.method == base.VESSEL_EVENTS,
                         MarineTrafficCall.params['imo'].astext == ship_imo,
@@ -72,6 +92,7 @@ def update(
                 .order_by(MarineTrafficCall.params['todate'].desc()) \
                 .first()
 
+            # if we did check this ship before and force rebuild is false, only query since last time
             if last_event_call is not None:
                 es_date_from = to_datetime(last_event_call.params['todate']) + dt.timedelta(minutes=1)
             else:
