@@ -68,10 +68,14 @@ def update_matching():
             .filter(Destination.iso2 == sa.null()).all()
 
         for still_missing in tqdm(still_missings):
-            looking_name = still_missing.name.replace(" OPL","")
+            looking_name = still_missing.name.replace(" OPL", "")
             found = Datalastic.get_port_infos(name=looking_name, fuzzy=False)
             if found:
-                ratios = np.array([SequenceMatcher(None, x.name, still_missing.name).ratio() for x in found])
+                potential_suffixes = ['', ' PORT']
+                ratios = np.array([max([SequenceMatcher(None, x.name.replace(suf, ''), still_missing.name).ratio()
+                                        for suf in potential_suffixes])
+                                   for x in found])
+
                 if max(ratios) > 0.8:
                     print("Best match: %s == %s (%f)" % (still_missing.name, found[ratios.argmax()].name, ratios.max()))
                     found_and_filtered = found[ratios.argmax()]
@@ -84,45 +88,50 @@ def update_matching():
         # Looking for country names in destination.name
         country_regexps = {
             'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$','^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$', '^RU[\w]{3}$'
-                   '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$',
-                   'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|^RU |KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$'],
+                   '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$', 'YEISK$', 'RUKOR$', 'AZOU$', '^PKC$',
+                   'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|^RU |KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$', 'RUAZOV$','RUVFP$'],
             'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$',
-                   '^TOROS$', 'CANAKALE$', 'IZMIT$'],
+                   '^TOROS$', 'CANAKALE$', 'IZMIT$', 'TR[/]?ZON$', 'SAMSUN/TR$', 'ST[A]?NBUL$', 'TR[ ]?IST$'],
             'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$', ' SKAW$|SKGEN$|^SKAW$'],
             'BR': ['[ |,|_]{1}BRAZIL$', '^BR ?PRM|BRPEE'],
             'SE': ['[ |,|_]{1}SWEDEN$'],
-            'IN': ['[ |,|_]{1}INDIA$','^INDIA$'],
-            'IT': ['[ |,|_]{1}ITALY$'],
-            'GR': ['[ |,|_]{1}GRE[E]?CE$','^VATIKA$','^KALAMATA$', 'LACONIA BAY$'],
-            'EG': ['[ |,|_]{1}EGYPT$'],
-            'FR': ['[ |,|_]{1}FRANCE','FRFOS$','FRLEH$'],
-            'EE': ['[ |,|_]{1}ESTONIA','TALLIN[\s|\w]*', '^TALLNN$', '^EETIL OPL$'],
-            'SG': ['[\s|\w]*SINGAPORE[\s|\w]*'],
-            'GB': ['[ |,|_]{1}UK$'],
-            'RO': ['[ |,|_]{1}ROMANIA', 'CONSTANTA[\s|\w]*'],
+            'IN': ['[ |,|_]{1}INDIA$','^INDIA$','SIKKA$','HAZIRA SPM$'],
+            'IT': ['RAVENNA$'],
+            'GR': ['[ |,|_]{1}GRE[E]?CE$','^VATIKA$','^KALAMATA$', 'LACONIA BAY$', 'LIMNOS GR'],
+            'EG': ['[ |,|_]{1}EGYPT$', 'PORT SAID$'],
+            'FR': ['[ |,|_]{1}FRANCE','FRFOS$','FRLEH$', 'DUNKERQUE FR$', 'DUNKERQUE$'],
+            'EE': ['[ |,|_]{1}ESTONIA','TALLIN[\s|\w]*', '^TALLNN$', '^EETIL OPL$', 'EE MUU$'],
+            'SG': ['[\s|\w]*SINGAPORE[\s|\w]*', 'PEBG[B|C]?$'],
+            'GB': ['[ |,|_]{1}UK$', '[ |,|_]{1}GB$', 'THAMESHAVEN$'],
+            'RO': ['[ |,|_]{1}ROMANIA', 'CONSTANTA[\s|\w]*', '^R0 GAL$'],
             'ZA': ['[ |,|_]{1}ZA'],
-            'NL': ['^NL [\s|\w]*$', '[ |,|_|\.]{1}NL[\s]?[\w]{3}$', 'BORS+ELE'],
-            'KR': ['[ |,|_]{1}S[\.]?KOREA$','^KR [\s|\w]*$', '( |,)KOREA|S\\.KOREA| KR$|KOR |KR_USN'],
+            'NL': ['^NL [\s|\w]*$', '[ |,|_|\.]{1}NL[\s]?[\w]{3}$', 'BORS+ELE','NETHERLAND$'],
+            'KR': ['[ |,|_]{1}S[\.]?KOREA$','^KR [\s|\w]*$',
+                   '( |,)KOREA|S\\.KOREA| KR$|KOR |KR_USN',
+                   '[ |,|_|/]{1}KR$', 'YEOSU BERTH$', '^KRICH$'],
             'JP': ['^JP [\s|\w]*$','[ |,|_]{1}JP$'],
-            'CN': ['[ |,|_]{1}CHINA$','^CN[_]?[\w]{3}$', '^CN [\s|\w]*$','^HUANG DAO$',
-                   '^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$', ' CN$|LAN QIAO$', 'CH LNS', 'CH TAG', 'C J K'],
+            'CN': ['[ |,|_]{1}CHINA$','^C[H|N][_]?[\w]{3}$', '^CN [\s|\w]*$','^HUANG DAO$',
+                   '^CAOFEIDIAN$','^LANYUNGANG$','^CHINA$', ' CN$|LAN QIAO$', 'CH LNS$', 'CH TAG$', 'C J K',
+                   'PENGLAI-193$', 'CH FAN$', 'CH[ ]?[I]?NA$', 'QING DAO/CN$'],
             'MY': ['[ |,|_|/]{1}MALAYSIA$', 'PELEPAS$'],
-            'TW': ['^TW[\s|\w]*','[ |,|_]{1}TW$'],
+            'TW': ['^TW[\s|\w]*','[ |,|_]{1}TW[N]?$'],
             'OM': ['[ |,|_|-]{1}OMAN'],
             'ES': ['[ |,|_|-]{1}SPAIN$', '^SP [\s|\w]*$'],
             'LY': ['[ |,|_|-|/]{1}LYBIA$', '^LYBIA$'],
-            'MT': ['[ |,|_|-]{1}MALTA$','^MALTA OPL$'],
+            'MT': ['[ |,|_|-]{1}MALTA$', '^MALTA OPL$'],
             'IR': ['ANZALI', 'BIK '],
             'YE': ['^YE [\s|\w]*$'],
             'AE': ['[ |,|_]{1}UAE$'],
-            'US': ["^USA$|^US "],
-            'AR': ['ARGENTINA$'],
+            'US': ["^USA$|^US ",',USA$', 'GARYVILLE$'],
             'DE': [',GERMA'],
-            'BE': [' BE$'],
+            'BE': [' BE$','BELGIUM$'],
             'NO': ['^NOSGE$'],
-            'FI': ['^KOTKA$'],
+            'FI': ['^KOTKA$', 'KOTKA FIN$'],
             'BG': [' BG$'],
-            'SK': ['^SK [\s|\w]*$']
+            'SK': ['^SK [\s|\w]*$'],
+            'PT': ['FIGUEIRO DE FOS$', '^PT SINES$'],
+            'VN' : ['VIET[ ]?NAM$'],
+            'PL' : ['GSANSK$']
         }
 
         for key, regexps in country_regexps.items():
@@ -130,6 +139,18 @@ def update_matching():
             update = Destination.__table__.update().values(iso2=key) \
                 .where(condition)
             execute_statement(update)
+
+        # All those that end with a country name
+        from base.models import Country
+        country_regex = session.query(Country.iso2,
+                                      ('[\.| |,|_|-|/]{1}' + Country.name + '$').label('regexp')).subquery()
+        update = Destination.__table__.update().values(iso2=country_regex.c.iso2) \
+            .where(sa.and_(
+            Destination.iso2 == sa.null(),
+            Destination.name.op('~*')(country_regex.c.regexp)))
+        print(update)
+        execute_statement(update)
+
 
 
         # "For orders" should be set as such
