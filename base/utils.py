@@ -57,7 +57,10 @@ def to_datetime(d, date_ref=None):
             try:
                 return to_datetime(int(d), date_ref=date_ref)
             except ValueError:
-                return dt.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
+                try:
+                    return dt.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
+                except ValueError:
+                    return dt.datetime.strptime(d, "%Y-%m-%d %H:%M")
     if isinstance(d, dt.datetime):
         return d
     if isinstance(d, dt.date):
