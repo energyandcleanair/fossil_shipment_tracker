@@ -47,7 +47,7 @@ class RussiaCounterResource(Resource):
                         default="2022-02-24", required=False)
     parser.add_argument('date_to', type=str, help='end date for arrival (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
-    parser.add_argument('destination_iso2', type=str, help='ISO2 of country of interest',
+    parser.add_argument('destination_iso2',  action='split', help='ISO2(s) of country of interest',
                         required=False, default=None)
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
