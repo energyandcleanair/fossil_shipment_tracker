@@ -208,7 +208,7 @@ class Datalastic:
         print(date_from, date_to)
         positions = cls.get_positions(imo, date_from=date_from, date_to=date_to)
 
-        if len(positions) == 0:
+        if not positions:
             logger.warning("No positions found for ship (imo: {}) between dates: {}, {}.".format(imo, date_from, date_to))
             return None
 
