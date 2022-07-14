@@ -68,6 +68,8 @@ def update(
 
     processed_ships = []
 
+    logger.info("Will process {} ships.".format(len(ships.all())))
+
     for ship in tqdm(ships.all()):
 
         # convert SQLAlchemy.row object
@@ -225,8 +227,15 @@ def add_interacting_ship_details_to_event(event, distance_check = 10000):
         print("Failed to upload missing ships")
         return False
 
+    # add ship imo to event info
+    event.interacting_ship_imo = intship.imo
+
+    # get closest position in time and add to event
     ship_position = Datalastic.get_position(imo=ship_imo, date=event_time)
+    if ship_position: event.ship_closest_position = ship_position.geometry
+
     intship_position = Datalastic.get_position(imo=intship.imo, date=event_time)
+    if intship_position: event.interacting_ship_closest_position = intship_position.geometry
 
     if not ship_position or not intship_position:
         print("Failed to find ship positions. try increasing time window...")
@@ -234,17 +243,13 @@ def add_interacting_ship_details_to_event(event, distance_check = 10000):
 
     ship_position, intship_position = ship_position.geometry, intship_position.geometry
 
-    # add positions to details
-    event.ship_closest_position, event.interacting_ship_closest_position = ship_position, intship_position
-
     # TODO: is there a better way to handle the SRID section?
     d = distance_between_points(ship_position.replace("SRID=4326;",""), intship_position.replace("SRID=4326;",""))
 
     if d:
         print("Distance between ships was {} at {}".format(d, event_time))
+        event.interacting_ship_details = {"distance_meters": int(d)}
         if d < distance_check:
-            event.interacting_ship_imo = intship.imo
-            event.interacting_ship_details = {"distance_meters": int(d)}
             return True
 
     return False
