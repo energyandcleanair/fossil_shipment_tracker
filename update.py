@@ -12,6 +12,7 @@ from engine import currency
 from engine import rscript
 from engine import counter
 from engine import entsog
+from engine import alert
 import base
 
 import datetime as dt
@@ -40,9 +41,10 @@ def update():
     position.update()
     destination.update()
     berth.update()
-    entsog.update(date_from=-14)
+    entsog.update(date_from=-21, nodata_error_date_from=-4)
     rscript.update()
     trajectory.update()
+    alert.update()
     counter.update()
     return
 

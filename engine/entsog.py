@@ -37,7 +37,7 @@ import requests
 
 import base
 from base.db import session
-from base.logger import logger
+from base.logger import logger, logger_slack
 from base.utils import to_list, to_datetime
 from base.db_utils import upsert
 from base.models import DB_TABLE_ENTSOGFLOW, EntsogFlow
@@ -570,7 +570,16 @@ def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=Fals
     return flows
 
 
-def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=True):
+def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=True, nodata_error_date_from=None):
+    """
+
+    :param date_from:
+    :param date_to:
+    :param filename:
+    :param save_to_file:
+    :param nodata_error_date_from: if no data after this date, raise an error. Can be an integer
+    :return:
+    """
 
     if isinstance(date_from, int):
         last_date = session.query(sa.func.max(EntsogFlow.date)).filter(EntsogFlow.value_m3 > 0).first()[0]
@@ -580,4 +589,9 @@ def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=Tr
                       date_to=date_to,
                       save_to_file=save_to_file,
                       filename=filename)
+
     upsert(df=flows, table=DB_TABLE_ENTSOGFLOW, constraint_name="unique_entsogflow")
+
+    # Raise alert if no recent data was found
+    if nodata_error_date_from is not None and flows.date.max() < to_datetime(nodata_error_date_from).date():
+        logger_slack.error("No ENTSOG flow found after %s (most recent is %s)" % (to_datetime(nodata_error_date_from).date(), flows.date.max()))
