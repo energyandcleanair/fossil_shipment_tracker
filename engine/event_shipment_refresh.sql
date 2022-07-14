@@ -22,7 +22,9 @@ SELECT
 	ORDER BY departure.ship_imo, departure.date_utc ASC) AS lead_shipment
  	LEFT JOIN (SELECT event.id, event.ship_imo, event.date_utc
 		   FROM event
-		   WHERE event.type_id = '21') AS ev
+		   WHERE event.type_id = '21'
+		   AND event.interacting_ship_details->>'distance_meters' IS NOT NULL
+		   AND (event.interacting_ship_details->>'distance_meters')::int < 5000) AS ev
 		   ON ((ev.date_utc BETWEEN lead_shipment.departure_date AND lead_shipment.next_departure_date_utc)
 		   AND ev.ship_imo = lead_shipment.ship_imo)
 		   WHERE ev.id IS NOT NULL
