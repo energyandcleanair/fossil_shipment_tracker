@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine
+import sqlalchemy
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -11,7 +12,7 @@ from psycopg2.extensions import register_adapter, AsIs
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 
 
-environment = get_env('ENVIRONMENT', 'development').lower() # development, production, test
+environment = get_env('ENVIRONMENT', 'test').lower() # development, production, test
 connections = {
     'test': get_env('DB_URL_TEST', default=None),
     'development': get_env('DB_URL_DEVELOPMENT', default=None),
@@ -38,6 +39,28 @@ session = scoped_session(sessionmaker(autocommit=False,
 Base = declarative_base()
 Base.query = session.query_property()
 
+def check_if_table_exists(table, create_table=False):
+    """
+    Function checks whether table exists in our db and creates the table if
+    desired
+
+    Parameters
+    ----------
+    table : base definition of the table
+    create_table : whether to create the table if it does not exist
+
+    Returns
+    -------
+
+    """
+    table_exists = sqlalchemy.inspect(engine).has_table(table.__tablename__)
+
+    if not table_exists and create_table:
+        table.__table__.create(engine)
+        # check whether creation was successful
+        return sqlalchemy.inspect(engine).has_table(table.__tablename__)
+    else:
+        return table_exists
 
 def init_db(drop_first=False):
     if drop_first:

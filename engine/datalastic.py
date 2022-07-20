@@ -8,6 +8,8 @@ from base.env import get_env
 from base.logger import logger
 from base.models import Ship, Position, Port
 
+from difflib import SequenceMatcher
+import numpy as np
 
 def load_cache(f):
     try:
@@ -45,8 +47,89 @@ class Datalastic:
             json.dump(cls.cache_ships, outfile)
 
     @classmethod
-    def get_ship(cls, imo=None, mmsi=None, query_if_not_in_cache=True, use_cache=True):
+    def find_ship(cls, name, fuzzy=True, return_closest=True):
+        """
+        Find ship based on name from datalastic API
 
+        TODO:
+            - could add a function to query by name in cache using fuzzy lookup, but this gets tricky as we could find
+            a vessel with the same name but could be wrong one - could check location too?
+            - refactor fuzzy lookup to function by itself as it is used in multiple places now
+
+        Parameters
+        ----------
+        name :
+        fuzzy :
+        return_closest :
+        query_if_not_in_cache :
+        use_cache :
+
+        Returns
+        -------
+        Datalastic response and ship object
+
+        """
+        if not cls.api_key:
+            cls.api_key = get_env("KEY_DATALASTIC")
+
+        params = {
+            'api-key': cls.api_key,
+            'name': name,
+        }
+
+        # TODO:
+        # datalastic seems to have a problem; if we add fuzzy parameter (whether 0/1) it always returns fuzzy so
+        # solution for now is to only add when used
+        if fuzzy:
+            params['fuzzy'] = 1
+
+        method = 'vessel_find'
+        api_result = requests.get(Datalastic.api_base + method, params, verify=False)
+        if api_result.status_code != 200:
+            logger.warning("Datalastic: Failed to query vessel %s: %s" % (name, api_result))
+            return None
+
+        response_data = api_result.json()["data"]
+
+        if len(response_data) == 0:
+            logger.debug("No vessel found matching name %s" % (name,))
+            return None
+
+        if len(response_data) == 1:
+            logger.debug("Only 1 vessel found matching name %s (no need to compare strings)" % (name,))
+            return cls.parse_ship_data(response_data[0])
+
+        else:
+            if not return_closest:
+                # return first match
+                return cls.parse_ship_data(response_data[0])
+
+            ratios = np.array([SequenceMatcher(None, s["name"], name).ratio() for s in response_data])
+            if max(ratios) > 0.90:
+                print("Best match: %s == %s (%f)" % (name, response_data[ratios.argmax()]["name"], ratios.max()))
+                found_and_filtered = response_data[ratios.argmax()]
+                if found_and_filtered:
+                    return cls.parse_ship_data(found_and_filtered)
+            else:
+                print("No matches close enough")
+                return None
+
+    @classmethod
+    def get_ship(cls, imo=None, mmsi=None, query_if_not_in_cache=True, use_cache=True):
+        """
+
+        Parameters
+        ----------
+        imo : ship imo
+        mmsi : ship mmsi
+        query_if_not_in_cache : use datalastic to query if ship not in cache
+        use_cache : whether to check cache
+
+        Returns
+        -------
+        Ship object
+
+        """
         if not cls.api_key:
             cls.api_key = get_env("KEY_DATALASTIC")
 
@@ -83,6 +166,10 @@ class Datalastic:
             if use_cache:
                 cls.cache_ship(response_data)
 
+        return cls.parse_ship_data(response_data)
+
+    @classmethod
+    def parse_ship_data(cls, response_data):
         data = {
             "mmsi": response_data["mmsi"],
             "name": response_data["name"],
@@ -96,22 +183,66 @@ class Datalastic:
             "liquid_gas": response_data["liquid_gas"],
             "others": {"datalastic": response_data}
         }
-
         return Ship(**data)
 
     @classmethod
+    def get_position(cls, imo, date, window=1):
+        """
+        Returns the position of the boat at the closest referenced time in datalastic
+
+        Parameters
+        ----------
+        imo :
+        date :
+        window : this is the time window within which to look to find closest position in time
+
+        Returns
+        -------
+
+        """
+        date = to_datetime(date)
+
+        date_from = (date - dt.timedelta(days=window)).strftime("%Y-%m-%d")
+        date_to = (date + dt.timedelta(days=window)).strftime("%Y-%m-%d")
+
+        print(date_from, date_to)
+        positions = cls.get_positions(imo, date_from=date_from, date_to=date_to)
+
+        if not positions:
+            logger.warning("No positions found for ship (imo: {}) between dates: {}, {}.".format(imo, date_from, date_to))
+            return None
+
+        return min(positions, key=lambda p: abs(p.date_utc - date))
+
+    @classmethod
     def get_positions(cls, imo, date_from, date_to):
+        """
+        Returns positions of the vessel by imo between the two dates
+
+        Parameters
+        ----------
+        imo :
+        date_from :
+        date_to :
+
+        Returns
+        -------
+
+        """
 
         if not cls.api_key:
             cls.api_key = get_env("KEY_DATALASTIC")
 
+        date_from = to_datetime(date_from)
+        date_to = to_datetime(date_to)
+
         params = {
             'api-key': cls.api_key,
             'imo': imo,
-            'from': to_datetime(date_from).strftime("%Y-%m-%d")
+            'from': date_from.strftime("%Y-%m-%d")
         }
         if date_to is not None:
-            params["to"] = to_datetime(date_to).strftime("%Y-%m-%d")
+            params["to"] = date_to.strftime("%Y-%m-%d")
 
         # Datalastic doesn't accept more than one month
         if date_to - date_from >= dt.timedelta(days=31):

@@ -35,6 +35,9 @@ from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
 from . import DB_TABLE_CURRENCY
+from . import DB_TABLE_MTEVENT_TYPE
+from . import DB_TABLE_EVENT
+from . import DB_TABLE_EVENT_SHIPMENT
 
 from . import DB_TABLE_ALERT_INSTANCE
 from . import DB_TABLE_ALERT_CONFIG
@@ -481,6 +484,55 @@ class Currency(Base):
     __table_args__ = (UniqueConstraint('date', 'currency', name='unique_currency'),)
     __tablename__ = DB_TABLE_CURRENCY
 
+class MarineTrafficEventType(Base):
+    id = Column(String, unique=True, primary_key=True)
+    name = Column(String)
+    description = Column(String)
+    availability = Column(String)
+
+    __table_args__ = (UniqueConstraint('id', name='unique_event_type_id'),)
+    __tablename__ = DB_TABLE_MTEVENT_TYPE
+
+class Event(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_name = Column(String)
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    ship_closest_position = Column(Geometry('POINT', srid=4326))
+    interacting_ship_name = Column(String)
+    interacting_ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
+    interacting_ship_closest_position = Column(Geometry('POINT', srid=4326))
+    interacting_ship_details = Column(JSONB) # details about ship from datalastic query
+    date_utc = Column(DateTime(timezone=False))
+    created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
+    type_id = Column(String, ForeignKey(DB_TABLE_MTEVENT_TYPE + '.id', onupdate="CASCADE"))
+    content = Column(JSONB)
+    source = Column(String, default="marinetraffic")
+
+    __table_args__ = (UniqueConstraint('ship_imo', 'interacting_ship_imo', 'date_utc', name='unique_event'),)
+    __tablename__ = DB_TABLE_EVENT
+
+class EventShipment(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"), nullable=False)
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT+'.id', onupdate="CASCADE"), nullable=True)
+    created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index(
+            "unique_event_shipment",
+            "shipment_id",
+            "event_id",
+            unique=True,
+            postgresql_where=event_id.isnot(None)
+        ),
+        Index(
+            "unique_shipment",
+            "shipment_id",
+            unique=True,
+            postgresql_where=event_id.is_(None)
+        ),
+    )
+    __tablename__ = DB_TABLE_EVENT_SHIPMENT
 
 #############################
 # Alert related models

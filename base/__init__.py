@@ -12,6 +12,10 @@ UNKNOWN_COMMODITY = "unknown"
 PIPELINE_GAS = "natural_gas"
 PIPELINE_OIL = "pipeline_oil"
 
+# MARINE TRAFFIC METHODS
+VESSEL_DATA = "vesselmasterdata/"
+VESSEL_EVENTS = "vesselevents/"
+HTTP_OK = "200"
 
 
 # LOAD STATUS
