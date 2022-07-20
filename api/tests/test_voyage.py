@@ -115,7 +115,12 @@ def test_kazak_oil(app):
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
-        #TODO
+
+        data_df = pd.DataFrame(data)
+
+        assert data_df[data_df.departure_berth_name.str.startswith('Novorossiysk CPC') & ( \
+                    data_df.commodity == 'crude_oil')].commodity_origin_iso2.unique().tolist() == ['KZ']
+
 
 
 def test_voyage(app):

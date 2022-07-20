@@ -10,7 +10,7 @@ from flask_restx import inputs
 
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
-    Destination, Price, Country, PortPrice, Currency
+    Destination, Price, Country, PortPrice, Currency, EventShipment
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
@@ -191,12 +191,16 @@ class VoyageResource(Resource):
             else_=DeparturePort.iso2
         ).label('commodity_origin_iso2')
 
+        # Distinct subquery for Event Shipment which can have multiple entries for same shipment
+        event_shipment_subquery = session.query(EventShipment.shipment_id.distinct().label("sts_shipment_id")).subquery()
+
         commodity_destination_iso2_field = case(
             # Lauri: My heuristic is that all tankers that discharge cargo
             # in Yeosu but don't go to one of the identified berths are s2s
             [(sa.and_(
                 ArrivalPort.name.ilike('Yeosu%'),
-                ShipmentArrivalBerth.id == sa.null()), 'CN')],
+                event_shipment_subquery.c.sts_shipment_id != sa.null()
+            ), 'CN')],
             else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
         ).label('commodity_destination_iso2')
 
@@ -287,6 +291,7 @@ class VoyageResource(Resource):
              .outerjoin(Destination, Shipment.last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
              .outerjoin(Commodity, Commodity.id == commodity_field)
+             .outerjoin(event_shipment_subquery, Shipment.id == event_shipment_subquery.c.sts_shipment_id)
              .outerjoin(Price,
                         sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
                                 Price.commodity == Commodity.pricing_commodity,
