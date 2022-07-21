@@ -48,11 +48,7 @@ class VoyageResource(Resource):
     parser.add_argument('ship_imo', action='split', help='IMO identifier(s) of the ship(s)',
                         required=False,
                         default=None)
-    parser.add_argument('commodity_origin_iso2', action='split', help='iso2(s) of origin of commodity',
-                        required=False,
-                        default=None)
-    parser.add_argument('commodity_origin_country', action='split',
-                        help='country name of origin of commodity e.g. Russia',
+    parser.add_argument('commodity_origin_iso2', action='split', help='iso2(s) of origin of commodity. Default to Russia only',
                         required=False,
                         default=None)
     parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure (only RU should be available)',
@@ -109,6 +105,8 @@ class VoyageResource(Resource):
                         type=inputs.boolean, default=False)
 
     # Misc
+    parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
+                        required=False, default=None)
     parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
                         required=False, action='split', default=None)
 
@@ -123,7 +121,6 @@ class VoyageResource(Resource):
         status = params.get("status")
         date_from = params.get("date_from")
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
-        commodity_origin_country = params.get("commodity_origin_country")
         departure_iso2 = params.get("departure_iso2")
         departure_port_id = params.get("departure_port_id")
         departure_berth_id = params.get("departure_berth_id")
@@ -142,6 +139,7 @@ class VoyageResource(Resource):
         routed_trajectory = params.get("routed_trajectory")
         currency = params.get("currency")
         sort_by = params.get("sort_by")
+        limit = params.get("limit")
 
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
@@ -204,7 +202,7 @@ class VoyageResource(Resource):
 
         # Commodity origin and destination field
         commodity_origin_iso2_field = case(
-            [(DepartureBerth.name.ilike('Novorossiysk CPC%'), 'KZ')],
+            [(DepartureBerth.name == 'Novorossiysk CPC', 'KZ')],
             else_=DeparturePort.iso2
         ).label('commodity_origin_iso2')
 
@@ -216,7 +214,7 @@ class VoyageResource(Resource):
             # in Yeosu but don't go to one of the identified berths are s2s
             [(sa.and_(
                 ArrivalPort.name.ilike('Yeosu%'),
-                Ship.commodity.in_([base.OIL_PRODUCTS, base.CRUDE_OIL, base.LNG,
+                commodity_field.in_([base.OIL_PRODUCTS, base.CRUDE_OIL, base.LNG,
                                     base.OIL_OR_CHEMICAL]),
                 ShipmentArrivalBerth.id == sa.null()
                 ## Use below one once event_shipment has been fixed
@@ -367,12 +365,6 @@ class VoyageResource(Resource):
                     Departure.date_utc <= to_datetime(date_to)
                 ))
 
-        if commodity_origin_iso2 is not None:
-            shipments_rich = shipments_rich.filter(commodity_origin_iso2_field.in_(to_list(commodity_origin_iso2)))
-
-        if commodity_origin_country is not None:
-            shipments_rich = shipments_rich.filter(CommodityOriginCountry.in_(to_list(commodity_origin_country)))
-
         if departure_iso2 is not None:
             shipments_rich = shipments_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
 
@@ -400,6 +392,12 @@ class VoyageResource(Resource):
         if currency is not None:
             shipments_rich = shipments_rich.filter(Currency.currency.in_(to_list(currency)))
 
+        # Filters operating on subquery instead
+        if commodity_origin_iso2 is not None:
+            shipments_rich_sq = shipments_rich.subquery()
+            shipments_rich = session.query(shipments_rich_sq) \
+                .filter(shipments_rich_sq.c.commodity_origin_iso2.in_(to_list(commodity_origin_iso2)))
+
         # Aggregate
         query = self.aggregate(query=shipments_rich, aggregate_by=aggregate_by)
 
@@ -413,7 +411,6 @@ class VoyageResource(Resource):
                 response="empty",
                 mimetype='application/json')
 
-
         # Rolling average
         result = self.roll_average(result=result, aggregate_by=aggregate_by, rolling_days=rolling_days)
 
@@ -423,6 +420,9 @@ class VoyageResource(Resource):
         # Sort results
         result = self.sort_result(result=result, sort_by=sort_by)
 
+        # Keep only n records
+        if limit:
+            result = result[:limit]
 
         response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
                                        aggregate_by=aggregate_by, download=download, routed_trajectory=routed_trajectory)
@@ -458,7 +458,13 @@ class VoyageResource(Resource):
             'commodity_group': [subquery.c.commodity_group],
 
             'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country, subquery.c.commodity_origin_region],
+            'commodity_origin_country': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
+                                      subquery.c.commodity_origin_region],
             'commodity_destination_iso2': [subquery.c.commodity_destination_iso2, subquery.c.commodity_destination_country, subquery.c.commodity_destination_region],
+            'commodity_destination_country': [subquery.c.commodity_destination_iso2,
+                                           subquery.c.commodity_destination_country,
+                                           subquery.c.commodity_destination_region],
+            'commodity_destination_region': [subquery.c.commodity_destination_region],
 
             'status': [subquery.c.status],
             'date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
@@ -536,6 +542,7 @@ class VoyageResource(Resource):
         len_before = len(result)
         n_currencies = len(result.currency.unique())
         sep = '#,#'
+        old_columns = result.columns # Used to keep the order
 
         result['currency'] = 'value_' + result.currency.str.lower()
 
@@ -546,7 +553,7 @@ class VoyageResource(Resource):
             result['destination_dates'] = result['destination_dates'].apply(
                 lambda row: sep.join([x.strftime("%Y-%m-%d %H:%M:%S") for x in row]) if row else row)
 
-        index_cols = list(set(result.columns) - set(['currency', 'value_currency', 'value_eur']))
+        index_cols = [x for x in result.columns if x not in ['currency', 'value_currency', 'value_eur']]
         # result[index_cols] = result[index_cols].replace({np.nan: na_str})
         # result[index_cols] = result[index_cols].replace({None: na_str})
 
@@ -575,7 +582,7 @@ class VoyageResource(Resource):
     def sort_result(self, result, sort_by):
         by = []
         ascending = []
-        default_ascending = True
+        default_ascending = False
         if sort_by:
             for s in sort_by:
                 m = re.match("(.*)\\((.*)\\)", s)
