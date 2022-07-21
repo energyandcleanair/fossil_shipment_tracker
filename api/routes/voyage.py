@@ -72,6 +72,12 @@ class VoyageResource(Resource):
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+    parser.add_argument('commodity_destination_iso2', action='split', help='ISO2(s) of commodity destination country',
+                        required=False, default=None)
+    parser.add_argument('commodity_destination_region', action='split',
+                        help='region(s) of commodity destination e.g. EU28,Turkey',
+                        required=False,
+                        default=None)
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
@@ -116,6 +122,8 @@ class VoyageResource(Resource):
         departure_port_unlocode = params.get("departure_port_unlocode")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
+        commodity_destination_iso2 = params.get("commodity_destination_iso2")
+        commodity_destination_region = params.get("commodity_destination_region")
         date_to = params.get("date_to")
         ship_imo = params.get("ship_imo")
         aggregate_by = params.get("aggregate_by")
@@ -196,6 +204,8 @@ class VoyageResource(Resource):
             # in Yeosu but don't go to one of the identified berths are s2s
             [(sa.and_(
                 ArrivalPort.name.ilike('Yeosu%'),
+                #TODO use STS
+                # e.g. event is not null
                 ShipmentArrivalBerth.id == sa.null()), 'CN')],
             else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
         ).label('commodity_destination_iso2')
@@ -213,7 +223,7 @@ class VoyageResource(Resource):
 
         # Query with joined information
         shipments_rich = (session.query(Shipment.id,
-                                    Shipment.status,
+                                        Shipment.status,
 
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
@@ -359,6 +369,12 @@ class VoyageResource(Resource):
 
         if destination_region is not None:
             shipments_rich = shipments_rich.filter(DestinationCountry.region.in_(to_list(destination_region)))
+
+        if commodity_destination_iso2 is not None:
+            shipments_rich = shipments_rich.filter(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2)))
+
+        if commodity_destination_region is not None:
+            shipments_rich = shipments_rich.filter(CommodityDestinationCountry.region.in_(to_list(commodity_destination_region)))
 
         if currency is not None:
             shipments_rich = shipments_rich.filter(Currency.currency.in_(to_list(currency)))
