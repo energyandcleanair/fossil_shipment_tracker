@@ -269,6 +269,7 @@ class RussiaCounterResource(Resource):
 
         return result
 
+
     def sort_result(self, result, sort_by):
         by = []
         ascending = []
