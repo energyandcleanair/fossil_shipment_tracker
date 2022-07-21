@@ -11,10 +11,6 @@ from base.db import engine
 from base.db import meta
 from tqdm import tqdm
 
-
-
-
-
 def execute_statement(stmt, print_result=False):
     with engine.connect() as con:
         con = con.execution_options(isolation_level="AUTOCOMMIT")
@@ -54,7 +50,7 @@ def upsert(df, table, constraint_name, dtype={}, show_progress=True):
         meta.reflect(views=False, resolve_fks=False)
 
     if isinstance(df, gpd.GeoDataFrame):
-        #TODO upsert not yet supported. Not sure what's the best way to proceed
+        # TODO upsert not yet supported. Not sure what's the best way to proceed
         # It will fail if constraint is violated
         # A way would be to first remove db records violating the constraint
         df.to_postgis(table,

@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import numpy as np
 import datetime as dt
+import re
 import pytz
 import datetime as dt
 from flask import Response
@@ -52,6 +53,10 @@ class RussiaCounterResource(Resource):
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+    parser.add_argument('commodity', action='split',
+                        help='commodity to include e.g. crude_oil,oil_products,lng (see commodity endpoint to get the whole list). Defaults to all.',
+                        required=False,
+                        default=None)
     parser.add_argument('commodity_group', action='split', help='commodity group(s) to include e.g. oil,coal,gas Defaults to all.',
                         required=False,
                         default=None)
@@ -60,6 +65,8 @@ class RussiaCounterResource(Resource):
                         default=['EUR', 'USD'])
     parser.add_argument('nest_in_data', help='Whether to nest the json content in a data key.',
                         type=inputs.boolean, default=True)
+    parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
+                        required=False, action='split', default=None)
 
     @routes_api.expect(parser)
     def get(self):
@@ -73,11 +80,13 @@ class RussiaCounterResource(Resource):
         aggregate_by = params.get("aggregate_by")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
+        commodity = params.get("commodity")
         commodity_group = params.get("commodity_group")
         fill_with_estimates = params.get("fill_with_estimates")
         nest_in_data = params.get("nest_in_data")
         use_eu = params.get("use_eu")
         currency = params.get("currency")
+        sort_by = params.get("sort_by")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -116,6 +125,9 @@ class RussiaCounterResource(Resource):
 
         if destination_region:
             query = query.filter(destination_region_field.in_(to_list(destination_region)))
+
+        if commodity:
+            query = query.filter(Commodity.id.in_(to_list(commodity)))
 
         if commodity_group:
             query = query.filter(Commodity.group.in_(to_list(commodity_group)))
@@ -175,6 +187,9 @@ class RussiaCounterResource(Resource):
 
         # Spread currencies
         counter = self.spread_currencies(result=counter)
+
+        # Sort results
+        counter = self.sort_result(result=counter, sort_by=sort_by)
 
         if format == "csv":
             return Response(
@@ -251,5 +266,24 @@ class RussiaCounterResource(Resource):
         len_after = len(result)
         assert len_after == len_before / n_currencies
         result.replace({np.nan: None}, inplace=True)
+
+        return result
+
+    def sort_result(self, result, sort_by):
+        by = []
+        ascending = []
+        default_ascending = True
+        if sort_by:
+            for s in sort_by:
+                m = re.match("(.*)\\((.*)\\)", s)
+                if m:
+                    ascending.append(m[1] == "asc")
+                    by.append(m[2])
+                else:
+                    # No asc(.*) or desc(.*)
+                    ascending.append(default_ascending)
+                    by.append(s)
+
+            result.sort_values(by=by, ascending=ascending, inplace=True)
 
         return result

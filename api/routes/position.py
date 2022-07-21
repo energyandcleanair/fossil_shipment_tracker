@@ -14,7 +14,7 @@ import base
 from base.models import Shipment, Position, ShipmentDepartureBerth, ShipmentArrivalBerth, Departure, Arrival, Ship, Berth
 from base.encoder import JsonEncoder
 from base.db import session
-from base.utils import to_datetime, update_geometry_from_wkb
+from base.utils import to_datetime, update_geometry_from_wkb, to_list
 from . import routes_api
 
 
@@ -25,6 +25,7 @@ class PositionResource(Resource):
 
     parser = reqparse.RequestParser()
     parser.add_argument('ship_imo', required=False, help='imo(s) of ship', action='split')
+    parser.add_argument('voyage_id', required=False, help='id(s) of voyage', action='split')
 
     parser.add_argument('date_from', help='start date (format 2020-01-15)',
                         default="2022-01-01", required=False)
@@ -105,6 +106,7 @@ class PositionResource(Resource):
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         ship_imo = params.get("ship_imo")
+        voyage_id = params.get("voyage_id")
         status = params.get("status")
         commodities = params.get("commodity")
         has_departure_berth = params.get("has_departure_berth")
@@ -160,6 +162,9 @@ class PositionResource(Resource):
             .outerjoin(ShipmentArrivalBerth, ShipmentArrivalBerth.shipment_id == Shipment.id)
             # .outerjoin(DepartureBerth, ShipmentDepartureBerth.berth_id == DepartureBerth.id) \
             # .outerjoin(ArrivalBerth, ShipmentArrivalBerth.berth_id == ArrivalBerth.id)
+
+        if voyage_id is not None:
+            query = query.filter(Shipment.id.in_(to_list(voyage_id)))
 
         if ship_imo is not None:
             query = query.filter(Position.ship_imo.in_(ship_imo))

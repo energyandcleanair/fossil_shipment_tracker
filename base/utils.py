@@ -1,5 +1,6 @@
 from shapely import geometry
 import shapely
+import pyproj
 import datetime as dt
 import pandas as pd
 from geoalchemy2 import WKTElement
@@ -7,6 +8,30 @@ from base.encoder import JsonEncoder
 import json
 import numpy as np
 
+def distance_between_points(p1, p2, wkt=True, ellps = 'WGS84'):
+    """
+    Returns distance in meters between two points; if wkt=False assumed to be shapely Point objects
+
+    Parameters
+    ----------
+    p1 : point 1
+    p2 : point 2
+    wkt : whether p1/p2 are wkt, if false assumed to be shapely Points
+
+    Returns
+    -------
+    Distance in meters
+
+    """
+    geod = pyproj.Geod(ellps=ellps)
+
+    try:
+        if wkt:
+            p1, p2 = shapely.wkt.loads(p1), shapely.wkt.loads(p2)
+        angle1, angle2, distance = geod.inv(p1.x, p1.y, p2.x, p2.y)
+        return distance
+    except TypeError:
+        return None
 
 def latlon_to_point(lat, lon, wkt=True):
     try:
@@ -32,7 +57,10 @@ def to_datetime(d, date_ref=None):
             try:
                 return to_datetime(int(d), date_ref=date_ref)
             except ValueError:
-                return dt.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
+                try:
+                    return dt.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
+                except ValueError:
+                    return dt.datetime.strptime(d, "%Y-%m-%d %H:%M")
     if isinstance(d, dt.datetime):
         return d
     if isinstance(d, dt.date):
