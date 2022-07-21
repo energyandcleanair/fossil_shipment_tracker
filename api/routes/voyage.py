@@ -216,7 +216,8 @@ class VoyageResource(Resource):
             # in Yeosu but don't go to one of the identified berths are s2s
             [(sa.and_(
                 ArrivalPort.name.ilike('Yeosu%'),
-                Ship.commodity.in_([base.OIL_PRODUCTS, base.CRUDE_OIL, base.LNG]),
+                Ship.commodity.in_([base.OIL_PRODUCTS, base.CRUDE_OIL, base.LNG,
+                                    base.OIL_OR_CHEMICAL]),
                 ShipmentArrivalBerth.id == sa.null()
                 ## Use below one once event_shipment has been fixed
                 #event_shipment_subquery.c.sts_shipment_id != sa.null()
