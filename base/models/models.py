@@ -72,6 +72,7 @@ class Ship(Base):
     unit = Column(String)
 
     __tablename__ = DB_TABLE_SHIP
+    __table_args__ = (Index('idx_ship_imo', "imo"),)
 
     @validates('liquid_oil')
     def validate_liquid_oil(self, key, liquid_oil):
@@ -382,7 +383,8 @@ class Price(Base):
                           "commodity",
                           unique=True,
                           postgresql_where=country_iso2.is_(None)
-                      )
+                      ),
+                      Index("idx_price_commodity", "commodity")
                       )
 
 
@@ -395,7 +397,8 @@ class PortPrice(Base):
 
     __tablename__ = DB_TABLE_PORTPRICE
     __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', name='unique_portprice'),
-                      CheckConstraint("eur_per_tonne >= 0", name="portprice_positive"))
+                      CheckConstraint("eur_per_tonne >= 0", name="portprice_positive"),
+                      Index("idx_portprice_commodity", "commodity"))
 
 
 # Entsog flows: before processing
