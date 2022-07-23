@@ -383,6 +383,9 @@ class VoyageResource(Resource):
         if destination_region is not None:
             shipments_rich = shipments_rich.filter(DestinationCountry.region.in_(to_list(destination_region)))
 
+        if commodity_origin_iso2 is not None:
+            shipments_rich = shipments_rich.filter(CommodityOriginCountry.iso2.in_(to_list(commodity_origin_iso2)))
+
         if commodity_destination_iso2 is not None:
             shipments_rich = shipments_rich.filter(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2)))
 
@@ -392,18 +395,11 @@ class VoyageResource(Resource):
         if currency is not None:
             shipments_rich = shipments_rich.filter(Currency.currency.in_(to_list(currency)))
 
-        # Filters operating on subquery instead
-        if commodity_origin_iso2 is not None:
-            shipments_rich_sq = shipments_rich.subquery()
-            shipments_rich = session.query(shipments_rich_sq) \
-                .filter(shipments_rich_sq.c.commodity_origin_iso2.in_(to_list(commodity_origin_iso2)))
-
         # Aggregate
         query = self.aggregate(query=shipments_rich, aggregate_by=aggregate_by)
 
         # Query
         result = pd.read_sql(query.statement, session.bind)
-
 
         if len(result) == 0:
             return Response(
