@@ -301,7 +301,7 @@ class EntsogFlowResource(Resource):
         n_currencies = len(result.currency.unique())
 
         result['currency'] = 'value_' + result.currency.str.lower()
-        index_cols = list(set(result.columns) - set(['currency', 'value_currency', 'value_eur']))
+        index_cols = [x for x in result.columns if x not in ['currency', 'value_currency', 'value_eur']]
 
         result = result[index_cols + ['currency', 'value_currency']] \
             .set_index(index_cols + ['currency'])['value_currency'] \

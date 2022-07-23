@@ -1,6 +1,6 @@
 import datetime as dt
 import pandas as pd
-import geopandas as gpd
+import re
 import json
 import numpy as np
 
@@ -69,6 +69,12 @@ class PipelineFlowResource(Resource):
     parser.add_argument('download', help='Whether to return results as a file or not.',
                         type=inputs.boolean, default=False)
 
+    # Misc
+    parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
+                        required=False, action='split', default=None)
+    parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
+                        required=False, default=None)
+
     @routes_api.expect(parser)
     def get(self):
         params = PipelineFlowResource.parser.parse_args()
@@ -89,6 +95,8 @@ class PipelineFlowResource(Resource):
         download = params.get("download")
         rolling_days = params.get("rolling_days")
         currency = params.get("currency")
+        sort_by = params.get("sort_by")
+        limit = params.get("limit")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -205,6 +213,13 @@ class PipelineFlowResource(Resource):
 
         result = self.spread_currencies(result)
 
+        # Sort results
+        result = self.sort_result(result=result, sort_by=sort_by)
+
+        # Keep only n records
+        if limit:
+            result = result[:limit]
+
         if len(result) == 0:
             return Response(
                 status=HTTPStatus.NO_CONTENT,
@@ -297,7 +312,7 @@ class PipelineFlowResource(Resource):
         n_currencies = len(result.currency.unique())
 
         result['currency'] = 'value_' + result.currency.str.lower()
-        index_cols = list(set(result.columns) - set(['currency', 'value_currency', 'value_eur']))
+        index_cols = [x for x in result.columns if x not in ['currency', 'value_currency', 'value_eur']]
 
         result = result[index_cols + ['currency', 'value_currency']] \
             .set_index(index_cols + ['currency'])['value_currency'] \
@@ -337,3 +352,22 @@ class PipelineFlowResource(Resource):
         return Response(response="Unknown format. Should be either csv or json",
                         status=HTTPStatus.BAD_REQUEST,
                         mimetype='application/json')
+
+    def sort_result(self, result, sort_by):
+        by = []
+        ascending = []
+        default_ascending = False
+        if sort_by:
+            for s in sort_by:
+                m = re.match("(.*)\\((.*)\\)", s)
+                if m:
+                    ascending.append(m[1] == "asc")
+                    by.append(m[2])
+                else:
+                    # No asc(.*) or desc(.*)
+                    ascending.append(default_ascending)
+                    by.append(s)
+
+            result.sort_values(by=by, ascending=ascending, inplace=True)
+
+        return result

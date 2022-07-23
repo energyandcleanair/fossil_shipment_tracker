@@ -67,6 +67,8 @@ class RussiaCounterResource(Resource):
                         type=inputs.boolean, default=True)
     parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
                         required=False, action='split', default=None)
+    parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
+                        required=False, default=None)
 
     @routes_api.expect(parser)
     def get(self):
@@ -87,6 +89,7 @@ class RussiaCounterResource(Resource):
         use_eu = params.get("use_eu")
         currency = params.get("currency")
         sort_by = params.get("sort_by")
+        limit = params.get("limit")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -191,6 +194,10 @@ class RussiaCounterResource(Resource):
         # Sort results
         counter = self.sort_result(result=counter, sort_by=sort_by)
 
+        # Keep only n records
+        if limit:
+            counter = counter[:limit]
+
         if format == "csv":
             return Response(
                 response=counter.to_csv(index=False),
@@ -255,7 +262,7 @@ class RussiaCounterResource(Resource):
         n_currencies = len(result.currency.unique())
 
         result['currency'] = 'value_' + result.currency.str.lower()
-        index_cols = list(set(result.columns) - set(['currency', 'value_currency', 'value_eur']))
+        index_cols = [x for x in result.columns if x not in ['currency', 'value_currency', 'value_eur']]
 
         result = result[index_cols + ['currency', 'value_currency']] \
             .set_index(index_cols + ['currency'])['value_currency'] \
@@ -273,7 +280,7 @@ class RussiaCounterResource(Resource):
     def sort_result(self, result, sort_by):
         by = []
         ascending = []
-        default_ascending = True
+        default_ascending = False
         if sort_by:
             for s in sort_by:
                 m = re.match("(.*)\\((.*)\\)", s)
