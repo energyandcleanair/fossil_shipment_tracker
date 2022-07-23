@@ -5,6 +5,7 @@ import json
 import pandas as pd
 import base
 
+from base.models import Shipment
 
 def test_voyage(app):
 
@@ -39,3 +40,16 @@ def test_no_coal_in_tanker(app):
         voyages = pd.DataFrame(data)
         assert voyages.duplicated(subset=['id']).any() == False
         assert not any(['tanker' in y for y in voyages.ship_type.str.lower().unique()])
+
+
+def test_no_coal_sts(app):
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {"commodity": "coal",
+                  "destination_iso2": "KR",
+                  "commodity_destination_iso2": "CN"}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        #TODO Check this is empty
