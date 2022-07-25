@@ -13,7 +13,7 @@ SELECT
 			shipment.status,
 			lead(departure.date_utc) over (
 				partition BY departure.ship_imo
-				ORDER BY departure.date_utc
+				ORDER BY departure.ship_imo, departure.date_utc ASC
 			) AS next_departure_date_utc
 	FROM shipment
 	LEFT JOIN departure ON departure.id = shipment.departure_id
@@ -23,10 +23,14 @@ SELECT
  	LEFT JOIN (SELECT event.id, event.ship_imo, event.date_utc
 		   FROM event
 		   WHERE event.type_id = '21'
-		   AND event.interacting_ship_details->>'distance_meters' IS NOT NULL
-		   AND (event.interacting_ship_details->>'distance_meters')::int < 5000) AS ev
-		   ON ((ev.date_utc BETWEEN lead_shipment.departure_date AND lead_shipment.next_departure_date_utc)
-		   AND ev.ship_imo = lead_shipment.ship_imo)
+		   ) AS ev
+		   ON (ev.ship_imo = lead_shipment.ship_imo
+		   AND (
+		   (lead_shipment.next_departure_date_utc IS NOT NULL AND ev.date_utc BETWEEN lead_shipment.departure_date AND lead_shipment.next_departure_date_utc)
+		   OR
+		   (lead_shipment.next_departure_date_utc IS NULL AND ev.date_utc BETWEEN lead_shipment.departure_date AND lead_shipment.arrival_date + interval '1 hour' * 72)
+		       )
+		   )
 		   WHERE ev.id IS NOT NULL
     ON CONFLICT
         DO NOTHING
