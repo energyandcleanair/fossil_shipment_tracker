@@ -49,7 +49,24 @@ def test_no_coal_sts(app):
                   "destination_iso2": "KR",
                   "commodity_destination_iso2": "CN"}
         response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+
+        # assert empty response - we should have no situations where there is coal and
+        # the destination != commodity_destination
+        assert response.status_code == 204
+
+
+def test_yeosu_sts(app):
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {"format": "json",
+                  "destination_iso2": "KR"}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
-        #TODO Check this is empty
+
+        voyages = pd.DataFrame(data)
+
+        voyages_sts = voyages[voyages['destination_iso2'] != voyages['commodity_destination_iso2']]
+
+        assert not voyages_sts.empty

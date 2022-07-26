@@ -216,9 +216,9 @@ class VoyageResource(Resource):
                 ArrivalPort.name.ilike('Yeosu%'),
                 commodity_field.in_([base.OIL_PRODUCTS, base.CRUDE_OIL, base.LNG,
                                     base.OIL_OR_CHEMICAL]),
-                ShipmentArrivalBerth.id == sa.null()
+                ShipmentArrivalBerth.id == sa.null(),
                 ## Use below one once event_shipment has been fixed
-                #event_shipment_subquery.c.sts_shipment_id != sa.null()
+                event_shipment_subquery.c.sts_shipment_id != sa.null()
             ), 'CN')],
             else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
         ).label('commodity_destination_iso2')
