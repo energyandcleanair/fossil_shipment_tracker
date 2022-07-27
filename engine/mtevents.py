@@ -23,9 +23,12 @@ import json
 from base.models import MarineTrafficEventType, Event, EventShipment, Shipment, Departure, Ship, MarineTrafficCall
 
 def update(
-        date_from="2022-02-01",
+        date_from="2022-02-24",
         date_to=dt.date.today() + dt.timedelta(days=1),
         ship_imo=None,
+        commodities = [base.LNG,
+                       base.CRUDE_OIL,
+                       base.OIL_PRODUCTS],
         use_cache=False,
         cache_objects=True,
         only_ongoing=False,
@@ -57,10 +60,13 @@ def update(
             Departure.ship_imo.distinct().label("ship_imo"),
             Shipment.status
          ) \
-        .join(Departure, Shipment.departure_id == Departure.id)
+        .join(Departure, Shipment.departure_id == Departure.id) \
+        .join(Ship, Departure.ship_imo == Ship.imo)
 
     if ship_imo:
         ships = ships.filter(Departure.ship_imo.in_(to_list(ship_imo)))
+    if commodities:
+        ships = ships.filter(Ship.commodity.in_(to_list(commodities)))
     if only_ongoing:
         ships = ships.filter(Shipment.status != base.COMPLETED)
     if limit:
