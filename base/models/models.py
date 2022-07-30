@@ -487,6 +487,7 @@ class Currency(Base):
     __table_args__ = (UniqueConstraint('date', 'currency', name='unique_currency'),)
     __tablename__ = DB_TABLE_CURRENCY
 
+
 class MarineTrafficEventType(Base):
     id = Column(String, unique=True, primary_key=True)
     name = Column(String)
@@ -495,6 +496,7 @@ class MarineTrafficEventType(Base):
 
     __table_args__ = (UniqueConstraint('id', name='unique_event_type_id'),)
     __tablename__ = DB_TABLE_MTEVENT_TYPE
+
 
 class Event(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
@@ -513,6 +515,7 @@ class Event(Base):
 
     __table_args__ = (UniqueConstraint('ship_imo', 'interacting_ship_imo', 'date_utc', name='unique_event'),)
     __tablename__ = DB_TABLE_EVENT
+
 
 class EventShipment(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
