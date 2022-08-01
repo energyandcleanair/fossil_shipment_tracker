@@ -182,14 +182,14 @@ def add_interacting_ship_details_to_event(event, distance_check = 10000):
 
     intship_name = intship_name[0]
 
+    event.interacting_ship_name = intship_name
+
     print("{} vessel interacting with {}".format(ship_name, intship_name))
     intship = Datalastic.find_ship(intship_name, fuzzy=True, return_closest=True)
 
     if not intship:
         print("Error in finding ship in Datalastic for event: {}".format(event_content))
         return False
-
-    event.interacting_ship_name = intship.name
 
     # fill imo where necessary from MT
     if intship.imo is None:
@@ -198,11 +198,14 @@ def add_interacting_ship_details_to_event(event, distance_check = 10000):
 
             if not mt_intship_check:
 
-                # add unknown ship to db so we don't repeatedly query MT
+                # add unknown ship to db, so we don't repeatedly query MT
                 unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi, mmsi=intship.mmsi, type=intship.type,
                                     name=intship.name)
                 session.add(unknown_ship)
                 session.commit()
+
+                # add int ship info before returning
+                intship.imo = unknown_ship.imo
 
                 return False
 
