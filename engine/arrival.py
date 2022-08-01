@@ -78,42 +78,44 @@ def update(min_dwt=base.DWT_MIN,
         arrival_portcall = portcall.find_arrival(departure_portcall=departure_portcall,
                                                  cache_only=cache_only)
 
-        if arrival_portcall:
+        # We don't create the arrival here anymore, using sql to do so.
+        # The call above is useful though to keep looking for required portcalls
 
-            existing_arrival = Arrival.query.filter(Arrival.departure_id == d.id).first()
-            if existing_arrival is not None and existing_arrival.portcall_id != arrival_portcall.id:
-                # Update
-                existing_arrival.date_utc = arrival_portcall.date_utc
-                existing_arrival.port_id = arrival_portcall.port_id
-                existing_arrival.portcall_id = arrival_portcall.id
-                existing_arrival.method_id = "python"
-                session.commit()
-
-                # And remove associated trajectories, berths etc
-                existing_shipment = Shipment.query.filter(Shipment.departure_id == d.id).first()
-                if existing_shipment is not None:
-                    session.query(ShipmentArrivalBerth).filter(ShipmentArrivalBerth.shipment_id == existing_shipment.id).delete()
-                    session.query(Trajectory).filter(Trajectory.shipment_id == existing_shipment.id).delete()
-
-                session.commit()
-
-            else:
-                # There was no such arrival
-                data = {
-                    "departure_id": d.id,
-                    "method_id": "python",
-                    "date_utc": arrival_portcall.date_utc,
-                    "port_id": arrival_portcall.port_id,
-                    "portcall_id": arrival_portcall.id
-                }
-                arrival = Arrival(**data)
-                session.add(arrival)
-                try:
-                    session.commit()
-                except sqlalchemy.exc.IntegrityError:
-                    logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
-                    session.rollback()
-
-        else:
-            logger.debug(
-                "No relevant arrival found. Should check portcalls for imo %s from date %s." % (imo, d.date_utc))
+        # if arrival_portcall:
+        #
+        #     existing_arrival = Arrival.query.filter(Arrival.departure_id == d.id).first()
+        #     if existing_arrival is not None and existing_arrival.portcall_id != arrival_portcall.id:
+        #         # Update
+        #         existing_arrival.date_utc = arrival_portcall.date_utc
+        #         existing_arrival.port_id = arrival_portcall.port_id
+        #         existing_arrival.portcall_id = arrival_portcall.id
+        #         existing_arrival.method_id = "python"
+        #         session.commit()
+        #
+        #         # And remove associated trajectories, berths etc
+        #         existing_shipment = Shipment.query.filter(Shipment.departure_id == d.id).first()
+        #         if existing_shipment is not None:
+        #             session.query(ShipmentArrivalBerth).filter(ShipmentArrivalBerth.shipment_id == existing_shipment.id).delete()
+        #             session.query(Trajectory).filter(Trajectory.shipment_id == existing_shipment.id).delete()
+        #
+        #         session.commit()
+        #
+        #     else:
+        #         # There was no such arrival
+        #         data = {
+        #             "departure_id": d.id,
+        #             "method_id": "python",
+        #             "date_utc": arrival_portcall.date_utc,
+        #             "port_id": arrival_portcall.port_id,
+        #             "portcall_id": arrival_portcall.id
+        #         }
+        #         arrival = Arrival(**data)
+        #         session.add(arrival)
+        #         try:
+        #             session.commit()
+        #         except sqlalchemy.exc.IntegrityError:
+        #             logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
+        #             session.rollback()
+        # else:
+        #     logger.debug(
+        #         "No relevant arrival found. Should check portcalls for imo %s from date %s." % (imo, d.date_utc))
