@@ -259,7 +259,8 @@ def get_next_portcall(date_from,
                                                                        date_from=date_from,
                                                                        date_to=date_to,
                                                                        arrival_or_departure=arrival_or_departure,
-                                                                       go_backward=go_backward)
+                                                                       go_backward=go_backward,
+                                                                       filter=filter)
 
         upload_portcalls(portcalls)
 
