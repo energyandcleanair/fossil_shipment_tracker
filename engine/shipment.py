@@ -1,20 +1,19 @@
 from base.db_utils import execute_statement
 from base.utils import to_list, to_datetime
 from base.logger import logger_slack
-
+from engine import departure
+import base
 
 def rebuild(date_from="2022-01-01"):
     logger_slack.info("=== Shipment rebuild ===")
     with open('engine/shipment_rebuild.sql', 'r') as file:
-        sql_content1 = file.read()
-    with open('engine/shipment_refresh.sql', 'r') as file:
-        sql_content2 = file.read()
+        sql_rebuild = file.read()
 
-    sql_content = sql_content1 + sql_content2
-    sql_content = sql_content.replace("date_utc >= '2022-01-01'",
-                                      "date_utc >= '%s'" % (to_datetime(date_from).strftime('%Y-%m-%d')))
-    execute_statement(sql_content, print_result=True)
+    execute_statement(sql_rebuild, print_result=True)
 
+    departure.update()
+
+    update(date_from=date_from)
 
 def update(date_from="2022-01-01"):
     logger_slack.info("=== Shipment update ===")

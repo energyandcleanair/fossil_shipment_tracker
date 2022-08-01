@@ -115,8 +115,23 @@ def get_dangling_imo_dates():
     subquery = session.query(Arrival.departure_id)
     return session.query(Departure.ship_imo, Departure.date_utc).filter(~Departure.id.in_(subquery)).all()
 
+def update(date_from="2022-01-01"):
 
-def update(date_from="2022-01-01",
+    add(date_from=date_from, commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
+                           base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
+
+    add(date_from=date_from, unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
+                     commodities=base.GENERAL_CARGO)
+
+    # Only keep oil related for India
+    remove(unlocode=['INSIK'],
+                     port_id=114313,
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    remove(port_name='SIKKA ANCH',
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+def add(date_from="2022-01-01",
            min_dwt=base.DWT_MIN,
            limit=None,
            commodities=[base.LNG,

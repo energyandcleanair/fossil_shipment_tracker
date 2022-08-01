@@ -21,20 +21,7 @@ import datetime as dt
 def update():
     portcall.update_departures_from_russia()
     ship.update()
-    departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
-                           base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
-
-    departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
-                     commodities=base.GENERAL_CARGO)
-
-    # Only keep oil related for India
-    departure.remove(unlocode=['INSIK'],
-                     port_id=114313,
-                     commodities=[base.LNG, base.COAL, base.BULK])
-
-    departure.remove(port_name='SIKKA ANCH',
-                     commodities=[base.LNG, base.COAL, base.BULK])
-
+    departure.update()
     arrival.update(date_from = dt.date.today() - dt.timedelta(days=90))
     currency.update()
     shipment.update()
