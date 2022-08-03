@@ -185,6 +185,7 @@ class Departure(Base):
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String) # Method through which we detected the departure
     portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=True)
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"), nullable=True)
 
     __tablename__ = DB_TABLE_DEPARTURE
 
@@ -198,6 +199,7 @@ class Arrival(Base):
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String)
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'))
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"), nullable=True)
 
     # Optional
     portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=True)
