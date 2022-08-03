@@ -3,6 +3,10 @@
  delete from shipmentarrivalberth;
  delete from shipment;
  delete from arrival;
- delete from departure;
+ with deleted_departures as (
+ delete from departure
+ )
+ SELECT count(id)
+ FROM departure;
 
 
