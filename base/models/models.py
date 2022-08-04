@@ -414,7 +414,7 @@ class EntsogFlow(Base):
     value_mwh = Column(Numeric)
     value_m3 = Column(Numeric)
 
-    type = Column(String)
+    type = Column(String, nullable=False)
 
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 

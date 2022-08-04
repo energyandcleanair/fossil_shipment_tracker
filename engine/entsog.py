@@ -416,7 +416,7 @@ def process_consumption_distribution(flows_distribution_raw,
     flows_distribution_raw['type'] = base.ENTSOG_DISTRIBUTION
     flows_consumption_raw['type'] = base.ENTSOG_CONSUMPTION
 
-    flows_agg = pd.concat([flows_distribution_raw,
+    flows = pd.concat([flows_distribution_raw,
                           flows_consumption_raw],
                           axis=0) \
         .groupby(['country', 'partner', 'date', 'type']) \
@@ -427,7 +427,9 @@ def process_consumption_distribution(flows_distribution_raw,
                          'value': 'value_kwh'}) \
         .reset_index()
 
-    return flows_agg
+    flows['destination_iso2'] = flows.destination_iso2.combine_first(flows.departure_iso2)
+
+    return flows
 
 
 def process_crossborder_flows_raw(flows_import_raw,
