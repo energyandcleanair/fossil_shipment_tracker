@@ -21,9 +21,10 @@ import re
 import json
 
 from base.models import MarineTrafficEventType, Event, EventShipment, Shipment, Departure, Ship, MarineTrafficCall
+from sqlalchemy import func
 
 def update(
-        date_from="2022-02-24",
+        date_from="2022-01-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         ship_imo=None,
         commodities = [base.LNG,
@@ -63,8 +64,14 @@ def update(
         .join(Departure, Shipment.departure_id == Departure.id) \
         .join(Ship, Departure.ship_imo == Ship.imo)
 
+    ships = session.query(
+            Ship.imo.distinct().label("ship_imo")
+    )
+
     if ship_imo:
-        ships = ships.filter(Departure.ship_imo.in_(to_list(ship_imo)))
+        ships = ships.filter(Ship.imo.in_(to_list(ship_imo)))
+    #if ship_imo:
+    #    ships = ships.filter(Departure.ship_imo.in_(to_list(ship_imo)))
     if commodities:
         ships = ships.filter(Ship.commodity.in_(to_list(commodities)))
     if only_ongoing:
@@ -150,8 +157,42 @@ def update(
                     session.rollback()
                     continue
 
+def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
+    # get closest position in time and add to event
+    ship_position, intship_position = Datalastic.get_position(imo=ship_one_imo, date=event_time),\
+                                      Datalastic.get_position(imo=ship_two_imo, date=event_time)
 
-def add_interacting_ship_details_to_event(event, distance_check = 10000):
+    if not ship_position or not intship_position:
+        print("Failed to find ship positions. try increasing time window...")
+        return ship_position, intship_position, None, None
+
+    ship_position_geom, intship_position_geom = ship_position.geometry, intship_position.geometry
+
+    # TODO: is there a better way to handle the SRID section?
+    d = distance_between_points(ship_position_geom.replace("SRID=4326;", ""), intship_position_geom.replace("SRID=4326;", ""))
+
+    if d:
+        print("Distance between ships was {} at {}".format(d, event_time))
+
+    # we calculate the time difference at the point the position is taken with an extra 0.5 hour buffer
+    time_difference = 0.5+abs((ship_position.date_utc - intship_position.date_utc).total_seconds()/3600.)
+
+    return ship_position_geom, \
+           intship_position_geom, \
+           d, \
+           time_difference
+
+def find_ships_in_db(interacting_ship_name):
+
+    ships = session.query(Ship) \
+            .filter(func.lower(Ship.name).ilike(func.lower(interacting_ship_name)),
+                    Ship.dwt > base.DWT_MIN,
+                    sqlalchemy.not_(Ship.name.contains('NOTFOUND'))).all()
+
+    return ships
+
+
+def add_interacting_ship_details_to_event(event, distance_check = 30000):
     """
     This function adds the interacting ship details to an mt event by:
         - finding the vessel using fuzzy search on datalastic
@@ -181,10 +222,94 @@ def add_interacting_ship_details_to_event(event, distance_check = 10000):
         return False
 
     intship_name = intship_name[0]
-
     event.interacting_ship_name = intship_name
 
     print("{} vessel interacting with {}".format(ship_name, intship_name))
+
+    int_ships = find_ships_in_db(intship_name)
+
+    # first, try and find the ship in our databse and check if position is satisfied
+    if int_ships:
+        for intship in int_ships:
+            ship_position, intship_position, d, position_time_diff = check_distance_between_ships(ship_imo, intship.imo, event_time)
+
+            # check if two ships are within a distance of each other based on avg speed and time difference of positions
+            # we multiply by 2 in the max case of them moving opposite to each other
+            if d is not None and d < position_time_diff*base.AVG_TANKER_SPEED_KMH*1000*2:
+
+                event.interacting_ship_imo = intship.imo
+                event.ship_closest_position = ship_position
+                event.interacting_ship_closest_position = intship_position
+                event.interacting_ship_details = {"distance_meters": int(d)}
+
+                return True
+
+    # since we did not find satisfactory ship in db, let's try datalastic
+
+    int_ships = Datalastic.find_ship(intship_name, fuzzy=True, return_closest=5)
+
+    if int_ships is None:
+        return False
+
+    for intship in int_ships:
+        if not intship:
+            print("Error in finding ship in Datalastic for event: {}".format(event_content))
+            continue
+
+        # fill imo where necessary from MT
+        if intship.imo is None:
+            if intship.mmsi is not None:
+                mt_intship_check = fill(mmsis=[intship.mmsi])
+
+                if not mt_intship_check:
+                    # add unknown ship to db, so we don't repeatedly query MT
+                    unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi, mmsi=intship.mmsi, type=intship.type,
+                                        name=intship.name)
+                    session.add(unknown_ship)
+                    session.commit()
+
+                    continue
+
+                mt_ship = session.query(Ship).filter(Ship.mmsi == intship.mmsi).all()
+
+                # check if we find more than 1 ship
+                if len(mt_ship) > 1:
+                    continue
+
+                # if we don't find any in db by mmsi we failed to upload...
+                if not mt_ship:
+                    print("Failed to find imo in MT for event: {}".format(event_content))
+                    continue
+
+                mt_ship = mt_ship[0]
+
+                if intship.name == mt_ship.name:
+                    intship.imo = mt_ship.imo
+                else:
+                    print("Found match for ship with mmsi, but names do not match for event {}".format(event_content))
+                    continue
+            else:
+                print("No ship imo found and we do not have an mmsi for event: {}".format(event_content))
+                continue
+
+            # check if interacting ship is in db
+        found = fill(imos=[intship.imo])
+        if not found:
+            print("Failed to upload missing ships")
+            continue
+
+        # get closest position in time and add to event
+        ship_position, intship_position, d, position_time_diff = check_distance_between_ships(ship_imo, intship.imo, event_time)
+
+        if d is not None and d < position_time_diff*base.AVG_TANKER_SPEED_KMH*2:
+                event.interacting_ship_imo = intship.imo
+                event.ship_closest_position = ship_position
+                event.interacting_ship_closest_position = intship_position
+                event.interacting_ship_details = {"distance_meters": int(d)}
+                return True
+
+    return False
+'''
     intship = Datalastic.find_ship(intship_name, fuzzy=True, return_closest=True)
 
     if not intship:
@@ -240,28 +365,18 @@ def add_interacting_ship_details_to_event(event, distance_check = 10000):
     event.interacting_ship_imo = intship.imo
 
     # get closest position in time and add to event
-    ship_position = Datalastic.get_position(imo=ship_imo, date=event_time)
-    if ship_position: event.ship_closest_position = ship_position.geometry
+    ship_position, intship_position, d = check_distance_between_ships(ship_imo, intship.imo)
 
-    intship_position = Datalastic.get_position(imo=intship.imo, date=event_time)
+    if ship_position: event.ship_closest_position = ship_position.geometry
     if intship_position: event.interacting_ship_closest_position = intship_position.geometry
 
-    if not ship_position or not intship_position:
-        print("Failed to find ship positions. try increasing time window...")
-        return False
-
-    ship_position, intship_position = ship_position.geometry, intship_position.geometry
-
-    # TODO: is there a better way to handle the SRID section?
-    d = distance_between_points(ship_position.replace("SRID=4326;",""), intship_position.replace("SRID=4326;",""))
-
     if d:
-        print("Distance between ships was {} at {}".format(d, event_time))
         event.interacting_ship_details = {"distance_meters": int(d)}
         if d < distance_check:
             return True
 
     return False
+'''
 
 def create_mtevent_type_table(force_rebuild=False):
     """
