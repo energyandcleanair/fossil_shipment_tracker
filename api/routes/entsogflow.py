@@ -7,7 +7,7 @@ import numpy as np
 from . import routes_api
 from flask_restx import inputs
 
-
+import base
 from base.models import EntsogFlow, Price, Country, Commodity, Currency
 from base.db import session
 from base.encoder import JsonEncoder
@@ -49,6 +49,10 @@ class EntsogFlowResource(Resource):
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+    parser.add_argument('type', action='split', help='type of information: flow, production, consumption, distribution'
+                                                     'or any combination of them',
+                        required=False,
+                        default=[base.ENTSOG_CROSSBORDER, base.ENTSOG_PRODUCTION])
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
@@ -81,6 +85,7 @@ class EntsogFlowResource(Resource):
         departure_iso2 = params.get("departure_iso2")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
+        type = params.get("type")
         date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
         format = params.get("format", "json")
@@ -120,6 +125,7 @@ class EntsogFlowResource(Resource):
 
         # Query with joined information
         flows_rich = (session.query(EntsogFlow.id,
+                                    EntsogFlow.type,
                                     EntsogFlow.commodity,
                                     Commodity.group.label('commodity_group'),
 
@@ -147,8 +153,8 @@ class EntsogFlowResource(Resource):
                                     )
              .join(DepartureCountry, DepartureCountry.iso2 == EntsogFlow.departure_iso2)
              .outerjoin(DestinationCountry, EntsogFlow.destination_iso2 == DestinationCountry.iso2)
-              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
-              .outerjoin(CommodityDestinationCountry,
+             .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
+             .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(Commodity, EntsogFlow.commodity == Commodity.id)
              .outerjoin(Price,
@@ -193,6 +199,9 @@ class EntsogFlowResource(Resource):
 
         if destination_region is not None:
             flows_rich = flows_rich.filter(DestinationCountry.region.in_(to_list(destination_region)))
+
+        if type is not None:
+            flows_rich = flows_rich.filter(EntsogFlow.type.in_(to_list(type)))
 
         if currency is not None:
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))

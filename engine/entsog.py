@@ -314,6 +314,14 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         opd.pointType.str.contains('production') \
         & (opd.directionKey == 'entry')]
 
+    consumption_points = opd.loc[
+        opd.pointType.str.contains('Consumers') \
+        & (opd.directionKey == 'exit')]
+
+    distribution_points = opd.loc[
+        opd.pointType.str.contains('Distribution') \
+        & (opd.directionKey == 'exit')]
+
     exit_points = opd.loc[
         opd.pointType.str.contains('Cross-Border') \
         & (opd.directionKey == 'exit')]
@@ -360,6 +368,22 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         date_to=to_datetime(date_to),
     )
 
+    flows_consumption_raw = get_physical_flows(
+        operator_key=keep_unique(consumption_points).operatorKey.to_list(),
+        point_key=keep_unique(consumption_points).pointKey.to_list(),
+        direction="exit",
+        date_from=to_datetime(date_from),
+        date_to=to_datetime(date_to),
+    )
+
+    flows_distribution_raw = get_physical_flows(
+        operator_key=keep_unique(distribution_points).operatorKey.to_list(),
+        point_key=keep_unique(distribution_points).pointKey.to_list(),
+        direction="exit",
+        date_from=to_datetime(date_from),
+        date_to=to_datetime(date_to),
+    )
+
     flows_export_raw = get_physical_flows(
         operator_key=keep_unique(exit_points).operatorKey.to_list(),
         point_key=keep_unique(exit_points).pointKey.to_list(),
@@ -380,7 +404,30 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
             add_countries(flows_import_lng_raw),
             add_countries(flows_export_raw),
             add_countries(flows_export_lng_raw),
-            add_countries(flows_production_raw))
+            add_countries(flows_production_raw),
+            add_countries(flows_consumption_raw),
+            add_countries(flows_distribution_raw),
+            )
+
+
+def process_consumption_distribution(flows_distribution_raw,
+                                    flows_consumption_raw):
+
+    flows_distribution_raw['type'] = base.ENTSOG_DISTRIBUTION
+    flows_consumption_raw['type'] = base.ENTSOG_CONSUMPTION
+
+    flows_agg = pd.concat([flows_distribution_raw,
+                          flows_consumption_raw],
+                          axis=0) \
+        .groupby(['country', 'partner', 'date', 'type']) \
+        .agg(value=('value', np.nansum)) \
+        .reset_index() \
+        .rename(columns={'country_import': 'destination_iso2',
+                         'partner': 'departure_iso2',
+                         'value': 'value_kwh'}) \
+        .reset_index()
+
+    return flows_agg
 
 
 def process_crossborder_flows_raw(flows_import_raw,
@@ -416,13 +463,13 @@ def process_crossborder_flows_raw(flows_import_raw,
         flows_export_raw = pd.DataFrame({'pointKey': pd.Series(dtype='str'),
                                          'operatorKey': pd.Series(dtype='int'),
                                          'value': pd.Series(dtype='float'),
-                                         'date': pd.Series(dtype='str')})
+                                         'date': pd.Series(dtype='str'),
+                                         'type': pd.Series(dtype='str')})
 
     flows_export = flows_export_raw
 
     if flows_export_lng_raw is not None:
         flows_export_lng = flows_export_lng_raw
-
         flows_export_lng['country'] = 'lng'  # Making LNG a country
         flows_export = pd.concat([flows_export, flows_export_lng], axis=0)
 
@@ -497,6 +544,16 @@ def process_crossborder_flows_raw(flows_import_raw,
                          'partner': 'from_country'}) \
         .reset_index()
 
+    flows_agg.rename(columns={'from_country': 'departure_iso2',
+                                      'to_country': 'destination_iso2',
+                                      'value': 'value_kwh'},
+                     inplace=True)
+
+    flows_agg.loc[
+        flows_agg.departure_iso2 != flows_agg.destination_iso2, 'type'] = base.ENTSOG_CROSSBORDER
+    flows_agg.loc[
+        flows_agg.departure_iso2 == flows_agg.destination_iso2, 'type'] = base.ENTSOG_PRODUCTION
+
     if save_to_file:
         filename = filename or "entsog_flows.csv"
         flows_agg.to_csv(filename, index=False)
@@ -513,25 +570,28 @@ def fix_kipi_flows(flows):
     return flows
 
 
-def get_crossborder_flows(date_from='2022-01-01',
+
+def get_flows(date_from='2022-01-01',
                           date_to=dt.date.today(),
                           country_iso2=None,
                           remove_pipe_in_pipe=True,
                           save_to_file=False,
                           filename=None):
+
+    # Get raw information from ENTSOG
     (flows_import_raw,
      flows_import_lng_raw,
      flows_export_raw,
      flows_export_lng_raw,
-     flows_production_raw) = get_crossborder_flows_raw(date_from=date_from,
+     flows_production_raw,
+     flows_consumption_raw,
+     flows_distribution_raw) = get_crossborder_flows_raw(date_from=date_from,
                                                        date_to=date_to,
                                                        country_iso2=country_iso2,
                                                        remove_pipe_in_pipe=remove_pipe_in_pipe)
 
-    ##########################
-    # Combine, aggregate, etc
-    ##########################
-    flows_agg = process_crossborder_flows_raw(flows_import_raw=flows_import_raw,
+    # Process cross border & production
+    flows_crossborder = process_crossborder_flows_raw(flows_import_raw=flows_import_raw,
                                               flows_export_raw=flows_export_raw,
                                               flows_import_lng_raw=flows_import_lng_raw,
                                               flows_export_lng_raw=flows_export_lng_raw,
@@ -541,19 +601,14 @@ def get_crossborder_flows(date_from='2022-01-01',
                                               remove_operators=[],
                                               save_to_file=save_to_file,
                                               filename=filename)
-    return flows_agg
+
+    # Consumption and distribution
+    flows_cons_dist = process_consumption_distribution(flows_distribution_raw=flows_distribution_raw,
+                                                       flows_consumption_raw=flows_consumption_raw)
 
 
-def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=False, filename=None):
-
-    flows = get_crossborder_flows(date_from=date_from,
-                                  date_to=date_to,
-                                  save_to_file=save_to_file,
-                                  filename=filename)
-
-    flows = flows.rename(columns={'from_country': 'departure_iso2',
-                          'to_country': 'destination_iso2',
-                          'value': 'value_kwh'})
+    flows = pd.concat([flows_crossborder,
+                       flows_cons_dist], axis=0)
 
     flows = fix_kipi_flows(flows)
 
@@ -567,6 +622,7 @@ def get_flows(date_from="2021-01-01", date_to=dt.date.today(), save_to_file=Fals
     flows.replace({'departure_iso2': {'UK': 'GB'},
                    'destination_iso2': {'UK': 'GB'}},
                   inplace=True)
+
     return flows
 
 
@@ -589,6 +645,9 @@ def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=Tr
                       date_to=date_to,
                       save_to_file=save_to_file,
                       filename=filename)
+
+    flows = flows[['commodity', 'departure_iso2', 'destination_iso2', 'date',
+                   'value_tonne', 'value_mwh', 'value_m3', 'type']]
 
     upsert(df=flows, table=DB_TABLE_ENTSOGFLOW, constraint_name="unique_entsogflow")
 
