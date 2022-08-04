@@ -422,12 +422,10 @@ def process_consumption_distribution(flows_distribution_raw,
         .groupby(['country', 'partner', 'date', 'type']) \
         .agg(value=('value', np.nansum)) \
         .reset_index() \
-        .rename(columns={'country_import': 'destination_iso2',
+        .rename(columns={'country': 'destination_iso2',
                          'partner': 'departure_iso2',
                          'value': 'value_kwh'}) \
         .reset_index()
-
-    flows['destination_iso2'] = flows.destination_iso2.combine_first(flows.departure_iso2)
 
     return flows
 
