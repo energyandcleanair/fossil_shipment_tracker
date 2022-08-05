@@ -64,14 +64,8 @@ def update(
         .join(Departure, Shipment.departure_id == Departure.id) \
         .join(Ship, Departure.ship_imo == Ship.imo)
 
-    ships = session.query(
-            Ship.imo.distinct().label("ship_imo")
-    )
-
     if ship_imo:
         ships = ships.filter(Ship.imo.in_(to_list(ship_imo)))
-    #if ship_imo:
-    #    ships = ships.filter(Departure.ship_imo.in_(to_list(ship_imo)))
     if commodities:
         ships = ships.filter(Ship.commodity.in_(to_list(commodities)))
     if only_ongoing:
