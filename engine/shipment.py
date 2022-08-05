@@ -18,8 +18,12 @@ def rebuild(date_from="2022-01-01"):
 def update(date_from="2022-01-01"):
     logger_slack.info("=== Shipment update ===")
 
-    with open('engine/shipment_refresh.sql', 'r') as file:
+    with open('engine/shipment_refresh_sts.sql', 'r') as file:
         sql_content = file.read()
+
+    with open('engine/shipment_refresh.sql', 'r') as file:
+        sql_content += file.read()
+
     sql_content = sql_content.replace("date_utc >= '2021-11-01'",
                                       "date_utc >= '%s'" % (to_datetime(date_from).strftime('%Y-%m-%d')))
     execute_statement(sql_content, print_result=True)
