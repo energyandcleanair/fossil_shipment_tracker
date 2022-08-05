@@ -1,3 +1,5 @@
+import datetime
+
 import pandas as pd
 import numpy as np
 import sqlalchemy
@@ -77,6 +79,8 @@ def update(
 
     logger.info("Will process {} ships.".format(len(ships.all())))
 
+    date_to, date_from = to_datetime(date_to), to_datetime(date_from)
+
     for ship in tqdm(ships.all()):
 
         # convert SQLAlchemy.row object
@@ -103,18 +107,25 @@ def update(
 
             # if we did check this ship before and force rebuild is false, only query since last time
             if last_event_call is not None:
-                es_date_from = to_datetime(last_event_call.params['todate']) + dt.timedelta(minutes=1)
-            else:
-                es_date_from = date_from
+                date_from = to_datetime(last_event_call.params['todate']) + dt.timedelta(minutes=1)
 
-            date_bounds = [(es_date_from, to_datetime(date_to))]
+        date_bounds = []
 
-        if force_rebuild:
-            date_bounds = [(date_from, date_to)]
+        day_delta = (date_to - date_from).days
+        polling_limit = datetime.timedelta(180)
+
+        for _d in range(0, int(day_delta / 180)):
+            date_bounds.append([date_from, date_from+polling_limit])
+            date_from = date_from + polling_limit + datetime.timedelta(1)
+
+        date_bounds.append([date_from, date_to])
 
         for dates in date_bounds:
             query_date_from = dates[0]
             query_date_to = dates[1]
+
+            if query_date_to < query_date_from:
+                continue
 
             events = Marinetraffic.get_ship_events_between_dates(
                 imo=ship_imo,
