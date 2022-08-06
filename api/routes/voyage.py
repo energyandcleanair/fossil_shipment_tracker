@@ -218,7 +218,7 @@ class VoyageResource(Resource):
                                     base.OIL_OR_CHEMICAL]),
                 ShipmentArrivalBerth.id == sa.null(),
                 ## Use below one once event_shipment has been fixed
-                event_shipment_subquery.c.sts_shipment_id != sa.null()
+                # event_shipment_subquery.c.sts_shipment_id != sa.null()
             ), 'CN')],
             else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
         ).label('commodity_destination_iso2')
