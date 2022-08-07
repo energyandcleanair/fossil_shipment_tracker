@@ -223,7 +223,9 @@ class Marinetraffic:
                                               save_empty_record=False)
 
         if response_datas is None:
-            logger.warning("Marinetraffic: Failed to query portcall %s: %s" % (unlocode, response))
+            if not imo or not '_v2' in imo:
+                #TODO deal with these v2 and unknown
+                logger.warning("Marinetraffic: Failed to query portcall %s: %s" % (unlocode, response))
             return []
 
         if not response_datas:
@@ -257,7 +259,7 @@ class Marinetraffic:
             "ship_imo": response_data["IMO"],
             "date_utc": response_data["TIMESTAMP_UTC"],
             "date_lt": response_data["TIMESTAMP_LT"],
-            "port_id": port.get_id(unlocode=response_data["UNLOCODE"], marinetraffic_id=response_data["PORT_ID"]),
+            "port_id": port.get_id(name=response_data["PORT_NAME"], unlocode=response_data["UNLOCODE"], marinetraffic_id=response_data["PORT_ID"]),
             "load_status": response_data.get("LOAD_STATUS"),
             "move_type": response_data["MOVE_TYPE"],
             "port_operation": response_data.get("PORT_OPERATION"),

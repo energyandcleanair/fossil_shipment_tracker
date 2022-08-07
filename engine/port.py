@@ -18,17 +18,35 @@ def count():
     return session.query(Port).count()
 
 
-def get_id(unlocode=None, marinetraffic_id=None):
+def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
+    """
+    Look for a port matching unlocode, marinetraffic and/or name
+    Note that if unlocode is given, the other fields aren't used for querying
+    the database, but only for asking Datalastic when missing
+    :param unlocode:
+    :param marinetraffic_id:
+    :param name:
+    :param add_if_needed:
+    :return:
+    """
     found = session.query(Port.id)
 
     if unlocode:
         found = found.filter(Port.unlocode==str(unlocode))
-
     elif marinetraffic_id:
         found = found.filter(Port.marinetraffic_id==marinetraffic_id)
 
     found = found.all()
     if len(found) == 0:
+        if add_if_needed and name:
+            port = Datalastic.get_port_infos(name=name, fuzzy=False)
+            if len(port) == 1:
+                port.unlocode = unlocode
+                port.marinetraffic_id = marinetraffic_id
+                session.add(port)
+                session.commit()
+                return(port.id)
+
         logger.warning("Didn't find any port (unlocode: %s, marinetraffic: %s)" %(unlocode, marinetraffic_id))
         return None
 
@@ -69,6 +87,8 @@ def add_check_departure_to_anchorage():
 
 
     insert_new_port(iso2='IN', marinetraffic_id=21982, name='SIKKA-ANCH')
+
+
 def fill():
     """
     Fill port data from prepared file

@@ -372,4 +372,9 @@ class Datalastic:
 
             ports.append(port)
 
+        # Datalastic fuzzy argument doesn't seem to work (always True)
+        # We filter here
+        if not fuzzy:
+            ports = [x for x in ports if x.name == name]
+
         return ports

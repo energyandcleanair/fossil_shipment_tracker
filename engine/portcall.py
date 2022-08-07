@@ -12,6 +12,7 @@ from base.utils import to_datetime, to_list
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
+from engine.datalastic import Datalastic
 
 from base.models import PortCall, Port, Ship
 
@@ -116,6 +117,37 @@ def fill_missing_port_id():
 
         else:
             logger.warning("Didn't find a single matching portcall")
+
+
+    # Those that have MT info
+    portcalls_to_update = PortCall.query.filter(
+        PortCall.others != sqlalchemy.null(),
+        PortCall.port_id == sqlalchemy.null()).all()
+
+    for pc in tqdm(portcalls_to_update):
+
+        port_name = pc.others.get('marinetraffic',{}).get('PORT_NAME')
+        mt_port_id = pc.others.get('marinetraffic', {}).get('PORT_ID')
+
+        if port_name and mt_port_id:
+
+            # First check in database if exists, in case
+            # it has been added earlier in the loop
+            existing_port = Port.query.filter(Port.name == port_name,
+                                              Port.marinetraffic_id == mt_port_id).first()
+            if existing_port:
+                pc.port_id = existing_port.id
+                session.commit()
+            else:
+                ports = Datalastic.get_port_infos(name=port_name, marinetraffic_id=mt_port_id, fuzzy=False)
+                if ports is not None and len(ports) == 1:
+                    new_port = ports[0]
+                    session.add(new_port)
+                    session.commit()
+                    pc.port_id = new_port.id
+                    session.commit()
+
+
 
 
 def upload_portcalls(portcalls):
