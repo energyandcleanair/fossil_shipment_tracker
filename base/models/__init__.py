@@ -20,7 +20,7 @@ DB_TABLE_MARINETRAFFICCALL = "mtcall"
 DB_TABLE_CURRENCY = "currency"
 DB_TABLE_MTEVENT_TYPE = "mtevent_type"
 DB_TABLE_EVENT = "event"
-DB_TABLE_EVENT_SHIPMENT = "event_shipment"
+DB_TABLE_SHIPMENT_WITH_STS = "shipment_with_sts"
 
 DB_TABLE_PIPELINEFLOW = "pipelineflow"
 DB_TABLE_COUNTER = "counter"
