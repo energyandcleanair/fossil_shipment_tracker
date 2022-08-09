@@ -1,13 +1,4 @@
-WITH completed_departure_portcalls AS (
-    SELECT
-        departure.portcall_id AS id
-    FROM
-        shipment
-        LEFT JOIN departure ON shipment.departure_id = departure.id
-    WHERE
-        shipment.status = 'completed'
-),
-departure_portcalls AS (
+WITH departure_portcalls AS (
     SELECT
         portcall.id,
         portcall.date_utc,
@@ -39,14 +30,31 @@ ships_in_ballast AS (
     WHERE
         load_status = 'in_ballast'
 ),
+departures_russia AS (
+    SELECT
+        *,
+        lead(date_utc, 1) OVER (PARTITION BY ship_imo ORDER BY date_utc) AS next_russia_departure_date_utc
+    FROM
+        departure_portcalls
+    WHERE
+        check_departure
+        AND move_type = 'departure'
+        AND port_operation = 'load'
+),
+departures_russia_full AS (
+    SELECT
+        *
+    FROM
+        departures_russia
+    WHERE
+        load_status = 'fully_laden'
+),
 -- take unique events by collapsing all of them between discharge calls and taking distinct ship name/int ship name
 unique_events AS (
     SELECT
   DISTINCT ON (
     next_departure_events.ship_imo,
-    next_departure_events.date_utc,
     next_departure_events.next_departure_date_utc,
-    next_departure_events.ship_name,
     next_departure_events.interacting_ship_name
   )
     next_departure_events.*
@@ -66,23 +74,28 @@ FROM
       ) AS distance_meters
     FROM
       (
-        SELECT
-          p.ship_imo,
-          p.date_utc,
-          lead(p.date_utc, 1) OVER (
-            PARTITION BY p.ship_imo
-            ORDER BY
-              p.date_utc
-          ) AS next_departure_date_utc
+        SELECT DISTINCT ON (d.ship_imo, d.id)
+          d.ship_imo,
+          d.id as departure_portcall_id,
+          d.date_utc,
+          p.date_utc AS next_departure_date_utc
         FROM
-          portcall p
-          LEFT JOIN port prt ON prt.id = p.port_id
-          LEFT JOIN ship s ON s.imo = p.ship_imo
+          departures_russia_full d
+        LEFT JOIN departure_portcalls p
+            ON p.ship_imo = d.ship_imo
         WHERE
-          p.move_type = 'departure'
-          AND s.commodity != 'unknown' -- and p.date_utc > '2021-11-01'
-          -- and p.port_operation = 'load'
-          -- and prt.check_departure is True
+            p.move_type = 'departure'
+            AND p.date_utc > d.date_utc
+            AND (d.next_russia_departure_date_utc IS NULL
+                OR p.date_utc <= d.next_russia_departure_date_utc)
+            AND (p.port_operation = 'discharge'
+                OR (p.previous_load_status = 'fully_laden'
+                    AND p.load_status = 'in_ballast')
+                OR p.port_operation = 'load')
+        ORDER BY
+            d.ship_imo,
+            d.id,
+            next_departure_date_utc DESC
       ) AS next_departures
       LEFT JOIN event ev ON (
         ev.ship_imo = next_departures.ship_imo
@@ -104,11 +117,9 @@ FROM
   ) AS next_departure_events
 ORDER BY
   next_departure_events.ship_imo,
-  next_departure_events.date_utc,
   next_departure_events.next_departure_date_utc,
-  next_departure_events.ship_name,
   next_departure_events.interacting_ship_name,
-  next_departure_events.distance_meters ASC
+  next_departure_events.event_date_utc DESC
 ),
 departures_sts AS (
     SELECT
@@ -120,25 +131,6 @@ departures_sts AS (
     WHERE
         e.interacting_ship_imo IS NOT NULL
         AND e.event_id IS NOT NULL
-),
-departures_russia AS (
-    SELECT
-        *,
-        lead(date_utc, 1) OVER (PARTITION BY ship_imo ORDER BY date_utc) AS next_russia_departure_date_utc
-    FROM
-        departure_portcalls
-    WHERE
-        check_departure
-        AND move_type = 'departure'
-        AND port_operation = 'load'
-),
-departures_russia_full AS (
-    SELECT
-        *
-    FROM
-        departures_russia
-    WHERE
-        load_status = 'fully_laden'
 ),
 next_departure AS (
     SELECT DISTINCT ON (departure_portcall_id)
@@ -204,14 +196,14 @@ next_departure_full AS (
 ),
 sts_arrival AS (
     SELECT DISTINCT ON (departure_portcall_id,
-        nextdeparture_portcall_id)
+        event_id)
         nextd.ship_imo AS ship_imo,
         nextd.departure_date_utc,
         nextd.departure_unlocode,
         nextd.departure_port_id,
         nextd.departure_portcall_id,
         ev.event_id,
-        ev.date_utc AS event_date_utc
+        ev.event_date_utc
     FROM
         next_departure_full nextd
         LEFT JOIN unique_events ev --previous arrival
@@ -225,9 +217,10 @@ sts_arrival AS (
         )
         ORDER BY
             departure_portcall_id,
-            nextdeparture_portcall_id,
-            ev.date_utc DESC
+            event_id,
+            ev.event_date_utc DESC
 ),
+-- now look at departures from sts and check if we have any matching arrivals
 sts_departures_with_next AS (
     SELECT DISTINCT ON (departure_event_id)
         d.ship_imo,
@@ -257,7 +250,7 @@ sts_departures_with_next AS (
 ),
 -- some sts departures wont have a next departure, so we merge to keep full
 sts_departures_with_next_full AS (
-    SELECT DISTINCT ON (ship_imo, nextdeparture_portcall_id)
+    SELECT DISTINCT ON (ship_imo, departure_event_id)
         d.ship_imo,
         d.departure_date_utc,
         d.event_id AS departure_event_id,
@@ -273,10 +266,10 @@ sts_departures_with_next_full AS (
             ON d.event_id = nextdsts.departure_event_id
     ORDER BY
         ship_imo,
-        nextdeparture_portcall_id,
+        departure_event_id,
         d.departure_date_utc ASC
 ),
-sts_departures_arrival AS (
+sts_departures_with_arrival AS (
     SELECT DISTINCT ON (departure_event_id)
         nextd.departure_event_id,
         nextd.ship_imo AS ship_imo,
@@ -306,7 +299,6 @@ completed_shipments_with_sts_arrival AS (
         NULL::bigint AS arrival_portcall_id,
         NULL::bigint AS arrival_port_id,
         event_date_utc as arrival_date_utc,
-        NEXTVAL('departure_id_seq') departure_id,
         NEXTVAL('arrival_id_seq') arrival_id,
         'completed' status,
         event_id AS arrival_event_id,
@@ -325,13 +317,12 @@ completed_shipments_with_sts_departure AS (
         arrival_portcall_id,
         arrival_port_id,
         arrival_date_utc,
-        NEXTVAL('departure_id_seq') departure_id,
         NEXTVAL('arrival_id_seq') arrival_id,
         'completed' status,
         departure_event_id,
         NULL::bigint AS arrival_event_id
     FROM
-        sts_departures_arrival
+        sts_departures_with_arrival
 ),
 uncompleted_shipments_with_sts_departure AS (
     SELECT
@@ -339,7 +330,6 @@ uncompleted_shipments_with_sts_departure AS (
         NULL::bigint AS arrival_event_id,
         nd.departure_date_utc,
         nd.ship_imo,
-        NEXTVAL('departure_id_seq') departure_id,
         NULL::bigint arrival_id,
         NULL::bigint arrival_port_id,
         NULL::bigint arrival_portcall_id,
@@ -365,7 +355,6 @@ shipments_sts AS (
         ship_imo,
         departure_date_utc,
         arrival_portcall_id,
-        departure_id,
         arrival_id,
         status,
         arrival_event_id,
@@ -379,7 +368,6 @@ shipments_sts AS (
         ship_imo,
         departure_date_utc,
         arrival_portcall_id,
-        departure_id,
         arrival_id,
         status,
         arrival_event_id,
@@ -393,13 +381,29 @@ shipments_sts AS (
         ship_imo,
         departure_date_utc,
         arrival_portcall_id,
-        departure_id,
         arrival_id,
         status,
         arrival_event_id,
         departure_event_id
     FROM
         uncompleted_shipments_with_sts_departure
+),
+sts_departures AS (
+    SELECT DISTINCT ON (departure_portcall_id, departure_event_id, departure_port_id, ship_imo)
+        NEXTVAL('departure_id_seq') departure_id,
+        departure_port_id,
+        ship_imo,
+        departure_date_utc,
+        'postgres',
+        departure_portcall_id,
+        departure_event_id
+    FROM
+        shipments_sts
+    ORDER BY
+        departure_portcall_id,
+        departure_event_id,
+        departure_port_id,
+        ship_imo DESC
 ),
 inserted_departures AS (
 INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id, event_id)
@@ -412,7 +416,7 @@ INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id, 
         departure_portcall_id,
         departure_event_id
     FROM
-        shipments_sts
+        sts_departures
     ON CONFLICT (portcall_id)
         DO UPDATE SET
             port_id = excluded.port_id -- just for id to be returned
@@ -462,9 +466,8 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
             OR
             (completed_shipments_all.departure_portcall_id IS NULL AND completed_shipments_all.departure_event_id = inserted_departures.event_id)
         )
-     ON CONFLICT (departure_id)
-        DO UPDATE SET
-            portcall_id = excluded.portcall_id
+     ON CONFLICT
+        DO NOTHING
         RETURNING
             id,
             portcall_id,
@@ -493,17 +496,15 @@ shipments_after_insertion AS (
             )
 ),
 inserted_shipments AS (
-INSERT INTO shipment (departure_id, arrival_id, status)
+INSERT INTO shipment_with_sts (departure_id, arrival_id, status)
     SELECT
         departure_id,
         arrival_id,
         status
     FROM
         shipments_after_insertion
-    ON CONFLICT (departure_id)
-        DO UPDATE SET
-            arrival_id = EXCLUDED.arrival_id,
-            status = EXCLUDED.status
+    ON CONFLICT
+        DO NOTHING
         RETURNING
             departure_id,
             arrival_id,

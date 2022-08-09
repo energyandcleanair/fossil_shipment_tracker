@@ -6,6 +6,14 @@ WITH completed_departure_portcalls AS (
         LEFT JOIN departure ON shipment.departure_id = departure.id
     WHERE
         shipment.status = 'completed'
+    UNION ALL
+    SELECT
+        departure.portcall_id AS id
+    FROM
+        shipment_with_sts
+        LEFT JOIN departure ON shipment_with_sts.departure_id = departure.id
+    WHERE
+        shipment_with_sts.status = 'completed'
 ),
 completed_arrival_portcalls AS (
     SELECT
@@ -249,9 +257,8 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
     FROM
         completed_shipments
         LEFT JOIN inserted_departures ON completed_shipments.departure_portcall_id = inserted_departures.portcall_id
-     ON CONFLICT (departure_id)
-        DO UPDATE SET
-            portcall_id = excluded.portcall_id
+     ON CONFLICT
+        DO NOTHING
         RETURNING
             id,
             portcall_id
