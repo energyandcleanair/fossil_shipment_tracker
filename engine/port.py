@@ -40,14 +40,14 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
     if len(found) == 0:
         if add_if_needed and name:
             port = Datalastic.get_port_infos(name=name, fuzzy=False)
-            if len(port) == 1:
+            if port is not None and len(port) == 1:
                 port.unlocode = unlocode
                 port.marinetraffic_id = marinetraffic_id
                 session.add(port)
                 session.commit()
                 return(port.id)
 
-        logger.warning("Didn't find any port (unlocode: %s, marinetraffic: %s)" %(unlocode, marinetraffic_id))
+        logger.warning("Didn't find any port (unlocode: %s, marinetraffic: %s)" % (unlocode, marinetraffic_id))
         return None
 
     if len(found) > 1:
