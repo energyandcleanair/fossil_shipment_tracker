@@ -201,8 +201,8 @@ class RussiaCounterResource(Resource):
         counter = self.pivot_result(result=counter, pivot_by=pivot_by)
 
         # Keep only n records
-        if limit:
-            counter = counter[:limit]
+        counter = self.limit_result(result=counter, limit=limit, aggregate_by=aggregate_by, sort_by=sort_by)
+
 
         if format == "csv":
             return Response(
@@ -290,6 +290,7 @@ class RussiaCounterResource(Resource):
         by = []
         ascending = []
         default_ascending = False
+
         if sort_by:
             for s in sort_by:
                 m = re.match("(.*)\\((.*)\\)", s)
@@ -312,5 +313,31 @@ class RussiaCounterResource(Resource):
         if pivot_by:
             index = [x for x in result.columns if not x.startswith('value') and x not in to_list(pivot_by)]
             result = result.pivot(index=index, columns=to_list(pivot_by), values='value_eur').reset_index()
+
+        return result
+
+    def limit_result(self, result, limit, aggregate_by, sort_by):
+
+        if not limit:
+            return result
+
+        if not aggregate_by:
+            limit_groupers = ['destination_country']
+
+        if aggregate_by:
+            limit_groupers = [x for x in aggregate_by \
+                              if not x.startswith('commodity') \
+                              and not x.startswith('date') \
+                              and x in result.columns]
+
+        sort_by = sort_by or 'value_eur'
+        top = result.groupby(limit_groupers) \
+            .agg({sort_by: 'sum'}) \
+            .reset_index() \
+            .sort_values(sort_by, ascending=False) \
+            .head(limit) \
+            .drop(sort_by, axis=1)
+
+        result = pd.merge(result, top, how='inner')
 
         return result
