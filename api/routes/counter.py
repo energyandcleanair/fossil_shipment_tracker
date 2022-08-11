@@ -331,6 +331,8 @@ class RussiaCounterResource(Resource):
                               and x in result.columns]
 
         sort_by = sort_by or 'value_eur'
+        # Can only take one
+        sort_by = to_list(sort_by)[0]
         top = result.groupby(limit_groupers) \
             .agg({sort_by: 'sum'}) \
             .reset_index() \
