@@ -164,9 +164,19 @@ class VoyageResource(Resource):
         commodity_field = case(
             [
                 (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
-                        DepartureBerth.commodity.ilike('%coal%')), 'coal'),
+                         DepartureBerth.commodity.ilike('%coal%'),
+                         # Lauri: For Taiwan, please exclude coal shipments without identified berth.
+                         # I've done that for data I've provided to Taiwan because too much of the rest is iron ore, scrap etc
+                         ArrivalPort.iso2 != 'TW'), 'coal'),
+
+                (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
+                         ArrivalPort.iso2 == 'TW',
+                         DepartureBerth.commodity.ilike('%coal%'),
+                         ArrivalBerth.id != sa.null()), 'coal'),
+
                 (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
                          ArrivalBerth.commodity.ilike('%coal%')), 'coal'),
+
                 (Ship.commodity.ilike('%bulk%'), 'bulk_not_coal')
             ],
             else_ = Ship.commodity
@@ -463,9 +473,18 @@ class VoyageResource(Resource):
             'commodity_destination_region': [subquery.c.commodity_destination_region],
 
             'status': [subquery.c.status],
+
             'date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
+            'month': [func.date_trunc('month', subquery.c.departure_date_utc).label("departure_month")],
+            'year': [func.date_trunc('year', subquery.c.departure_date_utc).label("departure_year")],
+
             'departure_date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
+            'departure_month': [func.date_trunc('month', subquery.c.departure_date_utc).label("departure_month")],
+            'departure_year': [func.date_trunc('year', subquery.c.departure_date_utc).label("departure_year")],
+
             'arrival_date': [func.date_trunc('day', subquery.c.arrival_date_utc).label('arrival_date')],
+            'arrival_month': [func.date_trunc('month', subquery.c.arrival_date_utc).label('arrival_month')],
+            'arrival_year': [func.date_trunc('year', subquery.c.arrival_date_utc).label('arrival_year')],
 
             'departure_port': [subquery.c.departure_port_name, subquery.c.departure_unlocode,
                                subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],

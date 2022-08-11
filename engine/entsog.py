@@ -276,7 +276,77 @@ def fix_opd_countries(opd):
     return opd
 
 
-def get_crossborder_flows_raw(date_from='2022-01-01',
+
+
+def get_flows_by_pointtype(date_from='2022-01-01',
+                              date_to=dt.date.today(),
+                              country_iso2=None,
+                              remove_pipe_in_pipe=True,
+                              remove_operators=[],
+                              remove_point_labels=[]):
+    """
+    Mainly to debug/understand why germany so low on consumption + distribution
+    :param date_from:
+    :param date_to:
+    :param country_iso2:
+    :param remove_pipe_in_pipe:
+    :param remove_operators:
+    :param remove_point_labels:
+    :return:
+    """
+    opd = get_operator_point_directions()
+    opd = fix_opd_countries(opd)
+
+    if country_iso2:
+        opd = opd.loc[opd.country.isin(to_list(country_iso2))]
+
+    if remove_pipe_in_pipe:
+        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
+                      | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
+
+    if remove_operators:
+        opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
+
+    if remove_point_labels:
+        opd = opd.loc[~opd.pointLabel.isin(to_list(remove_point_labels))]
+
+    def keep_unique(x):
+        return x[['pointKey', 'operatorKey']].drop_duplicates()
+
+    def add_countries(x):
+        if x is None:
+            return None
+
+        return x.merge(
+            opd[['pointKey', 'operatorKey', 'directionKey', 'country', 'partner']] \
+                .drop_duplicates())
+
+
+    flows = get_physical_flows(
+        operator_key=opd.operatorKey.to_list(),
+        point_key=opd.pointKey.to_list(),
+        direction=None,
+        date_from=to_datetime(date_from),
+        date_to=to_datetime(date_to),
+    )
+
+    flows = add_countries(flows)
+    flows['value_m3'] = flows.value / base.GCV_KWH_PER_M3
+
+    flows_sum = flows.groupby(['directionKey','pointType', 'country', 'partner']) \
+        .aggregate({'value_m3': 'sum'}) \
+        .reset_index()
+
+
+    # flows_within_country = flows_sum[flows_sum.country == flows_sum.partner]
+    flows_sum.sort_values(['value_m3'], inplace=True, ascending=False)
+    flows_sum.value_m3.sum() / 1e9
+    return flows_sum
+
+
+
+
+def get_flows_raw(date_from='2022-01-01',
                               date_to=dt.date.today(),
                               country_iso2=None,
                               remove_pipe_in_pipe=True,
@@ -306,6 +376,10 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         opd.pointType.str.contains('Cross-Border') \
         & (opd.directionKey == 'entry')]
 
+    storage_entry_points = opd.loc[
+        opd.pointType.str.startswith('Storage') \
+        & (opd.directionKey == 'entry')]
+
     lng_entry_points = opd.loc[
         opd.pointType.str.contains('LNG Entry point') \
         & (opd.directionKey == 'entry')]
@@ -318,12 +392,20 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         opd.pointType.str.contains('Consumers') \
         & (opd.directionKey == 'exit')]
 
+    transmission_exit_points = opd.loc[
+        opd.pointType.str.startswith('Transmission') \
+        & (opd.directionKey == 'exit')]
+
     distribution_points = opd.loc[
         opd.pointType.str.contains('Distribution') \
         & (opd.directionKey == 'exit')]
 
     exit_points = opd.loc[
         opd.pointType.str.contains('Cross-Border') \
+        & (opd.directionKey == 'exit')]
+
+    storage_exit_points = opd.loc[
+        opd.pointType.str.startswith('Storage') \
         & (opd.directionKey == 'exit')]
 
     lng_exit_points = opd.loc[
@@ -400,6 +482,22 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
         date_to=to_datetime(date_to),
     )
 
+    flows_storage_entry_raw = get_physical_flows(
+        operator_key=keep_unique(storage_entry_points).operatorKey.to_list(),
+        point_key=keep_unique(storage_entry_points).pointKey.to_list(),
+        direction="entry",
+        date_from=to_datetime(date_from),
+        date_to=to_datetime(date_to),
+    )
+
+    flows_storage_exit_raw = get_physical_flows(
+        operator_key=keep_unique(storage_exit_points).operatorKey.to_list(),
+        point_key=keep_unique(storage_exit_points).pointKey.to_list(),
+        direction="exit",
+        date_from=to_datetime(date_from),
+        date_to=to_datetime(date_to),
+    )
+
     return (add_countries(flows_import_raw),
             add_countries(flows_import_lng_raw),
             add_countries(flows_export_raw),
@@ -407,18 +505,28 @@ def get_crossborder_flows_raw(date_from='2022-01-01',
             add_countries(flows_production_raw),
             add_countries(flows_consumption_raw),
             add_countries(flows_distribution_raw),
+            add_countries(flows_storage_entry_raw),
+            add_countries(flows_storage_exit_raw),
             )
 
 
-def process_consumption_distribution(flows_distribution_raw,
-                                    flows_consumption_raw):
+def process_non_crossborder_flows(flows_distribution_raw,
+                            flows_consumption_raw,
+                            flows_storage_entry_raw,
+                            flows_storage_exit_raw
+                            ):
 
     flows_distribution_raw['type'] = base.ENTSOG_DISTRIBUTION
     flows_consumption_raw['type'] = base.ENTSOG_CONSUMPTION
+    flows_storage_entry_raw['type'] = base.ENTSOG_STORAGE_ENTRY
+    flows_storage_exit_raw['type'] = base.ENTSOG_STORAGE_EXIT
 
     flows = pd.concat([flows_distribution_raw,
-                          flows_consumption_raw],
-                          axis=0) \
+                       flows_consumption_raw,
+                       flows_storage_entry_raw,
+                       flows_storage_exit_raw
+                       ],
+                      axis=0) \
         .groupby(['country', 'partner', 'date', 'type']) \
         .agg(value=('value', np.nansum)) \
         .reset_index() \
@@ -430,7 +538,7 @@ def process_consumption_distribution(flows_distribution_raw,
     return flows
 
 
-def process_crossborder_flows_raw(flows_import_raw,
+def process_crossborder_flows(flows_import_raw,
                                   flows_import_lng_raw,
                                   flows_export_raw,
                                   flows_export_lng_raw,
@@ -585,13 +693,15 @@ def get_flows(date_from='2022-01-01',
      flows_export_lng_raw,
      flows_production_raw,
      flows_consumption_raw,
-     flows_distribution_raw) = get_crossborder_flows_raw(date_from=date_from,
+     flows_distribution_raw,
+     flows_storage_entry_raw,
+     flows_storage_exit_raw) = get_flows_raw(date_from=date_from,
                                                        date_to=date_to,
                                                        country_iso2=country_iso2,
                                                        remove_pipe_in_pipe=remove_pipe_in_pipe)
 
     # Process cross border & production
-    flows_crossborder = process_crossborder_flows_raw(flows_import_raw=flows_import_raw,
+    flows_crossborder = process_crossborder_flows(flows_import_raw=flows_import_raw,
                                               flows_export_raw=flows_export_raw,
                                               flows_import_lng_raw=flows_import_lng_raw,
                                               flows_export_lng_raw=flows_export_lng_raw,
@@ -603,8 +713,10 @@ def get_flows(date_from='2022-01-01',
                                               filename=filename)
 
     # Consumption and distribution
-    flows_cons_dist = process_consumption_distribution(flows_distribution_raw=flows_distribution_raw,
-                                                       flows_consumption_raw=flows_consumption_raw)
+    flows_cons_dist = process_non_crossborder_flows(flows_distribution_raw=flows_distribution_raw,
+                                                    flows_consumption_raw=flows_consumption_raw,
+                                                    flows_storage_entry_raw=flows_storage_entry_raw,
+                                                    flows_storage_exit_raw=flows_storage_exit_raw)
 
 
     flows = pd.concat([flows_crossborder,

@@ -59,7 +59,9 @@ def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.0
         .outerjoin(ShipmentArrivalBerth, ShipmentArrivalBerth.shipment_id == Shipment.id) \
         .outerjoin(DepartureBerthPosition, DepartureBerthPosition.id == ShipmentDepartureBerth.position_id) \
         .outerjoin(ArrivalBerthPosition, ArrivalBerthPosition.id == ShipmentArrivalBerth.position_id) \
-        .filter(sa.or_(rebuild_all, Trajectory.shipment_id.is_(None)),
+        .filter(sa.or_(rebuild_all,
+                       Trajectory.shipment_id.is_(None),
+                       Trajectory.geometry.is_(None)),
                 Shipment.status.in_([base.COMPLETED, base.ONGOING]))
 
     if shipment_id is not None:

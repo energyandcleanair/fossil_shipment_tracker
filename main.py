@@ -35,14 +35,53 @@ def update():
     #     Port.check_departure
     # )).all()
     # anc_ports = [x[0] for x in anc_ports]
+    # portcall.fill_missing_port_id()
+
+    # portcall.update_departures_from_russia(
+    #     marinetraffic_port_id=['24630','24631'],
+    #     date_from='2022-01-01',
+    #     date_to='2022-05-01',
+    #     force_rebuild=True,
+    #     between_existing_only=False)
     #
+    # portcall.update_departures_from_russia(
+    #     marinetraffic_port_id=['24630','24631'],
+    #     date_from='2022-05-01',
+    #     force_rebuild=True,
+    #     between_existing_only=False)
+
+    # departure.update(port_id=115225)
+    #
+    # departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
+    #                               base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
+    #
+    # departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
+    #                  commodities=base.GENERAL_CARGO)
+    #
+    # # Only keep oil related for Sikka (India) and MERSA EL HAMRA (Egypt)
+    # departure.remove(unlocode=['INSIK'],
+    #                  port_id=114313,
+    #                  commodities=[base.LNG, base.COAL, base.BULK])
+    #
+    # departure.remove(port_name='SIKKA ANCH',
+    #                  commodities=[base.LNG, base.COAL, base.BULK])
+    #
+    # departure.remove(unlocode=['EGMAH'],
+    #                  commodities=[base.LNG, base.COAL, base.BULK])
+    #
+    # departure.remove(port_name='MERSA EL HAMRA ANCH',
+    #                  commodities=[base.LNG, base.COAL, base.BULK])
+
+    # departure.update(date_from='2022-01-01',
+    #                  unlocode='EGMAH',
+    #                  commodities=[base.CRUDE_OIL, base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS])
     # Only keep oil related for India
     # departure.remove(unlocode=['INSIK'],
     #                  commodities=[base.LNG, base.COAL, base.BULK])
     #
     # departure.remove(port_name='SIKKA ANCH',
     #                  commodities=[base.LNG, base.COAL, base.BULK])
-
+    # port.add_check_departure_to_anchorage()
     # portcall.update_departures_from_russia(
     #     unlocode=['INSIK'],
     #     date_from='2022-02-24',
@@ -72,43 +111,45 @@ def update():
     #                   date_from='2021-01-01')
     # # #
     # # # # # # arrival.update(force_for_arrival_to_departure_greater_than=dt.timedelta(hours=24*10))
-    # arrival.update(date_from='2021-01-01',
-    #                date_to='2021-10-31',
-    #                include_undetected_arrival_shipments=True)
-    # ship.fill_missing_insurer()
-    # currency.update(date_from='2021-11-01', date_to='2022-01-01', force=True)
+    # arrival.update(date_from='2022-01-01', port_id=[30915, 115225]) #MERSA EL HAMRA ANCH
+    # # ship.fill_missing_insurer()
+    # # currency.update(date_from='2015-01-01', date_to='2020-01-01', force=True)
     # shipment.update()
-    # position.update()
+    # position.update(imo='9217321')
     # destination.update()
     # berth.update()
     # entsog.update(date_from=-14)
+    # flows = entsog.get_flows_by_pointtype(date_from='2020-01-01',
+    #                                       date_to='2020-12-31',
+    #                                       country_iso2='DE')
+    # flows.value_m3.sum() / 1e9
+    # flows['bcm'] = flows.value_m3 / 1e9
+    # flows['bcm'] = flows.bcm.round(1)
+    #
+    # flows2 = entsog.get_flows_by_pointtype(date_from='2020-01-01',
+    #                                       date_to='2020-12-31',
+    #                                       country_iso2='DE',
+    #                                        remove_pipe_in_pipe=False)
+    # flows2.value_m3.sum() / 1e9
     # rscript.update()
     # trajectory.update()
     # counter.update(date_from='2021-11-01')
     # ship.fix_not_found()
-    # # arrival.update(date_from=dt.date.today() - dt.timedelta(days=30))
-    # shipment.rebuild(date_from='2021-11-01')
-    # shipment.rebuild()
+    # arrival.update(date_from=dt.date.today() - dt.timedelta(days=90),
+    #                ship_imo='9487677')
+    # arrival.update(date_from=dt.date.today() - dt.timedelta(days=180))
+    # currency.update()
     # shipment.update()
+    # position.update()
     # destination.update()
-    # # berth.fill()
-    # berth.detect_arrival_berths()
-    # # # country.fill()
-    # counter.update()
-    # trajectory.reroute(date_from='2021-01-01')
-    # # # ship.collect_mt_for_large_oil_products()
-    # position.update(shipment_id=255262)
-    # trajectory.update()
-    # berth.update(shipment_id=255262)
-    # rscript.update()
-    counter.update()
-    # alert.update()
-    # country.fill()
     # berth.update()
-    # entsog.update(date_from='2022-02-24')
+    # entsog.update(date_from=-21, nodata_error_date_from=-4)
     # rscript.update()
-    # trajectory.update()
-    # counter.update()
+    # trajectory.update(shipment_id=359731)
+    # berth.update()
+    # alert.update()
+    counter.update()
+    # berth.update()
     return
 
 

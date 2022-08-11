@@ -27,12 +27,18 @@ def update():
     departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
                      commodities=base.GENERAL_CARGO)
 
-    # Only keep oil related for India
+    # Only keep oil related for Sikka (India) and MERSA EL HAMRA (Egypt)
     departure.remove(unlocode=['INSIK'],
                      port_id=114313,
                      commodities=[base.LNG, base.COAL, base.BULK])
 
     departure.remove(port_name='SIKKA ANCH',
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    departure.remove(unlocode=['EGMAH'],
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    departure.remove(port_name='MERSA EL HAMRA ANCH',
                      commodities=[base.LNG, base.COAL, base.BULK])
 
     arrival.update(date_from = dt.date.today() - dt.timedelta(days=90))

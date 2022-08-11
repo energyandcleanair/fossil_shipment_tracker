@@ -243,6 +243,9 @@ class RussiaCounterResource(Resource):
         aggregateby_cols_dict = {
             'currency': [subquery.c.currency],
             'date': [subquery.c.date],
+            'month': [func.date_trunc('month', subquery.c.date).label("month")],
+            'year': [func.date_trunc('year', subquery.c.date).label("year")],
+
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],

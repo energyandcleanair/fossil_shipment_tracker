@@ -27,6 +27,7 @@ def update(shipment_id=None):
 def count():
     return session.query(Berth).count()
 
+
 def fill():
     """
     Fill berth data from prepared files
@@ -59,7 +60,6 @@ def fill():
            constraint_name="berth_pkey",
            dtype={'geometry': Geometry('GEOMETRY', 4326)})
     return
-
 
 
 def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance_deg=1):
@@ -127,7 +127,9 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance
         | (berths_agg.has_moored) \
         | (berths_agg.min_speed == 0)].copy()
 
-    berths_agg_ok = berths_agg_ok[berths_agg_ok.distance_to_port < max_distance_deg]
+    # For ports without geometry, the distance is nan. We keep them
+    berths_agg_ok = berths_agg_ok[pd.isna(berths_agg_ok.distance_to_port) |
+                                  (berths_agg_ok.distance_to_port <= max_distance_deg)]
 
     if len(berths_agg) == 0:
         return None
@@ -143,10 +145,10 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance
     # Maximum one berthing per shipment
     berths_count = berths_agg_ok.groupby(['shipment_id'])["berth_id"].count().reset_index()
     if berths_count.berth_id.max() > 1:
-        logger.warning("Found more than one departure berth for a shipment. Keeping closest one")
+        logger.warning("Found more than one departure berth for a shipment. Keeping latest one")
         berths_agg_ok = berths_agg_ok \
-            .sort_values(["shipment_id", "distance_to_port"]) \
-            .drop_duplicates(['shipment_id'], keep="first")
+            .sort_values(["shipment_id", "max_date_utc"]) \
+            .drop_duplicates(['shipment_id'], keep="last")
 
 
     berths_agg_ok["method_id"] = "simple_overlapping"
@@ -164,7 +166,6 @@ def detect_arrival_berths(shipment_id=None, min_hours_at_berth=4, max_distance_d
 
     if shipment_id is not None:
         shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))
-
 
     berths = session.query(Shipment.id,
                            Berth.id,
@@ -216,7 +217,10 @@ def detect_arrival_berths(shipment_id=None, min_hours_at_berth=4, max_distance_d
     berths_agg_ok = berths_agg.loc[
         (berths_agg.max_date_utc - berths_agg.min_date_utc) > dt.timedelta(hours=min_hours_at_berth)]
 
-    berths_agg_ok = berths_agg_ok[berths_agg_ok.distance_to_port < max_distance_deg]
+    # For ports without geometry, the distance is nan. We keep them
+    berths_agg_ok = berths_agg_ok[pd.isna(berths_agg_ok.distance_to_port) |
+                                  (berths_agg_ok.distance_to_port <= max_distance_deg)]
+
 
     if len(berths_agg_ok) == 0:
         return None
@@ -228,9 +232,9 @@ def detect_arrival_berths(shipment_id=None, min_hours_at_berth=4, max_distance_d
     # Maximum one berthing per shipment
     berths_count = berths_agg_ok.groupby(['shipment_id'])["berth_id"].count().reset_index()
     if berths_count.berth_id.max() > 1:
-        logger.warning("Found more than one arrival berth for a shipment. Keeping closest one")
+        logger.warning("Found more than one arrival berth for a shipment. Keeping earliest one")
         berths_agg_ok = berths_agg_ok \
-            .sort_values(["shipment_id", "distance_to_port"]) \
+            .sort_values(["shipment_id", "min_date_utc"]) \
             .drop_duplicates(['shipment_id'], keep='first')
 
     # berths_agg_ok = pd.DataFrame(berths_count["shipment_id"].loc[berths_count.berth_id == 1]) \
