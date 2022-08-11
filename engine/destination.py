@@ -69,7 +69,7 @@ def update_matching():
 
         for still_missing in tqdm(still_missings):
             looking_name = still_missing.name.replace(" OPL", "")
-            found = Datalastic.get_port_infos(name=looking_name, fuzzy=False)
+            found = Datalastic.search_ports(name=looking_name, fuzzy=False)
             if found:
                 potential_suffixes = ['', ' PORT']
                 ratios = np.array([max([SequenceMatcher(None, x.name.replace(suf, ''), still_missing.name).ratio()

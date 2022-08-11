@@ -286,7 +286,7 @@ class Datalastic:
         return positions
 
     @classmethod
-    def get_port_infos(cls, name=None, marinetraffic_id=None, fuzzy=False):
+    def search_ports(cls, name=None, marinetraffic_id=None, fuzzy=False):
         """
         Some ports aren't in the UNLOCODE base. MarineTraffic returns port_name however, so
         we can look them up by name here.

@@ -39,8 +39,9 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
     found = found.all()
     if len(found) == 0:
         if add_if_needed and name:
-            port = Datalastic.get_port_infos(name=name, fuzzy=False)
-            if port is not None and len(port) == 1:
+            ports = Datalastic.search_ports(name=name, fuzzy=False)
+            if ports is not None and len(ports) == 1:
+                port = ports[0]
                 port.unlocode = unlocode
                 port.marinetraffic_id = marinetraffic_id
                 session.add(port)
@@ -120,7 +121,7 @@ def fill():
 
     for m in missing_ports:
         print(m)
-        found_ports = Datalastic.get_port_infos(name=m.name, fuzzy=False)
+        found_ports = Datalastic.search_ports(name=m.name, fuzzy=False)
         for found_port in found_ports:
             if found_port.unlocode == m.unlocode:
                 m.geometry = found_port.geometry
@@ -131,7 +132,7 @@ def fill():
 
 def insert_new_port(iso2, unlocode, name=None, marinetraffic_id=None):
     if name is not None:
-        new_ports = Datalastic.get_port_infos(name=name, marinetraffic_id=marinetraffic_id)
+        new_ports = Datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id)
     else:
         new_ports = [Port(**{"unlocode": unlocode,
                            "iso2": iso2})]

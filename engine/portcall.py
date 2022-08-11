@@ -139,7 +139,7 @@ def fill_missing_port_id():
                 pc.port_id = existing_port.id
                 session.commit()
             else:
-                ports = Datalastic.get_port_infos(name=port_name, marinetraffic_id=mt_port_id, fuzzy=False)
+                ports = Datalastic.search_ports(name=port_name, marinetraffic_id=mt_port_id, fuzzy=False)
                 if ports is not None and len(ports) == 1:
                     new_port = ports[0]
                     session.add(new_port)
@@ -171,7 +171,7 @@ def upload_portcalls(portcalls):
                     from engine.datalastic import Datalastic
                     from difflib import SequenceMatcher
                     import numpy as np
-                    found = Datalastic.get_port_infos(name=name, marinetraffic_id=marinetraffic_id)
+                    found = Datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id)
                     if found:
                         ratios = np.array([SequenceMatcher(None, x.name, name).ratio() for x in found])
                         if max(ratios) >= 0.9:
