@@ -67,6 +67,8 @@ class RussiaCounterResource(Resource):
                         type=inputs.boolean, default=True)
     parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
                         required=False, action='split', default=None)
+    parser.add_argument('pivot_by', type=str, help='pivoting value_eur by e.g. commodity_group.',
+                        required=False, action='split', default=None)
     parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
                         required=False, default=None)
 
@@ -89,6 +91,7 @@ class RussiaCounterResource(Resource):
         use_eu = params.get("use_eu")
         currency = params.get("currency")
         sort_by = params.get("sort_by")
+        pivot_by = params.get("pivot_by")
         limit = params.get("limit")
 
         if aggregate_by and '' in aggregate_by:
@@ -194,6 +197,9 @@ class RussiaCounterResource(Resource):
         # Sort results
         counter = self.sort_result(result=counter, sort_by=sort_by)
 
+        # Pivot
+        counter = self.pivot_result(result=counter, pivot_by=pivot_by)
+
         # Keep only n records
         if limit:
             counter = counter[:limit]
@@ -293,5 +299,15 @@ class RussiaCounterResource(Resource):
                     by.append(s)
 
             result.sort_values(by=by, ascending=ascending, inplace=True)
+
+        return result
+
+    def pivot_result(self, result, pivot_by):
+        by = []
+        ascending = []
+        default_ascending = False
+        if pivot_by:
+            index = [x for x in result.columns if not x.startswith('value') and x not in to_list(pivot_by)]
+            result = result.pivot(index=index, columns=to_list(pivot_by), values='value_eur').reset_index()
 
         return result
