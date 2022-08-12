@@ -81,6 +81,9 @@ class VoyageResource(Resource):
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
+    parser.add_argument('price_type', action='split', help='current or constant default: current',
+                        required=False,
+                        default=['current'])
 
     parser.add_argument('routed_trajectory',
                         help='whether or not to use (re)routed trajectories for those that go over land (only applicable if format=geojson)',
@@ -138,6 +141,7 @@ class VoyageResource(Resource):
         rolling_days = params.get("rolling_days")
         routed_trajectory = params.get("routed_trajectory")
         currency = params.get("currency")
+        price_type = params.get("price_type")
         sort_by = params.get("sort_by")
         limit = params.get("limit")
 
@@ -154,6 +158,7 @@ class VoyageResource(Resource):
 
         DestinationPort = aliased(Port)
         DestinationCountry = aliased(Country)
+
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -299,6 +304,7 @@ class VoyageResource(Resource):
                                     value_eur_field,
                                     Currency.currency,
                                     value_currency_field,
+                                    Price.type.label('price_type'),
 
                                     DepartureBerth.id.label("departure_berth_id"),
                                     DepartureBerth.name.label("departure_berth_name"),
@@ -347,7 +353,8 @@ class VoyageResource(Resource):
              .outerjoin(CommodityDestinationCountry, CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
-             .filter(destination_iso2_field != "RU"))
+             .filter(destination_iso2_field != "RU")
+             .filter(Price.type.in_(to_list(price_type))))
 
         if id is not None:
             shipments_rich = shipments_rich.filter(Shipment.id.in_(id))

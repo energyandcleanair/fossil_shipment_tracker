@@ -63,6 +63,9 @@ class RussiaCounterResource(Resource):
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
+    parser.add_argument('price_type', action='split', help='current or constant default: current',
+                        required=False,
+                        default=['current'])
     parser.add_argument('nest_in_data', help='Whether to nest the json content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
@@ -92,6 +95,7 @@ class RussiaCounterResource(Resource):
         nest_in_data = params.get("nest_in_data")
         use_eu = params.get("use_eu")
         currency = params.get("currency")
+        price_type = params.get("price_type")
         sort_by = params.get("sort_by")
         pivot_by = params.get("pivot_by")
         pivot_value = params.get("pivot_value")
@@ -146,6 +150,9 @@ class RussiaCounterResource(Resource):
 
         if date_to is not None:
             query = query.filter(Counter.date <= to_datetime(date_to))
+
+        if price_type is not None:
+            query = query.filter(Counter.price_type.in_(to_list(price_type)))
 
         query = self.aggregate(query, aggregate_by)
         counter = pd.read_sql(query.statement, session.bind)
@@ -237,7 +244,7 @@ class RussiaCounterResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['currency']
+        must_group_by = ['currency', 'price_type']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
@@ -254,7 +261,8 @@ class RussiaCounterResource(Resource):
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region],
-            'type': [subquery.c.type]
+            # 'type': [subquery.c.type],
+            'price_type': [subquery.c.price_type],
         }
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):
