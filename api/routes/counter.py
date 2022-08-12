@@ -67,8 +67,10 @@ class RussiaCounterResource(Resource):
                         type=inputs.boolean, default=True)
     parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
                         required=False, action='split', default=None)
-    parser.add_argument('pivot_by', type=str, help='pivoting value_eur by e.g. commodity_group.',
+    parser.add_argument('pivot_by', type=str, help='pivoting value_eur (or any other specified by pivot_value) by e.g. commodity_group.',
                         required=False, action='split', default=None)
+    parser.add_argument('pivot_value', type=str, help='pivoted value. Default: value_eur.',
+                        required=False, default='value_eur')
     parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
                         required=False, default=None)
 
@@ -92,6 +94,7 @@ class RussiaCounterResource(Resource):
         currency = params.get("currency")
         sort_by = params.get("sort_by")
         pivot_by = params.get("pivot_by")
+        pivot_value = params.get("pivot_value")
         limit = params.get("limit")
 
         if aggregate_by and '' in aggregate_by:
@@ -116,7 +119,7 @@ class RussiaCounterResource(Resource):
                 Counter.date,
                 Counter.value_tonne,
                 Counter.value_eur,
-                Counter.type,
+                Counter.price_type,
                 Currency.currency,
                 value_currency_field
             ) \
@@ -156,7 +159,7 @@ class RussiaCounterResource(Resource):
             daterange = pd.date_range(min(counter.date), max(counter.date)).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor('D')  # Should have been done already
             cols = intersect(["commodity", "commodity_group", 'destination_iso2',
-                                    'destination_country', "destination_region", 'type', 'currency'], counter.columns)
+                                    'destination_country', "destination_region", 'price_type', 'currency'], counter.columns)
 
             counter = counter \
                 .groupby(cols) \
@@ -195,13 +198,13 @@ class RussiaCounterResource(Resource):
         counter = self.spread_currencies(result=counter)
 
         # Sort results
-        counter = self.sort_result(result=counter, sort_by=sort_by)
-
-        # Pivot
-        counter = self.pivot_result(result=counter, pivot_by=pivot_by)
+        counter = self.sort_result(result=counter, sort_by=sort_by, aggregate_by=aggregate_by)
 
         # Keep only n records
         counter = self.limit_result(result=counter, limit=limit, aggregate_by=aggregate_by, sort_by=sort_by)
+
+        # Pivot
+        counter = self.pivot_result(result=counter, pivot_by=pivot_by, pivot_value=pivot_value)
 
 
         if format == "csv":
@@ -286,7 +289,7 @@ class RussiaCounterResource(Resource):
         return result
 
 
-    def sort_result(self, result, sort_by):
+    def sort_result(self, result, sort_by, aggregate_by):
         by = []
         ascending = []
         default_ascending = False
@@ -302,17 +305,35 @@ class RussiaCounterResource(Resource):
                     ascending.append(default_ascending)
                     by.append(s)
 
-            result.sort_values(by=by, ascending=ascending, inplace=True)
+            if not aggregate_by:
+                sorting_groupers = ['destination_country']
+
+            if aggregate_by:
+
+                sorting_groupers = [x for x in aggregate_by \
+                                    if not x.startswith('commodity') \
+                                    and not x in ['date', 'month', 'year', 'currency'] \
+                                    and x in result.columns]
+
+            sorted = result.groupby(sorting_groupers)[sort_by].sum() \
+                .reset_index() \
+                .sort_values(by=by, ascending=ascending) \
+                .drop(sort_by, axis=1)
+
+            result = pd.merge(sorted, result, how='left')
 
         return result
 
-    def pivot_result(self, result, pivot_by):
-        by = []
-        ascending = []
-        default_ascending = False
+    def pivot_result(self, result, pivot_by, pivot_value):
+
         if pivot_by:
             index = [x for x in result.columns if not x.startswith('value') and x not in to_list(pivot_by)]
-            result = result.pivot(index=index, columns=to_list(pivot_by), values='value_eur').reset_index()
+            result = result.pivot_table(index=index,
+                                        columns=to_list(pivot_by),
+                                        values=pivot_value,
+                                        sort=False,
+                                        fill_value=0).reset_index()
+            result['variable'] = pivot_value
 
         return result
 
@@ -327,7 +348,7 @@ class RussiaCounterResource(Resource):
         if aggregate_by:
             limit_groupers = [x for x in aggregate_by \
                               if not x.startswith('commodity') \
-                              and not x.startswith('date') \
+                              and not x in ['date','month','year'] \
                               and x in result.columns]
 
         sort_by = sort_by or 'value_eur'
