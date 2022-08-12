@@ -16,6 +16,9 @@ def update():
                 "library(remotes)",
                 # "remotes::install_github('energyandcleanair/entsog', upgrade=F)",
                 "remotes::install_github('energyandcleanair/202203_russian_gas', upgrade=F, force=F)",
+
+                # To ensure latest version is being used
+                "if('russiacounter' %in% (.packages())){detach('package:russiacounter', unload=T)}",
                 "library(russiacounter)",
                 # "library(devtools)",
                 # "devtools::reload(pkgload::inst('russiacounter'))",
