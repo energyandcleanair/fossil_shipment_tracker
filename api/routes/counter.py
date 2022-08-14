@@ -113,13 +113,13 @@ class RussiaCounterResource(Resource):
         query = session.query(
                 Counter.commodity,
                 Commodity.group.label("commodity_group"),
+                Commodity.group_name.label("commodity_group_name"),
                 Counter.destination_iso2,
                 Country.name.label('destination_country'),
                 destination_region_field,
                 Counter.date,
                 Counter.value_tonne,
                 Counter.value_eur,
-                Counter.price_type,
                 Currency.currency,
                 value_currency_field
             ) \
@@ -158,8 +158,8 @@ class RussiaCounterResource(Resource):
         if "date" in counter:
             daterange = pd.date_range(min(counter.date), max(counter.date)).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor('D')  # Should have been done already
-            cols = intersect(["commodity", "commodity_group", 'destination_iso2',
-                                    'destination_country', "destination_region", 'price_type', 'currency'], counter.columns)
+            cols = intersect(["commodity", "commodity_group", 'commodity_group_name', 'destination_iso2',
+                                    'destination_country', "destination_region",'price_type', 'currency'], counter.columns)
 
             counter = counter \
                 .groupby(cols) \
@@ -174,7 +174,7 @@ class RussiaCounterResource(Resource):
 
 
         if cumulate and "date" in counter:
-            groupby_cols = [x for x in ['commodity', 'commodity_group', 'destination_iso2', 'destination_country', 'destination_region', 'currency'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
+            groupby_cols = [x for x in ['commodity', 'commodity_group', 'commodity_group_name', 'destination_iso2', 'destination_country', 'destination_region', 'currency'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
             counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
             counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
             counter['value_currency'] = counter.groupby(groupby_cols)['value_currency'].transform(pd.Series.cumsum)
@@ -182,7 +182,8 @@ class RussiaCounterResource(Resource):
 
         if rolling_days is not None and rolling_days > 1:
             counter = counter \
-                .groupby(intersect(["commodity", "commodity_group", 'destination_iso2',
+                .groupby(intersect(["commodity", "commodity_group", 'commodity_group_name',
+                                    'destination_iso2',
                                     'destination_country',
                                     "destination_region", 'currency'], counter.columns)) \
                 .apply(lambda x: x.set_index('date') \
@@ -249,12 +250,12 @@ class RussiaCounterResource(Resource):
             'month': [func.date_trunc('month', subquery.c.date).label("month")],
             'year': [func.date_trunc('year', subquery.c.date).label("year")],
 
-            'commodity': [subquery.c.commodity, subquery.c.commodity_group],
-            'commodity_group': [subquery.c.commodity_group],
+            'commodity': [subquery.c.commodity, subquery.c.commodity_group, subquery.c.commodity_group_name],
+            'commodity_group': [subquery.c.commodity_group, subquery.c.commodity_group_name],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region],
-            'type': [subquery.c.type]
+            # 'type': [subquery.c.type]
         }
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):
@@ -310,8 +311,16 @@ class RussiaCounterResource(Resource):
 
             if aggregate_by:
 
+                dependencies = {
+                    'commodity': ['commodity_group', 'commodity_group_name'],
+                    'commodity_group': ['commodity', 'commodity_group_name'],
+                    'commodity_group_name': ['commodity', 'commodity_group']
+                }
+
+                aggregate_by_dependencies = [d for x in to_list(aggregate_by) for d in dependencies.get(x, [])]
+
                 sorting_groupers = [x for x in aggregate_by \
-                                    if not x.startswith('commodity') \
+                                    if not x in aggregate_by_dependencies \
                                     and not x in ['date', 'month', 'year', 'currency'] \
                                     and x in result.columns]
 
@@ -322,12 +331,28 @@ class RussiaCounterResource(Resource):
 
             result = pd.merge(sorted, result, how='left')
 
+
+            # Sort commodity group manually
+
+
         return result
 
     def pivot_result(self, result, pivot_by, pivot_value):
 
+        dependencies = {
+            'commodity': ['commodity_group','commodity_group_name'],
+            'commodity_group': ['commodity', 'commodity_group_name'],
+            'commodity_group_name': ['commodity', 'commodity_group']
+        }
+
         if pivot_by:
-            index = [x for x in result.columns if not x.startswith('value') and x not in to_list(pivot_by)]
+
+            pivot_by_dependencies = [d for x in to_list(pivot_by) for d in dependencies.get(x,[])]
+            index = [x for x in result.columns
+                        if not x.startswith('value') \
+                        and x not in to_list(pivot_by)
+                        and x not in pivot_by_dependencies]
+
             result = result.pivot_table(index=index,
                                         columns=to_list(pivot_by),
                                         values=pivot_value,
