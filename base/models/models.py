@@ -461,10 +461,16 @@ class Commodity(Base):
     id = Column(String, primary_key=True)
     transport = Column(String)
     name = Column(String)
-    group = Column(String) # Coal, Oil, Gas
     pricing_commodity = Column(String)
+    group = Column(String)  # coal, oil, gas
+    group_name = Column(String) # Coal, Oil, Gas
+
+    # To allow different grouping
+    alternative_groups = Column(JSONB, nullable=True)  # default, split_gas
 
     __tablename__ = DB_TABLE_COMMODITY
+    __table_args__ = (UniqueConstraint('id', name='unique_commodity'),)
+
 
 
 class MarineTrafficCall(Base):

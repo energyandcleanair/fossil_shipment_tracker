@@ -20,6 +20,7 @@ from base.logger import logger
 from base.db import session
 from base.models import Counter, Commodity, Country, Currency
 from base.utils import to_datetime, to_list, intersect, df_to_json
+from engine.commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route('/v0/counter', strict_slashes=False)
@@ -60,6 +61,9 @@ class RussiaCounterResource(Resource):
     parser.add_argument('commodity_group', action='split', help='commodity group(s) to include e.g. oil,coal,gas Defaults to all.',
                         required=False,
                         default=None)
+    parser.add_argument('commodity_grouping', type=str,
+                        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
+                        default='default')
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
@@ -88,6 +92,7 @@ class RussiaCounterResource(Resource):
         destination_region = params.get("destination_region")
         commodity = params.get("commodity")
         commodity_group = params.get("commodity_group")
+        commodity_grouping = params.get("commodity_grouping")
         fill_with_estimates = params.get("fill_with_estimates")
         nest_in_data = params.get("nest_in_data")
         use_eu = params.get("use_eu")
@@ -110,10 +115,12 @@ class RussiaCounterResource(Resource):
 
         value_currency_field = (Counter.value_eur * Currency.per_eur).label('value_currency')
 
+        commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
+
         query = session.query(
                 Counter.commodity,
-                Commodity.group.label("commodity_group"),
-                Commodity.group_name.label("commodity_group_name"),
+                commodity_subquery.c.group.label("commodity_group"),
+                commodity_subquery.c.group_name.label("commodity_group_name"),
                 Counter.destination_iso2,
                 Country.name.label('destination_country'),
                 destination_region_field,
@@ -123,7 +130,7 @@ class RussiaCounterResource(Resource):
                 Currency.currency,
                 value_currency_field
             ) \
-            .outerjoin(Commodity, Counter.commodity == Commodity.id) \
+            .outerjoin(commodity_subquery, Counter.commodity == commodity_subquery.c.id) \
             .join(Country, Counter.destination_iso2 == Country.iso2) \
             .outerjoin(Currency, Counter.date == Currency.date) \
             .filter(Counter.date >= to_datetime(date_from)) \
@@ -136,10 +143,10 @@ class RussiaCounterResource(Resource):
             query = query.filter(destination_region_field.in_(to_list(destination_region)))
 
         if commodity:
-            query = query.filter(Commodity.id.in_(to_list(commodity)))
+            query = query.filter(commodity_subquery.c.id.in_(to_list(commodity)))
 
         if commodity_group:
-            query = query.filter(Commodity.group.in_(to_list(commodity_group)))
+            query = query.filter(commodity_subquery.c.group.in_(to_list(commodity_group)))
 
         if currency is not None:
             query = query.filter(Currency.currency.in_(to_list(currency)))

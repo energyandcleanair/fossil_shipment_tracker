@@ -241,7 +241,7 @@ class PositionResource(Resource):
                 resp_content = result_geojson
 
             if download:
-                headers = {"Content-disposition": "attachment; filename=voyages.geojson"}
+                headers = {"Content-disposition": "attachment; filename=position.geojson"}
             else:
                 headers = {}
 

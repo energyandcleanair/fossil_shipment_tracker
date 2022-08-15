@@ -27,6 +27,7 @@ from sqlalchemy import func
 from base.utils import update_geometry_from_wkb
 import country_converter as coco
 import base
+from engine.commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route('/v0/voyage', strict_slashes=False)
@@ -78,10 +79,12 @@ class VoyageResource(Resource):
                         help='region(s) of commodity destination e.g. EU28,Turkey',
                         required=False,
                         default=None)
+    parser.add_argument('commodity_grouping', type=str,
+                        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
+                        default='default')
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
-
     parser.add_argument('routed_trajectory',
                         help='whether or not to use (re)routed trajectories for those that go over land (only applicable if format=geojson)',
                         required=False,
@@ -129,6 +132,7 @@ class VoyageResource(Resource):
         destination_region = params.get("destination_region")
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
         commodity_destination_region = params.get("commodity_destination_region")
+        commodity_grouping = params.get("commodity_grouping")
         date_to = params.get("date_to")
         ship_imo = params.get("ship_imo")
         aggregate_by = params.get("aggregate_by")
@@ -244,6 +248,8 @@ class VoyageResource(Resource):
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
+        commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
+
         # Query with joined information
         shipments_rich = (session.query(Shipment.id,
                                         Shipment.status,
@@ -292,7 +298,7 @@ class VoyageResource(Resource):
                                     Ship.owner.label("ship_owner"),
                                     Ship.insurer.label("ship_insurer"),
                                     commodity_field,
-                                    Commodity.group.label("commodity_group"),
+                                    commodity_subquery.c.group.label("commodity_group"),
 
                                     value_tonne_field,
                                     value_m3_field,
@@ -321,11 +327,11 @@ class VoyageResource(Resource):
              .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
              .outerjoin(Destination, Shipment.last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
-             .outerjoin(Commodity, Commodity.id == commodity_field)
+             .outerjoin(commodity_subquery, commodity_subquery.c.id == commodity_field)
              .outerjoin(event_shipment_subquery, Shipment.id == event_shipment_subquery.c.sts_shipment_id)
              .outerjoin(Price,
                         sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
-                                Price.commodity == Commodity.pricing_commodity,
+                                Price.commodity == commodity_subquery.c.pricing_commodity,
                                 sa.or_(
                                     sa.and_(Price.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
                                     Price.country_iso2 == destination_iso2_field)
@@ -333,13 +339,13 @@ class VoyageResource(Resource):
                         )
              .outerjoin(default_price,
                          sa.and_(default_price.c.date == func.date_trunc('day', Departure.date_utc),
-                                 default_price.c.commodity == Commodity.pricing_commodity
+                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
                                  )
                         )
              .outerjoin(PortPrice,
                         sa.and_(
                             PortPrice.port_id == DeparturePort.id,
-                            PortPrice.commodity == Commodity.pricing_commodity,
+                            PortPrice.commodity == commodity_subquery.c.pricing_commodity,
                             PortPrice.date == func.date_trunc('day', Departure.date_utc)
                         ))
              .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
@@ -365,7 +371,7 @@ class VoyageResource(Resource):
             shipments_rich = shipments_rich.filter(
                 sa.or_(
                     # Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"),
-                    Departure.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d")
+                    Departure.date_utc >= to_datetime(date_from)
                 ))
 
         if date_to is not None:

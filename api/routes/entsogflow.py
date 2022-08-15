@@ -6,6 +6,13 @@ import numpy as np
 
 from . import routes_api
 from flask_restx import inputs
+from http import HTTPStatus
+from flask import Response
+from flask_restx import Resource, reqparse
+import sqlalchemy as sa
+from sqlalchemy.orm import aliased
+from sqlalchemy import func, case
+
 
 import base
 from base.models import EntsogFlow, Price, Country, Commodity, Currency
@@ -13,14 +20,7 @@ from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
 from base.logger import logger
-
-
-from http import HTTPStatus
-from flask import Response
-from flask_restx import Resource, reqparse
-import sqlalchemy as sa
-from sqlalchemy.orm import aliased
-from sqlalchemy import func, case
+from engine.commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route('/v0/entsogflow', strict_slashes=False, doc=False)
@@ -56,6 +56,9 @@ class EntsogFlowResource(Resource):
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
+    parser.add_argument('commodity_grouping', type=str,
+                        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
+                        default='default')
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
@@ -85,6 +88,7 @@ class EntsogFlowResource(Resource):
         departure_iso2 = params.get("departure_iso2")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
+        commodity_grouping = params.get("commodity_grouping")
         type = params.get("type")
         date_to = params.get("date_to")
         aggregate_by = params.get("aggregate_by")
@@ -107,6 +111,8 @@ class EntsogFlowResource(Resource):
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
+        commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
+
         CommodityOriginCountry = aliased(Country)
         CommodityDestinationCountry = aliased(Country)
 
@@ -127,7 +133,7 @@ class EntsogFlowResource(Resource):
         flows_rich = (session.query(EntsogFlow.id,
                                     EntsogFlow.type,
                                     EntsogFlow.commodity,
-                                    Commodity.group.label('commodity_group'),
+                                    commodity_subquery.c.group.label('commodity_group'),
 
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
@@ -156,10 +162,10 @@ class EntsogFlowResource(Resource):
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
              .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
-             .outerjoin(Commodity, EntsogFlow.commodity == Commodity.id)
+             .outerjoin(commodity_subquery, EntsogFlow.commodity == commodity_subquery.c.id)
              .outerjoin(Price,
                         sa.and_(Price.date == EntsogFlow.date,
-                                Price.commodity == Commodity.pricing_commodity,
+                                Price.commodity == commodity_subquery.c.pricing_commodity,
                                 sa.or_(
                                     sa.and_(Price.country_iso2 == sa.null(), EntsogFlow.destination_iso2 == sa.null()),
                                     Price.country_iso2 == EntsogFlow.destination_iso2)
@@ -167,7 +173,7 @@ class EntsogFlowResource(Resource):
                         )
              .outerjoin(default_price,
                          sa.and_(default_price.c.date == EntsogFlow.date,
-                                 default_price.c.commodity == Commodity.pricing_commodity
+                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
                                  )
                         )
              .outerjoin(Currency, Currency.date == EntsogFlow.date)

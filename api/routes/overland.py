@@ -3,7 +3,12 @@ import pandas as pd
 import re
 import json
 import numpy as np
-
+from http import HTTPStatus
+from flask import Response
+from flask_restx import Resource, reqparse
+import sqlalchemy as sa
+from sqlalchemy.orm import aliased
+from sqlalchemy import func, case
 
 from . import routes_api
 from flask_restx import inputs
@@ -13,14 +18,9 @@ from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
 from base.logger import logger
+from engine.commodity import get_subquery as get_commodity_subquery
 
 
-from http import HTTPStatus
-from flask import Response
-from flask_restx import Resource, reqparse
-import sqlalchemy as sa
-from sqlalchemy.orm import aliased
-from sqlalchemy import func, case
 
 
 @routes_api.route('/v0/overland', strict_slashes=False)
@@ -40,6 +40,9 @@ class PipelineFlowResource(Resource):
     parser.add_argument('commodity_origin_iso2', action='split', help='iso2(s) of commodity origin',
                         required=False,
                         default=None)
+    parser.add_argument('commodity_grouping', type=str,
+                        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
+                        default='default')
     parser.add_argument('departure_iso2', action='split', help='iso2(s) of departure',
                         required=False,
                         default=None)
@@ -83,6 +86,7 @@ class PipelineFlowResource(Resource):
     def get_from_params(self, params):
         id = params.get("id")
         commodity = params.get("commodity")
+        commodity_grouping = params.get("commodity_grouping")
         date_from = params.get("date_from")
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
         departure_iso2 = params.get("departure_iso2")
@@ -110,6 +114,8 @@ class PipelineFlowResource(Resource):
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
+        commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
+
         CommodityOriginCountry = aliased(Country)
         CommodityDestinationCountry = aliased(Country)
 
@@ -130,7 +136,7 @@ class PipelineFlowResource(Resource):
         # Query with joined information
         flows_rich = (session.query(PipelineFlow.id,
                                     PipelineFlow.commodity,
-                                    Commodity.group.label('commodity_group'),
+                                    commodity_subquery.c.group.label('commodity_group'),
 
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
@@ -157,10 +163,10 @@ class PipelineFlowResource(Resource):
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
              .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
-             .outerjoin(Commodity, PipelineFlow.commodity == Commodity.id)
+             .outerjoin(commodity_subquery, PipelineFlow.commodity == commodity_subquery.c.id)
              .outerjoin(Price,
                         sa.and_(Price.date == PipelineFlow.date,
-                                Price.commodity == Commodity.pricing_commodity,
+                                Price.commodity == commodity_subquery.c.pricing_commodity,
                                 sa.or_(
                                     sa.and_(Price.country_iso2 == sa.null(), PipelineFlow.destination_iso2 == sa.null()),
                                     Price.country_iso2 == PipelineFlow.destination_iso2)
@@ -168,7 +174,7 @@ class PipelineFlowResource(Resource):
                         )
              .outerjoin(default_price,
                          sa.and_(default_price.c.date == PipelineFlow.date,
-                                 default_price.c.commodity == Commodity.pricing_commodity
+                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
                                  )
                         )
              .outerjoin(Currency, Currency.date == PipelineFlow.date)

@@ -19,6 +19,7 @@ from base.logger import logger
 from base.db import session
 from base.models import Counter, Commodity, Country, Currency
 from base.utils import to_datetime, to_list, intersect
+from engine.commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route('/v0/counter_last', strict_slashes=False)
@@ -41,6 +42,9 @@ class RussiaCounterLastResource(Resource):
                         help='use EU instead of EU28',
                         required=False,
                         default=False)
+    parser.add_argument('commodity_grouping', type=str,
+                        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
+                        default='default')
     parser.add_argument('aggregate_by', help='aggregation e.g. commodity_group,destination_region',
                         required=False, default=['commodity','destination_region'], action='split')
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
@@ -54,6 +58,7 @@ class RussiaCounterLastResource(Resource):
         destination_region = params.get("destination_region")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
+        commodity_grouping = params.get("commodity_grouping")
         aggregate_by = params.get("aggregate_by")
         fill_with_estimates = params.get("fill_with_estimates")
         use_eu = params.get("use_eu")
@@ -67,9 +72,12 @@ class RussiaCounterLastResource(Resource):
             else_ = Country.region
         ).label('destination_region')
 
+        commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
+
+
         query = session.query(
             Counter.commodity,
-            Commodity.group.label("commodity_group"),
+            commodity_subquery.c.group.label("commodity_group"),
             Counter.destination_iso2,
             Country.name.label('destination_country'),
             destination_region_field,
@@ -77,9 +85,10 @@ class RussiaCounterLastResource(Resource):
             func.sum(Counter.value_tonne).label("value_tonne"),
             func.sum(Counter.value_eur).label("value_eur")
         ) \
-            .outerjoin(Commodity, Counter.commodity == Commodity.id) \
+            .join(commodity_subquery, Counter.commodity == commodity_subquery.c.id) \
             .join(Country, Country.iso2 == Counter.destination_iso2) \
-            .group_by(Counter.commodity, Counter.destination_iso2, Country.name, destination_region_field, Counter.date, Commodity.group)
+            .group_by(Counter.commodity, Counter.destination_iso2, Country.name, destination_region_field,
+                      Counter.date, commodity_subquery.c.group)
 
         if destination_region:
             query = query.filter(destination_region_field.in_(to_list(destination_region)))
