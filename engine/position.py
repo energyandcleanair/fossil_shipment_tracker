@@ -211,6 +211,22 @@ def get_missing_berths(max_speed=0.5,
                        hours_from_arrival=72,
                        format='kml',
                        export_file='missing_berths.kml'):
+    """
+    Get potential unloading positions of ships that haven't an arrival berth identified
+    This is being used to feed in new berths after manually looking for them (e.g. GEM)
+    :param max_speed:
+    :param date_from:
+    :param date_to:
+    :param commodity:
+    :param exclude_in_berth:
+    :param do_cluster:
+    :param only_one_per_shipment:
+    :param cluster_m:
+    :param hours_from_arrival:
+    :param format:
+    :param export_file:
+    :return:
+    """
 
     positions = get_shipment_positions()
 
