@@ -184,7 +184,6 @@ def cluster(ordered_positions, buffer_deg=0.005):
     return trajectories
 
 
-
 def get_trajectories_over_land(date_from=-31,
                                min_land_distance=2,
                                ignore_recent_hours=24):
