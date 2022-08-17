@@ -61,8 +61,8 @@ unique_events AS (
 FROM
   (
     SELECT
-      next_departures.ship_imo,
-      next_departures.date_utc,
+      dr.ship_imo,
+      dr.date_utc,
       next_departures.next_departure_date_utc,
       ev.id AS event_id,
       ev.ship_name,
@@ -72,7 +72,8 @@ FROM
       cast(
         ev.interacting_ship_details ->> 'distance_meters' AS bigint
       ) AS distance_meters
-    FROM
+    FROM departures_russia_full dr
+    LEFT JOIN
       (
         SELECT DISTINCT ON (d.ship_imo, d.id)
           d.ship_imo,
@@ -97,17 +98,18 @@ FROM
             d.id,
             next_departure_date_utc DESC
       ) AS next_departures
+      ON dr.id = next_departures.departure_portcall_id
       LEFT JOIN event ev ON (
-        ev.ship_imo = next_departures.ship_imo
+        ev.ship_imo = dr.ship_imo
         AND (
           (
             next_departures.next_departure_date_utc IS NOT NULL
-            AND ev.date_utc BETWEEN next_departures.date_utc
+            AND ev.date_utc BETWEEN dr.date_utc
             AND next_departures.next_departure_date_utc
           )
           OR (
             next_departures.next_departure_date_utc IS NULL
-            AND ev.date_utc BETWEEN next_departures.date_utc
+            AND ev.date_utc BETWEEN dr.date_utc
             AND CURRENT_DATE
           )
         )
