@@ -304,6 +304,7 @@ def update_departures_from_russia(
         date_to=dt.date.today() + dt.timedelta(days=1),
         unlocode=None,
         marinetraffic_port_id=None,
+        port_id=None,
         force_rebuild=False,
         between_existing_only=False):
     """
@@ -321,6 +322,9 @@ def update_departures_from_russia(
 
     if marinetraffic_port_id is not None:
         ports = ports.filter(Port.marinetraffic_id.in_(to_list(marinetraffic_port_id)))
+
+    if port_id is not None:
+        ports = ports.filter(Port.id.in_(to_list(port_id)))
 
     ports = ports.all()
     for port in tqdm(ports):

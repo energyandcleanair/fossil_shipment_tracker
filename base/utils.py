@@ -41,6 +41,9 @@ def latlon_to_point(lat, lon, wkt=True):
 
 
 def to_list(d):
+    if d is None:
+        return []
+
     if not isinstance(d, list):
         return [d]
     else:

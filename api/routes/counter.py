@@ -77,6 +77,9 @@ class RussiaCounterResource(Resource):
                         required=False, default='value_eur')
     parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
                         required=False, default=None)
+    parser.add_argument('limit_by', action='split',
+                        help='in which group do you want to limit to n records',
+                        required=False, default=None)
 
     @routes_api.expect(parser)
     def get(self):
@@ -101,6 +104,7 @@ class RussiaCounterResource(Resource):
         pivot_by = params.get("pivot_by")
         pivot_value = params.get("pivot_value")
         limit = params.get("limit")
+        limit_by = params.get("limit_by")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -209,11 +213,14 @@ class RussiaCounterResource(Resource):
         counter = self.sort_result(result=counter, sort_by=sort_by, aggregate_by=aggregate_by)
 
         # Keep only n records
-        counter = self.limit_result(result=counter, limit=limit, aggregate_by=aggregate_by, sort_by=sort_by)
+        counter = self.limit_result(result=counter,
+                                    limit=limit,
+                                    aggregate_by=aggregate_by,
+                                    sort_by=sort_by,
+                                    limit_by=limit_by)
 
         # Pivot
         counter = self.pivot_result(result=counter, pivot_by=pivot_by, pivot_value=pivot_value)
-
 
         if format == "csv":
             return Response(
@@ -369,27 +376,36 @@ class RussiaCounterResource(Resource):
 
         return result
 
-    def limit_result(self, result, limit, aggregate_by, sort_by):
+    def limit_result(self, result, limit, aggregate_by, sort_by, limit_by):
 
         if not limit:
             return result
 
+        limit_by = to_list(limit_by) or []
+
         if not aggregate_by:
-            limit_groupers = ['destination_country']
+            group_by = ['destination_country']
 
         if aggregate_by:
-            limit_groupers = [x for x in aggregate_by \
+            group_by = [x for x in aggregate_by \
                               if not x.startswith('commodity') \
                               and not x in ['date','month','year'] \
                               and x in result.columns]
 
         sort_by = sort_by or 'value_eur'
+        group_by = group_by + [x for x in limit_by if x not in group_by]
+
         # Can only take one
         sort_by = to_list(sort_by)[0]
-        top = result.groupby(limit_groupers) \
+        top = result.groupby(group_by) \
             .agg({sort_by: 'sum'}) \
             .reset_index() \
-            .sort_values(sort_by, ascending=False) \
+            .sort_values(limit_by + to_list(sort_by), ascending=False)
+
+        if limit_by:
+            top = top.groupby(limit_by, as_index=False)
+
+        top = top \
             .head(limit) \
             .drop(sort_by, axis=1)
 
