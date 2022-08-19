@@ -16,8 +16,7 @@ def update():
     # Not much really. We just confirm crude_oil vs oil_products when necessary
     # And use MT for insurance
     collect_mt_for_large_oil_products()
-    collect_equasis_for_additional_infos()
-    collect_mt_for_insurers()
+    # collect_mt_for_insurers()
     return
 
 
@@ -49,30 +48,30 @@ def collect_mt_for_large_oil_products():
         else:
             logger.info("Was already using MT")
 
-
-def collect_mt_for_insurers(date_from='2022-02-24',
-                         commodity=[base.CRUDE_OIL, base.LNG]):
-
-    ships = session.query(Ship) \
-        .join(Departure, Ship.imo == Departure.ship_imo) \
-        .join(Shipment, Shipment.departure_id == Departure.id) \
-        .filter(Departure.date_utc >= date_from) \
-        .filter(Ship.insurer == sa.null()) \
-        .filter(Ship.commodity.in_(to_list(commodity))) \
-        .distinct() \
-        .all()
-
-    for ship in tqdm(ships):
-        if not 'INSURER' in ship.others.get('marinetraffic', {}).keys():
-            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi, use_cache=True)
-            # ship_mt = Marinetraffic.get_ship(imo=ship.imo, use_cache=False)
-            if ship_mt is not None and ship.imo == ship_mt.imo:
-                if 'datalastic' in ship.others:
-                    ship_mt.others['datalastic'] = ship.others['datalastic']
-                session.merge(ship_mt)
-                session.commit()
-            else:
-                logger.info("IMOs don't match or ship not found")
+#
+# def collect_mt_for_insurers(date_from='2022-02-24',
+#                          commodity=[base.CRUDE_OIL, base.LNG]):
+#
+#     ships = session.query(Ship) \
+#         .join(Departure, Ship.imo == Departure.ship_imo) \
+#         .join(Shipment, Shipment.departure_id == Departure.id) \
+#         .filter(Departure.date_utc >= date_from) \
+#         .filter(Ship.insurer == sa.null()) \
+#         .filter(Ship.commodity.in_(to_list(commodity))) \
+#         .distinct() \
+#         .all()
+#
+#     for ship in tqdm(ships):
+#         if not 'INSURER' in ship.others.get('marinetraffic', {}).keys():
+#             ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi, use_cache=True)
+#             # ship_mt = Marinetraffic.get_ship(imo=ship.imo, use_cache=False)
+#             if ship_mt is not None and ship.imo == ship_mt.imo:
+#                 if 'datalastic' in ship.others:
+#                     ship_mt.others['datalastic'] = ship.others['datalastic']
+#                 session.merge(ship_mt)
+#                 session.commit()
+#             else:
+#                 logger.info("IMOs don't match or ship not found")
 
 def fill_missing_commodity():
 
@@ -211,15 +210,13 @@ def set_commodity(ship):
     ship.unit = unit
     return ship
 
-
 def fix_mmsi_imo_discrepancy(date_from=None):
-
     query = session.query(PortCall.ship_imo, PortCall.ship_mmsi)
     if date_from is not None:
         query = query.filter(PortCall.date_utc >= to_datetime(date_from))
 
     portcall_ships = query.distinct().all()
-    
+
     correct = []
     wrong = []
     unknown = []
@@ -229,7 +226,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
         mmsi = portcall_ship.ship_mmsi
         # others = portcall_ship.others
         found_ship = Datalastic.get_ship(mmsi=mmsi, use_cache=True)
-        if not found_ship or not found_ship.imo or found_ship.imo=='0':
+        if not found_ship or not found_ship.imo or found_ship.imo == '0':
             from engine.marinetraffic import Marinetraffic
             found_ship = Marinetraffic.get_ship(mmsi=mmsi, use_cache=True)
 
@@ -285,7 +282,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                         session.rollback()
 
                 else:
-                    n_imo_ships = Ship.query.filter(Ship.imo.op('~')(correct_imo +'[_v]?')).count()
+                    n_imo_ships = Ship.query.filter(Ship.imo.op('~')(correct_imo + '[_v]?')).count()
                     new_imo = "%s_v%d" % (correct_imo, n_imo_ships + 1)
                     found_ship.imo = new_imo
                     session.add(found_ship)
@@ -324,7 +321,7 @@ def fix_not_found():
     # portcalls = PortCall.query.filter(PortCall.ship_imo.op('~*')('NOTFOUND.*')).all()
 
     for ship in tqdm(ships):
-        portcall = PortCall.query.filter(PortCall.ship_imo==ship.imo).first()
+        portcall = PortCall.query.filter(PortCall.ship_imo == ship.imo).first()
         if portcall:
             ship_mt_id = portcall.others.get('marinetraffic', {}).get('SHIP_ID')
             new_ship = Marinetraffic.get_ship(mt_id=ship_mt_id, use_cache=True)
@@ -345,7 +342,7 @@ def fix_not_found():
                         session.add(new_ship)
                         session.commit()
                     except IntegrityError:
-                        session.rollback() # Do manual edit here for now
+                        session.rollback()  # Do manual edit here for now
 
                 if new_ship and new_ship.name == ship.name:
                     try:
@@ -365,48 +362,6 @@ def fix_not_found():
                     session.commit()
                 else:
                     # What to do?
-                    logger.info("%s \n vs. \n %s " %(str(new_ship.others),
-                                                     str(ship.others)))
-
-
-def collect_equasis_for_additional_infos():
-    # We use equasis for insurer, manager and owner
-    ships = Ship.query \
-        .join(Departure, Departure.ship_imo==Ship.imo) \
-        .filter(sa.or_(
-        Ship.insurer == sa.null(),
-        Ship.manager == sa.null(),
-        Ship.owner == sa.null())) \
-        .filter(sa.or_(
-            Ship.others['equasis'] == sa.null(),
-            Ship.others['equasis']['management'] == [])) \
-        .all()
-
-    from engine.equasis import Equasis
-    equasis = Equasis()
-
-    for ship in tqdm(ships):
-        equasis_infos = equasis.get_ships_infos(imos=ship.imo)
-        info = equasis_infos[0]
-        if info is not None and len(info.get('management')):
-            insurer = info.get('pni')
-            if insurer:
-                ship.insurer = insurer
-            try:
-                manager = next(x.get('company') for x in info.get('management')[0] if x['role']=='ISM Manager')
-                ship.manager = manager
-            except StopIteration:
-                continue
-
-            try:
-                owner = next(x.get('company') for x in info.get('management')[0] if x['role']=='Registered owner')
-                ship.owner = owner
-            except StopIteration:
-                continue
-
-            others = ship.others.copy() if ship.others else {}
-            others.update({'equasis': info})
-            ship.others = others
-            session.commit()
-
+                    logger.info("%s \n vs. \n %s " % (str(new_ship.others),
+                                                      str(ship.others)))
 

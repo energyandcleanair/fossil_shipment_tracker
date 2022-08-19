@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+import datetime as dt
 
 from base.env import get_env
 from base.utils import to_list
@@ -8,25 +9,37 @@ from base.utils import to_list
 class Equasis():
 
     session = None
+    current_credentials_idx = -1
 
-    def __init__(self,
-                 username=get_env('EQUASIS_EMAIL'),
-                 password=get_env('EQUASIS_PASSWORD')):
+    def __init__(self):
         self.session = requests.Session()
-        self._login(username, password)
+        self._login()
     
-    def _login (self,
-                username=get_env('EQUASIS_EMAIL'),
-                password=get_env('EQUASIS_PASSWORD')):
+    def _login (self):
         url = 'https://www.equasis.org/EquasisWeb/authen/HomePage?fs=HomePage'
         headers = {'User-Agent': 'Mozilla/5.0'}
-        payload = {'j_email':username,'j_password':password, "submit":'Login'}
+        credentials = self._get_next_crendentials()
+        payload = {'j_email':credentials['username'],
+                   'j_password':credentials['password'],
+                   'submit':'Login'}
         try:
             resp = self.session.post(url,headers=headers,data=payload)
         except Exception as e:
             self._log('Error logging in to equasis.org')
-            #transform to your exception
             raise e
+
+    def _get_next_crendentials(self):
+        credentials = self._get_all_credentials()
+        self.current_credentials_idx += 1
+        self.current_credentials_idx %= len(credentials)
+        next_credentials = credentials[self.current_credentials_idx]
+        self._log("Trying with email %s"%(next_credentials['username']))
+        return next_credentials
+
+    def _get_all_credentials(self):
+        emails = ['hubert+%03d@energyandcleanair.org'%(x) for x in range(1,12)]
+        password = get_env('EQUASIS_PASSWORD')
+        return [{'username':x, 'password': password} for x in emails]
 
     def _clean_text(self, text):
         text = text.replace('\t','').replace('\r','').replace('\n','')
@@ -71,54 +84,76 @@ class Equasis():
     def _log(self, message):
         print(message)
 
-    def get_ships_infos(self, imos, itry=1):
+    def _parse_doa(self, doa):
+        formats = ['since %d/%m/%Y', 'during %m/%Y', 'before %m/%Y']
+        for format in formats:
+            try:
+                return dt.datetime.strptime(doa, format)
+            except ValueError:
+                continue
+        return None
+
+    def get_ship_infos(self, imo, itry=1, max_try=11):
+        
+        if itry > max_try:
+            return None
+        
         url = "https://www.equasis.org/EquasisWeb/restricted/ShipInfo?fs=Search"
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = []
-        for imo in to_list(imos):
-            ship_data = {}
-            ship_data['imo'] = imo
-            payload = {
-                "P_IMO": imo
-            }
-            
-            resp = None
-            try:
-                resp = self.session.post(url,headers=headers,data=payload)
-            except Exception as e:
-                self._log("Error getting response")
+        ship_data = {}
+        ship_data['imo'] = imo
+        payload = {
+            "P_IMO": imo
+        }
 
-                #parse it the way you want
-                raise e
+        try:
+            resp = self.session.post(url,headers=headers,data=payload)
+        except Exception as e:
+            self._log("Error getting response")
+            raise e
 
-            html_obj = BeautifulSoup(resp.content, "html.parser")
+        if "session has expired" in str(resp.content):
+            self._login()
+            return self.get_ship_infos(imo=imo, itry=itry + 1)
+        html_obj = BeautifulSoup(resp.content, "html.parser")
 
-            #In case ship info is required
-            #info_box = html_obj.body.find('div', attrs={'class':'info-details'})
-            if (not html_obj or not html_obj.body)and itry == 1:
-                self._login()
-                return self.get_ships_infos(imos=imos, itry=itry + 1)
+        #In case ship info is required
+        #info_box = html_obj.body.find('div', attrs={'class':'info-details'})
+        if (not html_obj or not html_obj.body) and itry == 1:
+            self._login()
+            return self.get_ship_infos(imo=imo, itry=itry + 1)
 
-            if not html_obj or not html_obj.body:
-                return None
-
-            pni_div = html_obj.body.find('div', attrs={'id': 'collapse6'})
-            if pni_div:
-                ship_data['pni'] = self._find_pni(pni_div)
-
-            management_div = html_obj.body.find('div', attrs={'id': 'collapse3'})
-            ship_data['management'] = []
-            if management_div:
-                ship_data['management'].append(self._find_management(management_div))
-
-            response.append(ship_data)
-                
-        return response
-
-    def get_insurer(self, imo):
-        resp = self.get_ships_infos(imos=[imo])
-        if resp:
-            return resp[0].get('pni')
-        else:
+        if not html_obj or not html_obj.body:
             return None
 
+        # Insurer
+        pni_div = html_obj.body.find('div', attrs={'id': 'collapse6'})
+        if pni_div:
+            ship_data['insurer'] = {'name': self._find_pni(pni_div)}
+
+        # Manager & Owner
+        management_div = html_obj.body.find('div', attrs={'id': 'collapse3'})
+        if management_div:
+            management_raw = self._find_management(management_div)
+            try:
+                manager_info = next(x for x in management_raw if x['role'] == 'ISM Manager')
+                ship_data['manager'] = {'name': manager_info.get('company'),
+                                        'address': manager_info.get('address'),
+                                        'date_from': self._parse_doa(manager_info.get('doa'))
+                                        }
+            except StopIteration:
+                pass
+
+            try:
+                owner_info = next(x for x in management_raw if x['role'] == 'Registered owner')
+                ship_data['owner'] = {'name': owner_info.get('company'),
+                                      'address': owner_info.get('address'),
+                                      'date_from': self._parse_doa(owner_info.get('doa')),
+                                    }
+            except StopIteration:
+                pass
+
+        if list(ship_data.keys()) == ['imo']:
+            pass
+
+        return ship_data

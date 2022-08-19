@@ -88,6 +88,39 @@ def test_counter(app):
                                 'value_tonne', 'value_eur', 'value_usd', 'type'])
         assert set(data_df.columns) == expected_columns
 
+def test_counter_use_eu(app):
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {"format": "json", "use_eu": True}
+        response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
+        data = response.json["data"]
+        data_df = pd.DataFrame(data)
+        assert 'EU' in data_df.destination_region.unique()
+        assert 'EU28' not in data_df.destination_region.unique()
+
+        response = test_client.get('/v0/counter_last?' + urllib.parse.urlencode(params))
+        data = response.json["data"]
+        data_df = pd.DataFrame(data)
+        assert 'EU' in data_df.destination_region.unique()
+        assert 'EU28' not in data_df.destination_region.unique()
+
+        params = {"format": "json", "use_eu": False}
+        response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        data_df = pd.DataFrame(data)
+
+        assert 'EU' not in data_df.destination_region.unique()
+        assert 'EU28' in data_df.destination_region.unique()
+
+        response = test_client.get('/v0/counter_last?' + urllib.parse.urlencode(params))
+        data = response.json["data"]
+        data_df = pd.DataFrame(data)
+        assert 'EU' not in data_df.destination_region.unique()
+        assert 'EU28' in data_df.destination_region.unique()
+
+
+
 
 def test_counter_cumulate(app):
 

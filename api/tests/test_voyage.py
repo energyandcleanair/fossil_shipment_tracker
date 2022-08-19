@@ -205,3 +205,24 @@ def test_voyage_rolling(app):
         assert base.ONGOING in set([x['status'] for x in data])
         assert base.COMPLETED in set([x['status'] for x in data])
         assert all(["departure_date" in x.keys() for x in data])
+
+
+def test_voyage_companies(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+
+        company_types = ['insurer', 'owner', 'manager']
+        for company_type in company_types:
+            params = {"format": "json",
+                      "aggregate_by": 'ship_%s' % (company_type)}
+            response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+            assert response.status_code == 200
+            data = response.json["data"]
+            assert len(data) > 0
+            data_df = pd.DataFrame(data)
+            assert set(data_df.columns) >= set(['ship_%s' % (company_type),
+                                                'ship_%s_country' % (company_type),
+                                                'ship_%s_iso2' % (company_type)])
+
+

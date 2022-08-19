@@ -41,7 +41,7 @@ class RussiaCounterLastResource(Resource):
     parser.add_argument('use_eu', type=inputs.boolean,
                         help='use EU instead of EU28',
                         required=False,
-                        default=False)
+                        default=True)
     parser.add_argument('commodity_grouping', type=str,
                         help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
                         default='default')
@@ -67,7 +67,9 @@ class RussiaCounterLastResource(Resource):
         destination_region_field = case(
             [
                 (sa.and_(use_eu, Counter.destination_iso2 == 'GB'), 'United Kingdom'),
-                (sa.and_(use_eu, Country.region=='EU28', Counter.destination_iso2 != 'GB'), 'EU')
+                (sa.and_(use_eu, Country.region=='EU28', Counter.destination_iso2 != 'GB'), 'EU'),
+                (sa.and_(not use_eu, Counter.destination_iso2 == 'GB'), 'EU28'),
+                (sa.and_(not use_eu, Country.region == 'EU'), 'EU28')
             ],
             else_ = Country.region
         ).label('destination_region')

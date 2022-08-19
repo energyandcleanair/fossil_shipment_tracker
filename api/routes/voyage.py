@@ -9,6 +9,7 @@ from flask_restx import inputs
 
 
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
+    ShipOwner, ShipInsurer, ShipManager, Company, \
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
     Destination, Price, Country, PortPrice, Currency, EventShipment
 from base.db import session
@@ -90,6 +91,28 @@ class VoyageResource(Resource):
                         required=False,
                         type=inputs.boolean, default=True)
 
+    parser.add_argument('ship_owner_iso2', action='split', help='iso2(s) of ship owner',
+                        required=False,
+                        default=None)
+    parser.add_argument('ship_owner_region', action='split', help='region(s) of ship owner e.g. EU,Turkey',
+                        required=False,
+                        default=None)
+    
+    parser.add_argument('ship_manager_iso2', action='split', help='iso2(s) of ship manager',
+                        required=False,
+                        default=None)
+    parser.add_argument('ship_manager_region', action='split', help='region(s) of ship manager e.g. EU,Turkey',
+                        required=False,
+                        default=None)
+    
+    parser.add_argument('ship_insurer_iso2', action='split', help='iso2(s) of ship insurer',
+                        required=False,
+                        default=None)
+    parser.add_argument('ship_insurer_region', action='split', help='region(s) of ship insurer e.g. EU,Turkey',
+                        required=False,
+                        default=None)
+    
+
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
@@ -133,6 +156,16 @@ class VoyageResource(Resource):
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
         commodity_destination_region = params.get("commodity_destination_region")
         commodity_grouping = params.get("commodity_grouping")
+
+        ship_owner_iso2 = params.get("ship_owner_iso2")
+        ship_owner_region = params.get("ship_owner_region")
+
+        ship_manager_iso2 = params.get("ship_manager_iso2")
+        ship_manager_region = params.get("ship_manager_region")
+
+        ship_insurer_iso2 = params.get("ship_insurer_iso2")
+        ship_insurer_region = params.get("ship_insurer_region")
+
         date_to = params.get("date_to")
         ship_imo = params.get("ship_imo")
         aggregate_by = params.get("aggregate_by")
@@ -150,6 +183,14 @@ class VoyageResource(Resource):
 
         CommodityOriginCountry = aliased(Country)
         CommodityDestinationCountry = aliased(Country)
+
+        ShipOwnerCompany = aliased(Company)
+        ShipManagerCompany = aliased(Company)
+        ShipInsurerCompany = aliased(Company)
+        
+        ShipOwnerCountry = aliased(Country)
+        ShipManagerCountry = aliased(Country)
+        ShipInsurerCountry = aliased(Country)
 
         DepartureCountry = aliased(Country)
 
@@ -251,9 +292,10 @@ class VoyageResource(Resource):
         commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
 
         # Query with joined information
-        shipments_rich = (session.query(Shipment.id,
-                                        Shipment.status,
+        shipments_rich = (session.query(
 
+                                    Shipment.id.distinct(), # Potential introducers of duplicates: ShipinOwner, Insurer etc.
+                                    Shipment.status,
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
                                     CommodityOriginCountry.name.label('commodity_origin_country'),
@@ -294,11 +336,25 @@ class VoyageResource(Resource):
                                     Ship.type.label("ship_type"),
                                     Ship.subtype.label("ship_subtype"),
                                     Ship.dwt.label("ship_dwt"),
-                                    Ship.manager.label("ship_manager"),
-                                    Ship.owner.label("ship_owner"),
-                                    Ship.insurer.label("ship_insurer"),
                                     commodity_field,
                                     commodity_subquery.c.group.label("commodity_group"),
+
+
+                                    # Companies
+                                    ShipManagerCompany.name.label("ship_manager"),
+                                    ShipManagerCountry.iso2.label("ship_manager_iso2"),
+                                    ShipManagerCountry.name.label("ship_manager_country"),
+                                    ShipManagerCountry.region.label("ship_manager_region"),
+
+                                    ShipOwnerCompany.name.label("ship_owner"),
+                                    ShipOwnerCountry.iso2.label("ship_owner_iso2"),
+                                    ShipOwnerCountry.name.label("ship_owner_country"),
+                                    ShipOwnerCountry.region.label("ship_owner_region"),
+
+                                    ShipInsurerCompany.name.label("ship_insurer"),
+                                    ShipInsurerCountry.iso2.label("ship_insurer_iso2"),
+                                    ShipInsurerCountry.name.label("ship_insurer_country"),
+                                    ShipOwnerCountry.region.label("ship_insurer_region"),
 
                                     value_tonne_field,
                                     value_m3_field,
@@ -352,6 +408,31 @@ class VoyageResource(Resource):
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
              .outerjoin(CommodityDestinationCountry, CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
+
+             .outerjoin(ShipOwner, sa.and_(
+                            ShipOwner.ship_imo == Departure.ship_imo,
+                            sa.or_(
+                                    Departure.date_utc >= ShipOwner.date_from,
+                                    ShipOwner.date_from == sa.null())))
+             .outerjoin(ShipOwnerCompany, ShipOwner.company_id == ShipOwnerCompany.id)
+             .outerjoin(ShipOwnerCountry, ShipOwnerCompany.country_iso2 == ShipOwnerCountry.iso2)
+
+             .outerjoin(ShipManager, sa.and_(
+                    ShipManager.ship_imo == Departure.ship_imo,
+                    sa.or_(
+                        Departure.date_utc >= ShipManager.date_from,
+                        ShipManager.date_from == sa.null())))
+             .outerjoin(ShipManagerCompany, ShipManager.company_id == ShipManagerCompany.id)
+             .outerjoin(ShipManagerCountry, ShipManagerCompany.country_iso2 == ShipManagerCountry.iso2)
+
+             .outerjoin(ShipInsurer, sa.and_(
+                    ShipInsurer.ship_imo == Departure.ship_imo,
+                    sa.or_(
+                        Departure.date_utc >= ShipInsurer.date_from,
+                        ShipInsurer.date_from == sa.null())))
+             .outerjoin(ShipInsurerCompany, ShipInsurer.company_id == ShipInsurerCompany.id)
+             .outerjoin(ShipInsurerCountry, ShipInsurerCompany.country_iso2 == ShipInsurerCountry.iso2)
+
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .filter(destination_iso2_field != "RU"))
 
@@ -407,6 +488,30 @@ class VoyageResource(Resource):
 
         if commodity_destination_region is not None:
             shipments_rich = shipments_rich.filter(CommodityDestinationCountry.region.in_(to_list(commodity_destination_region)))
+
+        if ship_owner_iso2 is not None:
+            shipments_rich = shipments_rich.filter(
+                ShipOwnerCountry.iso2.in_(to_list(ship_owner_iso2)))
+
+        if ship_owner_region is not None:
+            shipments_rich = shipments_rich.filter(
+                ShipOwnerCountry.region.in_(to_list(ship_owner_region)))
+
+        if ship_manager_iso2 is not None:
+            shipments_rich = shipments_rich.filter(
+                ShipOwnerCountry.iso2.in_(to_list(ship_manager_iso2)))
+
+        if ship_manager_region is not None:
+            shipments_rich = shipments_rich.filter(
+                ShipOwnerCountry.region.in_(to_list(ship_manager_region)))
+
+        if ship_insurer_iso2 is not None:
+            shipments_rich = shipments_rich.filter(
+                ShipOwnerCountry.iso2.in_(to_list(ship_insurer_iso2)))
+
+        if ship_insurer_region is not None:
+            shipments_rich = shipments_rich.filter(
+                ShipOwnerCountry.region.in_(to_list(ship_insurer_region)))
 
         if currency is not None:
             shipments_rich = shipments_rich.filter(Currency.currency.in_(to_list(currency)))
@@ -508,9 +613,9 @@ class VoyageResource(Resource):
             'arrival_port': [subquery.c.arrival_port_id, subquery.c.arrival_port_name],
             'departure_port': [subquery.c.departure_port_id, subquery.c.departure_port_name],
 
-            'ship_insurer': [subquery.c.ship_insurer],
-            'ship_manager': [subquery.c.ship_manager],
-            'ship_owner': [subquery.c.ship_owner]
+            'ship_insurer': [subquery.c.ship_insurer, subquery.c.ship_insurer_country, subquery.c.ship_insurer_iso2, subquery.c.ship_insurer_region],
+            'ship_manager': [subquery.c.ship_manager, subquery.c.ship_manager_country, subquery.c.ship_manager_iso2, subquery.c.ship_manager_region],
+            'ship_owner': [subquery.c.ship_owner, subquery.c.ship_owner_country, subquery.c.ship_owner_iso2, subquery.c.ship_owner_region]
         }
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):

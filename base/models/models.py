@@ -5,7 +5,6 @@ from sqlalchemy.orm import validates
 from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
 import datetime as dt
-from sqlalchemy.sql.expression import text
 
 
 import base
@@ -16,6 +15,10 @@ from . import DB_TABLE_PORTCALL
 from . import DB_TABLE_DEPARTURE
 from . import DB_TABLE_ARRIVAL
 from . import DB_TABLE_SHIP
+from . import DB_TABLE_SHIP_INSURER
+from . import DB_TABLE_SHIP_OWNER
+from . import DB_TABLE_SHIP_MANAGER
+from . import DB_TABLE_COMPANY
 from . import DB_TABLE_PORT
 from . import DB_TABLE_TERMINAL
 from . import DB_TABLE_BERTH
@@ -62,9 +65,9 @@ class Ship(Base):
     liquid_oil = Column(Numeric)
     others = Column(JSONB)
 
-    owner = Column(String)
-    manager = Column(String)
-    insurer = Column(String)
+    # owner = Column(String)
+    # manager = Column(String)
+    # insurer = Column(String)
 
     # Estimated commodity, quantity etc
     commodity = Column(String)
@@ -216,6 +219,56 @@ class Shipment(Base):
     destination_iso2s = Column(ARRAY(String))
 
     __tablename__ = DB_TABLE_SHIPMENT
+
+
+class Company(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    name = Column(String, nullable=False)
+    names = Column(ARRAY(String))
+    address = Column(String)
+    addresses = Column(ARRAY(String))
+    country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
+
+    __tablename__ = DB_TABLE_COMPANY
+    __table_args__ = (UniqueConstraint('name', name='unique_company'),)
+
+
+class ShipInsurer(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"), nullable=False)
+    date_from = Column(DateTime(timezone=False)) # Most likely null, not indicated by Equasis
+    company_raw_name = Column(String, nullable=False) # Name indicated by Equasis
+    company_id = Column(BigInteger, ForeignKey(DB_TABLE_COMPANY + '.id', onupdate="CASCADE"), nullable=False) # Link to cleaned list of companies
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
+    __tablename__ = DB_TABLE_SHIP_INSURER
+    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', name='unique_ship_insurer'),)
+
+
+class ShipOwner(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"), nullable=False)
+    date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
+    company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
+    company_id = Column(BigInteger, ForeignKey(DB_TABLE_COMPANY + '.id', onupdate="CASCADE"),
+                        nullable=False)  # Link to cleaned list of companies
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
+    __tablename__ = DB_TABLE_SHIP_OWNER
+    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', name='unique_ship_owner'),)
+
+
+class ShipManager(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"), nullable=False)
+    date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
+    company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
+    company_id = Column(BigInteger, ForeignKey(DB_TABLE_COMPANY + '.id', onupdate="CASCADE"),
+                        nullable=False)  # Link to cleaned list of companies
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
+    __tablename__ = DB_TABLE_SHIP_MANAGER
+    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', name='unique_ship_manager'),)
 
 
 class Position(Base):
@@ -470,7 +523,6 @@ class Commodity(Base):
 
     __tablename__ = DB_TABLE_COMMODITY
     __table_args__ = (UniqueConstraint('id', name='unique_commodity'),)
-
 
 
 class MarineTrafficCall(Base):
