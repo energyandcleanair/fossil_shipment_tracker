@@ -13,6 +13,7 @@ from engine import rscript
 from engine import counter
 from engine import entsog
 from engine import alert
+from engine import company
 import base
 
 import datetime as dt
@@ -43,6 +44,7 @@ def update():
 
     arrival.update(date_from = dt.date.today() - dt.timedelta(days=90))
     currency.update()
+    company.update()
     shipment.update()
     position.update()
     destination.update()
