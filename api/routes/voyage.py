@@ -35,6 +35,7 @@ from engine.commodity import get_subquery as get_commodity_subquery
 class VoyageResource(Resource):
 
     parser = reqparse.RequestParser()
+    default_date_from = '2022-01-01'
 
     # Query content
     parser.add_argument('id', help='id(s) of voyage. Default: returns all of them',
@@ -44,7 +45,11 @@ class VoyageResource(Resource):
     parser.add_argument('status', help='status of shipments. Could be any or several of completed, ongoing, undetected_arrival. Default: returns all of them',
                         default=None, action='split', required=False)
     parser.add_argument('date_from', help='start date for departure or arrival (format 2020-01-15)',
-                        default="2022-01-01", required=False)
+                        default=None, required=False)
+    parser.add_argument('departure_date_from', help='start date for departure (format 2020-01-15)',
+                        default=None, required=False)
+    parser.add_argument('arrival_date_from', help='start date for arrival (format 2020-01-15)',
+                        default=None, required=False)
     parser.add_argument('date_to', type=str, help='end date for departure or arrival arrival (format 2020-01-15 or -7 for seven days before today)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
     parser.add_argument('ship_imo', action='split', help='IMO identifier(s) of the ship(s)',
@@ -129,6 +134,11 @@ class VoyageResource(Resource):
                         type=inputs.boolean, default=True)
     parser.add_argument('download', help='Whether to return results as a file or not.',
                         type=inputs.boolean, default=False)
+    parser.add_argument('pivot_by', type=str,
+                        help='pivoting value_eur (or any other specified by pivot_value) by e.g. commodity_group.',
+                        required=False, action='split', default=None)
+    parser.add_argument('pivot_value', type=str, help='pivoted value. Default: value_eur.',
+                        required=False, default='value_eur')
 
     # Misc
     parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
@@ -146,6 +156,8 @@ class VoyageResource(Resource):
         commodity = params.get("commodity")
         status = params.get("status")
         date_from = params.get("date_from")
+        departure_date_from = params.get("departure_date_from")
+        arrival_date_from = params.get("arrival_date_from")
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
         departure_iso2 = params.get("departure_iso2")
         departure_port_id = params.get("departure_port_id")
@@ -177,6 +189,8 @@ class VoyageResource(Resource):
         currency = params.get("currency")
         sort_by = params.get("sort_by")
         limit = params.get("limit")
+        pivot_by = params.get("pivot_by")
+        pivot_value = params.get("pivot_value")
 
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
@@ -187,7 +201,7 @@ class VoyageResource(Resource):
         ShipOwnerCompany = aliased(Company)
         ShipManagerCompany = aliased(Company)
         ShipInsurerCompany = aliased(Company)
-        
+
         ShipOwnerCountry = aliased(Country)
         ShipManagerCountry = aliased(Country)
         ShipInsurerCountry = aliased(Country)
@@ -354,7 +368,7 @@ class VoyageResource(Resource):
                                     ShipInsurerCompany.name.label("ship_insurer"),
                                     ShipInsurerCountry.iso2.label("ship_insurer_iso2"),
                                     ShipInsurerCountry.name.label("ship_insurer_country"),
-                                    ShipOwnerCountry.region.label("ship_insurer_region"),
+                                    ShipInsurerCountry.region.label("ship_insurer_region"),
 
                                     value_tonne_field,
                                     value_m3_field,
@@ -451,9 +465,18 @@ class VoyageResource(Resource):
         if date_from is not None:
             shipments_rich = shipments_rich.filter(
                 sa.or_(
-                    # Arrival.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"),
                     Departure.date_utc >= to_datetime(date_from)
                 ))
+
+        if departure_date_from is not None:
+            shipments_rich = shipments_rich.filter(Departure.date_utc >= to_datetime(departure_date_from))
+
+        if arrival_date_from is not None:
+            shipments_rich = shipments_rich.filter(Arrival.date_utc >= to_datetime(arrival_date_from))
+
+        # Add the default date_from if none has been specified
+        if not date_from and not departure_date_from and not arrival_date_from:
+            shipments_rich = shipments_rich.filter(Departure.date_utc >= to_datetime(VoyageResource.default_date_from))
 
         if date_to is not None:
             shipments_rich = shipments_rich.filter(
@@ -499,19 +522,19 @@ class VoyageResource(Resource):
 
         if ship_manager_iso2 is not None:
             shipments_rich = shipments_rich.filter(
-                ShipOwnerCountry.iso2.in_(to_list(ship_manager_iso2)))
+                ShipManagerCountry.iso2.in_(to_list(ship_manager_iso2)))
 
         if ship_manager_region is not None:
             shipments_rich = shipments_rich.filter(
-                ShipOwnerCountry.region.in_(to_list(ship_manager_region)))
+                ShipManagerCountry.region.in_(to_list(ship_manager_region)))
 
         if ship_insurer_iso2 is not None:
             shipments_rich = shipments_rich.filter(
-                ShipOwnerCountry.iso2.in_(to_list(ship_insurer_iso2)))
+                ShipInsurerCountry.iso2.in_(to_list(ship_insurer_iso2)))
 
         if ship_insurer_region is not None:
             shipments_rich = shipments_rich.filter(
-                ShipOwnerCountry.region.in_(to_list(ship_insurer_region)))
+                ShipInsurerCountry.region.in_(to_list(ship_insurer_region)))
 
         if currency is not None:
             shipments_rich = shipments_rich.filter(Currency.currency.in_(to_list(currency)))
@@ -540,6 +563,9 @@ class VoyageResource(Resource):
         # Keep only n records
         if limit:
             result = result[:limit]
+
+        # Pivot
+        result = self.pivot_result(result=result, pivot_by=pivot_by, pivot_value=pivot_value)
 
         response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
                                        aggregate_by=aggregate_by, download=download, routed_trajectory=routed_trajectory)
@@ -669,6 +695,35 @@ class VoyageResource(Resource):
                            .mean()) \
                     .reset_index() \
                     .replace({np.nan: None})
+
+        return result
+
+    def pivot_result(self, result, pivot_by, pivot_value):
+
+        dependencies = {
+            'commodity': ['commodity_group', 'commodity_group_name'],
+            'commodity_group': ['commodity', 'commodity_group_name'],
+            'commodity_group_name': ['commodity', 'commodity_group'],
+
+            'ship_insurer_country': ['ship_insurer_region', 'ship_insurer_iso2'],
+            'ship_owner_country': ['ship_owner_region', 'ship_owner_iso2'],
+            'ship_manager_country': ['ship_manager_region', 'ship_manager_iso2']
+        }
+
+        if pivot_by:
+            pivot_by_dependencies = [d for x in to_list(pivot_by) for d in dependencies.get(x, [])]
+            index = [x for x in result.columns
+                     if not x.startswith('value') \
+                     and not x in ['ship_dwt'] \
+                     and x not in to_list(pivot_by)
+                     and x not in pivot_by_dependencies]
+
+            result = result.pivot_table(index=index,
+                                        columns=to_list(pivot_by),
+                                        values=pivot_value,
+                                        sort=False,
+                                        fill_value=0).reset_index()
+            result['variable'] = pivot_value
 
         return result
 
