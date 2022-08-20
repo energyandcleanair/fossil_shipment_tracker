@@ -615,7 +615,18 @@ class VoyageResource(Resource):
 
             'ship_insurer': [subquery.c.ship_insurer, subquery.c.ship_insurer_country, subquery.c.ship_insurer_iso2, subquery.c.ship_insurer_region],
             'ship_manager': [subquery.c.ship_manager, subquery.c.ship_manager_country, subquery.c.ship_manager_iso2, subquery.c.ship_manager_region],
-            'ship_owner': [subquery.c.ship_owner, subquery.c.ship_owner_country, subquery.c.ship_owner_iso2, subquery.c.ship_owner_region]
+            'ship_owner': [subquery.c.ship_owner, subquery.c.ship_owner_country, subquery.c.ship_owner_iso2, subquery.c.ship_owner_region],
+
+            'ship_insurer_country': [subquery.c.ship_insurer_country, subquery.c.ship_insurer_iso2,
+                             subquery.c.ship_insurer_region],
+            'ship_manager_country': [subquery.c.ship_manager_country, subquery.c.ship_manager_iso2,
+                             subquery.c.ship_manager_region],
+            'ship_owner_country': [subquery.c.ship_owner_country, subquery.c.ship_owner_iso2,
+                           subquery.c.ship_owner_region],
+
+            'ship_insurer_region': [subquery.c.ship_insurer_region],
+            'ship_manager_region': [subquery.c.ship_manager_region],
+            'ship_owner_region': [subquery.c.ship_owner_region]
         }
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):
