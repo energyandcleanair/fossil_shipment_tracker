@@ -141,7 +141,8 @@ def fill_country():
             'US': ['USA[\.]?$'],
             'SG': ['Singapore [0-9]*$'],
             'TW': ['\(Taiwan\)[\.]?'],
-            'HK': ['Hong Kong, China[\.]?[\w]*[0-9]*']
+            'HK': ['Hong Kong, China[\.]?[\w]*[0-9]*'],
+            'PT': ['Madeira[\.]?$']
         }
         for key, regexps in address_regexps.items():
             condition = sa.or_(*[Company.address.op('~')(regexp) for regexp in regexps])
@@ -150,7 +151,6 @@ def fill_country():
             execute_statement(update)
 
     def fill_using_name_regexps():
-        # Only for those without address!
         name_regexps = {
             'BM': ['\(Bermuda\)$'],
             'NO': ['Norway$'],
@@ -158,11 +158,15 @@ def fill_country():
                    'North of England P&I Association',
                    'UK P&I Club',
                    'The London P&I Club',
-                   'The West of  England Shipowners'],
+                   'The West of  England Shipowners',
+                   'Standard P&I Club per Charles Taylor & Co'],
             'LU': ['The Ship owners\' Mutual P&I Association \(Luxembourg\)'],
             'JP': ['Japan Ship Owners\' P&I Association'],
             'NO': ['^Hydor AS$'],
-            'SE': ['\(Swedish Club\)$']
+            'SE': ['\(Swedish Club\)$'],
+            'US': ['American Steamship Owner P&I association$'],
+            'NL': ['Noord Nederlandsche P&I Club$'],
+            'RU': ['VSK Insurance Company']
         }
 
         for key, regexps in name_regexps.items():
@@ -173,9 +177,18 @@ def fill_country():
                 .where(condition)
             execute_statement(update)
 
+    def remove_care_of():
+        to_remove = ['^Care of']
+        condition = sa.and_(
+            sa.or_(*[Company.address.op('~')(regexp) for regexp in to_remove]))
+        update = Company.__table__.update().values(country_iso2=sa.null()) \
+            .where(condition)
+        execute_statement(update)
+
     fill_using_country_ending()
     fill_using_address_regexps()
     fill_using_name_regexps()
+    remove_care_of()
 
 
 

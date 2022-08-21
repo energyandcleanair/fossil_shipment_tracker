@@ -23,10 +23,12 @@ def fill():
                               'name_official':'name_official','name_short':'name'}, inplace=True)
 
     def to_region(row):
-        if row.iso2 in ["US", "TR", "KR", "CN", "IN"]:
+        if row.iso2 in ["US", "TR", "KR", "CN", "IN", "GB"]:
             return row["name"]
-        if row.EU28 == "EU28":
-            return "EU28"
+        if row.EU == "EU":
+            return "EU"
+        if row.iso2 in ["LU"]:
+            return "EU"
         return "Others"
 
     def to_regions(row):
