@@ -16,23 +16,30 @@ from engine.marinetraffic import Marinetraffic
 from engine.equasis import Equasis
 
 
-
 def update():
     update_info_from_equasis()
     fill_country()
     return
 
-def find_or_create_company_id(raw_name, address=None):
+
+def find_or_create_company_id(raw_name, imo=None, address=None):
+
     company_sq = session.query(Company.id,
+                               Company.imo,
                                func.unnest(Company.names).label('name')).subquery()
     existing_company = session.query(company_sq) \
-        .filter(company_sq.c.name == raw_name) \
+        .filter(company_sq.c.name == raw_name,
+                sa.or_(
+                    imo is None,
+                    company_sq.c.imo == imo)
+                ) \
         .first()
 
     if existing_company:
         company_id = existing_company.id
     else:
-        new_company = Company(name=raw_name,
+        new_company = Company(imo=imo,
+                              name=raw_name,
                               names=[raw_name],
                               address=address,
                               addresses=[address])
@@ -77,6 +84,7 @@ def update_info_from_equasis():
                                                             ShipInsurer.ship_imo == imo).first()
                 if not insurer:
                     insurer = ShipInsurer(company_raw_name=insurer_raw_name,
+                                          imo=None,
                                           ship_imo=imo,
                                           company_id=find_or_create_company_id(raw_name=insurer_raw_name))
                 insurer.updated_on = dt.datetime.now()
@@ -88,17 +96,21 @@ def update_info_from_equasis():
             if manager_info:
                 manager_raw_name = manager_info.get('name')
                 manager_address = manager_info.get('address')
+                manager_imo = manager_info.get('imo')
                 manager_date_from = manager_info.get('date_from')
 
                 # See if exists
                 manager = session.query(ShipManager).filter(ShipManager.company_raw_name == manager_raw_name,
-                                                        ShipManager.ship_imo == imo).first()
+                                                            ShipManager.imo == manager_imo,
+                                                            ShipManager.ship_imo == imo).first()
                 if not manager:
                     manager = ShipManager(company_raw_name=manager_raw_name,
-                                      ship_imo=imo,
-                                      date_from=manager_date_from,
-                                      company_id=find_or_create_company_id(raw_name=manager_raw_name,
-                                                                           address=manager_address))
+                                          ship_imo=imo,
+                                          imo=manager_imo,
+                                          date_from=manager_date_from,
+                                          company_id=find_or_create_company_id(raw_name=manager_raw_name,
+                                                                               imo=manager_imo,
+                                                                               address=manager_address))
                 manager.updated_on = dt.datetime.now()
                 session.add(manager)
                 session.commit()
@@ -108,6 +120,7 @@ def update_info_from_equasis():
             if owner_info:
                 owner_raw_name = owner_info.get('name')
                 owner_address = owner_info.get('address')
+                owner_imo = owner_info.get('imo')
                 owner_date_from = owner_info.get('date_from')
 
                 # See if exists
@@ -116,13 +129,14 @@ def update_info_from_equasis():
                 if not owner:
                     owner = ShipOwner(company_raw_name=owner_raw_name,
                                       ship_imo=imo,
+                                      imo=owner_imo,
                                       date_from=owner_date_from,
                                       company_id=find_or_create_company_id(raw_name=owner_raw_name,
+                                                                           imo=owner_imo,
                                                                            address=owner_address))
                 owner.updated_on = dt.datetime.now()
                 session.add(owner)
                 session.commit()
-
 
 
 def fill_country():

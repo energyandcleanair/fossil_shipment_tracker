@@ -223,6 +223,7 @@ class Shipment(Base):
 
 class Company(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
+    imo = Column(String)
     name = Column(String, nullable=False)
     names = Column(ARRAY(String))
     address = Column(String)
@@ -230,11 +231,13 @@ class Company(Base):
     country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
 
     __tablename__ = DB_TABLE_COMPANY
-    __table_args__ = (UniqueConstraint('name', name='unique_company'),)
+    __table_args__ = (UniqueConstraint('name', name='unique_company_name'),
+                      UniqueConstraint('imo', name='unique_company_imo'),)
 
 
 class ShipInsurer(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
+    imo = Column(String)
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"), nullable=False)
     date_from = Column(DateTime(timezone=False)) # Most likely null, not indicated by Equasis
     company_raw_name = Column(String, nullable=False) # Name indicated by Equasis
@@ -247,6 +250,7 @@ class ShipInsurer(Base):
 
 class ShipOwner(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
+    imo = Column(String)
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"), nullable=False)
     date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
@@ -260,6 +264,7 @@ class ShipOwner(Base):
 
 class ShipManager(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
+    imo = Column(String)
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"), nullable=False)
     date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis

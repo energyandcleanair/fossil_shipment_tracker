@@ -138,6 +138,7 @@ class Equasis():
             try:
                 manager_info = next(x for x in management_raw if x['role'] == 'ISM Manager')
                 ship_data['manager'] = {'name': manager_info.get('company'),
+                                        'imo': manager_info.get('imo'), # IMO of company
                                         'address': manager_info.get('address'),
                                         'date_from': self._parse_doa(manager_info.get('doa'))
                                         }
@@ -147,6 +148,7 @@ class Equasis():
             try:
                 owner_info = next(x for x in management_raw if x['role'] == 'Registered owner')
                 ship_data['owner'] = {'name': owner_info.get('company'),
+                                      'imo': owner_info.get('imo'),  # IMO of company
                                       'address': owner_info.get('address'),
                                       'date_from': self._parse_doa(owner_info.get('doa')),
                                     }
