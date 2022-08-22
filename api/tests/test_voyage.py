@@ -60,7 +60,7 @@ def test_voyage_aggregated(app):
             data_df = pd.DataFrame(data)
 
             expected_columns = set(aggregate_by + ['value_tonne', 'value_m3', 'ship_dwt',
-                                                   'value_eur', 'value_usd'])
+                                                   'value_eur', 'value_usd', 'count'])
 
 
             if "departure_port" in aggregate_by:

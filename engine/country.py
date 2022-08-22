@@ -27,8 +27,6 @@ def fill():
             return row["name"]
         if row.EU == "EU":
             return "EU"
-        if row.iso2 in ["LU"]:
-            return "EU"
         return "Others"
 
     def to_regions(row):

@@ -71,11 +71,13 @@ def test_pipelineflow_aggregation(app):
             assert len(data) > 0
             data_df = pd.DataFrame(data)
 
-            expected_columns = set(aggregate_by + ['value_tonne', 'value_eur', 'value_m3']) if aggregate_by \
+            expected_columns = set(aggregate_by + ['value_tonne', 'value_eur', 'value_m3', 'value_usd']) if aggregate_by \
                 else set(['id', 'commodity', 'commodity_group',
+                          'commodity_origin_country', 'commodity_origin_iso2', 'commodity_origin_region',
+                          'commodity_destination_country', 'commodity_destination_region', 'commodity_destination_iso2',
                           'departure_iso2', 'departure_country', 'departure_region',
                           'destination_iso2', 'destination_country', 'destination_region',
-                          'date', 'value_tonne', 'value_eur', 'value_m3'])
+                          'date', 'value_tonne', 'value_eur', 'value_m3', 'value_usd'])
 
             if "commodity" in aggregate_by:
                 expected_columns.update(["commodity_group"])

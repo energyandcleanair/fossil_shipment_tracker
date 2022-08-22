@@ -83,9 +83,9 @@ def test_counter(app):
         assert len(data) > 0
         data_df = pd.DataFrame(data)
 
-        expected_columns = set(['commodity', 'commodity_group', 'date',
+        expected_columns = set(['commodity', 'commodity_group', 'commodity_group_name', 'date',
                                 'destination_iso2', 'destination_country', 'destination_region',
-                                'value_tonne', 'value_eur', 'value_usd', 'type'])
+                                'value_tonne', 'value_eur', 'value_usd'])
         assert set(data_df.columns) == expected_columns
 
 def test_counter_use_eu(app):
@@ -176,13 +176,16 @@ def test_counter_aggregation(app):
             assert len(data) > 0
             data_df = pd.DataFrame(data)
 
-            expected_columns = set(aggregate_by + ['value_tonne', 'value_eur']) if aggregate_by \
-                else set(['commodity', 'commodity_group', 'destination_region',
+            expected_columns = set(aggregate_by + ['value_tonne', 'value_eur', 'value_usd']) if aggregate_by \
+                else set(['commodity', 'commodity_group', 'commodity_group_name', 'destination_region',
                           'destination_iso2', 'destination_country',
-                          'date', 'value_tonne', 'value_eur', 'value_usd', 'type'])
+                          'date', 'value_tonne', 'value_eur', 'value_usd'])
 
             if "commodity" in aggregate_by:
-                expected_columns.update(["commodity_group"])
+                expected_columns.update(["commodity_group", 'commodity_group_name'])
+
+            if "commodity_group" in aggregate_by:
+                expected_columns.update(['commodity_group_name'])
 
             if "destination_iso2" in aggregate_by or 'destination_country' in aggregate_by:
                 expected_columns.update(["destination_country", 'destination_iso2', 'destination_region'])

@@ -1,6 +1,5 @@
 from tqdm import tqdm
-from sqlalchemy.exc import IntegrityError
-import base
+import pandas as pd
 import datetime as dt
 from sqlalchemy import func
 import sqlalchemy as sa
@@ -199,10 +198,46 @@ def fill_country():
             .where(condition)
         execute_statement(update)
 
+    def fill_using_file():
+        companies_df = pd.read_csv("assets/companies.csv", dtype={'imo': str})
+        companies_df = companies_df.dropna(subset=['imo','iso2'])
+        imo_country = dict(zip(companies_df.imo, companies_df.iso2))
+        from sqlalchemy.sql import case
+
+        session.query(Company).filter(
+            Company.imo.in_(imo_country)
+        ).update({
+            Company.country_iso2: case(
+                imo_country,
+                value=Company.imo,
+            )
+        }, synchronize_session='fetch')
+        session.commit()
+
+        # For those without imo
+        companies_df = pd.read_csv("assets/companies.csv", dtype={'imo': str})
+        companies_df = companies_df[pd.isna(companies_df.imo)]
+        companies_df = companies_df.dropna(subset=['name', 'iso2'])
+        name_country = dict(zip(companies_df.name, companies_df.iso2))
+        from sqlalchemy.sql import case
+
+        session.query(Company).filter(
+            Company.name.in_(name_country),
+            Company.imo == sa.null()
+        ).update({
+            Company.country_iso2: case(
+                name_country,
+                value=Company.name,
+            )
+        }, synchronize_session='fetch')
+        session.commit()
+
     fill_using_country_ending()
     fill_using_address_regexps()
     fill_using_name_regexps()
     remove_care_of()
+    fill_using_file()
+
 
 
 

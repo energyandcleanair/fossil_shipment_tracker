@@ -145,6 +145,9 @@ class VoyageResource(Resource):
                         required=False, default=None)
     parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
                         required=False, action='split', default=None)
+    parser.add_argument('select', type=str,
+                        help='selecting specific columns only, with the possibility to rename e.g. new_name1(var1),var2,var3',
+                        required=False, action='split', default=None)
 
     @routes_api.expect(parser)
     def get(self):
@@ -191,6 +194,7 @@ class VoyageResource(Resource):
         limit = params.get("limit")
         pivot_by = params.get("pivot_by")
         pivot_value = params.get("pivot_value")
+        select = params.get("select")
 
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
@@ -308,7 +312,7 @@ class VoyageResource(Resource):
         # Query with joined information
         shipments_rich = (session.query(
 
-                                    Shipment.id.distinct(), # Potential introducers of duplicates: ShipinOwner, Insurer etc.
+                                    Shipment.id.distinct().label('id'), # Potential introducers of duplicates: ShipinOwner, Insurer etc.
                                     Shipment.status,
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
@@ -356,16 +360,19 @@ class VoyageResource(Resource):
 
                                     # Companies
                                     ShipManagerCompany.name.label("ship_manager"),
+                                    ShipManagerCompany.imo.label("ship_manager_imo"),
                                     ShipManagerCountry.iso2.label("ship_manager_iso2"),
                                     ShipManagerCountry.name.label("ship_manager_country"),
                                     ShipManagerCountry.region.label("ship_manager_region"),
 
                                     ShipOwnerCompany.name.label("ship_owner"),
+                                    ShipOwnerCompany.imo.label("ship_owner_imo"),
                                     ShipOwnerCountry.iso2.label("ship_owner_iso2"),
                                     ShipOwnerCountry.name.label("ship_owner_country"),
                                     ShipOwnerCountry.region.label("ship_owner_region"),
 
                                     ShipInsurerCompany.name.label("ship_insurer"),
+                                    ShipInsurerCompany.imo.label("ship_insurer_imo"),
                                     ShipInsurerCountry.iso2.label("ship_insurer_iso2"),
                                     ShipInsurerCountry.name.label("ship_insurer_country"),
                                     ShipInsurerCountry.region.label("ship_insurer_region"),
@@ -567,6 +574,9 @@ class VoyageResource(Resource):
         # Pivot
         result = self.pivot_result(result=result, pivot_by=pivot_by, pivot_value=pivot_value)
 
+        # Select, rename
+        result = self.select(result, select=select)
+
         response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
                                        aggregate_by=aggregate_by, download=download, routed_trajectory=routed_trajectory)
         return response
@@ -587,6 +597,7 @@ class VoyageResource(Resource):
             func.sum(subquery.c.value_m3).label("value_m3"),
             func.sum(subquery.c.value_eur).label("value_eur"),
             func.sum(subquery.c.value_currency).label("value_currency"),
+            func.count(subquery.c.id).label("count"),
         ]
 
         # Adding must have grouping columns
@@ -639,9 +650,9 @@ class VoyageResource(Resource):
             'arrival_port': [subquery.c.arrival_port_id, subquery.c.arrival_port_name],
             'departure_port': [subquery.c.departure_port_id, subquery.c.departure_port_name],
 
-            'ship_insurer': [subquery.c.ship_insurer, subquery.c.ship_insurer_country, subquery.c.ship_insurer_iso2, subquery.c.ship_insurer_region],
-            'ship_manager': [subquery.c.ship_manager, subquery.c.ship_manager_country, subquery.c.ship_manager_iso2, subquery.c.ship_manager_region],
-            'ship_owner': [subquery.c.ship_owner, subquery.c.ship_owner_country, subquery.c.ship_owner_iso2, subquery.c.ship_owner_region],
+            'ship_insurer': [subquery.c.ship_insurer, subquery.c.ship_insurer_imo, subquery.c.ship_insurer_country, subquery.c.ship_insurer_iso2, subquery.c.ship_insurer_region],
+            'ship_manager': [subquery.c.ship_manager, subquery.c.ship_manager_imo, subquery.c.ship_manager_country, subquery.c.ship_manager_iso2, subquery.c.ship_manager_region],
+            'ship_owner': [subquery.c.ship_owner, subquery.c.ship_owner_imo, subquery.c.ship_owner_country, subquery.c.ship_owner_iso2, subquery.c.ship_owner_region],
 
             'ship_insurer_country': [subquery.c.ship_insurer_country, subquery.c.ship_insurer_iso2,
                              subquery.c.ship_insurer_region],
@@ -686,7 +697,7 @@ class VoyageResource(Resource):
                 result = result \
                     .groupby([x for x in result.columns if x not in [date_column, 'ship_dwt',
                                                                      'value_tonne', 'value_m3',
-                                                                     'value_eur', 'value_currency']]) \
+                                                                     'value_eur', 'value_currency', 'count']]) \
                     .apply(lambda x: x.set_index(date_column) \
                            .resample("D").sum() \
                            .reindex(daterange) \
@@ -714,7 +725,7 @@ class VoyageResource(Resource):
             pivot_by_dependencies = [d for x in to_list(pivot_by) for d in dependencies.get(x, [])]
             index = [x for x in result.columns
                      if not x.startswith('value') \
-                     and not x in ['ship_dwt'] \
+                     and not x in ['ship_dwt', 'count'] \
                      and x not in to_list(pivot_by)
                      and x not in pivot_by_dependencies]
 
@@ -768,6 +779,28 @@ class VoyageResource(Resource):
         len_after = len(result)
         assert len_after == len_before / n_currencies
 
+        return result
+
+    def select(self, result, select):
+
+        if not select:
+            return result
+
+        names = []
+        variables = []
+
+        for s in to_list(select):
+            m = re.match("(.*)\\((.*)\\)", s)
+            if m:
+                names.append(m[1])
+                variables.append(m[2])
+            else:
+                # No asc(.*) or desc(.*)
+                names.append(s)
+                variables.append(s)
+
+        result = result[variables]
+        result.columns = names
         return result
 
 

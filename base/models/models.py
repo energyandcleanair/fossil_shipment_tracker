@@ -231,8 +231,7 @@ class Company(Base):
     country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
 
     __tablename__ = DB_TABLE_COMPANY
-    __table_args__ = (UniqueConstraint('name', name='unique_company_name'),
-                      UniqueConstraint('imo', name='unique_company_imo'),)
+    __table_args__ = (UniqueConstraint('imo', name='unique_company_imo'),)
 
 
 class ShipInsurer(Base):
