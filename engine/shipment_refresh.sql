@@ -265,6 +265,7 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
 ),
 shipments_after_insertion AS (
     SELECT
+        NEXTVAL('shipment_with_sts_id_seq') id,
         departure_portcall_id,
         inserted_departures.id AS departure_id,
         arrival_portcall_id,
@@ -276,8 +277,9 @@ shipments_after_insertion AS (
         LEFT JOIN inserted_arrivals ON shipments.arrival_portcall_id = inserted_arrivals.portcall_id
 ),
 inserted_shipments AS (
-INSERT INTO shipment (departure_id, arrival_id, status)
+INSERT INTO shipment (id, departure_id, arrival_id, status)
     SELECT
+        id,
         departure_id,
         arrival_id,
         status
