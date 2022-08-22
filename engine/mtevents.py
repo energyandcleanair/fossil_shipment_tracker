@@ -14,15 +14,14 @@ from base.models import DB_TABLE_MTEVENT_TYPE
 from base.utils import distance_between_points, to_list, to_datetime
 
 from engine.datalastic import Datalastic
-from engine.marinetraffic import Marinetraffic, load_cache
+from engine.marinetraffic import Marinetraffic
 from engine.ship import fill
 
 import datetime as dt
 
 import re
-import json
 
-from base.models import MarineTrafficEventType, Event, EventShipment, Shipment, Departure, Ship, MarineTrafficCall
+from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall
 from sqlalchemy import func
 
 def update(
@@ -32,6 +31,7 @@ def update(
         commodities = [base.LNG,
                        base.CRUDE_OIL,
                        base.OIL_PRODUCTS],
+        min_dwt=base.DWT_MIN,
         use_cache=False,
         cache_objects=True,
         only_ongoing=False,
@@ -70,6 +70,8 @@ def update(
         ships = ships.filter(Ship.imo.in_(to_list(ship_imo)))
     if commodities:
         ships = ships.filter(Ship.commodity.in_(to_list(commodities)))
+    if min_dwt:
+        ships = ships.filter(Ship.dwt >= min_dwt)
     if only_ongoing:
         ships = ships.filter(Shipment.status != base.COMPLETED)
     if limit:
