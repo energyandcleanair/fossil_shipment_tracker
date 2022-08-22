@@ -1,4 +1,9 @@
-WITH departure_portcalls AS (
+-- first delete existing sts shipments for refresh - we do this as we have non-unqiue departure/arrival ids and hence
+-- we refresh whole table each time
+WITH deleted_sts_shipments AS (
+     delete from shipment_with_sts
+),
+departure_portcalls AS (
     SELECT
         portcall.id,
         portcall.date_utc,
@@ -477,6 +482,7 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
 ),
 shipments_after_insertion AS (
     SELECT
+        NEXTVAL('shipment_id_seq') id,
         departure_portcall_id,
         inserted_departures.id AS departure_id,
         arrival_portcall_id,
@@ -498,8 +504,9 @@ shipments_after_insertion AS (
             )
 ),
 inserted_shipments AS (
-INSERT INTO shipment_with_sts (departure_id, arrival_id, status)
+INSERT INTO shipment_with_sts (id, departure_id, arrival_id, status)
     SELECT
+        id,
         departure_id,
         arrival_id,
         status
@@ -511,6 +518,16 @@ INSERT INTO shipment_with_sts (departure_id, arrival_id, status)
             departure_id,
             arrival_id,
             status
+),
+--- delete any shipments that were in non sts shipment table that now have a sts arrival (for example ongoing shipments)
+deleted_shipments AS (
+    DELETE FROM shipment
+        WHERE departure_id IN (
+            SELECT
+                departure_id
+            FROM
+                inserted_shipments
+        )
 )
     SELECT
         status,
