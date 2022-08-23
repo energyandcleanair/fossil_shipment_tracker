@@ -52,6 +52,8 @@ ENTSOG_CONSUMPTION = "consumption"
 ENTSOG_DISTRIBUTION = "distribution"
 ENTSOG_STORAGE_ENTRY = "storage_entry"
 ENTSOG_STORAGE_EXIT = "storage_exit"
+ENTSOG_TRANSMISSION_ENTRY = "transmission_entry"
+ENTSOG_TRANSMISSION_EXIT = "transmission_exit"
 
 # COMMODITY GROUPING
 COMMODITY_GROUPING_DEFAULT = "default"
