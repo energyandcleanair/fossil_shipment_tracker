@@ -48,6 +48,8 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
                 session.commit()
                 return(port.id)
 
+            #TODO Add MT here
+
         logger.warning("Didn't find any port (unlocode: %s, marinetraffic: %s)" % (unlocode, marinetraffic_id))
         return None
 
