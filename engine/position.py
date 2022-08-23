@@ -204,11 +204,12 @@ def get_missing_berths(max_speed=0.5,
                        date_from=None,
                        date_to=None,
                        commodity=None,
-                       exclude_in_berth=True,
+                       exclude_in_berth=False,
                        do_cluster=True,
                        only_one_per_shipment=False,
-                       cluster_m=50,
-                       hours_from_arrival=72,
+                       distance_to_coast_m=None,
+                       cluster_m=100,
+                       hours_from_arrival=24*7,
                        format='kml',
                        export_file='missing_berths.kml'):
     """
@@ -263,8 +264,17 @@ def get_missing_berths(max_speed=0.5,
                             only_one_per_shipment=only_one_per_shipment)
 
     positions_df = pd.read_sql(positions.statement, session.bind)
+
     positions_df = update_geometry_from_wkb(positions_df)
     result_gdf = gpd.GeoDataFrame(positions_df, geometry='geometry')
+
+    if distance_to_coast_m:
+        coastline = gpd.read_file('assets/ne_10m_coastline/ne_10m_coastline.shp')
+        coastline = coastline.to_crs(3857)  # Pick another
+        coastline['geometry'] = coastline['geometry'].buffer(distance_to_coast_m)
+        coastline = coastline.to_crs(4326)
+        result_gdf = result_gdf.sjoin(coastline, how="inner")[list(result_gdf.columns)]
+
 
     if format == "kml":
         import fiona
@@ -322,7 +332,6 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
                       clustered_points2.c.cluster,
                       clustered_points2.c.arrival_date) \
             .subquery()
-
 
 
         if only_one_per_shipment:
