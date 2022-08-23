@@ -384,6 +384,10 @@ def get_flows_raw(date_from='2022-01-01',
         opd.pointType.str.contains('LNG Entry point') \
         & (opd.directionKey == 'entry')]
 
+    transmission_entry_points = opd.loc[
+        opd.pointType.str.startswith('Transmission') \
+        & (opd.directionKey == 'entry')]
+
     production_points = opd.loc[
         opd.pointType.str.contains('production') \
         & (opd.directionKey == 'entry')]
@@ -411,6 +415,21 @@ def get_flows_raw(date_from='2022-01-01',
     lng_exit_points = opd.loc[
         opd.pointType.str.contains('LNG Entry point') \
         & (opd.directionKey == 'exit')]
+
+    # Check all are uniques
+    all = pd.concat([entry_points,
+               storage_entry_points,
+               lng_entry_points,
+               transmission_entry_points,
+               production_points,
+               consumption_points,
+               transmission_exit_points,
+               distribution_points,
+               exit_points,
+               storage_exit_points,
+               lng_exit_points
+                     ], axis=0)
+    assert len(all.index) == len(all.index.unique())
 
     def keep_unique(x):
         return x[['pointKey', 'operatorKey']].drop_duplicates()
@@ -498,6 +517,22 @@ def get_flows_raw(date_from='2022-01-01',
         date_to=to_datetime(date_to),
     )
 
+    flows_transmission_entry_raw = get_physical_flows(
+        operator_key=keep_unique(transmission_entry_points).operatorKey.to_list(),
+        point_key=keep_unique(transmission_entry_points).pointKey.to_list(),
+        direction="entry",
+        date_from=to_datetime(date_from),
+        date_to=to_datetime(date_to),
+    )
+
+    flows_transmission_exit_raw = get_physical_flows(
+        operator_key=keep_unique(transmission_exit_points).operatorKey.to_list(),
+        point_key=keep_unique(transmission_exit_points).pointKey.to_list(),
+        direction="exit",
+        date_from=to_datetime(date_from),
+        date_to=to_datetime(date_to),
+    )
+
     return (add_countries(flows_import_raw),
             add_countries(flows_import_lng_raw),
             add_countries(flows_export_raw),
@@ -507,24 +542,32 @@ def get_flows_raw(date_from='2022-01-01',
             add_countries(flows_distribution_raw),
             add_countries(flows_storage_entry_raw),
             add_countries(flows_storage_exit_raw),
+            add_countries(flows_transmission_entry_raw),
+            add_countries(flows_transmission_exit_raw),
             )
 
 
 def process_non_crossborder_flows(flows_distribution_raw,
-                            flows_consumption_raw,
-                            flows_storage_entry_raw,
-                            flows_storage_exit_raw
+                                  flows_consumption_raw,
+                                  flows_storage_entry_raw,
+                                  flows_storage_exit_raw,
+                                  flows_transmission_entry_raw,
+                                  flows_transmission_exit_raw
                             ):
 
     flows_distribution_raw['type'] = base.ENTSOG_DISTRIBUTION
     flows_consumption_raw['type'] = base.ENTSOG_CONSUMPTION
     flows_storage_entry_raw['type'] = base.ENTSOG_STORAGE_ENTRY
     flows_storage_exit_raw['type'] = base.ENTSOG_STORAGE_EXIT
+    flows_transmission_entry_raw['type'] = base.ENTSOG_TRANSMISSION_ENTRY
+    flows_transmission_exit_raw['type'] = base.ENTSOG_TRANSMISSION_EXIT
 
     flows = pd.concat([flows_distribution_raw,
                        flows_consumption_raw,
                        flows_storage_entry_raw,
-                       flows_storage_exit_raw
+                       flows_storage_exit_raw,
+                       flows_transmission_entry_raw,
+                       flows_transmission_exit_raw
                        ],
                       axis=0) \
         .groupby(['country', 'partner', 'date', 'type']) \
@@ -695,7 +738,9 @@ def get_flows(date_from='2022-01-01',
      flows_consumption_raw,
      flows_distribution_raw,
      flows_storage_entry_raw,
-     flows_storage_exit_raw) = get_flows_raw(date_from=date_from,
+     flows_storage_exit_raw,
+     flows_transmission_entry_raw,
+     flows_transmission_exit_raw) = get_flows_raw(date_from=date_from,
                                                        date_to=date_to,
                                                        country_iso2=country_iso2,
                                                        remove_pipe_in_pipe=remove_pipe_in_pipe)
@@ -716,7 +761,9 @@ def get_flows(date_from='2022-01-01',
     flows_cons_dist = process_non_crossborder_flows(flows_distribution_raw=flows_distribution_raw,
                                                     flows_consumption_raw=flows_consumption_raw,
                                                     flows_storage_entry_raw=flows_storage_entry_raw,
-                                                    flows_storage_exit_raw=flows_storage_exit_raw)
+                                                    flows_storage_exit_raw=flows_storage_exit_raw,
+                                                    flows_transmission_entry_raw=flows_transmission_entry_raw,
+                                                    flows_transmission_exit_raw=flows_transmission_exit_raw)
 
 
     flows = pd.concat([flows_crossborder,
