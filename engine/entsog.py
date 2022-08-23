@@ -753,10 +753,24 @@ def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=Tr
         last_date = session.query(sa.func.max(EntsogFlow.date)).filter(EntsogFlow.value_m3 > 0).first()[0]
         date_from = to_datetime(last_date) + dt.timedelta(days=date_from)
 
-    flows = get_flows(date_from=date_from,
-                      date_to=date_to,
-                      save_to_file=save_to_file,
-                      filename=filename)
+    flows = None
+    itry = 0
+    ntries = 3
+
+    while flows is None and itry <= ntries:
+        itry += 1
+        try:
+            flows = get_flows(date_from=date_from,
+                              date_to=date_to,
+                              save_to_file=save_to_file,
+                              filename=filename)
+        except TypeError:
+            logger.warning("ENTSOG failed. Trying again")
+            continue
+
+    if flows is None:
+        logger_slack.error("Failed to get ENTSOG data")
+        raise ValueError("Failed to get ENTSOG data.")
 
     flows = flows[['commodity', 'departure_iso2', 'destination_iso2', 'date',
                    'value_tonne', 'value_mwh', 'value_m3', 'type']]
