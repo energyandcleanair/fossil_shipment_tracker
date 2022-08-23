@@ -182,8 +182,8 @@ def sanity_check(result):
     global_old = comparison.old_eur.sum()
     global_new = comparison.new_eur.sum()
 
-    eu_old = comparison.loc[comparison.commodity_destination_region == 'EU28'].old_eur.sum()
-    eu_new = comparison.loc[comparison.commodity_destination_region == 'EU28'].new_eur.sum()
+    eu_old = comparison.loc[comparison.commodity_destination_region == 'EU'].old_eur.sum()
+    eu_new = comparison.loc[comparison.commodity_destination_region == 'EU'].new_eur.sum()
 
     return ok, global_new, global_old, eu_new, eu_old
 

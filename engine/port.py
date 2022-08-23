@@ -39,7 +39,7 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
     found = found.all()
     if len(found) == 0:
         if add_if_needed and name:
-            ports = Datalastic.search_ports(name=name, fuzzy=False)
+            ports = Datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id, fuzzy=False)
             if ports is not None and len(ports) == 1:
                 port = ports[0]
                 port.unlocode = unlocode

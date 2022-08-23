@@ -295,9 +295,13 @@ class VoyageResource(Resource):
                 # event_shipment_subquery.c.sts_shipment_id != sa.null()
                 ), 'CN'),
 
+                # Looks like StS only
+                (ArrivalPort.name.ilike('Lakonikos Gulf%'), sa.null()),
+
                 # For completed shipments, we don't use declared destination
                 # but only actual one
-                (Shipment.status == base.COMPLETED, ArrivalPort.iso2)],
+                (Shipment.status == base.COMPLETED, ArrivalPort.iso2)
+            ],
             else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
         ).label('commodity_destination_iso2')
 

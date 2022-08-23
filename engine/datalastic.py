@@ -335,6 +335,38 @@ class Datalastic:
                 "lon": 122.6466,
                 "uuid": None,
                 "unlocode": "CNCJK"
+            },
+            "25806": {
+                "port_name": name,
+                "country_iso": "GR",
+                "lat": None,
+                "lon": None,
+                "uuid": None,
+                "unlocode": None
+            },
+            "25570": {
+                "port_name": name,
+                "country_iso": "PH",
+                "lat": 14.59285,
+                "lon": 120.591,
+                "uuid": None,
+                "unlocode": None
+            },
+            "25584": {
+                "port_name": name,
+                "country_iso": "US",
+                "lat": 40.99952,
+                "lon": -72.64605,
+                "uuid": None,
+                "unlocode": None
+            },
+            "22921": {
+                "port_name": name,
+                "country_iso": "LB",
+                "lat": 34.5125,
+                "lon": 35.83174,
+                "uuid": None,
+                "unlocode": None
             }
         }
         if marinetraffic_id in manual_matches:
