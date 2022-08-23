@@ -1,6 +1,6 @@
 import pandas as pd
 import datetime as dt
-import sqlalchemy
+import sqlalchemy as sa
 from tqdm import tqdm
 
 import base
@@ -51,7 +51,7 @@ def initial_fill(limit=None):
                                  "load_status", "port_operation", "date_utc",
                                  "terminal_id", "berth_id", "others"]]
 
-    from sqlalchemy.dialects.postgresql import JSONB
+    from sa.dialects.postgresql import JSONB
 
     portcalls_df['ship_mmsi'] = portcalls_df.ship_mmsi.apply(str)
     portcalls_df['ship_imo'] = portcalls_df.ship_imo.apply(str)
@@ -74,8 +74,8 @@ def fill_missing_port_operation():
     """
     portcalls_to_update = PortCall.query.filter(
         PortCall.move_type == "departure",
-        PortCall.port_operation == sqlalchemy.null(),
-        PortCall.port_id != sqlalchemy.null()).all()
+        PortCall.port_operation == sa.null(),
+        PortCall.port_id != sa.null()).all()
 
     for pc in tqdm(portcalls_to_update):
         new_pc = Marinetraffic.get_portcalls_between_dates(marinetraffic_port_id=pc.port_id,
@@ -100,8 +100,8 @@ def fill_missing_port_id():
     :return:
     """
     portcalls_to_update = PortCall.query.filter(
-        PortCall.others == sqlalchemy.null(),
-        PortCall.port_id == sqlalchemy.null()).all()
+        PortCall.others == sa.null(),
+        PortCall.port_id == sa.null()).all()
 
     for pc in tqdm(portcalls_to_update):
         new_pc = Marinetraffic.get_portcalls_between_dates(imo=pc.ship_imo,
@@ -121,8 +121,8 @@ def fill_missing_port_id():
 
     # Those that have MT info
     portcalls_to_update = PortCall.query.filter(
-        PortCall.others != sqlalchemy.null(),
-        PortCall.port_id == sqlalchemy.null()).all()
+        PortCall.others != sa.null(),
+        PortCall.port_id == sa.null()).all()
 
     for pc in tqdm(portcalls_to_update):
 
@@ -148,8 +148,6 @@ def fill_missing_port_id():
                     session.commit()
 
 
-
-
 def upload_portcalls(portcalls):
     # Store them in db so that we won't query them again
     if portcalls:
@@ -158,7 +156,7 @@ def upload_portcalls(portcalls):
         try:
             session.add(portcall)
             session.commit()
-        except sqlalchemy.exc.IntegrityError as e:
+        except sa.exc.IntegrityError as e:
             session.rollback()
 
             # First try if this is a missing port
@@ -192,7 +190,7 @@ def upload_portcalls(portcalls):
                 try:
                     session.add(portcall)
                     session.commit()
-                except sqlalchemy.exc.IntegrityError as e:
+                except sa.exc.IntegrityError as e:
                     session.rollback()
                     logger.warning("Failed to add portcall. Probably a problem with port: %s"%(str(e).split("\n")[0]))
                     continue
@@ -383,7 +381,7 @@ def update_departures_from_russia(
                     session.commit()
                     if force_rebuild:
                         logger.info("Found a missing port call")
-                except sqlalchemy.exc.IntegrityError as e:
+                except sa.exc.IntegrityError as e:
                     if "psycopg2.errors.UniqueViolation" in str(e):
                         logger.warning("Failed to upload portcall: duplicated port call")
                     else:
@@ -584,6 +582,3 @@ def fill_arrival_gaps(imo=None, date_from=None, min_dwt=base.DWT_MIN):
 
     for index, row in tqdm(problematic_df.iterrows(), total=problematic_df.shape[0]):
         new_portcall = get_next_portcall(arrival_or_departure="arrival", imo=row.ship_imo, date_from=to_datetime(row.date_utc), use_cache=False)
-
-
-

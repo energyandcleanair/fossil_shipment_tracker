@@ -54,6 +54,9 @@ class RussiaCounterResource(Resource):
     parser.add_argument('destination_region', action='split', help='region(s) of destination e.g. EU,Turkey',
                         required=False,
                         default=None)
+    parser.add_argument('destination_region_not', action='split', help='region(s) of destination to exclude e.g. For orders',
+                        required=False,
+                        default=None)
     parser.add_argument('commodity', action='split',
                         help='commodity to include e.g. crude_oil,oil_products,lng (see commodity endpoint to get the whole list). Defaults to all.',
                         required=False,
@@ -93,6 +96,7 @@ class RussiaCounterResource(Resource):
         aggregate_by = params.get("aggregate_by")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
+        destination_region_not = params.get("destination_region_not")
         commodity = params.get("commodity")
         commodity_group = params.get("commodity_group")
         commodity_grouping = params.get("commodity_grouping")
@@ -148,6 +152,9 @@ class RussiaCounterResource(Resource):
         if destination_region:
             query = query.filter(destination_region_field.in_(to_list(destination_region)))
 
+        if destination_region_not:
+            query = query.filter(destination_region_field.notin_(to_list(destination_region_not)))
+
         if commodity:
             query = query.filter(commodity_subquery.c.id.in_(to_list(commodity)))
 
@@ -183,7 +190,6 @@ class RussiaCounterResource(Resource):
                        .fillna(0)) \
                 .reset_index() \
                 .sort_values(intersect(['commodity', 'date'], counter.columns))
-
 
 
         if cumulate and "date" in counter:
