@@ -123,6 +123,11 @@ def sanity_check(result):
         logger_slack.error("Missing prices")
         ok = False
 
+    for_orders = result[(result.commodity_destination_iso2 == base.FOR_ORDERS)]
+    if len(for_orders) > 0:
+        logger_slack.error("Counter has for_orders")
+        ok = False
+
     def get_comparison_df(compared_cols):
         old_data = pd.read_sql(session.query(Counter,
                                              Counter.destination_iso2.label('commodity_destination_iso2'),

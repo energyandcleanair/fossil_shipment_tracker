@@ -285,14 +285,19 @@ class VoyageResource(Resource):
         commodity_destination_iso2_field = case(
             # Lauri: My heuristic is that all tankers that discharge cargo
             # in Yeosu but don't go to one of the identified berths are s2s
-            [(sa.and_(
+            [
+                (sa.and_(
                 ArrivalPort.name.ilike('Yeosu%'),
                 commodity_field.in_([base.OIL_PRODUCTS, base.CRUDE_OIL, base.LNG,
                                     base.OIL_OR_CHEMICAL]),
                 ShipmentArrivalBerth.id == sa.null(),
                 ## Use below one once event_shipment has been fixed
                 # event_shipment_subquery.c.sts_shipment_id != sa.null()
-            ), 'CN')],
+                ), 'CN'),
+
+                # For completed shipments, we don't use declared destination
+                # but only actual one
+                (Shipment.status == base.COMPLETED, ArrivalPort.iso2)],
             else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
         ).label('commodity_destination_iso2')
 
