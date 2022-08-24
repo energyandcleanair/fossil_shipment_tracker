@@ -16,18 +16,18 @@ def test_shipment_table():
                               Departure.id.label("departure_id")) \
         .join(Departure, Shipment.departure_id == Departure.id)
 
-    arrivals, departures, shipment_ids = [s.arrival_id for s in shipments if s != sa.null()], [s.departure_id for s in shipments], [s.shipment_id for s in shipments.all()]
+    arrivals, departures, shipment_ids = [s.arrival_id for s in shipments if s.arrival_id is not None], [s.departure_id for s in shipments], [s.shipment_id for s in shipments.all()]
 
     assert len(arrivals) == len(set(arrivals)) and len(departures) == len(set(departures))
 
     # check that no departure/arrival is references in STS shipments and non-STS shipments
 
-    shipments_sts = session.query(Shipment.id.label("shipment_id"),
+    shipments_sts = session.query(ShipmentWithSTS.id.label("shipment_id"),
                                   ShipmentWithSTS.arrival_id,
                                   Departure.id.label("departure_id")) \
         .join(Departure, ShipmentWithSTS.departure_id == Departure.id)
 
-    arrivals_sts, departures_sts, shipment_ids_sts = [s.arrival_id for s in shipments_sts if s != sa.null()], [s.departure_id for s in shipments_sts], [s.shipment_id for s in shipments_sts.all()]
+    arrivals_sts, departures_sts, shipment_ids_sts = [s.arrival_id for s in shipments_sts if s.arrival_id is not None], [s.departure_id for s in shipments_sts], [s.shipment_id for s in shipments_sts.all()]
 
     assert not list(set(departures_sts) & set(departures)) and not list(set(arrivals_sts) & set(arrivals))
 
@@ -50,11 +50,11 @@ def test_portcall_relationship():
     # note - departure/arrivals can appear multiple times in the shipment with sts table, but only one portcall should
     # always be linked with departure/arrival
 
-    departures, arrivals = session.query(Departure.id), session.query(Arrival.id)
+    departures, arrivals = session.query(Departure.id, Departure.portcall_id), session.query(Arrival.id, Arrival.portcall_id)
 
-    departure_ids, arrival_ids = [d.id for d in departures if d != sa.null()], [a.id for a in arrivals if a != sa.null()]
+    departure_portcall_ids, arrival_portcall_ids = [d.id for d in departures if d != sa.null()], [a.id for a in arrivals if a != sa.null()]
 
-    assert len(departure_ids) == len(set(departure_ids)) and len(arrival_ids) == len(set(arrival_ids))
+    assert len(departure_portcall_ids) == len(set(departure_portcall_ids)) and len(arrival_portcall_ids) == len(set(arrival_portcall_ids))
 
 def test_counter(app):
     with app.test_client() as test_client:
