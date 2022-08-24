@@ -121,6 +121,7 @@ FROM
       )
     WHERE
       ev.type_id = '21'
+      AND ev.interacting_ship_imo IS NOT NULL
   ) AS next_departure_events
 ORDER BY
   next_departure_events.ship_imo,
@@ -213,7 +214,7 @@ sts_arrival AS (
         ev.event_date_utc
     FROM
         next_departure_full nextd
-        LEFT JOIN unique_events ev --previous arrival
+        LEFT JOIN unique_events ev
             ON ev.ship_imo = nextd.ship_imo
     WHERE
         ev.event_date_utc > nextd.departure_date_utc AND
@@ -432,6 +433,31 @@ INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id, 
             portcall_id,
             event_id
 ),
+completed_shipments_all AS (
+    SELECT
+        arrival_id,
+        arrival_date_utc,
+        'postgres',
+        arrival_port_id,
+        arrival_portcall_id,
+        departure_event_id,
+        arrival_event_id,
+        departure_portcall_id
+    FROM
+        completed_shipments_with_sts_arrival
+    UNION ALL
+    SELECT
+        arrival_id,
+        arrival_date_utc,
+        'postgres',
+        arrival_port_id,
+        arrival_portcall_id,
+        departure_event_id,
+        arrival_event_id,
+        departure_portcall_id
+    FROM
+        completed_shipments_with_sts_departure
+),
 inserted_arrivals AS (
 INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id, event_id)
     SELECT
@@ -443,30 +469,7 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
         arrival_portcall_id,
         arrival_event_id
     FROM
-        (SELECT
-            arrival_id,
-            arrival_date_utc,
-            'postgres',
-            arrival_port_id,
-            arrival_portcall_id,
-            departure_event_id,
-            arrival_event_id,
-            departure_portcall_id
-        FROM
-            completed_shipments_with_sts_arrival
-        UNION ALL
-        SELECT
-            arrival_id,
-            arrival_date_utc,
-            'postgres',
-            arrival_port_id,
-            arrival_portcall_id,
-            departure_event_id,
-            arrival_event_id,
-            departure_portcall_id
-        FROM
-            completed_shipments_with_sts_departure
-        ) as completed_shipments_all
+        completed_shipments_all
         LEFT JOIN inserted_departures ON
         (
             (completed_shipments_all.departure_portcall_id IS NOT NULL AND completed_shipments_all.departure_portcall_id = inserted_departures.portcall_id)
@@ -482,11 +485,8 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
 ),
 shipments_after_insertion AS (
     SELECT
-        NEXTVAL('shipment_id_seq') id,
-        departure_portcall_id,
         inserted_departures.id AS departure_id,
-        arrival_portcall_id,
-        inserted_arrivals.id AS arrival_id,
+        completed_shipments_all.arrival_id AS arrival_id,
         status
     FROM
         shipments_sts
@@ -496,17 +496,21 @@ shipments_after_insertion AS (
                 OR
                 (shipments_sts.departure_portcall_id IS NULL AND shipments_sts.departure_event_id = inserted_departures.event_id)
             )
-        LEFT JOIN inserted_arrivals ON
+        LEFT JOIN completed_shipments_all ON
             (
-                (shipments_sts.arrival_portcall_id IS NOT NULL AND shipments_sts.arrival_portcall_id = inserted_arrivals.portcall_id)
+                (shipments_sts.arrival_portcall_id IS NOT NULL AND shipments_sts.departure_event_id IS NOT NULL
+                    AND shipments_sts.arrival_portcall_id = completed_shipments_all.arrival_portcall_id AND shipments_sts.departure_event_id = completed_shipments_all.departure_event_id)
                 OR
-                (shipments_sts.arrival_portcall_id IS NULL AND shipments_sts.arrival_event_id = inserted_arrivals.event_id)
+                (shipments_sts.arrival_portcall_id IS NOT NULL AND shipments_sts.departure_event_id IS NULL
+                    AND shipments_sts.arrival_portcall_id = completed_shipments_all.arrival_portcall_id)
+                OR
+                (shipments_sts.arrival_portcall_id IS NULL AND shipments_sts.arrival_event_id = completed_shipments_all.arrival_event_id)
             )
 ),
 inserted_shipments AS (
 INSERT INTO shipment_with_sts (id, departure_id, arrival_id, status)
     SELECT
-        id,
+        NEXTVAL('shipment_id_seq') id,
         departure_id,
         arrival_id,
         status
