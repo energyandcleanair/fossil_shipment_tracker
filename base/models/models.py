@@ -149,7 +149,7 @@ class ShipmentDepartureBerth(Base):
     For each shipment, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, unique=True)
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE", ondelete="CASCADE"))
 
     # Optional
@@ -166,7 +166,7 @@ class ShipmentArrivalBerth(Base):
     For each shipment, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, unique=True)
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE", ondelete="CASCADE"))
 
     # Optional
@@ -325,7 +325,7 @@ class Destination(Base):
 
 class Trajectory(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, unique=True)
     geometry = Column(Geometry('MULTILINESTRING', srid=4326))
     geometry_routed = Column(Geometry('MULTILINESTRING', srid=4326))
     routing_date = Column(DateTime(timezone=False))  # time where geometry_routed was built
