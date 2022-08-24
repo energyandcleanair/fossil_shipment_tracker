@@ -4,13 +4,13 @@ import datetime as dt
 import base
 from base.logger import logger_slack
 from base.utils import to_list, to_datetime
-from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination
+from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, ShipmentWithSTS, Event
 import sqlalchemy as sa
 from sqlalchemy import func, or_
 from tqdm import tqdm
 from difflib import SequenceMatcher
 import pandas as pd
-
+from engine.shipment import return_combined_shipments
 
 from base.db_utils import execute_statement, upsert
 from base.models import DB_TABLE_POSITION
@@ -22,116 +22,131 @@ def get(imo, date_from, date_to):
 
 
 def update_shipment_last_position():
-
     # add last_position to shipment table for faster retrieval
 
+    shipments_all = return_combined_shipments(session)
+
+    shipments_distinct_departure = session.query(
+        shipments_all.c.shipment_departure_id
+    ) \
+        .distinct(shipments_all.c.shipment_departure_id) \
+        .subquery()
+
     shipment_next_departure_date = session.query(
-        Shipment.id,
+        shipments_distinct_departure.c.shipment_departure_id,
         func.lead(Departure.date_utc).over(
             Departure.ship_imo,
             Departure.date_utc).label('date_utc')) \
-    .join(Departure, Departure.id == Shipment.departure_id).subquery()
+        .join(Departure, Departure.id == shipments_distinct_departure.c.shipment_departure_id).subquery()
 
-
-    shipments_w_last_position = session.query(Shipment.id,
-                                          Position.id.label('position_id'),
-                                          Position.destination_name,
-                                          Position.destination_port_id
-                                          ) \
-        .join(Departure, Departure.id == Shipment.departure_id) \
-        .outerjoin(shipment_next_departure_date, shipment_next_departure_date.c.id == Shipment.id) \
-        .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
+    shipments_w_last_position = session.query(shipments_all.c.shipment_id,
+                                              Position.id.label('position_id'),
+                                              Position.destination_name,
+                                              Position.destination_port_id
+                                              ) \
+        .join(Departure, Departure.id == shipments_all.c.shipment_departure_id) \
+        .outerjoin(shipment_next_departure_date,
+                   shipment_next_departure_date.c.shipment_departure_id == shipments_all.c.shipment_departure_id) \
+        .outerjoin(Arrival, Arrival.id == shipments_all.c.shipment_arrival_id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
-            sa.and_(
-                Position.date_utc >= Departure.date_utc,
-                sa.or_(Arrival.date_utc == sa.null(),
-                       Position.date_utc < Arrival.date_utc),
-                sa.or_(shipment_next_departure_date.c.date_utc == sa.null(),
-                       Position.date_utc < shipment_next_departure_date.c.date_utc)
-            )) \
-        .distinct(Shipment.id) \
-        .order_by(Shipment.id, Position.date_utc.desc()) \
+        sa.and_(
+            Position.date_utc >= Departure.date_utc,
+            sa.or_(Arrival.date_utc == sa.null(),
+                   Position.date_utc < Arrival.date_utc),
+            sa.or_(shipment_next_departure_date.c.date_utc == sa.null(),
+                   Position.date_utc < shipment_next_departure_date.c.date_utc)
+        )) \
+        .distinct(shipments_all.c.shipment_id) \
+        .order_by(shipments_all.c.shipment_id, Position.date_utc.desc()) \
         .subquery()
 
     update = Shipment.__table__.update().values(last_position_id=shipments_w_last_position.c.position_id) \
-        .where(Shipment.__table__.c.id == shipments_w_last_position.c.id)
+        .where(Shipment.__table__.c.id == shipments_w_last_position.c.shipment_id)
+
+    update_sts = ShipmentWithSTS.__table__.update().values(last_position_id=shipments_w_last_position.c.position_id) \
+        .where(ShipmentWithSTS.__table__.c.id == shipments_w_last_position.c.shipment_id)
+
     execute_statement(update)
+    execute_statement(update_sts)
 
 
 def update(commodities=None,
-           imo=None,
+           ship_imo=None,
            shipment_id=None,
            date_from=None,
+           date_to=None,
            shipment_status=None,
            force_for_those_without_destination=False):
-
     logger_slack.info("=== Position update ===")
     buffer = dt.timedelta(hours=24)
     # We update position which are still ongoing (no arrival yet)
     # or who are still missing some positions (should have til Arrival + n hours, and from Departure - n_hours)
 
-    shipments_positions = session.query(Shipment.id.label('shipment_id'),
-                                    # Departure.ship_imo.label('ship_imo'),
-                                    # Departure.date_utc.label('departure_date'),
-                                    # Arrival.date_utc.label('arrival_date'),
-                                    # Ship.commodity.label('commodity'),
-                                    Position.date_utc.label('position_date')
-                                    ) \
-        .join(Departure, Shipment.departure_id == Departure.id) \
-        .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
+    shipments_all = return_combined_shipments(session)
+
+    shipments_positions = session.query(shipments_all.c.shipment_id,
+                                        Position.date_utc.label('position_date')
+                                        ) \
+        .join(Departure, shipments_all.c.shipment_departure_id == Departure.id) \
+        .outerjoin(Arrival, shipments_all.c.shipment_arrival_id == Arrival.id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .outerjoin(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(Position.date_utc >= Departure.date_utc - dt.timedelta(
-            hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE) - buffer) \
+        hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE) - buffer) \
         .filter(sa.or_(
-            Arrival.date_utc == sa.null(),
-            Position.date_utc <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL) + buffer)) \
+        Arrival.date_utc == sa.null(),
+        Position.date_utc <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL) + buffer)) \
         .filter(sa.or_(
-            not force_for_those_without_destination,
-            Position.destination_name != sa.null())) \
+        not force_for_those_without_destination,
+        Position.destination_name != sa.null())) \
         .subquery()
 
-
-    shipments_to_update = session.query(Shipment.id,
-                                    Departure.ship_imo,
-                                    Departure.date_utc.label('departure_date'),
-                                    Arrival.date_utc.label('arrival_date'),
-                                    Ship.commodity,
-                                    func.min(shipments_positions.c.position_date).label('first_date'),
-                                    func.max(shipments_positions.c.position_date).label('last_date')
-                                    ) \
-        .outerjoin(shipments_positions, Shipment.id == shipments_positions.c.shipment_id) \
-        .join(Departure, Shipment.departure_id == Departure.id) \
-        .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
+    shipments_to_update = session.query(shipments_all.c.shipment_id,
+                                        Departure.ship_imo,
+                                        Departure.date_utc.label('departure_date'),
+                                        Arrival.date_utc.label('arrival_date'),
+                                        Ship.commodity,
+                                        func.min(shipments_positions.c.position_date).label('first_date'),
+                                        func.max(shipments_positions.c.position_date).label('last_date')
+                                        ) \
+        .outerjoin(shipments_positions, shipments_all.c.shipment_id == shipments_positions.c.shipment_id) \
+        .join(Departure, shipments_all.c.shipment_departure_id == Departure.id) \
+        .outerjoin(Arrival, shipments_all.c.shipment_arrival_id == Arrival.id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
-        .group_by(Shipment.id, Departure.ship_imo, Departure.date_utc, Arrival.date_utc, Ship.commodity) \
+        .group_by(shipments_all.c.shipment_id, Departure.ship_imo, Departure.date_utc, Arrival.date_utc, Ship.commodity) \
         .having(sa.or_(
-                        sa.and_(Arrival.date_utc == sa.null(),
-                                func.max(shipments_positions.c.position_date) < dt.datetime.utcnow() - dt.timedelta(hours=12)), # To prevent too much refreshing
-                        sa.or_(
-                                   func.min(shipments_positions.c.position_date) == sa.null(),
-                                   func.max(shipments_positions.c.position_date) < Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
-                                   func.min(shipments_positions.c.position_date) > Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
-                                   )
-                               )
-                ) \
-        .filter(Shipment.status != base.UNDETECTED_ARRIVAL)
+        sa.and_(Arrival.date_utc == sa.null(),
+                func.max(shipments_positions.c.position_date) < dt.datetime.utcnow() - dt.timedelta(hours=12)),
+        # To prevent too much refreshing
+        sa.or_(
+            func.min(shipments_positions.c.position_date) == sa.null(),
+            func.max(shipments_positions.c.position_date) < Arrival.date_utc + dt.timedelta(
+                hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL),
+            func.min(shipments_positions.c.position_date) > Departure.date_utc - dt.timedelta(
+                hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)
+        )
+    )
+    ) \
+        .filter(shipments_all.c.shipment_status != base.UNDETECTED_ARRIVAL)
 
     if shipment_id is not None:
-        shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))
+        shipments_to_update = shipments_to_update.filter(shipments_all.c.shipment_id.in_(to_list(shipment_id)))
 
-    if imo is not None:
-        shipments_to_update = shipments_to_update.filter(Ship.imo.in_(to_list(imo)))
+    if ship_imo is not None:
+        shipments_to_update = shipments_to_update.filter(Ship.imo.in_(to_list(ship_imo)))
 
     if commodities is not None:
         shipments_to_update = shipments_to_update.filter(Ship.commodity.in_(to_list(commodities)))
 
     if shipment_status is not None:
-        shipments_to_update = shipments_to_update.filter(Shipment.status.in_(to_list(shipment_status)))
+        shipments_to_update = shipments_to_update.filter(shipments_all.c.shipment_status.in_(to_list(shipment_status)))
 
     if date_from is not None:
         shipments_to_update = shipments_to_update.filter(Departure.date_utc >= (to_datetime(date_from)))
+
+    if date_to is not None:
+        shipments_to_update = shipments_to_update.filter(Departure.date_utc <= (to_datetime(date_to)))
 
     shipments_to_update = shipments_to_update.order_by(Departure.date_utc.desc()).all()
     # Add positions
@@ -165,6 +180,3 @@ def update(commodities=None,
                 upsert(positions_df, table=DB_TABLE_POSITION, constraint_name='unique_position', show_progress=False)
 
     update_shipment_last_position()
-
-
-
