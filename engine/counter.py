@@ -111,6 +111,7 @@ def update(date_from='2021-11-01'):
 
 def sanity_check(result):
 
+    ok = True
     missing_price = result.loc[
         (result.value_tonne > 0) &
         (result.value_eur <= 0) &
@@ -121,12 +122,20 @@ def sanity_check(result):
 
     if len(missing_price) > 0:
         logger_slack.error("Missing prices")
-        ok = False
+        ok = ok and False
 
     for_orders = result[(result.commodity_destination_iso2 == base.FOR_ORDERS)]
     if len(for_orders) > 0:
         logger_slack.error("Counter has for_orders")
-        ok = False
+        ok = ok and False
+
+    coal_ban = result[(result.commodity_destination_region == 'EU') & \
+        (result.commodity.isin(['coal_rail_road', 'coke_rail_road']) &
+         (result.date >= '2022-08-11'))].value_tonne.sum()
+
+    if coal_ban > 0:
+        logger_slack.error("Counter has overland coal after august 10")
+        ok = ok and False
 
     def get_comparison_df(compared_cols):
         old_data = pd.read_sql(session.query(Counter,
@@ -162,7 +171,7 @@ def sanity_check(result):
         return comparison
 
     comparison = get_comparison_df(compared_cols=['commodity_group', 'commodity_destination_region'])
-    ok = comparison.ok.all()
+    ok = ok and comparison.ok.all()
 
     logger_slack.info(comparison.reset_index() \
                       .rename(columns={'commodity_destination_region': 'region',
