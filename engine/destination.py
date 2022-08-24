@@ -4,7 +4,7 @@ from base.db import session, engine
 import datetime as dt
 import base
 from base.logger import logger_slack
-from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, MTVoyageInfo
+from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, MTVoyageInfo, ShipmentWithSTS
 import sqlalchemy as sa
 from sqlalchemy import ARRAY, String
 from sqlalchemy import func, or_
@@ -12,6 +12,7 @@ from tqdm import tqdm
 from difflib import SequenceMatcher
 import numpy as np
 from base.db_utils import execute_statement
+from engine.shipment import return_combined_shipments
 
 
 def update():
@@ -25,9 +26,11 @@ def update():
 
 def update_matching():
 
+        shipments_all = return_combined_shipments(session)
+
         # Insert missing ones
-        dest1 = session.query(Shipment.last_destination_name.label('destination_name'))
-        dest2 = session.query(func.unnest(Shipment.destination_names).label('destination_name'))
+        dest1 = session.query(shipments_all.c.shipment_last_destination_name.label('destination_name'))
+        dest2 = session.query(func.unnest(shipments_all.c.shipment_destination_names).label('destination_name'))
         destinations = dest1.union(dest2).subquery()
 
         new_destinations = session.query(destinations) \
@@ -172,43 +175,51 @@ def update_matching():
 
 def update_from_positions():
 
+    shipments_all = return_combined_shipments(session)
+
     # add last_destination_name to shipment table for faster retrieval
-    shipments_w_last_position = session.query(Shipment.id,
+    # we add in all position we have stored for the shipment and then take the latest date position with destination
+    shipments_w_last_position = session.query(shipments_all.c.shipment_id,
                                           Position.id.label('position_id'),
                                           Position.destination_name,
                                           Position.destination_port_id
                                           ) \
-        .join(Departure, Departure.id == Shipment.departure_id) \
-        .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
+        .join(Departure, Departure.id == shipments_all.c.shipment_departure_id) \
+        .outerjoin(Arrival, Arrival.id == shipments_all.c.shipment_arrival_id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
         sa.and_(
-            Shipment.last_destination_name == sa.null(),
+            shipments_all.c.shipment_last_destination_name == sa.null(),
             Position.date_utc >= Departure.date_utc,
             Position.destination_name != sa.null(),
             sa.or_(Arrival.date_utc == sa.null(),
                    Position.date_utc <= Arrival.date_utc)
         )) \
-        .distinct(Shipment.id) \
-        .order_by(Shipment.id, Position.date_utc.desc()) \
+        .distinct(shipments_all.c.shipment_id) \
+        .order_by(shipments_all.c.shipment_id, Position.date_utc.desc()) \
         .subquery()
 
     update = Shipment.__table__.update().values(last_destination_name=shipments_w_last_position.c.destination_name) \
-        .where(Shipment.__table__.c.id == shipments_w_last_position.c.id)
+        .where(Shipment.__table__.c.id == shipments_w_last_position.c.shipment_id)
+
+    update_sts = ShipmentWithSTS.__table__.update().values(last_destination_name=shipments_w_last_position.c.destination_name) \
+        .where(ShipmentWithSTS.__table__.c.id == shipments_w_last_position.c.shipment_id)
+
     execute_statement(update)
+    execute_statement(update_sts)
 
 
     # List all destinations, after removing consecutive identical ones
-    s1 = session.query(Shipment.id,
+    s1 = session.query(shipments_all.c.shipment_id,
                        Position.date_utc,
                        Position.destination_name,
                        func.lag(Position.destination_name).over(
-                           partition_by=Shipment.id,
+                           partition_by=shipments_all.c.shipment_id,
                            order_by=Position.date_utc)
                        .label('previous_destination_name')
                        ) \
-        .join(Departure, Departure.id == Shipment.departure_id) \
-        .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
+        .join(Departure, Departure.id == shipments_all.c.shipment_departure_id) \
+        .outerjoin(Arrival, Arrival.id == shipments_all.c.shipment_arrival_id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
             sa.and_(
@@ -217,7 +228,7 @@ def update_from_positions():
                 Position.destination_name != sa.null(),
                 sa.or_(Arrival.date_utc == sa.null(),
                        Position.date_utc <= Arrival.date_utc))) \
-        .order_by(Shipment.id, Position.date_utc) \
+        .order_by(shipments_all.c.shipment_id, Position.date_utc) \
         .subquery()
 
     s2 = session.query(s1,
@@ -227,7 +238,7 @@ def update_from_positions():
         .outerjoin(Destination, Destination.name == s1.c.destination_name) \
         .subquery()
 
-    shipments_destinations = session.query(s2.c.id,
+    shipments_destinations = session.query(s2.c.shipment_id,
                                            func.array_agg(s2.c.destination_name,
                                                           type_=ARRAY(String)).label('destination_names'),
                                            func.array_agg(s2.c.date_utc,
@@ -235,13 +246,20 @@ def update_from_positions():
                                            func.array_agg(s2.c.iso2,
                                                           type_=ARRAY(String)).label('destination_iso2s'),
                                            ) \
-        .group_by(s2.c.id).subquery()
+        .group_by(s2.c.shipment_id).subquery()
 
     update = Shipment.__table__.update().values(destination_names=shipments_destinations.c.destination_names,
                                                 destination_dates=shipments_destinations.c.destination_dates,
                                                 destination_iso2s=shipments_destinations.c.destination_iso2s) \
-        .where(Shipment.__table__.c.id == shipments_destinations.c.id)
+        .where(Shipment.__table__.c.id == shipments_destinations.c.shipment_id)
+
+    update_sts = ShipmentWithSTS.__table__.update().values(destination_names=shipments_destinations.c.destination_names,
+                                                destination_dates=shipments_destinations.c.destination_dates,
+                                                destination_iso2s=shipments_destinations.c.destination_iso2s) \
+        .where(ShipmentWithSTS.__table__.c.id == shipments_destinations.c.shipment_id)
+
     execute_statement(update)
+    execute_statement(update_sts)
 
 
 
