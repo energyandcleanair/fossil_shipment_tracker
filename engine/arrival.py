@@ -7,7 +7,7 @@ from engine import departure
 from engine import portcall
 from base.logger import logger, logger_slack
 from base.db import session
-from base.models import Arrival, Shipment, Port, PortCall, Departure, ShipmentArrivalBerth, Trajectory
+from base.models import Arrival, Shipment, Port, PortCall, Departure, ShipmentArrivalBerth, Trajectory, ShipmentWithSTS
 
 
 def get_dangling_arrivals():
@@ -41,7 +41,9 @@ def update(min_dwt=base.DWT_MIN,
 
     if not include_undetected_arrival_shipments:
         undetected_arrival_departures = session.query(Shipment.departure_id) \
-            .filter(Shipment.status == base.UNDETECTED_ARRIVAL).all()
+            .filter(Shipment.status == base.UNDETECTED_ARRIVAL) \
+                .union(session.query(ShipmentWithSTS.departure_id) \
+            .filter(ShipmentWithSTS.status == base.UNDETECTED_ARRIVAL)).all()
         dangling_departures = [x for x in dangling_departures if x.id not in
                                [y[0] for y in undetected_arrival_departures]]
 
@@ -73,9 +75,7 @@ def update(min_dwt=base.DWT_MIN,
     # dangling_departures.sort(key=lambda x: x.date_utc, reverse=True)
 
     for d in tqdm(dangling_departures):
-        departure_portcall = PortCall.query.filter(PortCall.id == d.portcall_id).first()
-        imo = departure_portcall.ship_imo
-        arrival_portcall = portcall.find_arrival(departure_portcall=departure_portcall,
+        arrival_portcall = portcall.find_arrival(departure=d,
                                                  cache_only=cache_only)
 
         if arrival_portcall:
@@ -90,7 +90,9 @@ def update(min_dwt=base.DWT_MIN,
                 session.commit()
 
                 # And remove associated trajectories, berths etc
-                existing_shipment = Shipment.query.filter(Shipment.departure_id == d.id).first()
+                non_sts_shipment = Shipment.query.filter(Shipment.departure_id == d.id).first()
+                existing_shipment = non_sts_shipment if non_sts_shipment else ShipmentWithSTS.query.filter(ShipmentWithSTS.departure_id == d.id).first()
+
                 if existing_shipment is not None:
                     session.query(ShipmentArrivalBerth).filter(ShipmentArrivalBerth.shipment_id == existing_shipment.id).delete()
                     session.query(Trajectory).filter(Trajectory.shipment_id == existing_shipment.id).delete()
@@ -116,4 +118,4 @@ def update(min_dwt=base.DWT_MIN,
 
         else:
             logger.debug(
-                "No relevant arrival found. Should check portcalls for imo %s from date %s." % (imo, d.date_utc))
+                "No relevant arrival found. Should check portcalls for departure %s from date %s." % (d, d.date_utc))
