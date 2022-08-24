@@ -13,7 +13,7 @@ from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
 
-from base.models import PortCall, Port, Ship
+from base.models import PortCall, Port, Ship, Event
 
 
 def initial_fill(limit=None):
@@ -258,6 +258,7 @@ def get_next_portcall(date_from,
                                                                        unlocode=unlocode,
                                                                        date_from=date_from,
                                                                        date_to=date_to,
+                                                                       filter=filter,
                                                                        arrival_or_departure=arrival_or_departure,
                                                                        go_backward=go_backward)
 
@@ -358,7 +359,7 @@ def update_departures_from_russia(
 
 
 
-def find_arrival(departure_portcall,
+def find_arrival(departure,
                  date_to=dt.datetime.utcnow(),
                  cache_only=False):
     """
@@ -367,24 +368,32 @@ def find_arrival(departure_portcall,
     :param departure_portcall:
     :return:
     """
+
+    if departure.portcall_id is not None:
+        departure_portcall = PortCall.query.filter(PortCall.id == departure.portcall_id).first()
+        ship_imo, date_utc, load_status, is_sts = departure_portcall.ship_imo, departure_portcall.date_utc, departure_portcall.load_status, False
+    else:
+        departure_event = Event.query.filter(Event.id == departure.event_id).first()
+        ship_imo, date_utc, load_status, is_sts = departure_event.interacting_ship_imo, departure_event.date_utc, base.FULLY_LADEN, True
+
     originally_checked_port_ids = [x for x, in session.query(Port.id).filter(Port.check_departure).all()]
 
     # filter_departure = lambda x: x.port_operation in ["discharge", "both"]
     filter_departure_russia = lambda x: x.port_id in originally_checked_port_ids and x.port_operation == 'load'
-    filter_departure = lambda x: (departure_portcall.load_status == base.FULLY_LADEN and x.load_status == base.IN_BALLAST) \
+    filter_departure = lambda x: (load_status == base.FULLY_LADEN and x.load_status == base.IN_BALLAST and not is_sts) \
                                  or x.port_operation in ["discharge", "both"]
     filter_arrival = lambda x: x.port_id is not None
 
     # We query new departures only if there is none between current portcall and next departure from russia
-    next_departure = get_next_portcall(date_from=departure_portcall.date_utc + dt.timedelta(minutes=1),
+    next_departure = get_next_portcall(date_from=date_utc + dt.timedelta(minutes=1),
                                        arrival_or_departure="departure",
-                                       imo=departure_portcall.ship_imo,
+                                       imo=ship_imo,
                                        cache_only=True,
                                        filter=filter_departure)
 
-    next_departure_russia = get_next_portcall(date_from=departure_portcall.date_utc + dt.timedelta(minutes=1),
+    next_departure_russia = get_next_portcall(date_from=date_utc + dt.timedelta(minutes=1),
                                               arrival_or_departure="departure",
-                                              imo=departure_portcall.ship_imo,
+                                              imo=ship_imo,
                                               cache_only=True,
                                               filter=filter_departure_russia)
 
@@ -397,11 +406,11 @@ def find_arrival(departure_portcall,
         next_departure_date_to = next_departure_russia.date_utc - dt.timedelta(
             minutes=1) if next_departure_russia else to_datetime(date_to)
 
-        next_departure_date_from = departure_portcall.date_utc + dt.timedelta(minutes=1)
+        next_departure_date_from = date_utc + dt.timedelta(minutes=1)
         next_departure = get_next_portcall(date_from=next_departure_date_from,
                                            date_to=next_departure_date_to,
                                            arrival_or_departure="departure",
-                                           imo=departure_portcall.ship_imo,
+                                           imo=ship_imo,
                                            use_cache=True,
                                            filter=filter_departure)
 
@@ -414,7 +423,7 @@ def find_arrival(departure_portcall,
         cached_arrival = get_next_portcall(imo=next_departure.ship_imo,
                                     arrival_or_departure="arrival",
                                     date_from=next_departure.date_utc,
-                                    date_to=departure_portcall.date_utc,
+                                    date_to=date_utc,
                                     filter=filter_arrival,
                                     go_backward=True,
                                     cache_only=True)
@@ -426,7 +435,7 @@ def find_arrival(departure_portcall,
         if cached_arrival:
             date_to = cached_arrival.date_utc + dt.timedelta(minutes=1)
         else:
-            date_to = departure_portcall.date_utc
+            date_to = date_utc
 
         arrival = get_next_portcall(imo=next_departure.ship_imo,
                                     arrival_or_departure="arrival",
