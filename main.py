@@ -4,6 +4,7 @@ from engine import departure
 from engine import arrival
 from engine import shipment
 from engine import currency
+from engine import company
 from engine import trajectory
 from engine import position
 from engine import destination
@@ -82,17 +83,34 @@ def update():
     # departure.remove(port_name='SIKKA ANCH',
     #                  commodities=[base.LNG, base.COAL, base.BULK])
     # port.add_check_departure_to_anchorage()
+
+    indian_port_ids = [
+            114313, #SIKKA ANCH
+            62343, #SIKKA
+            61757, #JAMNAGAR
+            62257 #Reliance SEZ/Jamnagar
+        ]
+
     # portcall.update_departures_from_russia(
-    #     unlocode=['INSIK'],
-    #     date_from='2022-02-24',
-    #     # date_to='2022-01-01',
+    #     port_id=indian_port_ids,
+    #     date_from='2021-10-01',
     #     force_rebuild=True,
     #     between_existing_only=True)
     #
-    # departure.update(commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS],
-    #                  date_from='2022-02-24',
-    #                  unlocode=['INJGA', 'INSIK'])
+    # departure.update(commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.OIL_OR_CHEMICAL],
+    #                  date_from='2021-10-01',
+    #                  port_id=indian_port_ids)
     #
+    # # departure.remove(port_id=indian_port_ids,
+    # #                  commodities=[base.LNG, base.COAL, base.BULK])
+    #
+    # arrival.update(port_id=indian_port_ids,
+    #                commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.OIL_OR_CHEMICAL],
+    #                date_from='2021-10-01')
+    #
+    # shipment.update(date_from='2021-10-01')
+
+
     # portcall.update_departures_from_russia(date_from='2021-01-01',
     #                                         date_to='2021-03-01',
     #                                         force_rebuild=True,
@@ -140,22 +158,29 @@ def update():
     # arrival.update(date_from=dt.date.today() - dt.timedelta(days=180))
     # currency.update()
     # shipment.update()
+    # company.fill_country()
+    # commodity.fill()
+    # country.fill()
+    # company.fill_country()
+    # portcall.fill_missing_port_id()
     # position.update()
     # destination.update()
+    # position.get_missing_berths()
     # berth.update()
-    # entsog.update(date_from=-21, nodata_error_date_from=-4)
+    entsog.update(date_from=-21, nodata_error_date_from=-4)
     # rscript.update()
     # trajectory.update(shipment_id=359731)
     # berth.update()
     # alert.update()
-    counter.update()
+    # counter.update()
     # berth.update()
+    # commodity.fill()
     return
 
 
 if __name__ == "__main__":
     # from base.db import init_db
-    init_db(drop_first=False)
+    # init_db(drop_first=False)
     # commodity.fill()
     # country.fill()
     print("=== Using %s environment ===" % (base.db.environment,))
