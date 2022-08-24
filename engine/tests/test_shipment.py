@@ -2,6 +2,10 @@ from engine.shipment import rebuild, update
 from base.db import session, check_if_table_exists
 from base.models import Shipment, Arrival, Departure, ShipmentWithSTS
 import sqlalchemy as sa
+from update import update
+
+def test_update():
+    update()
 
 def test_check_tables():
 
