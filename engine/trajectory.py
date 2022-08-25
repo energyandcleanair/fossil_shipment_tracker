@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy import or_
 import sqlalchemy as sa
 from geoalchemy2.functions import ST_MakeLine, ST_Multi, ST_Union, ST_Distance, ST_ClusterDBSCAN, ST_Centroid
-from base.logger import logger_slack
+from base.logger import logger_slack, logger
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.expression import text
 from tqdm import tqdm
@@ -316,7 +316,8 @@ def remove_intermediary_points(coords):
 def cut_at_globe_side(route):
     return route
 
-def reroute(date_from=-30, min_land_distance=3,
+def reroute(date_from=-30,
+            min_land_distance=3,
             min_segment_land_distance=3,
             max_segment_land_distance=90 # Use to remove segmenta that cross the +180/-180 line
             ):
@@ -327,82 +328,87 @@ def reroute(date_from=-30, min_land_distance=3,
 
     for traj in tqdm(trajs):
 
-        # Split segments and only deal with overlapping ones
-        segments_df = get_splitted_traj(trajectory_id=traj.id)
+        try:
+            # Split segments and only deal with overlapping ones
+            segments_df = get_splitted_traj(trajectory_id=traj.id)
 
-        # Remove those that cross globe extremity
-        for index, segment in segments_df.iterrows():
-            coords_4326 = wkb_to_shape(segment.geometry).coords
-            if coords_4326[0][0] * coords_4326[1][0] < -120 * 120:
-                # if crossing globe 'extremity' (e.g. Japan to US)
-                segments_df.loc[index, 'geometry'] = None
-                continue
+            # Remove those that cross globe extremity
+            for index, segment in segments_df.iterrows():
+                coords_4326 = wkb_to_shape(segment.geometry).coords
+                if coords_4326[0][0] * coords_4326[1][0] < -120 * 120:
+                    # if crossing globe 'extremity' (e.g. Japan to US)
+                    segments_df.loc[index, 'geometry'] = None
+                    continue
 
-        overland_segments_df = segments_df.loc[(segments_df.land_distance > min_segment_land_distance) \
-                                                    & ~segments_df.geometry.isnull()]
+            overland_segments_df = segments_df.loc[(segments_df.land_distance > min_segment_land_distance) \
+                                                        & ~segments_df.geometry.isnull()]
 
-        for index, segment in overland_segments_df.iterrows():
-            geom = wkb_to_shape(segment.geometry)
-            coords_3857 = to_3857(geom.coords)
-            coords_4326 = to_4326(coords_3857)
-            (x_i, y_i) = coords_3857[0]
-            (x_f, y_f) = coords_3857[-1]
-            row_i, col_i = dataset.index(x_i, y_i)
-            row_f, col_f = dataset.index(x_f, y_f)
+            for index, segment in overland_segments_df.iterrows():
+                geom = wkb_to_shape(segment.geometry)
+                coords_3857 = to_3857(geom.coords)
+                coords_4326 = to_4326(coords_3857)
+                (x_i, y_i) = coords_3857[0]
+                (x_f, y_f) = coords_3857[-1]
+                row_i, col_i = dataset.index(x_i, y_i)
+                row_f, col_f = dataset.index(x_f, y_f)
 
-            starts = [[row_i, col_i]]
-            ends = [[row_f, col_f]]
+                starts = [[row_i, col_i]]
+                ends = [[row_f, col_f]]
 
-            # Pass full set of start and end points to `MCP.find_costs`
-            # from skimage.graph import _mcp
-            # offsets = _mcp.make_offsets(2, True)
-            # offsets4 = np.array([[x,y] for x in range(-3,4) for y in range(-3,4) if x != 0 or y != 0])
-            # # print(offsets)
+                # Pass full set of start and end points to `MCP.find_costs`
+                # from skimage.graph import _mcp
+                # offsets = _mcp.make_offsets(2, True)
+                # offsets4 = np.array([[x,y] for x in range(-3,4) for y in range(-3,4) if x != 0 or y != 0])
+                # # print(offsets)
 
-            # m = MCP_Geometric(img, fully_connected=True)
-            # cost_array, tracebacks_array = m.find_costs(starts, ends)
-            # #
-            # # # Transpose `ends` so can be used to index in NumPy
-            # # ends_idx = tuple(np.asarray(ends).T.tolist())
-            # # costs = cost_array[ends_idx]
-            # #
-            # # # Compute exact minimum cost path to each endpoint
-            # tracebacks = [m.traceback(end) for end in ends]
-            # tracebacks_3857 = [[dataset.xy(rowcol[0], rowcol[1]) for rowcol in t] for t in tracebacks]
-            # tracebacks_4326 = [to_4326(t) for t in tracebacks_3857]
-            # #
-            # for t in tracebacks_4326:
-            #     ax.plot([pt[0] for pt in t],
-            #              [pt[1] for pt in t], label='MCP')
-            # fig.legend()
+                # m = MCP_Geometric(img, fully_connected=True)
+                # cost_array, tracebacks_array = m.find_costs(starts, ends)
+                # #
+                # # # Transpose `ends` so can be used to index in NumPy
+                # # ends_idx = tuple(np.asarray(ends).T.tolist())
+                # # costs = cost_array[ends_idx]
+                # #
+                # # # Compute exact minimum cost path to each endpoint
+                # tracebacks = [m.traceback(end) for end in ends]
+                # tracebacks_3857 = [[dataset.xy(rowcol[0], rowcol[1]) for rowcol in t] for t in tracebacks]
+                # tracebacks_4326 = [to_4326(t) for t in tracebacks_3857]
+                # #
+                # for t in tracebacks_4326:
+                #     ax.plot([pt[0] for pt in t],
+                #              [pt[1] for pt in t], label='MCP')
+                # fig.legend()
 
-            from skimage.graph import route_through_array
-            route, weight = route_through_array(img, starts[0], ends[0], geometric=True)
-            route_simplified = remove_intermediary_points(coords=route)
-            route_3857 = [dataset.xy(rowcol[0], rowcol[1]) for rowcol in route_simplified]
-            route_4326 = to_4326(route_3857)
+                from skimage.graph import route_through_array
+                route, weight = route_through_array(img, starts[0], ends[0], geometric=True)
+                route_simplified = remove_intermediary_points(coords=route)
+                route_3857 = [dataset.xy(rowcol[0], rowcol[1]) for rowcol in route_simplified]
+                route_4326 = to_4326(route_3857)
 
-            geometry_routed = LineString(route_4326)
+                geometry_routed = LineString(route_4326)
 
-            if False:
-                fig, ax = plt.subplots()
-                ax.plot([pt[0] for pt in coords_4326],
-                         [pt[1] for pt in coords_4326],
-                         label='Original')
-                ax.plot([pt[0] for pt in route_4326],
-                         [pt[1] for pt in route_4326],
-                         label='route_through_array')
-                fig.legend()
-                ax.set_title(traj.shipment_id)
-                fig.show()
+                if False:
+                    fig, ax = plt.subplots()
+                    ax.plot([pt[0] for pt in coords_4326],
+                             [pt[1] for pt in coords_4326],
+                             label='Original')
+                    ax.plot([pt[0] for pt in route_4326],
+                             [pt[1] for pt in route_4326],
+                             label='route_through_array')
+                    fig.legend()
+                    ax.set_title(traj.shipment_id)
+                    fig.show()
 
-            segments_df.loc[index, 'geometry'] = geometry_routed
+                segments_df.loc[index, 'geometry'] = geometry_routed
 
-        geometry_routed = MultiLineString(segments_df.loc[~segments_df.geometry.isnull()] \
-            .geometry.to_list())
-        traj.geometry_routed = 'SRID=4326;' + geometry_routed.wkt
-        traj.routing_date = dt.datetime.now()
-        session.commit()
+            geometry_routed = MultiLineString(segments_df.loc[~segments_df.geometry.isnull()] \
+                .geometry.to_list())
+            traj.geometry_routed = 'SRID=4326;' + geometry_routed.wkt
+            traj.routing_date = dt.datetime.now()
+            session.commit()
+
+        except ValueError as e:
+            logger.warning("Failed to reroute traj")
+            continue
 
 
 def push_ne_10m_land():
