@@ -35,7 +35,7 @@ def update(
                        base.OIL_OR_CHEMICAL],
         min_dwt=base.DWT_MIN,
         use_cache=False,
-        cache_objects=True,
+        cache_objects=False,
         force_rebuild=False,
         upload_unprocessed_events=True,
         limit=None):
