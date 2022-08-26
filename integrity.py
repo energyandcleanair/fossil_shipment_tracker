@@ -50,11 +50,31 @@ def test_portcall_relationship():
     # note - departure/arrivals can appear multiple times in the shipment with sts table, but only one portcall should
     # always be linked with departure/arrival
 
-    departures, arrivals = session.query(Departure.id, Departure.portcall_id), session.query(Arrival.id, Arrival.portcall_id)
+    non_sts_shipments = session.query(
+        Shipment.id,
+        Departure.portcall_id.label('departure_portcall_id'),
+        Arrival.portcall_id.label('arrival_portcall_id')
+    ) \
+    .join(Departure, Departure.id == Shipment.departure_id) \
+    .join(Arrival, Arrival.id == Shipment.arrival_id)
 
-    departure_portcall_ids, arrival_portcall_ids = [d.id for d in departures if d != sa.null()], [a.id for a in arrivals if a != sa.null()]
+    departure_portcall_ids, arrival_portcall_ids = [d.departure_portcall_id for d in non_sts_shipments if d.departure_portcall_id is not None],  \
+                                                   [a.arrival_portcall_id for a in non_sts_shipments if a.arrival_portcall_id is not None]
 
     assert len(departure_portcall_ids) == len(set(departure_portcall_ids)) and len(arrival_portcall_ids) == len(set(arrival_portcall_ids))
+
+    sts_shipments = session.query(
+        ShipmentWithSTS.id,
+        Departure.portcall_id.label('departure_portcall_id'),
+        Arrival.portcall_id.label('arrival_portcall_id')
+    ) \
+    .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+    .join(Arrival, Arrival.id == ShipmentWithSTS.arrival_id)
+
+    departure_portcall_ids_sts, arrival_portcall_ids_sts = [d.departure_portcall_id for d in sts_shipments if d.departure_portcall_id is not None], \
+                                                   [a.arrival_portcall_id for a in sts_shipments if a.arrival_portcall_id is not None]
+
+    assert not len(set(departure_portcall_ids_sts) & set(departure_portcall_ids)) and not len(set(arrival_portcall_ids_sts) & set(arrival_portcall_ids))
 
 def test_counter(app):
     with app.test_client() as test_client:
