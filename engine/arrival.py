@@ -78,6 +78,9 @@ def update(min_dwt=base.DWT_MIN,
         arrival_portcall = portcall.find_arrival(departure=d,
                                                  cache_only=cache_only)
 
+        # We don't create the arrival here anymore, using sql to do so.
+        # The call above is useful though to keep looking for required portcalls
+        '''
         if arrival_portcall:
 
             existing_arrival = Arrival.query.filter(Arrival.departure_id == d.id).first()
@@ -98,8 +101,6 @@ def update(min_dwt=base.DWT_MIN,
                     session.query(Trajectory).filter(Trajectory.shipment_id == existing_shipment.id).delete()
 
                 session.commit()
-        # We don't create the arrival here anymore, using sql to do so.
-        # The call above is useful though to keep looking for required portcalls
 
             else:
                 # There was no such arrival
@@ -121,3 +122,4 @@ def update(min_dwt=base.DWT_MIN,
         else:
             logger.debug(
                 "No relevant arrival found. Should check portcalls for departure %s from date %s." % (d, d.date_utc))
+        '''
