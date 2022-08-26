@@ -202,7 +202,7 @@ class Arrival(Base):
     event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"), nullable=True, unique=True)
 
     # Optional
-    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=True)
+    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=False)
     __tablename__ = DB_TABLE_ARRIVAL
 
 
