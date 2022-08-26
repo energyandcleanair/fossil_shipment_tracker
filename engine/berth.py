@@ -74,9 +74,15 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance
         shipment_id = to_list(shipment_id)
         shipments_to_update = shipments_to_update.filter(shipments_all.c.shipment_id.in_(shipment_id))
 
-    berths = session.query(shipments_all.c.shipment_id, Berth.id, Position.id, Position.date_utc,
-                           Position.navigation_status, Position.speed,
-                           Berth.port_unlocode, Departure.port_id) \
+    berths = session.query(shipments_all.c.shipment_id,
+                           Berth.id,
+                           Position.id,
+                           Position.date_utc,
+                           Position.navigation_status,
+                           Position.speed,
+                           Berth.port_unlocode,
+                           Departure.port_id,
+                           func.ST_distance(Port.geometry, Berth.geometry).label('distance_to_port')) \
         .filter(shipments_all.c.shipment_id.in_(shipments_to_update)) \
         .filter(sa.or_(
             Position.navigation_status == "Moored",
