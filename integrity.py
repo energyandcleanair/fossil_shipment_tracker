@@ -4,7 +4,7 @@ from api.tests import test_counter
 from app import app
 from base.logger import logger
 
-def test_check():
+def check():
 
     logger.info("Checking integrity: shipment, portcall and berth relationship.")
     test_shipment_table()
