@@ -51,7 +51,7 @@ def initial_fill(limit=None):
                                  "load_status", "port_operation", "date_utc",
                                  "terminal_id", "berth_id", "others"]]
 
-    from sa.dialects.postgresql import JSONB
+    from sqlalchemy.dialects.postgresql import JSONB
 
     portcalls_df['ship_mmsi'] = portcalls_df.ship_mmsi.apply(str)
     portcalls_df['ship_imo'] = portcalls_df.ship_imo.apply(str)
@@ -277,8 +277,7 @@ def get_next_portcall(date_from,
                                                                        date_to=date_to,
                                                                        filter=filter,
                                                                        arrival_or_departure=arrival_or_departure,
-                                                                       go_backward=go_backward,
-                                                                       filter=filter)
+                                                                       go_backward=go_backward)
 
         upload_portcalls(portcalls)
 
