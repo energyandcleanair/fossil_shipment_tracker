@@ -280,29 +280,6 @@ class VoyageResource(Resource):
             else_=DeparturePort.iso2
         ).label('commodity_origin_iso2')
 
-        commodity_destination_iso2_field = case(
-            # Lauri: My heuristic is that all tankers that discharge cargo
-            # in Yeosu but don't go to one of the identified berths are s2s
-            [
-                (sa.and_(
-                    ArrivalPort.name.ilike('Yeosu%'),
-                    commodity_field.in_([base.OIL_PRODUCTS, base.CRUDE_OIL, base.LNG,
-                                         base.OIL_OR_CHEMICAL]),
-                    ShipmentArrivalBerth.id == sa.null(),
-                    ## Use below one once event_shipment has been fixed
-                    # event_shipment_subquery.c.sts_shipment_id != sa.null()
-                ), 'CN'),
-
-                # Looks like StS only
-                (ArrivalPort.name.ilike('Lakonikos Gulf%'), sa.null()),
-
-                # For completed shipments, we don't use declared destination
-                # but only actual one
-                (Shipment.status == base.COMPLETED, ArrivalPort.iso2)
-            ],
-            else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
-        ).label('commodity_destination_iso2')
-
         # To remove Kazak oil
         departure_iso2_field = case(
             [(DepartureBerth.name.ilike('Novorossiysk CPC%'), 'KZ')],
@@ -377,6 +354,31 @@ class VoyageResource(Resource):
 
         shipments_combined = shipments_non_sts.union(shipments_sts_with_arrival).subquery()
 
+        # generate commodity destination field now, after combining shipment tables
+
+        commodity_destination_iso2_field = case(
+            # Lauri: My heuristic is that all tankers that discharge cargo
+            # in Yeosu but don't go to one of the identified berths are s2s
+            [
+                (sa.and_(
+                    ArrivalPort.name.ilike('Yeosu%'),
+                    commodity_field.in_([base.OIL_PRODUCTS, base.CRUDE_OIL, base.LNG,
+                                         base.OIL_OR_CHEMICAL]),
+                    ShipmentArrivalBerth.id == sa.null(),
+                    ## Use below one once event_shipment has been fixed
+                    # event_shipment_subquery.c.sts_shipment_id != sa.null()
+                ), 'CN'),
+
+                # Looks like StS only
+                (ArrivalPort.name.ilike('Lakonikos Gulf%'), sa.null()),
+
+                # For completed shipments, we don't use declared destination
+                # but only actual one
+                (shipments_combined.c.shipment_status == base.COMPLETED, ArrivalPort.iso2)
+            ],
+            else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
+        ).label('commodity_destination_iso2')
+
         commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
 
         # Query with joined information
@@ -424,9 +426,6 @@ class VoyageResource(Resource):
                                     Ship.type.label("ship_type"),
                                     Ship.subtype.label("ship_subtype"),
                                     Ship.dwt.label("ship_dwt"),
-                                    Ship.manager.label("ship_manager"),
-                                    Ship.owner.label("ship_owner"),
-                                    Ship.insurer.label("ship_insurer"),
 
                                     shipments_combined.c.ship_name.label("arrival_ship_name"),
                                     shipments_combined.c.ship_imo.label("arrival_ship_imo"),
@@ -434,9 +433,6 @@ class VoyageResource(Resource):
                                     shipments_combined.c.ship_type.label("arrival_ship_type"),
                                     shipments_combined.c.ship_subtype.label("arrival_ship_subtype"),
                                     shipments_combined.c.ship_dwt.label("arrival_ship_dwt"),
-                                    shipments_combined.c.ship_manager.label("arrival_ship_manager"),
-                                    shipments_combined.c.ship_owner.label("arrival_ship_owner"),
-                                    shipments_combined.c.ship_insurer.label("arrival_ship_insurer"),
 
                                     commodity_field,
                                     commodity_subquery.c.group.label("commodity_group"),
@@ -461,9 +457,15 @@ class VoyageResource(Resource):
                                     ShipInsurerCountry.name.label("ship_insurer_country"),
                                     ShipInsurerCountry.region.label("ship_insurer_region"),
 
-                                    value_tonne_field*shipments_combined.c.weight,
-                                    value_m3_field*shipments_combined.c.weight,
-                                    value_eur_field*shipments_combined.c.weight,
+                                    value_tonne_field.label('value_tonne_unweighted'),
+                                    value_m3_field.label('value_m3_unweighted'),
+                                    value_eur_field.label('value_eur_unweighted'),
+
+                                    shipments_combined.c.weight.label('weight'),
+
+                                    sa.sql.label('value_tonne', value_tonne_field*shipments_combined.c.weight),
+                                    sa.sql.label('value_m3', value_m3_field*shipments_combined.c.weight),
+                                    sa.sql.label('value_eur', value_eur_field*shipments_combined.c.weight),
                                     Currency.currency,
                                     value_currency_field,
 
@@ -488,7 +490,6 @@ class VoyageResource(Resource):
              .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
              .outerjoin(Destination, shipments_combined.c.shipment_last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
-             .outerjoin(Commodity, Commodity.id == commodity_field)
              .outerjoin(commodity_subquery, commodity_subquery.c.id == commodity_field)
              .outerjoin(Price,
                         sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
