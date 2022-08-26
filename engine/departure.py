@@ -5,7 +5,7 @@ import base
 from base.logger import logger_slack
 import sqlalchemy as sa
 from sqlalchemy import func
-from base.models import PortCall, Departure, Arrival, Ship, Port, Shipment, Event
+from base.models import PortCall, Departure, Arrival, Ship, Port, Shipment, Event, ShipmentWithSTS
 
 
 
@@ -128,6 +128,12 @@ def update(date_from="2022-01-01"):
                      commodities=[base.LNG, base.COAL, base.BULK])
 
     remove(port_name='SIKKA ANCH',
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    remove(unlocode=['EGMAH'],
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    remove(port_name='MERSA EL HAMRA ANCH',
                      commodities=[base.LNG, base.COAL, base.BULK])
 
 def add(date_from="2022-01-01",
