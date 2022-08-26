@@ -1,12 +1,19 @@
-from engine import arrival, position, destination, berth, trajectory
 from base.db import session, check_if_table_exists
 from base.models import Trajectory, ShipmentWithSTS, Shipment, ShipmentArrivalBerth, ShipmentDepartureBerth, Departure, Arrival
-import sqlalchemy as sa
-import pandas as pd
-import numpy as np
-import datetime as dt
-from engine.shipment import return_combined_shipments
+from api.tests import test_counter
+from app import app
+from base.logger import logger
 
+def test_check():
+
+    logger.info("Checking integrity: shipment, portcall and berth relationship.")
+    test_shipment_table()
+    test_portcall_relationship()
+    test_berths()
+
+    logger.info("Checkin integrity: counter, voyage and pricing")
+    test_counter.test_counter_against_voyage(app)
+    test_counter.test_pricing_gt0(app)
 def test_shipment_table():
 
     # check that the shipment table respect unique departures and arrivals
@@ -75,54 +82,3 @@ def test_portcall_relationship():
                                                    [a.arrival_portcall_id for a in sts_shipments if a.arrival_portcall_id is not None]
 
     assert not len(set(departure_portcall_ids_sts) & set(departure_portcall_ids)) and not len(set(arrival_portcall_ids_sts) & set(arrival_portcall_ids))
-
-def test_counter(app):
-    with app.test_client() as test_client:
-
-        response = test_client.get('/v0/counter')
-        assert response.status_code == 200
-        data = response.json["data"]
-        counter_df = pd.DataFrame(data).sort_values(['date'], ascending=False)
-
-        response = test_client.get('/v0/overland')
-        assert response.status_code == 200
-        data = response.json["data"]
-        pipeline_df = pd.DataFrame(data).sort_values(['date'], ascending=False)
-
-        response = test_client.get('/v0/voyage')
-        assert response.status_code == 200
-        data = response.json["data"]
-        voyage_df = pd.DataFrame(data)
-
-        counter2 = pd.concat([
-            voyage_df.loc[(voyage_df.arrival_date_utc>='2022-02-24')&(voyage_df.departure_iso2=='RU')][['destination_region', 'commodity_group','value_eur']],
-            pipeline_df.loc[(pipeline_df.date >= '2022-02-24') &
-                            (pipeline_df.departure_iso2.isin(['TR','RU','BY']))][['destination_region', 'commodity_group', 'value_eur']]]) \
-        .groupby(['destination_region', 'commodity_group']) \
-        .agg(value_eur=('value_eur', lambda x: np.nansum(x)/1e9))
-
-        counter1 = counter_df.groupby(['destination_region', 'commodity_group']) \
-        .agg(value_eur=('value_eur', lambda x: np.nansum(x)/1e9))
-
-        counter1==counter2
-
-def test_pricing_gt0(app):
-    with app.test_client() as test_client:
-        response = test_client.get('/v0/counter')
-        assert response.status_code == 200
-        data = response.json["data"]
-        counter_df = pd.DataFrame(data).sort_values(['date'], ascending=False)
-
-        response = test_client.get('/v0/overland')
-        assert response.status_code == 200
-        data = response.json["data"]
-        pipeline_df = pd.DataFrame(data).sort_values(['date'], ascending=False)
-
-
-        pipeline_notgas = pipeline_df.loc[pipeline_df.commodity != 'natural_gas']
-
-        assert pd.to_datetime(pipeline_df.date).max() > dt.date.today() - dt.timedelta(days=3)
-        assert all(pipeline_df.value_eur > 0)
-
-        assert pd.to_datetime(pipeline_notgas.date).max() > dt.date.today() - dt.timedelta(days=3)
-        assert all(pipeline_notgas.value_eur > 0)

@@ -14,18 +14,22 @@ from engine import counter
 from engine import entsog
 from engine import alert
 from engine import company
+from engine import mtevents
+import integrity
 import base
 
 import datetime as dt
 
 
 def update():
+    integrity.check()
     portcall.update_departures_from_russia()
     ship.update()
     departure.update()
     arrival.update(date_from = dt.date.today() - dt.timedelta(days=90))
     currency.update()
     company.update()
+    mtevents.update()
     shipment.update()
     position.update()
     destination.update()
@@ -35,6 +39,7 @@ def update():
     trajectory.update()
     alert.update()
     counter.update()
+    integrity.check()
     return
 
 
