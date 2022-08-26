@@ -21,20 +21,21 @@ import datetime as dt
 
 import re
 
-from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall
+from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall, Port, Event
 from sqlalchemy import func
+import sqlalchemy as sa
 
 def update(
-        date_from="2022-01-01",
+        date_from="2021-11-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         ship_imo=None,
         commodities = [base.LNG,
                        base.CRUDE_OIL,
-                       base.OIL_PRODUCTS],
+                       base.OIL_PRODUCTS,
+                       base.OIL_OR_CHEMICAL],
         min_dwt=base.DWT_MIN,
         use_cache=False,
         cache_objects=True,
-        only_ongoing=False,
         force_rebuild=False,
         upload_unprocessed_events=True,
         limit=None):
@@ -61,9 +62,8 @@ def update(
 
     ships = session.query(
             Departure.ship_imo.distinct().label("ship_imo"),
-            Shipment.status
          ) \
-        .join(Departure, Shipment.departure_id == Departure.id) \
+        .join(Port, Port.id == Departure.port_id) \
         .join(Ship, Departure.ship_imo == Ship.imo)
 
     if ship_imo:
@@ -72,8 +72,6 @@ def update(
         ships = ships.filter(Ship.commodity.in_(to_list(commodities)))
     if min_dwt:
         ships = ships.filter(Ship.dwt >= min_dwt)
-    if only_ongoing:
-        ships = ships.filter(Shipment.status != base.COMPLETED)
     if limit:
         ships = ships.limit(limit)
 
@@ -235,7 +233,7 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
 
     int_ships = find_ships_in_db(intship_name)
 
-    # first, try and find the ship in our databse and check if position is satisfied
+    # first, try and find the ship in our database and check if position is satisfied
     if int_ships:
         for intship in int_ships:
             ship_position, intship_position, d, position_time_diff = check_distance_between_ships(ship_imo, intship.imo, event_time)
@@ -256,6 +254,11 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
     int_ships = Datalastic.find_ship(intship_name, fuzzy=True, return_closest=5)
 
     if int_ships is None:
+
+        # before returning false, let's try and add in imo locally
+        int_ship_imo_local = find_ship_imo_locally(intship_name)
+        if int_ship_imo_local is not None: event.interacting_ship_imo = int_ship_imo_local
+
         return False
 
     for intship in int_ships:
@@ -315,75 +318,58 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
                 event.interacting_ship_details = {"distance_meters": int(d)}
                 return True
 
-    return False
-'''
-    intship = Datalastic.find_ship(intship_name, fuzzy=True, return_closest=True)
-
-    if not intship:
-        print("Error in finding ship in Datalastic for event: {}".format(event_content))
-        return False
-
-    # fill imo where necessary from MT
-    if intship.imo is None:
-        if intship.mmsi is not None:
-            mt_intship_check = fill(mmsis=[intship.mmsi])
-
-            if not mt_intship_check:
-
-                # add unknown ship to db, so we don't repeatedly query MT
-                unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi, mmsi=intship.mmsi, type=intship.type,
-                                    name=intship.name)
-                session.add(unknown_ship)
-                session.commit()
-
-                # add int ship info before returning
-                intship.imo = unknown_ship.imo
-
-                return False
-
-            mt_ship = session.query(Ship).filter(Ship.mmsi == intship.mmsi).all()
-
-            # check if we find more than 1 ship
-            if len(mt_ship) > 1:
-                return False
-
-            # if we don't find any in db by mmsi we failed to upload...
-            if not mt_ship:
-                print("Failed to find imo in MT for event: {}".format(event_content))
-                return False
-
-            mt_ship = mt_ship[0]
-
-            if intship.name == mt_ship.name:
-                intship.imo = mt_ship.imo
-            else:
-                print("Found match for ship with mmsi, but names do not match for event {}".format(event_content))
-        else:
-            print("No ship imo found and we do not have an mmsi for event: {}".format(event_content))
-            return False
-
-    # check if interacting ship is in db
-    found = fill(imos=[intship.imo])
-    if not found:
-        print("Failed to upload missing ships")
-        return False
-
-    # add ship imo to event info
-    event.interacting_ship_imo = intship.imo
-
-    # get closest position in time and add to event
-    ship_position, intship_position, d = check_distance_between_ships(ship_imo, intship.imo)
-
-    if ship_position: event.ship_closest_position = ship_position.geometry
-    if intship_position: event.interacting_ship_closest_position = intship_position.geometry
-
-    if d:
-        event.interacting_ship_details = {"distance_meters": int(d)}
-        if d < distance_check:
-            return True
+    # before returning false, let's try and add in imo locally
+    int_ship_imo_local = find_ship_imo_locally(intship_name)
+    if int_ship_imo_local is not None: event.interacting_ship_imo = int_ship_imo_local
 
     return False
-'''
+def find_ship_imo_locally(ship_name):
+    '''
+    Finds the imo of a ship using its name either in previous events or in the database using exact match
+
+    :param ship_name:
+    :return:
+    '''
+    int_ship_found = session.query(
+        Event
+    ) \
+    .filter(Event.interacting_ship_name == ship_name) \
+    .filter(Event.interacting_ship_imo != sa.null()).first()
+
+    if int_ship_found is not None:
+        logger.info("Found match for ship name in previous events.")
+        return int_ship_found.interacting_ship_imo
+
+    else:
+        # take exact match in db
+        int_ships = find_ships_in_db(ship_name)
+        if len(int_ships) > 0:
+            logger.info("Found match for ship name in db.")
+            return int_ships[0].imo
+
+        return None
+
+def back_fill_ship_imo():
+    '''
+    Function to find and add ship_imo for ships which did not meet legacy distance check logic or which we were
+    unable to find at the time
+
+    :return:
+    '''
+    events = session.query(
+        Event
+    ) \
+    .filter(Event.interacting_ship_imo == sa.null())
+
+    for e in tqdm(events.all()):
+        # first try and find a ship has been seen in STS events and we have confirmed imo for
+        interacting_ship_name = e.interacting_ship_name
+
+        interacting_ship_imo = find_ship_imo_locally(interacting_ship_name)
+
+        if interacting_ship_imo is not None:
+            e.interacting_ship_imo = interacting_ship_imo
+            session.commit()
 
 def create_mtevent_type_table(force_rebuild=False):
     """
