@@ -1,8 +1,61 @@
 -- first delete existing sts shipments for refresh - we do this as we have non-unqiue departure/arrival ids and hence
 -- we refresh whole table each time
+-- CLEAN UP BEGIN
 WITH deleted_sts_shipments AS (
-     delete from shipment_with_sts
+     DELETE FROM shipment_with_sts
+     RETURNING
+        id,
+        departure_id,
+        arrival_id
 ),
+deleted_departure_sts AS (
+    DELETE FROM departure
+    where id IN (
+        SELECT
+            departure_id
+        FROM
+            deleted_sts_shipments
+    )
+),
+deleted_arrival_sts AS (
+    DELETE FROM arrival
+    where id IN (
+        SELECT
+            arrival_id
+        FROM
+            deleted_sts_shipments
+        WHERE
+            arrival_id IS NOT NULL
+    )
+),
+deleted_shipmentarrivalberth_sts AS (
+    DELETE FROM shipmentarrivalberth
+    where shipment_id IN (
+        SELECT
+            id
+        FROM
+            deleted_sts_shipments
+    )
+),
+deleted_shipmentdepartureberth_sts AS (
+    DELETE FROM shipmentdepartureberth
+    where shipment_id IN (
+        SELECT
+            id
+        FROM
+            deleted_sts_shipments
+    )
+),
+deleted_trajectory_sts AS (
+    DELETE FROM trajectory
+    where shipment_id IN (
+        SELECT
+            id
+        FROM
+            deleted_sts_shipments
+    )
+),
+-- CLEAN UP END
 departure_portcalls AS (
     SELECT
         portcall.id,
@@ -510,7 +563,7 @@ shipments_after_insertion AS (
 inserted_shipments AS (
 INSERT INTO shipment_with_sts (id, departure_id, arrival_id, status)
     SELECT
-        NEXTVAL('shipment_id_seq') id,
+        NEXTVAL('flow_id_seq') id,
         departure_id,
         arrival_id,
         status
@@ -524,15 +577,114 @@ INSERT INTO shipment_with_sts (id, departure_id, arrival_id, status)
             status
 ),
 --- delete any shipments that were in non sts shipment table that now have a sts arrival (for example ongoing shipments)
+--- CLEAN UP BEGIN
 deleted_shipments AS (
-    DELETE FROM shipment
-        WHERE departure_id IN (
+    DELETE FROM shipment s
+        USING departure d
+            WHERE d.id = s.departure_id
+            AND d.portcall_id IS NOT NULL
+            AND d.portcall_id IN (
+                SELECT
+                    ds.portcall_id
+                FROM
+                    inserted_shipments ins
+                JOIN
+                    inserted_departures ds ON ds.id = ins.departure_id
+                WHERE
+                    ds.portcall_id IS NOT NULL
+            )
+            RETURNING
+                s.id,
+                s.departure_id,
+                s.arrival_id
+),
+--- we could do this combined above with USING and OUTER JOIN but it's hacky and more tricky to modify in the future
+deleted_shipments_post_sts AS (
+    DELETE FROM shipment s
+        USING arrival a
+            WHERE a.id = s.arrival_id
+            AND a.portcall_id IS NOT NULL
+            AND a.portcall_id IN (
+                SELECT
+                    ars.portcall_id
+                FROM
+                    inserted_shipments ins
+                JOIN
+                    inserted_arrivals ars ON ars.id = ins.arrival_id
+                WHERE
+                    ars.portcall_id IS NOT NULL
+            )
+            RETURNING
+                s.id,
+                s.departure_id,
+                s.arrival_id
+),
+deleted_trajectory AS (
+    DELETE FROM trajectory
+        WHERE shipment_id IN (
+            SELECT
+                id
+            FROM
+                deleted_shipments
+            UNION ALL SELECT
+                id
+            FROM
+                deleted_shipments_post_sts
+        )
+),
+deleted_shipmentdepartureberth AS (
+    DELETE FROM shipmentdepartureberth
+        WHERE shipment_id IN (
+            SELECT
+                id
+            FROM
+                deleted_shipments
+            UNION ALL SELECT
+                id
+            FROM
+                deleted_shipments_post_sts
+        )
+),
+deleted_shipmentarrivalberth AS (
+    DELETE FROM shipmentarrivalberth
+        WHERE shipment_id IN (
+            SELECT
+                id
+            FROM
+                deleted_shipments
+            UNION ALL SELECT
+                id
+            FROM
+                deleted_shipments_post_sts
+        )
+),
+deleted_departure AS (
+    DELETE FROM departure
+        WHERE id IN (
             SELECT
                 departure_id
             FROM
-                inserted_shipments
+                deleted_shipments
+            UNION ALL SELECT
+                departure_id
+            FROM
+                deleted_shipments_post_sts
+        )
+),
+deleted_arrivals AS (
+    DELETE FROM arrival
+        WHERE id IN (
+            SELECT
+                arrival_id
+            FROM
+                deleted_shipments
+            UNION ALL SELECT
+                arrival_id
+            FROM
+                deleted_shipments_post_sts
         )
 )
+--- CLEAN UP END
     SELECT
         status,
         count(*)
