@@ -40,7 +40,7 @@ from . import DB_TABLE_MARINETRAFFICCALL
 from . import DB_TABLE_CURRENCY
 from . import DB_TABLE_MTEVENT_TYPE
 from . import DB_TABLE_EVENT
-from . import DB_TABLE_EVENT_SHIPMENT
+from . import DB_TABLE_SHIPMENT_WITH_STS
 
 from . import DB_TABLE_ALERT_INSTANCE
 from . import DB_TABLE_ALERT_CONFIG
@@ -149,7 +149,7 @@ class ShipmentDepartureBerth(Base):
     For each shipment, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, unique=True)
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE", ondelete="CASCADE"))
 
     # Optional
@@ -166,7 +166,7 @@ class ShipmentArrivalBerth(Base):
     For each shipment, lists the berth detected as well as the method used to find it
     """
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, unique=True)
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + '.id', onupdate="CASCADE", ondelete="CASCADE"))
 
     # Optional
@@ -185,6 +185,7 @@ class Departure(Base):
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String) # Method through which we detected the departure
     portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=True)
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"), nullable=True)
 
     __tablename__ = DB_TABLE_DEPARTURE
 
@@ -194,13 +195,14 @@ class Departure(Base):
 
 class Arrival(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=True)
+    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=False)
     date_utc = Column(DateTime(timezone=False))
     method_id = Column(String)
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'))
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"), nullable=True, unique=True)
 
     # Optional
-    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=True)
+    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=False)
     __tablename__ = DB_TABLE_ARRIVAL
 
 
@@ -219,6 +221,22 @@ class Shipment(Base):
     destination_iso2s = Column(ARRAY(String))
 
     __tablename__ = DB_TABLE_SHIPMENT
+
+class ShipmentWithSTS(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=False)
+    arrival_id = Column(BigInteger, ForeignKey(DB_TABLE_ARRIVAL + '.id', onupdate="CASCADE"), unique=False)
+    last_position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + '.id', onupdate="CASCADE"), unique=False)
+
+    last_destination_name = Column(String)
+    status = Column(String)
+
+    # Storing all distinct destinations
+    destination_names = Column(ARRAY(String))
+    destination_dates = Column(ARRAY(DateTime(timezone=False)))
+    destination_iso2s = Column(ARRAY(String))
+
+    __tablename__ = DB_TABLE_SHIPMENT_WITH_STS
 
 
 class Company(Base):
@@ -307,7 +325,7 @@ class Destination(Base):
 
 class Trajectory(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT + '.id', onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    shipment_id = Column(BigInteger, unique=True)
     geometry = Column(Geometry('MULTILINESTRING', srid=4326))
     geometry_routed = Column(Geometry('MULTILINESTRING', srid=4326))
     routing_date = Column(DateTime(timezone=False))  # time where geometry_routed was built
@@ -579,30 +597,6 @@ class Event(Base):
 
     __table_args__ = (UniqueConstraint('ship_imo', 'interacting_ship_imo', 'date_utc', name='unique_event'),)
     __tablename__ = DB_TABLE_EVENT
-
-
-class EventShipment(Base):
-    id = Column(BigInteger, autoincrement=True, primary_key=True)
-    shipment_id = Column(BigInteger, ForeignKey(DB_TABLE_SHIPMENT+'.id', onupdate="CASCADE"), nullable=False)
-    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT+'.id', onupdate="CASCADE"), nullable=True)
-    created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow, nullable=False)
-
-    __table_args__ = (
-        Index(
-            "unique_event_shipment",
-            "shipment_id",
-            "event_id",
-            unique=True,
-            postgresql_where=event_id.isnot(None)
-        ),
-        Index(
-            "unique_shipment",
-            "shipment_id",
-            unique=True,
-            postgresql_where=event_id.is_(None)
-        ),
-    )
-    __tablename__ = DB_TABLE_EVENT_SHIPMENT
 
 #############################
 # Alert related models

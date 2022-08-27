@@ -5,7 +5,7 @@ import base
 from base.logger import logger_slack
 import sqlalchemy as sa
 from sqlalchemy import func
-from base.models import PortCall, Departure, Arrival, Ship, Port, Shipment
+from base.models import PortCall, Departure, Arrival, Ship, Port, Shipment, Event, ShipmentWithSTS
 
 
 
@@ -25,8 +25,7 @@ def get_departures_with_arrival_too_remote_from_next_departure(min_timedelta,
 
     query = session.query(Departure) \
         .join(subq1, Departure.id == subq1.c.id) \
-        .join(PortCall, PortCall.id == Departure.portcall_id) \
-        .join(Ship, PortCall.ship_imo == Ship.imo) \
+        .join(Ship, Departure.ship_imo == Ship.imo) \
         .join(Port, Departure.port_id == Port.id) \
         .filter((subq1.c.next_date_utc - subq1.c.arrival_date_utc) > min_timedelta)
 
@@ -56,10 +55,10 @@ def get_departures_without_arrival(min_dwt=None, commodities=None,
                                    unlocode=None, port_id=None):
 
     subquery = session.query(Arrival.departure_id).filter(Arrival.departure_id != sa.null())
+
     query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
-        .join(PortCall, PortCall.id == Departure.portcall_id) \
-        .join(Ship, PortCall.ship_imo == Ship.imo) \
-        .join(Port, Departure.port_id == Port.id)
+        .join(Ship, Departure.ship_imo == Ship.imo) \
+        .join(Port, Departure.port_id == Port.id, isouter=True)
 
     if min_dwt is not None:
         query = query.filter(Ship.dwt >= min_dwt)
@@ -115,8 +114,29 @@ def get_dangling_imo_dates():
     subquery = session.query(Arrival.departure_id)
     return session.query(Departure.ship_imo, Departure.date_utc).filter(~Departure.id.in_(subquery)).all()
 
+def update(date_from="2022-01-01"):
 
-def update(date_from="2022-01-01",
+    add(date_from=date_from, commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
+                           base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
+
+    add(date_from=date_from, unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
+                     commodities=base.GENERAL_CARGO)
+
+    # Only keep oil related for India
+    remove(unlocode=['INSIK'],
+                     port_id=114313,
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    remove(port_name='SIKKA ANCH',
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    remove(unlocode=['EGMAH'],
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+    remove(port_name='MERSA EL HAMRA ANCH',
+                     commodities=[base.LNG, base.COAL, base.BULK])
+
+def add(date_from="2022-01-01",
            min_dwt=base.DWT_MIN,
            limit=None,
            commodities=[base.LNG,

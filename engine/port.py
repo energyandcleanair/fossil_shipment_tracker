@@ -44,9 +44,15 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
                 port = ports[0]
                 port.unlocode = unlocode
                 port.marinetraffic_id = marinetraffic_id
-                session.add(port)
-                session.commit()
-                return(port.id)
+                try:
+                    session.add(port)
+                    session.commit()
+                    return(port.id)
+                except sa.exc.IntegrityError as e:
+                    if "psycopg2.errors.UniqueViolation" in str(e):
+                        print("Failed to upload port: duplicated port")
+                    session.rollback()
+                    return None
 
             #TODO Add MT here
 

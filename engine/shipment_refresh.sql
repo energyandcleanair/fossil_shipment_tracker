@@ -6,6 +6,22 @@ WITH completed_departure_portcalls AS (
         LEFT JOIN departure ON shipment.departure_id = departure.id
     WHERE
         shipment.status = 'completed'
+    UNION ALL
+    SELECT
+        departure.portcall_id AS id
+    FROM
+        shipment_with_sts
+        LEFT JOIN departure ON shipment_with_sts.departure_id = departure.id
+    WHERE
+        shipment_with_sts.status = 'completed'
+),
+completed_arrival_portcalls AS (
+    SELECT
+        portcall_id as id
+    FROM
+        arrival
+    WHERE
+        portcall_id IS NOT NULL
 ),
 departure_portcalls AS (
     SELECT
@@ -124,7 +140,9 @@ next_departure_full AS (
             SELECT
                 id
             FROM
-                completed_departure_portcalls)
+                completed_departure_portcalls
+            WHERE
+                id IS NOT NULL)
 ),
 previous_arrival AS (
     SELECT DISTINCT ON (departure_portcall_id,
@@ -145,6 +163,12 @@ previous_arrival AS (
         preva.date_utc <= nextd.nextdeparture_date_utc
         AND preva.move_type = 'arrival'
         AND preva.date_utc > nextd.departure_date_utc
+        AND preva.id NOT IN (
+            SELECT
+                id
+            FROM
+                completed_arrival_portcalls
+        )
         ORDER BY
             departure_portcall_id,
             nextdeparture_portcall_id,
@@ -233,15 +257,15 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
     FROM
         completed_shipments
         LEFT JOIN inserted_departures ON completed_shipments.departure_portcall_id = inserted_departures.portcall_id
-     ON CONFLICT (departure_id)
-        DO UPDATE SET
-            portcall_id = excluded.portcall_id
+     ON CONFLICT
+        DO NOTHING
         RETURNING
             id,
             portcall_id
 ),
 shipments_after_insertion AS (
     SELECT
+        NEXTVAL('flow_id_seq') id,
         departure_portcall_id,
         inserted_departures.id AS departure_id,
         arrival_portcall_id,
@@ -253,8 +277,9 @@ shipments_after_insertion AS (
         LEFT JOIN inserted_arrivals ON shipments.arrival_portcall_id = inserted_arrivals.portcall_id
 ),
 inserted_shipments AS (
-INSERT INTO shipment (departure_id, arrival_id, status)
+INSERT INTO shipment (id, departure_id, arrival_id, status)
     SELECT
+        id,
         departure_id,
         arrival_id,
         status
@@ -276,4 +301,3 @@ INSERT INTO shipment (departure_id, arrival_id, status)
         inserted_shipments
     GROUP BY
         1;
-

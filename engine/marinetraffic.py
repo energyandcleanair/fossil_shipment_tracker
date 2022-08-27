@@ -404,7 +404,7 @@ class Marinetraffic:
                                       date_to,
                                       use_cache=True,
                                       cache_objects=True,
-                                      event_type='21,22'):
+                                      event_type='21'):
         """
 
         Parameters
@@ -428,7 +428,8 @@ class Marinetraffic:
         if use_cache:
             event_filter = lambda x: (imo is not None and str(x["IMO"]) == str(imo)) \
                                     and (dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S") >= date_from) \
-                                    and (dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S") <= date_to)
+                                    and (dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S") <= date_to) \
+                                    and x["EVENT_ID"] in event_type.split(",")
 
             response_datas = cls.get_cached_object(cls.cache_events, event_filter)
 

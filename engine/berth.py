@@ -15,6 +15,7 @@ from base.models import DB_TABLE_BERTH, DB_TABLE_SHIPMENTARRIVALBERTH, DB_TABLE_
 from base.utils import to_list
 from base.utils import update_geometry_from_wkb
 from engine import port
+from engine.shipment import return_combined_shipments
 
 
 def update(shipment_id=None):
@@ -65,13 +66,15 @@ def fill():
 def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance_deg=1):
 
     # Look for shipments to update
-    shipments_to_update = session.query(Shipment.id).filter(Shipment.id.notin_(session.query(ShipmentDepartureBerth.shipment_id)))
+    shipments_all = return_combined_shipments(session)
+
+    shipments_to_update = session.query(shipments_all.c.shipment_id).filter(shipments_all.c.shipment_id.notin_(session.query(ShipmentDepartureBerth.shipment_id)))
 
     if shipment_id is not None:
         shipment_id = to_list(shipment_id)
-        shipments_to_update = shipments_to_update.filter(Shipment.id.in_(shipment_id))
+        shipments_to_update = shipments_to_update.filter(shipments_all.c.shipment_id.in_(shipment_id))
 
-    berths = session.query(Shipment.id,
+    berths = session.query(shipments_all.c.shipment_id,
                            Berth.id,
                            Position.id,
                            Position.date_utc,
@@ -80,14 +83,14 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance
                            Berth.port_unlocode,
                            Departure.port_id,
                            func.ST_distance(Port.geometry, Berth.geometry).label('distance_to_port')) \
-        .filter(Shipment.id.in_(shipments_to_update)) \
+        .filter(shipments_all.c.shipment_id.in_(shipments_to_update)) \
         .filter(sa.or_(
             Position.navigation_status == "Moored",
             Position.speed < 0.5)) \
-        .join(Departure, Shipment.departure_id == Departure.id) \
+        .join(Departure, shipments_all.c.shipment_departure_id == Departure.id) \
         .join(Port, Departure.port_id == Port.id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
-        .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
+        .outerjoin(Arrival, shipments_all.c.shipment_arrival_id == Arrival.id) \
         .join(Berth, func.ST_Contains(Berth.geometry, Position.geometry)) \
         .filter(Position.date_utc >= Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)) \
         .filter(sa.or_(
@@ -95,8 +98,8 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance
                             Position.date_utc <= Departure.date_utc + dt.timedelta(hours=base.BERTH_MAX_HOURS_AFTER_DEPARTURE)),
                     sa.and_(Arrival.date_utc != sa.null(),
                             (Arrival.date_utc - Position.date_utc) > (Position.date_utc - Departure.date_utc)))) \
-        .order_by(Shipment.id, Berth.id, Position.date_utc) \
-        .distinct(Shipment.id, Berth.id, Position.id, Position.date_utc)
+        .order_by(shipments_all.c.shipment_id, Berth.id, Position.date_utc) \
+        .distinct(shipments_all.c.shipment_id, Berth.id, Position.id, Position.date_utc)
 
     berths_df = pd.read_sql(berths.statement, session.bind)
 
@@ -162,12 +165,14 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance
 def detect_arrival_berths(shipment_id=None, min_hours_at_berth=4, max_distance_deg=1):
 
     # Look for shipments to update
-    shipments_to_update = session.query(Shipment.id).filter(Shipment.id.notin_(session.query(ShipmentArrivalBerth.shipment_id)))
+    shipments_all = return_combined_shipments(session)
+
+    shipments_to_update = session.query(shipments_all.c.shipment_id).filter(shipments_all.c.shipment_id.notin_(session.query(ShipmentArrivalBerth.shipment_id)))
 
     if shipment_id is not None:
-        shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))
+        shipments_to_update = shipments_to_update.filter(shipments_all.c.shipment_id.in_(to_list(shipment_id)))
 
-    berths = session.query(Shipment.id,
+    berths = session.query(shipments_all.c.shipment_id,
                            Berth.id,
                            Position.id,
                            Position.date_utc,
@@ -175,20 +180,20 @@ def detect_arrival_berths(shipment_id=None, min_hours_at_berth=4, max_distance_d
                            Berth.port_unlocode,
                            Arrival.port_id,
                            func.ST_distance(Port.geometry, Berth.geometry).label('distance_to_port')) \
-        .filter(Shipment.id.in_(shipments_to_update)) \
+        .filter(shipments_all.c.shipment_id.in_(shipments_to_update)) \
         .filter(sa.or_(
             Position.navigation_status == "Moored",
             Position.speed < 0.5)) \
-        .join(Departure, Shipment.departure_id == Departure.id) \
+        .join(Departure, shipments_all.c.shipment_departure_id == Departure.id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
-        .join(Arrival, Shipment.arrival_id == Arrival.id) \
+        .join(Arrival, shipments_all.c.shipment_arrival_id == Arrival.id) \
         .join(Port, Arrival.port_id == Port.id) \
         .join(Berth, func.ST_Contains(Berth.geometry, Position.geometry)) \
         .filter(Position.date_utc >= Departure.date_utc - dt.timedelta(hours=base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE)) \
         .filter(Position.date_utc <= Arrival.date_utc + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL)) \
         .filter((Arrival.date_utc - Position.date_utc) < (Position.date_utc - Departure.date_utc)) \
-        .order_by(Shipment.id, Berth.id, Position.date_utc) \
-        .distinct(Shipment.id, Berth.id, Position.id, Position.date_utc)
+        .order_by(shipments_all.c.shipment_id, Berth.id, Position.date_utc) \
+        .distinct(shipments_all.c.shipment_id, Berth.id, Position.id, Position.date_utc)
 
 
     berths_df = pd.read_sql(berths.statement, session.bind)

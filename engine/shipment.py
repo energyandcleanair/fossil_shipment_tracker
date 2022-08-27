@@ -1,26 +1,31 @@
 from base.db_utils import execute_statement
 from base.utils import to_list, to_datetime
 from base.logger import logger_slack
-
+from engine import departure
+from sqlalchemy.orm import load_only
+from sqlalchemy.inspection import inspect
+from base.models import Shipment, ShipmentWithSTS
 
 def rebuild(date_from="2022-01-01"):
     logger_slack.info("=== Shipment rebuild ===")
     with open('engine/shipment_rebuild.sql', 'r') as file:
-        sql_content1 = file.read()
-    with open('engine/shipment_refresh.sql', 'r') as file:
-        sql_content2 = file.read()
+        sql_rebuild = file.read()
 
-    sql_content = sql_content1 + sql_content2
-    sql_content = sql_content.replace("date_utc >= '2022-01-01'",
-                                      "date_utc >= '%s'" % (to_datetime(date_from).strftime('%Y-%m-%d')))
-    execute_statement(sql_content, print_result=True)
+    execute_statement(sql_rebuild, print_result=True)
 
+    departure.update()
+
+    update(date_from=date_from)
 
 def update(date_from="2022-01-01"):
     logger_slack.info("=== Shipment update ===")
 
-    with open('engine/shipment_refresh.sql', 'r') as file:
+    with open('engine/shipment_refresh_sts.sql', 'r') as file:
         sql_content = file.read()
+
+    with open('engine/shipment_refresh.sql', 'r') as file:
+        sql_content += file.read()
+
     sql_content = sql_content.replace("date_utc >= '2021-11-01'",
                                       "date_utc >= '%s'" % (to_datetime(date_from).strftime('%Y-%m-%d')))
     execute_statement(sql_content, print_result=True)
@@ -59,3 +64,21 @@ def update(date_from="2022-01-01"):
     #     session.add(new_shipment)
     # session.commit()
 
+def return_combined_shipments(session, columns=None):
+    """
+    Combine sts and non sts shipment tables and return the union subquery
+
+    :param session:
+    :param columns:
+    :return:
+    """
+    if not columns:
+        columns = [column.name for column in inspect(Shipment).c]
+
+    non_sts_shipments = session.query(Shipment) \
+        .options(load_only(*columns))
+
+    sts_shipments = session.query(ShipmentWithSTS) \
+        .options(load_only(*columns))
+
+    return non_sts_shipments.union(sts_shipments).subquery()

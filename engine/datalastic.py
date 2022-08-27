@@ -2,6 +2,7 @@ import requests
 import json
 import datetime as dt
 
+import base
 from base.utils import latlon_to_point
 from base.utils import to_datetime
 from base.env import get_env
@@ -47,7 +48,7 @@ class Datalastic:
             json.dump(cls.cache_ships, outfile)
 
     @classmethod
-    def find_ship(cls, name, fuzzy=True, return_closest=True):
+    def find_ship(cls, name, dwt_min = base.DWT_MIN, fuzzy=True, return_closest=1):
         """
         Find ship based on name from datalastic API
 
@@ -82,6 +83,8 @@ class Datalastic:
         # solution for now is to only add when used
         if fuzzy:
             params['fuzzy'] = 1
+        if dwt_min:
+            params['deadweight_min'] = dwt_min
 
         method = 'vessel_find'
         api_result = requests.get(Datalastic.api_base + method, params, verify=False)
@@ -97,19 +100,21 @@ class Datalastic:
 
         if len(response_data) == 1:
             logger.debug("Only 1 vessel found matching name %s (no need to compare strings)" % (name,))
-            return cls.parse_ship_data(response_data[0])
+            return [cls.parse_ship_data(response_data[0])]
 
         else:
             if not return_closest:
                 # return first match
-                return cls.parse_ship_data(response_data[0])
+                return [cls.parse_ship_data(response_data[0])]
 
             ratios = np.array([SequenceMatcher(None, s["name"], name).ratio() for s in response_data])
             if max(ratios) > 0.90:
                 print("Best match: %s == %s (%f)" % (name, response_data[ratios.argmax()]["name"], ratios.max()))
-                found_and_filtered = response_data[ratios.argmax()]
-                if found_and_filtered:
-                    return cls.parse_ship_data(found_and_filtered)
+
+                sorted_response = [s for _, s in sorted(zip(ratios, response_data), key=lambda pair: pair[0], reverse=True)]
+
+                if sorted_response:
+                    return [cls.parse_ship_data(s) for s in sorted_response[0:return_closest]]
             else:
                 print("No matches close enough")
                 return None
@@ -186,7 +191,7 @@ class Datalastic:
         return Ship(**data)
 
     @classmethod
-    def get_position(cls, imo, date, window=1):
+    def get_position(cls, imo, date, window=72):
         """
         Returns the position of the boat at the closest referenced time in datalastic
 
@@ -202,8 +207,8 @@ class Datalastic:
         """
         date = to_datetime(date)
 
-        date_from = (date - dt.timedelta(days=window)).strftime("%Y-%m-%d")
-        date_to = (date + dt.timedelta(days=window)).strftime("%Y-%m-%d")
+        date_from = (date - dt.timedelta(hours=window)).strftime("%Y-%m-%d")
+        date_to = (date + dt.timedelta(hours=window)).strftime("%Y-%m-%d")
 
         print(date_from, date_to)
         positions = cls.get_positions(imo, date_from=date_from, date_to=date_to)

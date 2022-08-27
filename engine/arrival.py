@@ -7,7 +7,7 @@ from engine import departure
 from engine import portcall
 from base.logger import logger, logger_slack
 from base.db import session
-from base.models import Arrival, Shipment, Port, PortCall, Departure, ShipmentArrivalBerth, Trajectory
+from base.models import Arrival, Shipment, Port, PortCall, Departure, ShipmentArrivalBerth, Trajectory, ShipmentWithSTS
 
 
 def get_dangling_arrivals():
@@ -41,7 +41,9 @@ def update(min_dwt=base.DWT_MIN,
 
     if not include_undetected_arrival_shipments:
         undetected_arrival_departures = session.query(Shipment.departure_id) \
-            .filter(Shipment.status == base.UNDETECTED_ARRIVAL).all()
+            .filter(Shipment.status == base.UNDETECTED_ARRIVAL) \
+                .union(session.query(ShipmentWithSTS.departure_id) \
+            .filter(ShipmentWithSTS.status == base.UNDETECTED_ARRIVAL)).all()
         dangling_departures = [x for x in dangling_departures if x.id not in
                                [y[0] for y in undetected_arrival_departures]]
 
@@ -73,49 +75,51 @@ def update(min_dwt=base.DWT_MIN,
     # dangling_departures.sort(key=lambda x: x.date_utc, reverse=True)
 
     for d in tqdm(dangling_departures):
-        departure_portcall = PortCall.query.filter(PortCall.id == d.portcall_id).first()
-        imo = departure_portcall.ship_imo
-        arrival_portcall = portcall.find_arrival(departure_portcall=departure_portcall,
+        arrival_portcall = portcall.find_arrival(departure=d,
                                                  cache_only=cache_only)
 
         # We don't create the arrival here anymore, using sql to do so.
         # The call above is useful though to keep looking for required portcalls
+        '''
+        if arrival_portcall:
 
-        # if arrival_portcall:
-        #
-        #     existing_arrival = Arrival.query.filter(Arrival.departure_id == d.id).first()
-        #     if existing_arrival is not None and existing_arrival.portcall_id != arrival_portcall.id:
-        #         # Update
-        #         existing_arrival.date_utc = arrival_portcall.date_utc
-        #         existing_arrival.port_id = arrival_portcall.port_id
-        #         existing_arrival.portcall_id = arrival_portcall.id
-        #         existing_arrival.method_id = "python"
-        #         session.commit()
-        #
-        #         # And remove associated trajectories, berths etc
-        #         existing_shipment = Shipment.query.filter(Shipment.departure_id == d.id).first()
-        #         if existing_shipment is not None:
-        #             session.query(ShipmentArrivalBerth).filter(ShipmentArrivalBerth.shipment_id == existing_shipment.id).delete()
-        #             session.query(Trajectory).filter(Trajectory.shipment_id == existing_shipment.id).delete()
-        #
-        #         session.commit()
-        #
-        #     else:
-        #         # There was no such arrival
-        #         data = {
-        #             "departure_id": d.id,
-        #             "method_id": "python",
-        #             "date_utc": arrival_portcall.date_utc,
-        #             "port_id": arrival_portcall.port_id,
-        #             "portcall_id": arrival_portcall.id
-        #         }
-        #         arrival = Arrival(**data)
-        #         session.add(arrival)
-        #         try:
-        #             session.commit()
-        #         except sqlalchemy.exc.IntegrityError:
-        #             logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
-        #             session.rollback()
-        # else:
-        #     logger.debug(
-        #         "No relevant arrival found. Should check portcalls for imo %s from date %s." % (imo, d.date_utc))
+            existing_arrival = Arrival.query.filter(Arrival.departure_id == d.id).first()
+            if existing_arrival is not None and existing_arrival.portcall_id != arrival_portcall.id:
+                # Update
+                existing_arrival.date_utc = arrival_portcall.date_utc
+                existing_arrival.port_id = arrival_portcall.port_id
+                existing_arrival.portcall_id = arrival_portcall.id
+                existing_arrival.method_id = "python"
+                session.commit()
+
+                # And remove associated trajectories, berths etc
+                non_sts_shipment = Shipment.query.filter(Shipment.departure_id == d.id).first()
+                existing_shipment = non_sts_shipment if non_sts_shipment else ShipmentWithSTS.query.filter(ShipmentWithSTS.departure_id == d.id).first()
+
+                if existing_shipment is not None:
+                    session.query(ShipmentArrivalBerth).filter(ShipmentArrivalBerth.shipment_id == existing_shipment.id).delete()
+                    session.query(Trajectory).filter(Trajectory.shipment_id == existing_shipment.id).delete()
+
+                session.commit()
+
+            else:
+                # There was no such arrival
+                data = {
+                    "departure_id": d.id,
+                    "method_id": "python",
+                    "date_utc": arrival_portcall.date_utc,
+                    "port_id": arrival_portcall.port_id,
+                    "portcall_id": arrival_portcall.id
+                }
+                arrival = Arrival(**data)
+                session.add(arrival)
+                try:
+                    session.commit()
+                except sqlalchemy.exc.IntegrityError:
+                    logger.warning("Failed to push portcall. Probably missing port_id: %s" % (arrival.port_id,))
+                    session.rollback()
+
+        else:
+            logger.debug(
+                "No relevant arrival found. Should check portcalls for departure %s from date %s." % (d, d.date_utc))
+        '''

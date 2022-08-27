@@ -14,37 +14,22 @@ from engine import counter
 from engine import entsog
 from engine import alert
 from engine import company
+from engine import mtevents
+import integrity
 import base
 
 import datetime as dt
 
 
 def update():
+    integrity.check()
     portcall.update_departures_from_russia()
     ship.update()
-    departure.update(commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
-                           base.OIL_OR_CHEMICAL, base.COAL, base.BULK])
-
-    departure.update(unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
-                     commodities=base.GENERAL_CARGO)
-
-    # Only keep oil related for Sikka (India) and MERSA EL HAMRA (Egypt)
-    departure.remove(unlocode=['INSIK'],
-                     port_id=114313,
-                     commodities=[base.LNG, base.COAL, base.BULK])
-
-    departure.remove(port_name='SIKKA ANCH',
-                     commodities=[base.LNG, base.COAL, base.BULK])
-
-    departure.remove(unlocode=['EGMAH'],
-                     commodities=[base.LNG, base.COAL, base.BULK])
-
-    departure.remove(port_name='MERSA EL HAMRA ANCH',
-                     commodities=[base.LNG, base.COAL, base.BULK])
-
+    departure.update()
     arrival.update(date_from = dt.date.today() - dt.timedelta(days=90))
     currency.update()
     company.update()
+    mtevents.update()
     shipment.update()
     position.update()
     destination.update()
@@ -54,6 +39,7 @@ def update():
     trajectory.update()
     alert.update()
     counter.update()
+    integrity.check()
     return
 
 

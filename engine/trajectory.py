@@ -19,7 +19,7 @@ import numpy as np
 
 
 import base
-from base.models import Position, Trajectory, Shipment, Departure, Arrival, Ship, ShipmentArrivalBerth, ShipmentDepartureBerth
+from base.models import Position, Trajectory, Shipment, Departure, Arrival, Ship, ShipmentArrivalBerth, ShipmentDepartureBerth, ShipmentWithSTS
 from engine import position
 from base.db import session
 from base.db import engine
@@ -30,6 +30,7 @@ from base.models import DB_TABLE_TRAJECTORY
 import pandas as pd
 import geopandas as gpd
 from geoalchemy2 import Geometry
+from engine.shipment import return_combined_shipments
 
 
 def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.001, extend_beyond=False):
@@ -40,7 +41,9 @@ def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.0
     buffer_before_hours = base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE if extend_beyond else 0
     buffer_after_hours = base.QUERY_POSITION_HOURS_AFTER_ARRIVAL if extend_beyond else 0
 
-    shipments_to_update = session.query(Shipment.id.label('shipment_id'),
+    shipments_all = return_combined_shipments(session)
+
+    shipments_to_update = session.query(shipments_all.c.shipment_id,
                                     sa.func.greatest(
                                         Departure.date_utc - dt.timedelta(hours=buffer_before_hours),
                                         DepartureBerthPosition.date_utc
@@ -52,20 +55,20 @@ def update(shipment_id=None, rebuild_all=False, do_cluster=True, cluster_deg=0.0
                                     ).label('arrival_date'),
                                     Trajectory.shipment_id
                                     ) \
-        .outerjoin(Trajectory, Trajectory.shipment_id == Shipment.id) \
-        .join(Departure, Shipment.departure_id == Departure.id) \
-        .outerjoin(Arrival, Shipment.arrival_id == Arrival.id) \
-        .outerjoin(ShipmentDepartureBerth, ShipmentDepartureBerth.shipment_id == Shipment.id) \
-        .outerjoin(ShipmentArrivalBerth, ShipmentArrivalBerth.shipment_id == Shipment.id) \
+        .outerjoin(Trajectory, Trajectory.shipment_id == shipments_all.c.shipment_id) \
+        .join(Departure, shipments_all.c.shipment_departure_id == Departure.id) \
+        .outerjoin(Arrival, shipments_all.c.shipment_arrival_id == Arrival.id) \
+        .outerjoin(ShipmentDepartureBerth, ShipmentDepartureBerth.shipment_id == shipments_all.c.shipment_id) \
+        .outerjoin(ShipmentArrivalBerth, ShipmentArrivalBerth.shipment_id == shipments_all.c.shipment_id) \
         .outerjoin(DepartureBerthPosition, DepartureBerthPosition.id == ShipmentDepartureBerth.position_id) \
         .outerjoin(ArrivalBerthPosition, ArrivalBerthPosition.id == ShipmentArrivalBerth.position_id) \
         .filter(sa.or_(rebuild_all,
                        Trajectory.shipment_id.is_(None),
                        Trajectory.geometry.is_(None)),
-                Shipment.status.in_([base.COMPLETED, base.ONGOING]))
+                shipments_all.c.shipment_status.in_([base.COMPLETED, base.ONGOING]))
 
     if shipment_id is not None:
-        shipments_to_update = shipments_to_update.filter(Shipment.id.in_(to_list(shipment_id)))
+        shipments_to_update = shipments_to_update.filter(shipments_all.c.shipment_id.in_(to_list(shipment_id)))
 
     shipments_to_update = shipments_to_update.subquery()
     ordered_positions = session.query(shipments_to_update.c.shipment_id,
