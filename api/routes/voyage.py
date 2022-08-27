@@ -927,10 +927,10 @@ class VoyageResource(Resource):
                 status=200,
                 mimetype='application/json')
 
-        if format == "geojson":
+        if format in ["geojson", "kml"]:
             if aggregate_by is not None:
                 return Response(
-                    response="Cannot query geojson with aggregation.",
+                    response="Cannot query geojson or kml with aggregation.",
                     status=HTTPStatus.BAD_REQUEST,
                     mimetype='application/json')
 
@@ -945,32 +945,48 @@ class VoyageResource(Resource):
                 trajectories_df["geometry"] = trajectories_df.geometry_routed.combine_first(trajectories_df.geometry)
 
             trajectories_df.drop(["geometry_routed"], axis=1)
-
-
             trajectories_df = update_geometry_from_wkb(trajectories_df)
 
             result_gdf = gpd.GeoDataFrame(trajectories_df[["shipment_id", "geometry"]].rename(columns={'shipment_id': 'id'}),
                                           geometry='geometry') \
                             .merge(result)
-            result_geojson = result_gdf.to_json(cls=JsonEncoder)
 
-            if nest_in_data:
-                resp_content = '{"data": ' + result_geojson + '}'
-            else:
-                resp_content = result_geojson
+            if format == 'geojson':
+                result_geojson = result_gdf.to_json(cls=JsonEncoder)
 
-            if download:
-                headers = {"Content-disposition":
-                               "attachment; filename=voyages.geojson"}
-            else:
-                headers = {}
+                if nest_in_data:
+                    resp_content = '{"data": ' + result_geojson + '}'
+                else:
+                    resp_content = result_geojson
 
-            return Response(
-                response=resp_content,
-                status=200,
-                mimetype='application/json',
-                headers=headers)
+                if download:
+                    headers = {"Content-disposition":
+                                   "attachment; filename=voyages.geojson"}
+                else:
+                    headers = {}
 
-        return Response(response="Unknown format. Should be either csv, json or geojson",
+                return Response(
+                    response=resp_content,
+                    status=200,
+                    mimetype='application/json',
+                    headers=headers)
+
+            if format == 'kml':
+                import fiona
+                import io
+                fiona.supported_drivers['KML'] = 'rw'
+                file_kml = io.BytesIO()
+
+                result_gdf.to_file(file_kml, driver='KML')
+                headers = {"Content-disposition": "attachment; filename=trajectories.kml"}
+                file_kml.seek(0)
+                return Response(
+                    response=file_kml,
+                    status=200,
+                    mimetype='application/kml',
+                    headers=headers)
+
+
+        return Response(response="Unknown format. Should be either csv, json, geojson or kml",
                         status=HTTPStatus.BAD_REQUEST,
                         mimetype='application/json')
