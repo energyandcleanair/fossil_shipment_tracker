@@ -307,6 +307,7 @@ def test_counter_against_voyage(app):
 
         counter1 == counter2
 
+
 def test_pricing_gt0(app):
     with app.test_client() as test_client:
         response = test_client.get('/v0/counter')

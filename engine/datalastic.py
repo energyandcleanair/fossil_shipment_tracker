@@ -372,6 +372,14 @@ class Datalastic:
                 "lon": 35.83174,
                 "uuid": None,
                 "unlocode": None
+            },
+            "258": {
+                "port_name": name,
+                "country_iso": "BR",
+                "lat": -12.75194,
+                "lon": -38.62173,
+                "uuid": None,
+                "unlocode": 'BRMDD'
             }
         }
         if marinetraffic_id in manual_matches:
