@@ -296,7 +296,7 @@ def test_counter_against_voyage(app):
         voyage_df = pd.DataFrame(data)
 
         counter2 = pd.concat([
-            voyage_df.loc[(voyage_df.arrival_date_utc>='2022-02-24')&(voyage_df.departure_iso2=='RU')][['destination_region', 'commodity_group','value_eur']],
+            voyage_df.loc[(voyage_df.arrival_date_utc>='2022-02-24') & (voyage_df.departure_iso2=='RU')][['destination_region', 'commodity_group','value_eur']],
             pipeline_df.loc[(pipeline_df.date >= '2022-02-24') &
                             (pipeline_df.departure_iso2.isin(['TR','RU','BY']))][['destination_region', 'commodity_group', 'value_eur']]]) \
         .groupby(['destination_region', 'commodity_group']) \
@@ -305,7 +305,7 @@ def test_counter_against_voyage(app):
         counter1 = counter_df.groupby(['destination_region', 'commodity_group']) \
         .agg(value_eur=('value_eur', lambda x: np.nansum(x)/1e9))
 
-        counter1==counter2
+        counter1 == counter2
 
 def test_pricing_gt0(app):
     with app.test_client() as test_client:

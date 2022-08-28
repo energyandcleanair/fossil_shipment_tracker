@@ -286,8 +286,7 @@ class VoyageResource(Resource):
             else_=DeparturePort.iso2
         ).label('departure_iso2')
 
-        destination_iso2_field = func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2) \
-                                     .label('destination_iso2')
+
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
@@ -355,7 +354,6 @@ class VoyageResource(Resource):
         shipments_combined = shipments_non_sts.union(shipments_sts_with_arrival).subquery()
 
         # generate commodity destination field now, after combining shipment tables
-
         commodity_destination_iso2_field = case(
             # Lauri: My heuristic is that all tankers that discharge cargo
             # in Yeosu but don't go to one of the identified berths are s2s
@@ -378,6 +376,11 @@ class VoyageResource(Resource):
             ],
             else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
         ).label('commodity_destination_iso2')
+
+        destination_iso2_field = case(
+            [(shipments_combined.c.shipment_status == base.COMPLETED, ArrivalPort.iso2)],
+            else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2)
+        ).label('destination_iso2')
 
         commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
 
