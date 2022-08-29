@@ -21,3 +21,5 @@ from .price import *
 from .entsogflow import *
 from .commodity import *
 from .alert import *
+
+from .charts import *

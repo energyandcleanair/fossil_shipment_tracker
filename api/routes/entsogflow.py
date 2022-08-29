@@ -258,6 +258,7 @@ class EntsogFlowResource(Resource):
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
+            'type': [subquery.c.type],
             'currency': [subquery.c.currency],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
@@ -271,6 +272,7 @@ class EntsogFlowResource(Resource):
                                     subquery.c.departure_region],
             'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country,
                                   subquery.c.departure_region],
+            'departure_region': [subquery.c.departure_region],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region]
