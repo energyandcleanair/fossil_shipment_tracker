@@ -1,1 +1,1 @@
-from .gas_consumption import *
+from .eu_gas_consumption import *

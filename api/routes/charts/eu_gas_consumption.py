@@ -34,8 +34,8 @@ import base
 from engine.commodity import get_subquery as get_commodity_subquery
 
 
-@routes_api.route('/v0/chart/gas_consumption', strict_slashes=False)
-class ChartGasConsumption(Resource):
+@routes_api.route('/v0/chart/eu_gas_consumption', strict_slashes=False)
+class ChartEUGasConsumption(Resource):
 
     parser = reqparse.RequestParser()
     parser.add_argument('date_from', type=str, help='start date for counter data (format 2020-01-15)',
@@ -52,7 +52,7 @@ class ChartGasConsumption(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-        params = ChartGasConsumption.parser.parse_args()
+        params = ChartEUGasConsumption.parser.parse_args()
         date_from = params.get("date_from")
         rolling_days = params.get("rolling_days")
         format = params.get("format")
