@@ -144,6 +144,9 @@ class VoyageResource(Resource):
     # Misc
     parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
                         required=False, default=None)
+    parser.add_argument('limit_by', action='split',
+                        help='in which group do you want to limit to n records',
+                        required=False, default=None)
     parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
                         required=False, action='split', default=None)
     parser.add_argument('select', type=str,
@@ -193,6 +196,7 @@ class VoyageResource(Resource):
         currency = params.get("currency")
         sort_by = params.get("sort_by")
         limit = params.get("limit")
+        limit_by = params.get("limit_by")
         pivot_by = params.get("pivot_by")
         pivot_value = params.get("pivot_value")
         select = params.get("select")
@@ -656,8 +660,11 @@ class VoyageResource(Resource):
         result = self.sort_result(result=result, sort_by=sort_by)
 
         # Keep only n records
-        if limit:
-            result = result[:limit]
+        result = self.limit_result(result=result,
+                                    limit=limit,
+                                    aggregate_by=aggregate_by,
+                                    sort_by=sort_by,
+                                    limit_by=limit_by)
 
         # Pivot
         result = self.pivot_result(result=result, pivot_by=pivot_by, pivot_value=pivot_value)
@@ -733,10 +740,9 @@ class VoyageResource(Resource):
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region],
 
+
             'arrival_berth_owner': [subquery.c.arrival_berth_owner],
 
-            'arrival_port': [subquery.c.arrival_port_id, subquery.c.arrival_port_name],
-            'departure_port': [subquery.c.departure_port_id, subquery.c.departure_port_name],
 
             'ship_insurer': [subquery.c.ship_insurer, subquery.c.ship_insurer_imo, subquery.c.ship_insurer_country, subquery.c.ship_insurer_iso2, subquery.c.ship_insurer_region],
             'ship_manager': [subquery.c.ship_manager, subquery.c.ship_manager_imo, subquery.c.ship_manager_country, subquery.c.ship_manager_iso2, subquery.c.ship_manager_region],
@@ -908,6 +914,46 @@ class VoyageResource(Resource):
                     by.append(s)
 
             result.sort_values(by=by, ascending=ascending, inplace=True)
+
+        return result
+
+
+    def limit_result(self, result, limit, aggregate_by, sort_by, limit_by):
+
+        if not limit:
+            return result
+
+        limit_by = to_list(limit_by) or []
+
+        if not aggregate_by:
+            group_by = ['destination_country']
+
+        if aggregate_by:
+            group_by = [x for x in aggregate_by \
+                        if not x.startswith('commodity') \
+                        and not x in ['arrival_date', 'arrival_month', 'arrival_year',
+                                      'departure_date', 'departure_month', 'departure_year',
+                                      'date', 'month', 'year'] \
+                        and x in result.columns]
+
+        sort_by = sort_by or 'value_eur'
+        group_by = group_by + [x for x in limit_by if x not in group_by]
+
+        # Can only take one
+        sort_by = to_list(sort_by)[0]
+        top = result.groupby(group_by) \
+            .agg({sort_by: 'sum'}) \
+            .reset_index() \
+            .sort_values(limit_by + to_list(sort_by), ascending=False)
+
+        if limit_by:
+            top = top.groupby(limit_by, as_index=False)
+
+        top = top \
+            .head(limit) \
+            .drop(sort_by, axis=1)
+
+        result = pd.merge(result, top, how='inner')
 
         return result
 
