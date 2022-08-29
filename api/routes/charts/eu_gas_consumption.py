@@ -40,6 +40,9 @@ class ChartEUGasConsumption(Resource):
     parser = reqparse.RequestParser()
     parser.add_argument('date_from', type=str, help='start date for counter data (format 2020-01-15)',
                         default="2021-01-01", required=False)
+    parser.add_argument('date_to', type=str, help='start date for counter data (format 2020-01-15)',
+                        default=-7,
+                        required=False)
     parser.add_argument('rolling_days', type=int,
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=7)
@@ -54,6 +57,7 @@ class ChartEUGasConsumption(Resource):
     def get(self):
         params = ChartEUGasConsumption.parser.parse_args()
         date_from = params.get("date_from")
+        date_to = params.get("date_to")
         rolling_days = params.get("rolling_days")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
@@ -106,9 +110,23 @@ class ChartEUGasConsumption(Resource):
                  columns='type',
                  values='value_m3').reset_index()
 
-        wide['storage_drawdown'] = wide.storage_entry - wide.storage_exit
-        wide['imports'] = wide.crossborder_in - wide.crossborder_out
-        wide['implied_consumption'] = wide.imports + wide.production + wide.storage_drawdown
+        storage_drawdown = 'Storage drawdown'
+        imports = 'Imports'
+        implied_consumption = 'Implied consumption'
+        production = 'Production'
+
+        wide['date'] = pd.to_datetime(wide.date).dt.date
+        wide[storage_drawdown] = wide.storage_entry - wide.storage_exit
+        wide[production] = wide.production
+        wide[imports] = wide.crossborder_in - wide.crossborder_out
+        wide[implied_consumption] = wide[imports] + wide.production + wide[storage_drawdown]
+
+        if date_from:
+            wide = wide[wide.date >=pd.to_datetime(to_datetime(date_from))]
+
+        if date_to:
+            wide = wide[wide.date <= pd.to_datetime(to_datetime(date_to))]
+
 
         return self.build_response(result=wide,
                                    format=format,
