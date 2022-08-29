@@ -2,16 +2,16 @@ from base.db import session, check_if_table_exists
 from base.models import Trajectory, ShipmentWithSTS, Shipment, ShipmentArrivalBerth, ShipmentDepartureBerth, Departure, Arrival
 from api.tests import test_counter
 from app import app
-from base.logger import logger
+from base.logger import logger, logger_slack
 
 def check():
 
-    logger.info("Checking integrity: shipment, portcall and berth relationship.")
+    logger_slack.info("Checking integrity: shipment, portcall and berth relationship.")
     test_shipment_table()
     test_portcall_relationship()
     test_berths()
 
-    logger.info("Checkin integrity: counter, voyage and pricing")
+    logger_slack.info("Checkin integrity: counter, voyage and pricing")
     test_counter.test_counter_against_voyage(app)
     test_counter.test_pricing_gt0(app)
 def test_shipment_table():
