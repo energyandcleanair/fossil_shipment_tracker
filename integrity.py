@@ -11,7 +11,7 @@ def check():
     test_portcall_relationship()
     test_berths()
 
-    logger_slack.info("Checkin integrity: counter, voyage and pricing")
+    logger_slack.info("Checking integrity: counter, voyage and pricing")
     test_counter.test_counter_against_voyage(app)
     test_counter.test_pricing_gt0(app)
 def test_shipment_table():
