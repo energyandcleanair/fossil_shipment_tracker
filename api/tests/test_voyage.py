@@ -122,6 +122,19 @@ def test_kazak_oil(app):
                     data_df.commodity == 'crude_oil')].commodity_origin_iso2.unique().tolist() == ['KZ']
 
 
+def test_voyage_sts(app):
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+
+        params = {"format": "json",
+                  "is_sts": "True",
+                  "currency":"EUR",
+                  "aggregate_by":"event_month"}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+
+        df = pd.DataFrame(data)
 
 def test_voyage(app):
 

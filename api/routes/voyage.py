@@ -45,6 +45,8 @@ class VoyageResource(Resource):
                         default=None, action='split', required=False)
     parser.add_argument('status', help='status of shipments. Could be any or several of completed, ongoing, undetected_arrival. Default: returns all of them',
                         default=None, action='split', required=False)
+    parser.add_argument('is_sts', help='denotes whether a shipment has had sts. Can be either True or False. Default: returns both',
+                        default=None, required=False)
     parser.add_argument('date_from', help='start date for departure or arrival (format 2020-01-15)',
                         default=None, required=False)
     parser.add_argument('departure_date_from', help='start date for departure (format 2020-01-15)',
@@ -162,6 +164,7 @@ class VoyageResource(Resource):
         id = params.get("id")
         commodity = params.get("commodity")
         status = params.get("status")
+        is_sts = params.get("is_sts")
         date_from = params.get("date_from")
         departure_date_from = params.get("departure_date_from")
         arrival_date_from = params.get("arrival_date_from")
@@ -336,10 +339,12 @@ class VoyageResource(Resource):
                 else_=1.0
             ).label('weight'),
             sa.sql.expression.literal_column('True').label('is_sts'),
-            ArrivalShip
+            ArrivalShip,
+            Event.date_utc.label("event_date_utc")
         ) \
         .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
         .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
+        .outerjoin(Event, Event.id == Arrival.event_id) \
         .outerjoin(shipment_sts_departures, shipment_sts_departures.c.departure_event_id == Arrival.event_id) \
         .outerjoin(shipment_sts_weights, shipment_sts_weights.c.id == ShipmentWithSTS.id) \
         .outerjoin(ArrivalShip, ArrivalShip.imo == shipment_sts_weights.c.imo) \
@@ -350,7 +355,8 @@ class VoyageResource(Resource):
             sa.sql.expression.literal_column('1.0').label('weight'),
             sa.sql.expression.literal_column('False').label('is_sts'),
             # Arrival ship is the same as departure ship for non sts shipments, so we just add this in so we can union
-            Ship
+            Ship,
+            sa.null().label('event_date_utc')
         ) \
         .join(Departure, Departure.id == Shipment.departure_id) \
         .join(Ship, Ship.imo == Departure.ship_imo)
@@ -391,7 +397,10 @@ class VoyageResource(Resource):
         # Query with joined information
         shipments_rich = (session.query(shipments_combined.c.shipment_id.distinct().label('id'), # Potential introducers of duplicates: ShipinOwner, Insurer etc.
                                         shipments_combined.c.shipment_status.label('status'),
-                                        shipments_combined.c.is_sts,
+
+                                    # STS related columns
+                                    shipments_combined.c.is_sts,
+                                    shipments_combined.c.event_date_utc,
 
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
@@ -561,6 +570,9 @@ class VoyageResource(Resource):
         if status is not None:
             shipments_rich = shipments_rich.filter(shipments_combined.c.shipment_status.in_(status))
 
+        if is_sts is not None:
+            shipments_rich = shipments_rich.filter(shipments_combined.c.is_sts == is_sts)
+
         if date_from is not None:
             shipments_rich = shipments_rich.filter(
                 sa.or_(
@@ -716,6 +728,12 @@ class VoyageResource(Resource):
             'commodity_destination_region': [subquery.c.commodity_destination_region],
 
             'status': [subquery.c.status],
+            'is_sts': [subquery.c.is_sts],
+
+            # we can aggregate by the date of the STS event
+            'event_date' : [func.date_trunc('day', subquery.c.event_date_utc).label("event_date")],
+            'event_month': [func.date_trunc('month', subquery.c.event_date_utc).label("event_month")],
+            'event_year': [func.date_trunc('year', subquery.c.event_date_utc).label("event_year")],
 
             'date': [func.date_trunc('day', subquery.c.departure_date_utc).label("departure_date")],
             'month': [func.date_trunc('month', subquery.c.departure_date_utc).label("departure_month")],
