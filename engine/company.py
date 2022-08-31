@@ -166,7 +166,6 @@ def fill_country():
     def fill_using_name_regexps():
         name_regexps = {
             'BM': ['\(Bermuda\)$'],
-            'NO': ['Norway$'],
             'GB': ['Britannia Steamship insurance Association Ld',
                    'North of England P&I Association',
                    'UK P&I Club',
@@ -175,7 +174,7 @@ def fill_country():
                    'Standard P&I Club per Charles Taylor & Co'],
             'LU': ['The Ship owners\' Mutual P&I Association \(Luxembourg\)'],
             'JP': ['Japan Ship Owners\' P&I Association'],
-            'NO': ['^Hydor AS$'],
+            'NO': ['Norway$', '^Hydor AS$'],
             'SE': ['\(Swedish Club\)$'],
             'US': ['American Steamship Owner P&I association$'],
             'NL': ['Noord Nederlandsche P&I Club$'],
