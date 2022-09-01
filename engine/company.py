@@ -150,6 +150,9 @@ def fill_country():
         execute_statement(update)
 
     def fill_using_address_regexps():
+        """Using address to estimate country_iso2
+        which might be different from registration_country_iso2
+        """
         address_regexps = {
             'US': ['USA[\.]?$'],
             'SG': ['Singapore [0-9]*$'],
@@ -157,6 +160,7 @@ def fill_country():
             'HK': ['Hong Kong, China[\.]?[\w]*[0-9]*'],
             'PT': ['Madeira[\.]?$']
         }
+
         for key, regexps in address_regexps.items():
             condition = sa.or_(*[Company.address.op('~')(regexp) for regexp in regexps])
             update = Company.__table__.update().values(country_iso2=key) \
@@ -164,6 +168,10 @@ def fill_country():
             execute_statement(update)
 
     def fill_using_name_regexps():
+        """
+        This is for insurers. Assuming country == registration_country
+        :return:
+        """
         name_regexps = {
             'BM': ['\(Bermuda\)$'],
             'GB': ['Britannia Steamship insurance Association Ld',
@@ -185,9 +193,11 @@ def fill_country():
             condition = sa.and_(
                 Company.address == sa.null(),
                 sa.or_(*[Company.name.op('~')(regexp) for regexp in regexps]))
-            update = Company.__table__.update().values(country_iso2=key) \
+            update = Company.__table__.update().values(country_iso2=key,
+                                                       registration_country_iso2=key) \
                 .where(condition)
             execute_statement(update)
+
 
     def remove_care_of():
         to_remove = ['^Care of']
@@ -197,16 +207,19 @@ def fill_country():
             .where(condition)
         execute_statement(update)
 
+
     def fill_using_file():
+        """ Manual listing of companies registriation countries
+        """
         companies_df = pd.read_csv("assets/companies.csv", dtype={'imo': str})
-        companies_df = companies_df.dropna(subset=['imo','iso2'])
-        imo_country = dict(zip(companies_df.imo, companies_df.iso2))
+        companies_df = companies_df.dropna(subset=['imo', 'registration_iso2'])
+        imo_country = dict(zip(companies_df.imo, companies_df.registration_iso2))
         from sqlalchemy.sql import case
 
         session.query(Company).filter(
             Company.imo.in_(imo_country)
         ).update({
-            Company.country_iso2: case(
+            Company.registration_country_iso2: case(
                 imo_country,
                 value=Company.imo,
             )
@@ -216,15 +229,15 @@ def fill_country():
         # For those without imo
         companies_df = pd.read_csv("assets/companies.csv", dtype={'imo': str})
         companies_df = companies_df[pd.isna(companies_df.imo)]
-        companies_df = companies_df.dropna(subset=['name', 'iso2'])
-        name_country = dict(zip(companies_df.name, companies_df.iso2))
+        companies_df = companies_df.dropna(subset=['name', 'registration_iso2'])
+        name_country = dict(zip(companies_df.name, companies_df.registration_iso2))
         from sqlalchemy.sql import case
 
         session.query(Company).filter(
             Company.name.in_(name_country),
             Company.imo == sa.null()
         ).update({
-            Company.country_iso2: case(
+            Company.registration_country_iso2: case(
                 name_country,
                 value=Company.name,
             )
@@ -234,7 +247,7 @@ def fill_country():
     fill_using_country_ending()
     fill_using_address_regexps()
     fill_using_name_regexps()
-    remove_care_of()
+    # remove_care_of()
     fill_using_file()
 
 
