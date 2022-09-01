@@ -222,6 +222,7 @@ class Shipment(Base):
 
     __tablename__ = DB_TABLE_SHIPMENT
 
+
 class ShipmentWithSTS(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     departure_id = Column(BigInteger, ForeignKey(DB_TABLE_DEPARTURE + '.id', onupdate="CASCADE"), unique=False)
@@ -247,6 +248,7 @@ class Company(Base):
     address = Column(String)
     addresses = Column(ARRAY(String))
     country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
+    registration_country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
 
     __tablename__ = DB_TABLE_COMPANY
     __table_args__ = (UniqueConstraint('imo', name='unique_company_imo'),)
