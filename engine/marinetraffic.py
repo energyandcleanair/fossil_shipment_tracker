@@ -3,7 +3,7 @@ import json
 import datetime as dt
 import base
 import sqlalchemy as sa
-from psycopg2.errors import UniqueViolation
+from sqlalchemy.exc import IntegrityError
 from base.db import session
 from base.logger import logger
 from base.env import get_env
@@ -261,7 +261,7 @@ class Marinetraffic:
                     session.add(unknown_ship)
                     try:
                         session.commit()
-                    except UniqueViolation:
+                    except IntegrityError:
                         session.rollback()
                         is_same = bool(Ship.query.filter(Ship.imo==r_imo, Ship.name == r['SHIPNAME']).count())
                         if is_same:
