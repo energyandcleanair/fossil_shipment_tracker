@@ -108,7 +108,7 @@ def fill(imos=[], mmsis=[]):
         # Ship already in db
         return True
 
-    logger.info("Adding missing ships. IMO: %s | MMSI: %s" % (",".join(imos), ",".join(mmsis)))
+    logger.info("Adding %d missing ships"%(len(imos) + len(mmsis)))
 
     # First with Datalastic
     ships = [Datalastic.get_ship(imo=x, query_if_not_in_cache=False) for x in get_missing_ships_imos(imos)]
