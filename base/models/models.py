@@ -288,7 +288,7 @@ class ShipManager(Base):
     date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
     company_id = Column(BigInteger, ForeignKey(DB_TABLE_COMPANY + '.id', onupdate="CASCADE"),
-                        nullable=False)  # Link to cleaned list of companies
+                        nullable=True)  # Link to cleaned list of companies
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_SHIP_MANAGER

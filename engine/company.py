@@ -55,7 +55,8 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
             if ratio > 0.9:
                 company_id = existing_company.id
             else:
-                raise ValueError('Inconsistency: %s != %s (IMO=%s)' % (existing_company.name, raw_name, imo))
+                logger.warning('Inconsistency: %s != %s (IMO=%s)' % (existing_company.name, raw_name, imo))
+                company_id = None
 
     return company_id
 
