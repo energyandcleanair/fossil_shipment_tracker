@@ -114,6 +114,7 @@ def get_dangling_imo_dates():
     subquery = session.query(Arrival.departure_id)
     return session.query(Departure.ship_imo, Departure.date_utc).filter(~Departure.id.in_(subquery)).all()
 
+
 def update(date_from="2022-01-01"):
 
     add(date_from=date_from, commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS,
@@ -136,6 +137,7 @@ def update(date_from="2022-01-01"):
     remove(port_name='MERSA EL HAMRA ANCH',
                      commodities=[base.LNG, base.COAL, base.BULK])
 
+
 def add(date_from="2022-01-01",
            min_dwt=base.DWT_MIN,
            limit=None,
@@ -151,15 +153,14 @@ def add(date_from="2022-01-01",
            ):
     logger_slack.info("=== Update departures ===")
     # Look for relevant PortCalls without associated departure
-    subquery_ports = session.query(Port.id).filter(Port.check_departure)
-    subquery = session.query(Departure.portcall_id)
+    subquery = session.query(Departure.portcall_id).filter(Departure.portcall_id != sa.null())
 
-    dangling_portcalls = PortCall.query.filter(
+    dangling_portcalls = session.query(PortCall).filter(
         PortCall.move_type == "departure",
         PortCall.load_status.in_([base.FULLY_LADEN]),
         PortCall.port_operation.in_(["load"]),
-        ~PortCall.id.in_(subquery),
-        PortCall.port_id.in_(subquery_ports)) \
+        sa.not_(PortCall.id.in_(subquery)),
+        Port.check_departure) \
         .join(Ship, PortCall.ship_imo == Ship.imo) \
         .join(Port, PortCall.port_id == Port.id)
 
@@ -198,7 +199,6 @@ def add(date_from="2022-01-01",
         }
         session.add(Departure(**departure_data))
     session.commit()
-
 
 
 def remove(commodities, unlocode=None, port_id=None, port_name=None):

@@ -184,7 +184,8 @@ class Marinetraffic:
                                     unlocode=None,
                                     imo=None,
                                     marinetraffic_port_id=None,
-                                    arrival_or_departure=None):
+                                    arrival_or_departure=None,
+                                    use_call_based=False):
 
         if imo is None and unlocode is None and marinetraffic_port_id is None:
             raise ValueError("Need to specify either imo, unlocode or marinetraffic_port_id")
@@ -192,7 +193,10 @@ class Marinetraffic:
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
 
-        api_key = get_env("KEY_MARINETRAFFIC_EV01")
+        if use_call_based:
+            api_key = get_env("KEY_MARINETRAFFIC_EV01_CALL_BASED")
+        else:
+            api_key = get_env("KEY_MARINETRAFFIC_EV01")
 
         params = {
             'v': 4,
@@ -232,18 +236,32 @@ class Marinetraffic:
             return []
 
         portcalls = []
+
+        # Filling missing ships
+        if imo is None:
+            mmsis = [x['MMSI'] for x in response_datas]
+            found = ship.fill(mmsis=mmsis)
+
+            mmsi_imo = session.query(Ship.mmsi, Ship.imo).filter(Ship.mmsi.in_(mmsis)).all()
+            mmsi_imo_dict = dict(zip([x[0] for x in mmsi_imo],
+                                    [x[1] for x in mmsi_imo]))
+
+
+
         for r in response_datas:
             # IMO's missing
             if imo is None:
                 # Ship not found, let's add it
-                found = ship.fill(mmsis=[r["MMSI"]])
-                if not found:
-                    unknown_ship = Ship(imo='NOTFOUND_' + r['MMSI'], mmsi=r['MMSI'], type=r["TYPE_NAME"],
+                #Very important: don't overwrite imo variable
+                r_imo = mmsi_imo_dict.get(r["MMSI"])
+                if r_imo is None:
+                    r_imo = 'NOTFOUND_' + r['MMSI']
+                    unknown_ship = Ship(imo=r_imo, mmsi=r['MMSI'], type=r["TYPE_NAME"],
                                     name=r['SHIPNAME'])
                     session.add(unknown_ship)
                     session.commit()
 
-                r["IMO"] = session.query(Ship.imo).filter(Ship.mmsi == r["MMSI"]).first()[0]
+                r["IMO"] = r_imo
 
             if imo is not None:
                 r["IMO"] = imo
@@ -269,7 +287,8 @@ class Marinetraffic:
 
 
     @classmethod
-    def get_next_portcall(cls, date_from, arrival_or_departure, date_to=None, imo=None, unlocode=None,  filter=None, go_backward=False):
+    def get_next_portcall(cls, date_from, arrival_or_departure, date_to=None, imo=None, unlocode=None,
+                          filter=None, go_backward=False, use_call_based=False):
         """
         The function returns collects arrival portcalls until it finds one matching
         filter (or until it finds one if filter is None).
@@ -279,9 +298,10 @@ class Marinetraffic:
         :param imo:
         :param date_from:
         :param filter:
+        :param use_call_based: weither to use the normal (credit-based) key or the call-based key
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
-        delta_time = dt.timedelta(hours=12)
+        delta_time = dt.timedelta(hours=12) if not use_call_based else dt.timedelta(days=190)
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
         if date_to is None:
@@ -314,7 +334,8 @@ class Marinetraffic:
                                                                unlocode=unlocode,
                                                                arrival_or_departure=arrival_or_departure,
                                                                date_from=date_from_call,
-                                                               date_to=date_to_call)
+                                                               date_to=date_to_call,
+                                                               use_call_based=use_call_based)
             portcalls.extend(period_portcalls)
             if filter:
                 filtered_portcalls.extend([x for x in period_portcalls if filter(x)])

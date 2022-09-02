@@ -136,6 +136,9 @@ def fill_missing_port_id():
 
 
 def upload_portcalls(portcalls):
+
+    duplicated = 0
+
     # Store them in db so that we won't query them again
     if portcalls:
         print("Uploading %d portcalls" % (len(portcalls),))
@@ -183,10 +186,15 @@ def upload_portcalls(portcalls):
                     continue
             else:
                 if "unique_portcall" in str(e):
-                    logger.warning("Failed to add portcall. Duplicated portcall: %s" % (str(e).split("\n")[0]))
+                    duplicated += 1
                 else:
                     logger.warning("Failed to add portcall: %s" % (str(e).split("\n")[0]))
                 continue
+
+    if duplicated:
+        logger.warning("Found %d uplicated portcalls." %(duplicated,))
+
+    return
 
 
 def get_next_portcall(date_from,
@@ -197,7 +205,8 @@ def get_next_portcall(date_from,
                       filter=None,
                       use_cache=True,
                       cache_only=False,
-                      go_backward=False):
+                      go_backward=False,
+                      use_call_based=False):
 
     # First look in DB
     if use_cache:
@@ -260,7 +269,8 @@ def get_next_portcall(date_from,
                                                    date_to=date_to,
                                                    filter=filter,
                                                    arrival_or_departure=arrival_or_departure,
-                                                   go_backward=go_backward
+                                                   go_backward=go_backward,
+                                                   use_call_based=use_call_based
                                                    )
 
             if flush:
@@ -277,7 +287,8 @@ def get_next_portcall(date_from,
                                                                        date_to=date_to,
                                                                        filter=filter,
                                                                        arrival_or_departure=arrival_or_departure,
-                                                                       go_backward=go_backward)
+                                                                       go_backward=go_backward,
+                                                                       use_call_based=use_call_based)
 
         upload_portcalls(portcalls)
 
@@ -433,6 +444,7 @@ def find_arrival(departure,
                                            arrival_or_departure="departure",
                                            imo=ship_imo,
                                            use_cache=True,
+                                           cache_only=cache_only,
                                            filter=filter_departure)
 
         if next_departure is None and next_departure_russia is not None:
@@ -464,7 +476,7 @@ def find_arrival(departure,
                                     date_to=date_to,
                                     filter=filter_arrival,
                                     go_backward=True,
-                                    cache_only=False)
+                                    cache_only=cache_only)
         return arrival
     else:
         return None
