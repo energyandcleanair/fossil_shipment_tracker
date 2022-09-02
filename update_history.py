@@ -141,7 +141,7 @@ def update_departures_portcalls():
 
     # Brute force: 3 calls per port
     date_from = to_datetime('2021-01-01')
-    date_to = dt.datetime.now()
+    date_to = to_datetime('2022-09-01')
     ports = session.query(Port).filter(Port.check_departure).all()
 
     intervals = []
@@ -153,15 +153,24 @@ def update_departures_portcalls():
         start += delta_time
 
     for port in tqdm(ports):
+        print("Port %s" % (port.marinetraffic_id,))
+        for interval in intervals:
 
-       for interval in intervals:
-           portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
-                                                              unlocode=port.unlocode,
-                                                              marinetraffic_port_id=port.marinetraffic_id,
-                                                              date_from=interval[0],
-                                                              date_to=interval[1],
-                                                              use_call_based=True)
-           portcall.upload_portcalls(portcalls)
+           # Check if this call has already been made
+           found = MarineTrafficCall.query.filter(
+               MarineTrafficCall.params['portid'].astext == (port.unlocode or port.marinetraffic_id),
+               MarineTrafficCall.params['fromdate'].astext == interval[0].strftime('%Y-%m-%d %H:%M'),
+               MarineTrafficCall.params['todate'].astext == interval[1].strftime('%Y-%m-%d %H:%M'),
+               MarineTrafficCall.id != 635416
+                                          ).count()
+           if not found:
+               portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
+                                                                  unlocode=port.unlocode,
+                                                                  marinetraffic_port_id=port.marinetraffic_id,
+                                                                  date_from=interval[0],
+                                                                  date_to=interval[1],
+                                                                  use_call_based=True)
+               portcall.upload_portcalls(portcalls)
 
 
 if __name__ == "__main__":

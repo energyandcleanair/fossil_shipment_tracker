@@ -3,7 +3,7 @@ import json
 import datetime as dt
 import base
 import sqlalchemy as sa
-
+from psycopg2.errors import UniqueViolation
 from base.db import session
 from base.logger import logger
 from base.env import get_env
@@ -259,7 +259,21 @@ class Marinetraffic:
                     unknown_ship = Ship(imo=r_imo, mmsi=r['MMSI'], type=r["TYPE_NAME"],
                                     name=r['SHIPNAME'])
                     session.add(unknown_ship)
-                    session.commit()
+                    try:
+                        session.commit()
+                    except UniqueViolation:
+                        session.rollback()
+                        is_same = bool(Ship.query.filter(Ship.imo==r_imo, Ship.name == r['SHIPNAME']).count())
+                        if is_same:
+                            continue
+                        else:
+                            n_imo_ships = Ship.query.filter(Ship.imo.op('~')(r_imo)).count()
+                            if n_imo_ships > 0:
+                                unknown_ship.imo = "%s_v%d" % (r_imo, n_imo_ships + 1)
+                                session.add(ship)
+                                session.commit()
+                            raise ValueError()
+
 
                 r["IMO"] = r_imo
 
