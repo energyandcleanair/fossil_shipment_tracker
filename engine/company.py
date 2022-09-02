@@ -1,9 +1,11 @@
 from tqdm import tqdm
+import numpy as np
 import pandas as pd
 import datetime as dt
 from sqlalchemy import func
 import sqlalchemy as sa
 from base.db_utils import execute_statement
+from difflib import SequenceMatcher
 
 
 from base.db import session
@@ -43,8 +45,18 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
                               address=address,
                               addresses=[address])
         session.add(new_company)
-        session.commit()
-        company_id = new_company.id
+        try:
+            session.commit()
+            company_id = new_company.id
+        except sa.exc.IntegrityError:
+            session.rollback()
+            existing_company = session.query(Company).filter(Company.imo == imo).first()
+            ratio = SequenceMatcher(None, existing_company.name, raw_name).ratio()
+            if ratio > 0.9:
+                company_id = existing_company.id
+            else:
+                raise ValueError('Inconsistency: %s != %s (IMO=%s)' % (existing_company.name, raw_name, imo))
+
     return company_id
 
 
