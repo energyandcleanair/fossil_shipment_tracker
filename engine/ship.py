@@ -201,7 +201,7 @@ def ship_to_commodity(ship):
 
 
     # # Heuristic1: if oil_products but dwt > 90,000t, then assume crude_oil
-    if float(ship.dwt) > 90e3 and commodity in [base.OIL_PRODUCTS]:
+    if ship.dwt and float(ship.dwt) > 90e3 and commodity in [base.OIL_PRODUCTS]:
         commodity = base.CRUDE_OIL
 
 
