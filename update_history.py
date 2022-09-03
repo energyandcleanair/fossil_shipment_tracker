@@ -67,7 +67,9 @@ def update_arrival_portcalls(date_from, date_to):
         MarineTrafficCall.records
         ) \
     .filter(MarineTrafficCall.method == 'portcalls/',
-            MarineTrafficCall.params['movetype'] == sa.null())
+            MarineTrafficCall.params['movetype'] == sa.null(),
+            MarineTrafficCall.status == base.HTTP_OK
+    )
 
 
     # Get departures of interest
@@ -176,7 +178,9 @@ def update_departures_portcalls(date_from, date_to):
            found = MarineTrafficCall.query.filter(
                MarineTrafficCall.params['portid'].astext == (port.unlocode or port.marinetraffic_id),
                MarineTrafficCall.params['fromdate'].astext == interval[0].strftime('%Y-%m-%d %H:%M'),
-               MarineTrafficCall.params['todate'].astext == interval[1].strftime('%Y-%m-%d %H:%M')).count()
+               MarineTrafficCall.params['todate'].astext == interval[1].strftime('%Y-%m-%d %H:%M'),
+               MarineTrafficCall.status == base.HTTP_OK
+           ).count()
            if not found:
                portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
                                                                   unlocode=port.unlocode,
