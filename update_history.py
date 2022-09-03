@@ -57,8 +57,8 @@ def update_arrival_portcalls(date_from, date_to):
                           Departure.date_utc.label('departure_date')) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .outerjoin(Arrival, Arrival.departure_id == Departure.id) \
-        .filter(Ship.commodity.in_([base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS])) \
-        .filter(Arrival.id == sa.null())
+        .filter(Ship.commodity.in_([base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS]))
+        # .filter(Arrival.id == sa.null())
 
     queried = session.query(
         MarineTrafficCall.params['imo'].label('imo'),
@@ -98,18 +98,20 @@ def update_arrival_portcalls(date_from, date_to):
 
     # Get information on calls already made to MT
     queried_df = pd.read_sql(queried.statement, session.bind)
-    queried_df['date_from'] = pd.to_datetime(queried_df.date_from)
-    queried_df['date_to'] = pd.to_datetime(queried_df.date_to)
-    queried_df = queried_df[queried_df.imo.isin(departure_dates.imo)]
-    queried_df['dates'] = queried_df.progress_apply(
-        lambda row: pd.date_range(row.date_from.floor('H'), row.date_to.floor('H'), freq='H'),
-        axis=1)
+    if len(queried_df):
+        queried_df['date_from'] = pd.to_datetime(queried_df.date_from)
+        queried_df['date_to'] = pd.to_datetime(queried_df.date_to)
+        queried_df = queried_df[queried_df.imo.isin(departure_dates.imo)]
+        queried_df['dates'] = queried_df.progress_apply(
+            lambda row: pd.date_range(row.date_from.floor('H'), row.date_to.floor('H'), freq='H'),
+            axis=1)
 
-    queried_dates = queried_df[['imo', 'dates']].explode('dates').drop_duplicates().sort_values(['imo', 'dates'])
+        queried_dates = queried_df[['imo', 'dates']].explode('dates').drop_duplicates().sort_values(['imo', 'dates'])
 
-    # See what dates are missing / need to be queried
-    missing_dates = pd.concat([departure_dates, queried_dates, queried_dates]).drop_duplicates(keep=False)
-
+        # See what dates are missing / need to be queried
+        missing_dates = pd.concat([departure_dates, queried_dates, queried_dates]).drop_duplicates(keep=False)
+    else:
+        missing_dates = departure_dates
 
     missing_ship_dates = missing_dates[missing_dates.dates <= pd.to_datetime(date_to)] \
         .groupby('imo').agg(date_from=('dates', min),
@@ -118,7 +120,7 @@ def update_arrival_portcalls(date_from, date_to):
 
     missing_ship_dates['interval'] = missing_ship_dates.date_to - missing_ship_dates.date_from
     missing_ship_dates = missing_ship_dates.sort_values('interval', ascending=False)
-    missing_ship_dates = missing_ship_dates[missing_ship_dates.interval >= dt.timedelta(days=2)]
+    missing_ship_dates = missing_ship_dates[missing_ship_dates.interval >= dt.timedelta(days=1)]
     missing_ship_dates = missing_ship_dates[~missing_ship_dates.imo.str.contains('_')]
 
     for index, row in tqdm(missing_ship_dates.iterrows(), total=missing_ship_dates.shape[0]):
@@ -135,7 +137,7 @@ def update_arrival_portcalls(date_from, date_to):
 
         for interval in intervals:
             portcalls = portcall.get_next_portcall(date_from=interval[0],
-                                                   date_to=interval[1],
+                                                   date_to=max(interval[1], interval[0] + delta_time),
                                                    arrival_or_departure=None,
                                                    imo=imo,
                                                    use_call_based=True, # VERY IMPORTANT TO USE THE RIGHT KEY!!
