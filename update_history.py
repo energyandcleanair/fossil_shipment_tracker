@@ -41,8 +41,8 @@ def update_history():
     #
     # We use it to fill past data
 
-    update_departures_portcalls(date_from='2020-07-01', date_to='2021-01-01')
-    departure.update(date_from='2020-07-01')
+    # update_departures_portcalls(date_from='2020-07-01', date_to='2021-01-01')
+    # departure.update(date_from='2020-07-01')
     update_arrival_portcalls(date_from='2020-07-01', date_to='2022-01-01')
     # update_sts_events()
 
@@ -121,6 +121,7 @@ def update_arrival_portcalls(date_from, date_to):
     missing_ship_dates['interval'] = missing_ship_dates.date_to - missing_ship_dates.date_from
     missing_ship_dates = missing_ship_dates.sort_values('interval', ascending=False)
     missing_ship_dates = missing_ship_dates[~missing_ship_dates.imo.str.contains('_')]
+    missing_ship_dates = missing_ship_dates[missing_ship_dates.interval > dt.timedelta(hours=1)]
 
     for index, row in tqdm(missing_ship_dates.iterrows(), total=missing_ship_dates.shape[0]):
 
@@ -131,12 +132,12 @@ def update_arrival_portcalls(date_from, date_to):
         start = row.date_from
         end = row.date_to
         while start < end:
-            intervals.append((start, min(start + delta_time, end)))
+            intervals.append([start, min(start + delta_time, end)])
             start += delta_time
 
         for interval in intervals:
             # VERY IMPORTANT TO USE THE RIGHT KEY!!
-            use_call_based = (interval[1] - interval[0]) > dt.timedelta(days=5)
+            use_call_based = (interval[1] - interval[0]) > dt.timedelta(days=20)
             if use_call_based:
                 # Might as well query more, same cost
                 interval[1] = max(interval[1], interval[0] + delta_time)
