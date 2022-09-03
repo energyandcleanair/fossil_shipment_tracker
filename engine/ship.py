@@ -144,7 +144,7 @@ def upload_ships(ships):
         except sa.exc.IntegrityError as e:
             session.rollback()
             # Ship with this IMO probably already exists.
-            n_imo_ships = Ship.query.filter(Ship.imo==ship.imo).count()
+            n_imo_ships = Ship.query.filter(Ship.imo.op('~')(ship.imo)).count()
             if n_imo_ships > 0:
                 ship.imo = "%s_v%d"%(ship.imo, n_imo_ships+1)
                 session.add(ship)
