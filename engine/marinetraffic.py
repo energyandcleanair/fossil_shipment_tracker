@@ -270,7 +270,7 @@ class Marinetraffic:
                             n_imo_ships = Ship.query.filter(Ship.imo.op('~')(r_imo)).count()
                             if n_imo_ships > 0:
                                 unknown_ship.imo = "%s_v%d" % (r_imo, n_imo_ships + 1)
-                                session.add(ship)
+                                session.add(unknown_ship)
                                 session.commit()
                             raise ValueError()
 
