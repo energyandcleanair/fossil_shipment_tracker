@@ -120,7 +120,6 @@ def update_arrival_portcalls(date_from, date_to):
 
     missing_ship_dates['interval'] = missing_ship_dates.date_to - missing_ship_dates.date_from
     missing_ship_dates = missing_ship_dates.sort_values('interval', ascending=False)
-    missing_ship_dates = missing_ship_dates[missing_ship_dates.interval >= dt.timedelta(days=1)]
     missing_ship_dates = missing_ship_dates[~missing_ship_dates.imo.str.contains('_')]
 
     for index, row in tqdm(missing_ship_dates.iterrows(), total=missing_ship_dates.shape[0]):
@@ -136,11 +135,17 @@ def update_arrival_portcalls(date_from, date_to):
             start += delta_time
 
         for interval in intervals:
+            # VERY IMPORTANT TO USE THE RIGHT KEY!!
+            use_call_based = (interval[1] - interval[0]) > dt.timedelta(days=5)
+            if use_call_based:
+                # Might as well query more, same cost
+                interval[1] = max(interval[1], interval[0] + delta_time)
+
             portcalls = portcall.get_next_portcall(date_from=interval[0],
-                                                   date_to=max(interval[1], interval[0] + delta_time),
+                                                   date_to=interval[1],
                                                    arrival_or_departure=None,
                                                    imo=imo,
-                                                   use_call_based=True, # VERY IMPORTANT TO USE THE RIGHT KEY!!
+                                                   use_call_based=use_call_based,
                                                    use_cache=False,
                                                    filter=lambda x: False
                                                    )
