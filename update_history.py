@@ -152,11 +152,11 @@ def update_arrival_portcalls(date_from, date_to):
     return
 
 
-def update_departures_portcalls():
+def update_departures_portcalls(date_from, date_to):
 
     # Brute force: 3 calls per port
-    date_from = to_datetime('2020-01-01')
-    date_to = to_datetime('2021-01-01')
+    date_from = to_datetime(date_from)
+    date_to = to_datetime(date_to)
     ports = session.query(Port).filter(Port.check_departure).all()
 
     intervals = []
