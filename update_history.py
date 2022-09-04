@@ -57,7 +57,7 @@ def update_arrival_portcalls(date_from, date_to):
                           Departure.date_utc.label('departure_date')) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .outerjoin(Arrival, Arrival.departure_id == Departure.id) \
-        .filter(Ship.commodity.in_([base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS]))
+        .filter(Ship.commodity.in_([base.OIL_OR_CHEMICAL, base.COAL]))
         # .filter(Arrival.id == sa.null())
 
     queried = session.query(
@@ -100,10 +100,11 @@ def update_arrival_portcalls(date_from, date_to):
 
     # Get information on calls already made to MT
     queried_df = pd.read_sql(queried.statement, session.bind)
+    queried_df = queried_df[queried_df.imo.isin(departure_dates.imo)]
+
     if len(queried_df):
         queried_df['date_from'] = pd.to_datetime(queried_df.date_from)
         queried_df['date_to'] = pd.to_datetime(queried_df.date_to)
-        queried_df = queried_df[queried_df.imo.isin(departure_dates.imo)]
         queried_df['dates'] = queried_df.progress_apply(
             lambda row: pd.date_range(row.date_from.floor('H'), row.date_to.floor('H'), freq='H'),
             axis=1)
