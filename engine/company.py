@@ -1,5 +1,5 @@
+import requests.exceptions
 from tqdm import tqdm
-import numpy as np
 import pandas as pd
 import datetime as dt
 from sqlalchemy import func
@@ -10,10 +10,7 @@ from difflib import SequenceMatcher
 
 from base.db import session
 from base.logger import logger
-from base.models import Ship, PortCall, Departure, Shipment, ShipInsurer, ShipOwner, ShipManager, Company, Country
-from base.utils import to_datetime, to_list
-from engine.datalastic import Datalastic
-from engine.marinetraffic import Marinetraffic
+from base.models import Departure, ShipInsurer, ShipOwner, ShipManager, Company, Country
 from engine.equasis import Equasis
 
 
@@ -83,9 +80,19 @@ def update_info_from_equasis():
         .all()
 
     imos = [x[0] for x in imos]
+    itry = 0
+    ntries = 3
+    equasis_infos = None
 
     for imo in tqdm(imos):
-        equasis_infos = equasis.get_ship_infos(imo=imo)
+
+        while equasis_infos is None and itry <= ntries:
+            itry += 1
+            try:
+                equasis_infos = equasis.get_ship_infos(imo=imo)
+            except requests.exceptions.HTTPError as e:
+                logger.warning("Failed to get equasis ship info, trying again.")
+
         if equasis_infos is not None:
 
             # Insurer
