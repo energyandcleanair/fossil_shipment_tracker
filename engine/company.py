@@ -282,7 +282,7 @@ def fill_country():
     fill_using_file()
 
 
-class CompanyImpScraper:
+class CompanyImoScraper:
     """
     Class for scrapig IMO/detailed information about ship company registration and address
 
@@ -315,7 +315,7 @@ class CompanyImpScraper:
         try:
             element = WebDriverWait(browser, wait_time).until(EC.presence_of_element_located((by, item)))
         except TimeoutException:
-            print("Failed to find button...")
+            print("Failed to find object...")
             return None
 
         if not element:
@@ -383,15 +383,15 @@ class CompanyImpScraper:
 
             break
 
-        pwd_field = browser.find_element(By.CSS_SELECTOR, PWD_FIELD_CSS)
+        pwd_field = self.browser.find_element(By.CSS_SELECTOR, PWD_FIELD_CSS)
 
-        if not pwd_field:
+        if pwd_field is None:
             return False
 
         ActionChains(browser) \
             .click(pwd_field) \
             .send_keys(password) \
-            .click(login_button) \
+            .send_keys(Keys.ENTER) \
             .perform()
 
         # verify we logged in
@@ -403,7 +403,7 @@ class CompanyImpScraper:
 
         return True
 
-    def initialise_browser(self, options=None, browser=None):
+    def initialise_browser(self, options=None, browser=None, headless=False):
         """
         Initialise web browser
 
@@ -420,7 +420,8 @@ class CompanyImpScraper:
         if not options:
             options = webdriver.ChromeOptions()
             options.add_argument('ignore-certificate-errors')
-            options.add_argument("--headless")
+            if headless:
+                options.add_argument("--headless")
 
         if not browser:
             if not self.service: self.service = Service(ChromeDriverManager().install())
@@ -447,7 +448,7 @@ class CompanyImpScraper:
         if not browser:
             browser = self.browser
 
-        table_html = self._search_data(search_text, search_by)
+        table_html = self._search_data(search_text=search_text, search_by=search_by)
 
         if table_html:
             table_df = pd.read_html(table_html)[0]
@@ -521,7 +522,7 @@ class CompanyImpScraper:
 
         browser.get(self.base)
 
-        button_search = self._wait_for_object(item=execute_css, by=By.ID)
+        button_search = self._wait_for_object(item=execute_css, by=By.CSS_SELECTOR)
 
         if not button_search:
             return None
