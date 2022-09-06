@@ -453,26 +453,28 @@ class CompanyImoScraper:
         if table_html:
             table_df = pd.read_html(table_html)[0]
 
+            if table_df.empty:
+                return None
+
             try:
-                registration, name, imo = table_df['Registered in'].values[0], table_df['Name'].values[0], \
-                                          table_df['IMO Company Number'].values[0]
+                registration, name, imo = table_df['Registered in'].values.tolist(), \
+                                          table_df['Name'].values.tolist(), \
+                                          table_df['IMO Company Number'].values.tolist()
 
-                detailed_info = self.get_detailed_information(imo)
-                address = detailed_info['Company address:'].values[0]
-
-                return registration, address, name, imo
+                return list(zip(registration, name, imo))
 
             except KeyError:
                 return None
 
         return None
 
-    def get_detailed_information(self, search_text):
+    def get_detailed_information(self, search_text, search_by='IMO'):
         """
         Find the address of selected imo/name
 
         Parameters
         ----------
+        search_by :
         search_text : base text we search for to find the right table
 
         Returns
@@ -487,12 +489,24 @@ class CompanyImoScraper:
 
         address_table = WebDriverWait(self.browser, 10, ignored_exceptions=EC.StaleElementReferenceException). \
             until(
-            EC.presence_of_element_located((By.XPATH, "//td[contains(text(), 'IMO')]/ancestor::table[@class='table']")))
+            EC.presence_of_element_located((By.XPATH, "//td[contains(text(), '{}')]/ancestor::table[@class='table']".format(search_by))))
 
         if address_table is None:
             return None
 
-        return pd.read_html(address_table.get_attribute('outerHTML'), index_col=0)[0].T
+        table_df = pd.read_html(address_table.get_attribute('outerHTML'), index_col=0)[0].T
+
+        if table_df.empty:
+            return None
+
+        try:
+            address, status = table_df['Company address:'].values.tolist(), \
+                              table_df['Company status:'].values.tolist()
+
+            return list(zip(address, status))
+
+        except KeyError:
+            return None
 
     def _search_data(self,
                      search_text,

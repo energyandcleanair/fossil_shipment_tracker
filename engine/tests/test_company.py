@@ -13,18 +13,23 @@ def test_imo_scraper():
         service=None
     )
 
-    scraper.initialise_browser()
+    scraper.initialise_browser(headless=True)
 
     if not scraper.perform_login(get_env("IMO_USER"), get_env("IMO_PASSWORD")):
         return False
 
     expected_info = (
         'Bermuda',
-        'Care of SKS Pool AS , Zander Kaaes gate 7, 5015 Bergen, Norway.',
         'SKS SHIPOWNING 9 LTD',
         6269087
     )
 
+    expected_address = 'Care of SKS Pool AS , Zander Kaaes gate 7, 5015 Bergen, Norway.'
+
     info = scraper.get_information(search_text='6269087')
 
-    assert info == expected_info
+    address = scraper.get_detailed_information(search_text='6269087')
+
+    assert info[0] == expected_info
+
+    assert address[0][0] == expected_address
