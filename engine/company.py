@@ -7,8 +7,9 @@ import sqlalchemy as sa
 from base.db_utils import execute_statement
 from difflib import SequenceMatcher
 
-
+import base
 from base.db import session
+from base.env import get_env
 from base.logger import logger
 from base.models import Departure, ShipInsurer, ShipOwner, ShipManager, Company, Country
 from engine.equasis import Equasis
@@ -25,6 +26,8 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 
 import time
+
+
 def update():
     update_info_from_equasis()
     fill_country()
@@ -32,6 +35,20 @@ def update():
 
 
 def find_or_create_company_id(raw_name, imo=None, address=None):
+    """
+    The function checks whether we have a company which matches the name or exactly and has same imo, if not
+    we attempt to create a record, and if there is imo conflict we double-check name similarity is close
+
+    Parameters
+    ----------
+    raw_name : name of the company
+    imo : optional imo of the company
+    address : optional address of the company
+
+    Returns
+    -------
+
+    """
 
     company_sq = session.query(Company.id,
                                Company.imo,
@@ -83,10 +100,10 @@ def update_info_from_equasis():
         .outerjoin(ShipOwner, ShipOwner.ship_imo == Departure.ship_imo) \
         .outerjoin(ShipManager, ShipManager.ship_imo == Departure.ship_imo) \
         .filter(sa.or_(sa.and_(
-                        ShipInsurer.id == sa.null(),
-                        ShipOwner.id == sa.null(),
-                        ShipManager.id == sa.null()),
-                       ShipInsurer.updated_on <= dt.datetime.now() - max_age)) \
+        ShipInsurer.id == sa.null(),
+        ShipOwner.id == sa.null(),
+        ShipManager.id == sa.null()),
+        ShipInsurer.updated_on <= dt.datetime.now() - max_age)) \
         .distinct() \
         .all()
 
@@ -144,7 +161,7 @@ def update_info_from_equasis():
                 manager.updated_on = dt.datetime.now()
                 session.add(manager)
                 session.commit()
-                
+
             # Owner
             owner_info = equasis_infos.get('owner')
             if owner_info:
@@ -170,19 +187,38 @@ def update_info_from_equasis():
 
 
 def fill_country():
+    """
+    This function uses regex and company name/address to attempt to fill in country_iso2 and registration_country_iso2
+
+    Returns
+    -------
+
+    """
 
     def fill_using_country_ending():
+        """
+        We check the ending of company address using regex to see if we can determine iso2
+
+        Returns
+        -------
+
+        """
         country_regex = session.query(Country.iso2,
                                       ('[\.| |,|_|-|/]{1}' + Country.name + '[\.]?$').label('regexp')).subquery()
         update = Company.__table__.update().values(country_iso2=country_regex.c.iso2) \
             .where(sa.and_(
-                        Company.country_iso2 == sa.null(),
-                        Company.address.op('~*')(country_regex.c.regexp)))
+            Company.country_iso2 == sa.null(),
+            Company.address.op('~*')(country_regex.c.regexp)))
         execute_statement(update)
 
     def fill_using_address_regexps():
-        """Using address to estimate country_iso2
+        """
+        Using address to estimate country_iso2
         which might be different from registration_country_iso2
+
+        Returns
+        -------
+
         """
         address_regexps = {
             'US': ['USA[\.]?$'],
@@ -201,7 +237,10 @@ def fill_country():
     def fill_using_name_regexps():
         """
         This is for insurers. Assuming country == registration_country
-        :return:
+
+        Returns
+        -------
+
         """
         name_regexps = {
             'BM': ['\(Bermuda\)$'],
@@ -229,7 +268,6 @@ def fill_country():
                 .where(condition)
             execute_statement(update)
 
-
     def remove_care_of():
         to_remove = ['^Care of']
         condition = sa.and_(
@@ -238,9 +276,13 @@ def fill_country():
             .where(condition)
         execute_statement(update)
 
-
     def fill_using_file():
-        """ Manual listing of companies registriation countries
+        """
+        Manual listing of companies registriation countries
+
+        Returns
+        -------
+
         """
         companies_df = pd.read_csv("assets/companies.csv", dtype={'imo': str})
         companies_df = companies_df.dropna(subset=['imo', 'registration_iso2'])
@@ -275,6 +317,18 @@ def fill_country():
         }, synchronize_session='fetch')
         session.commit()
 
+    def fill_using_imo_website():
+
+        scraper = CompanyImoScraper(
+            base_url=base.IMO_BASE_URL,
+            service=None
+        )
+
+        scraper.initialise_browser(headless=True)
+
+        if not scraper.perform_login(get_env("IMO_USER"), get_env("IMO_PASSWORD")):
+            return False
+
     fill_using_country_ending()
     fill_using_address_regexps()
     fill_using_name_regexps()
@@ -287,6 +341,7 @@ class CompanyImoScraper:
     Class for scrapig IMO/detailed information about ship company registration and address
 
     """
+
     def __init__(self, base_url, service=None):
 
         self.service = service
@@ -489,7 +544,8 @@ class CompanyImoScraper:
 
         address_table = WebDriverWait(self.browser, 10, ignored_exceptions=EC.StaleElementReferenceException). \
             until(
-            EC.presence_of_element_located((By.XPATH, "//td[contains(text(), '{}')]/ancestor::table[@class='table']".format(search_by))))
+            EC.presence_of_element_located(
+                (By.XPATH, "//td[contains(text(), '{}')]/ancestor::table[@class='table']".format(search_by))))
 
         if address_table is None:
             return None
@@ -563,8 +619,3 @@ class CompanyImoScraper:
             return table.get_attribute('outerHTML')
 
         return None
-
-
-
-
-
