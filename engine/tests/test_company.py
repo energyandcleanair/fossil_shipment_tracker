@@ -33,3 +33,7 @@ def test_imo_scraper():
     assert info[0] == expected_info
 
     assert address[0][0] == expected_address
+
+def test_company_registration_scraper():
+
+    fill_using_imo_website()

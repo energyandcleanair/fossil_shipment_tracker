@@ -317,23 +317,77 @@ def fill_country():
         }, synchronize_session='fetch')
         session.commit()
 
-    def fill_using_imo_website():
-
-        scraper = CompanyImoScraper(
-            base_url=base.IMO_BASE_URL,
-            service=None
-        )
-
-        scraper.initialise_browser(headless=True)
-
-        if not scraper.perform_login(get_env("IMO_USER"), get_env("IMO_PASSWORD")):
-            return False
-
     fill_using_country_ending()
     fill_using_address_regexps()
     fill_using_name_regexps()
     # remove_care_of()
     fill_using_file()
+
+
+def fill_using_imo_website():
+    """
+    Query companies with missing registration ISO2 and fill it in if found
+
+    Returns
+    -------
+
+    """
+    scraper = CompanyImoScraper(
+        base_url=base.IMO_BASE_URL,
+        service=None
+    )
+
+    scraper.initialise_browser(headless=True)
+
+    if not scraper.perform_login(get_env("IMO_USER"), get_env("IMO_PASSWORD")):
+        return False
+
+    db_countries = dict(session.query(
+        Country.name,
+        Country.iso2
+    ).all())
+
+    # some countries from IMO website are not the same as standard/official names in our db, so let's add them
+    additional_countries = {
+        'USA':'US',
+        "China, People's Republic of":'CN',
+        'Virgin Islands, British':'VI',
+        'Singapore':'SG',
+        'Taiwan':'TW',
+        'Hong Kong, China':'HK',
+        'Madeira':'PT'
+    }
+
+    country_dict = db_countries | additional_countries
+
+    companies = session.query(
+        Company
+    ) \
+        .filter(sa.and_(
+        Company.registration_country_iso2 == sa.null(),
+        Company.imo != sa.null())
+    ) \
+        .all()
+
+    for company in tqdm(companies):
+
+        # check imo website for company imo or name
+        company_info = scraper.get_information(search_text=str(company.imo))
+
+        if company_info is not None and len(company_info) > 1:
+            logger.warning("Found more than one company with this search term, skipping...")
+            continue
+
+        company_info = company_info[0]
+        # add reg iso2 to record and commit
+        try:
+            company.registration_country_iso2 = country_dict[company_info[0]]
+            session.add(company)
+            session.commit()
+        except KeyError:
+            logger.warning("We did not find the ISO2 for {}. Considering adding manually.".format(company.imo))
+        except IndexError:
+            logger.warning("Failed to parse correct information from IMO website for {}.".format(company.imo))
 
 
 class CompanyImoScraper:
@@ -397,13 +451,13 @@ class CompanyImoScraper:
         if not browser:
             browser = self.browser
 
-        browser.get(self.base)
-
         AUTHOR_CSS = "[id$=AuthorityType][class='form-control']"
         LOGIN_FIELD_CSS = "[id$=txtUsername][class='form-control']"
         PWD_FIELD_CSS = "[id$=txtPassword][class='form-control']"
         LOGIN_BTN_CSS = "[id$=btnLogin][class='btn btn-default']"
         SRCH_BTN = "[id$=btnSearchCompanies][class='button']"
+
+        browser.get(self.base)
 
         button_search = self._wait_for_object(item=AUTHOR_CSS, by=By.CSS_SELECTOR)
 
