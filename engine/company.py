@@ -350,12 +350,18 @@ def fill_using_imo_website():
     # some countries from IMO website are not the same as standard/official names in our db, so let's add them
     additional_countries = {
         'USA':'US',
+        'United States of America':'US',
         "China, People's Republic of":'CN',
+        'Korea, South':'KR',
         'Virgin Islands, British':'VI',
         'Singapore':'SG',
         'Taiwan':'TW',
         'Hong Kong, China':'HK',
-        'Madeira':'PT'
+        'Madeira':'PT',
+        'St Kitts & Nevis':'KN',
+        'Antigua & Barbuda':'AG',
+        'Irish Republic':'IE',
+        'St Vincent & The Grenadines':'VC'
     }
 
     country_dict = db_countries | additional_countries
@@ -374,8 +380,8 @@ def fill_using_imo_website():
         # check imo website for company imo or name
         company_info = scraper.get_information(search_text=str(company.imo))
 
-        if company_info is not None and len(company_info) > 1:
-            logger.warning("Found more than one company with this search term, skipping...")
+        if company_info is None or len(company_info) > 1:
+            logger.warning("Company not found, or more than one company with this search term ({}), skipping...".format(company.imo))
             continue
 
         company_info = company_info[0]
@@ -385,7 +391,7 @@ def fill_using_imo_website():
             session.add(company)
             session.commit()
         except KeyError:
-            logger.warning("We did not find the ISO2 for {}. Considering adding manually.".format(company.imo))
+            logger.warning("We did not find the ISO2 for imo {}, country {}. Considering adding manually.".format(company.imo, company_info[0]))
         except IndexError:
             logger.warning("Failed to parse correct information from IMO website for {}.".format(company.imo))
 
