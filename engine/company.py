@@ -1,5 +1,5 @@
+import requests.exceptions
 from tqdm import tqdm
-import numpy as np
 import pandas as pd
 import datetime as dt
 from sqlalchemy import func
@@ -7,14 +7,25 @@ import sqlalchemy as sa
 from base.db_utils import execute_statement
 from difflib import SequenceMatcher
 
-
+import base
 from base.db import session
+from base.env import get_env
 from base.logger import logger
-from base.models import Ship, PortCall, Departure, Shipment, ShipInsurer, ShipOwner, ShipManager, Company, Country
-from base.utils import to_datetime, to_list
-from engine.datalastic import Datalastic
-from engine.marinetraffic import Marinetraffic
+from base.models import Departure, ShipInsurer, ShipOwner, ShipManager, Company, Country
 from engine.equasis import Equasis
+
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support.ui import Select
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.keys import Keys
+
+import time
 
 
 def update():
@@ -24,6 +35,20 @@ def update():
 
 
 def find_or_create_company_id(raw_name, imo=None, address=None):
+    """
+    The function checks whether we have a company which matches the name or exactly and has same imo, if not
+    we attempt to create a record, and if there is imo conflict we double-check name similarity is close
+
+    Parameters
+    ----------
+    raw_name : name of the company
+    imo : optional imo of the company
+    address : optional address of the company
+
+    Returns
+    -------
+
+    """
 
     company_sq = session.query(Company.id,
                                Company.imo,
@@ -75,17 +100,27 @@ def update_info_from_equasis():
         .outerjoin(ShipOwner, ShipOwner.ship_imo == Departure.ship_imo) \
         .outerjoin(ShipManager, ShipManager.ship_imo == Departure.ship_imo) \
         .filter(sa.or_(sa.and_(
-                        ShipInsurer.id == sa.null(),
-                        ShipOwner.id == sa.null(),
-                        ShipManager.id == sa.null()),
-                       ShipInsurer.updated_on <= dt.datetime.now() - max_age)) \
+        ShipInsurer.id == sa.null(),
+        ShipOwner.id == sa.null(),
+        ShipManager.id == sa.null()),
+        ShipInsurer.updated_on <= dt.datetime.now() - max_age)) \
         .distinct() \
         .all()
 
     imos = [x[0] for x in imos]
+    itry = 0
+    ntries = 3
+    equasis_infos = None
 
     for imo in tqdm(imos):
-        equasis_infos = equasis.get_ship_infos(imo=imo)
+
+        while equasis_infos is None and itry <= ntries:
+            itry += 1
+            try:
+                equasis_infos = equasis.get_ship_infos(imo=imo)
+            except requests.exceptions.HTTPError as e:
+                logger.warning("Failed to get equasis ship info, trying again.")
+
         if equasis_infos is not None:
 
             # Insurer
@@ -126,7 +161,7 @@ def update_info_from_equasis():
                 manager.updated_on = dt.datetime.now()
                 session.add(manager)
                 session.commit()
-                
+
             # Owner
             owner_info = equasis_infos.get('owner')
             if owner_info:
@@ -152,19 +187,38 @@ def update_info_from_equasis():
 
 
 def fill_country():
+    """
+    This function uses regex and company name/address to attempt to fill in country_iso2 and registration_country_iso2
+
+    Returns
+    -------
+
+    """
 
     def fill_using_country_ending():
+        """
+        We check the ending of company address using regex to see if we can determine iso2
+
+        Returns
+        -------
+
+        """
         country_regex = session.query(Country.iso2,
                                       ('[\.| |,|_|-|/]{1}' + Country.name + '[\.]?$').label('regexp')).subquery()
         update = Company.__table__.update().values(country_iso2=country_regex.c.iso2) \
             .where(sa.and_(
-                        Company.country_iso2 == sa.null(),
-                        Company.address.op('~*')(country_regex.c.regexp)))
+            Company.country_iso2 == sa.null(),
+            Company.address.op('~*')(country_regex.c.regexp)))
         execute_statement(update)
 
     def fill_using_address_regexps():
-        """Using address to estimate country_iso2
+        """
+        Using address to estimate country_iso2
         which might be different from registration_country_iso2
+
+        Returns
+        -------
+
         """
         address_regexps = {
             'US': ['USA[\.]?$'],
@@ -183,7 +237,10 @@ def fill_country():
     def fill_using_name_regexps():
         """
         This is for insurers. Assuming country == registration_country
-        :return:
+
+        Returns
+        -------
+
         """
         name_regexps = {
             'BM': ['\(Bermuda\)$'],
@@ -211,7 +268,6 @@ def fill_country():
                 .where(condition)
             execute_statement(update)
 
-
     def remove_care_of():
         to_remove = ['^Care of']
         condition = sa.and_(
@@ -220,9 +276,13 @@ def fill_country():
             .where(condition)
         execute_statement(update)
 
-
     def fill_using_file():
-        """ Manual listing of companies registriation countries
+        """
+        Manual listing of companies registriation countries
+
+        Returns
+        -------
+
         """
         companies_df = pd.read_csv("assets/companies.csv", dtype={'imo': str})
         companies_df = companies_df.dropna(subset=['imo', 'registration_iso2'])
@@ -262,9 +322,361 @@ def fill_country():
     fill_using_name_regexps()
     # remove_care_of()
     fill_using_file()
+    fill_using_imo_website()
 
 
+def fill_using_imo_website():
+    """
+    Query companies with missing registration ISO2 and fill it in if found
+
+    Returns
+    -------
+
+    """
+    scraper = CompanyImoScraper(
+        base_url=base.IMO_BASE_URL,
+        service=None
+    )
+
+    scraper.initialise_browser(headless=True)
+
+    if not scraper.perform_login(get_env("IMO_USER"), get_env("IMO_PASSWORD")):
+        return False
+
+    db_countries = dict(session.query(
+        Country.name,
+        Country.iso2
+    ).all())
+
+    # some countries from IMO website are not the same as standard/official names in our db, so let's add them
+    additional_countries = {
+        'USA':'US',
+        'United States of America':'US',
+        "China, People's Republic of":'CN',
+        'Korea, South':'KR',
+        'Virgin Islands, British':'VI',
+        'Singapore':'SG',
+        'Taiwan':'TW',
+        'Hong Kong, China':'HK',
+        'Madeira':'PT',
+        'St Kitts & Nevis':'KN',
+        'Antigua & Barbuda':'AG',
+        'Irish Republic':'IE',
+        'St Vincent & The Grenadines':'VC'
+    }
+
+    country_dict = db_countries | additional_countries
+
+    companies = session.query(
+        Company
+    ) \
+        .filter(sa.and_(
+        Company.registration_country_iso2 == sa.null(),
+        Company.imo != sa.null())
+    ) \
+        .all()
+
+    for company in tqdm(companies):
+
+        # check imo website for company imo or name
+        company_info = scraper.get_information(search_text=str(company.imo))
+
+        if company_info is None or len(company_info) > 1:
+            logger.warning("Company not found, or more than one company with this search term ({}), skipping...".format(company.imo))
+            continue
+
+        company_info = company_info[0]
+        # add reg iso2 to record and commit
+        try:
+            company.registration_country_iso2 = country_dict[company_info[0]]
+            session.add(company)
+            session.commit()
+        except KeyError:
+            logger.warning("We did not find the ISO2 for imo {}, country {}. Considering adding manually.".format(company.imo, company_info[0]))
+        except IndexError:
+            logger.warning("Failed to parse correct information from IMO website for {}.".format(company.imo))
 
 
+class CompanyImoScraper:
+    """
+    Class for scrapig IMO/detailed information about ship company registration and address
 
+    """
 
+    def __init__(self, base_url, service=None):
+
+        self.service = service
+        self.browser = None
+        self.base = base_url
+
+    def _wait_for_object(self, item, by, browser=None, wait_time=30):
+        """
+
+        Parameters
+        ----------
+        item : item to wait for
+        by : method to use (eg. By.CSS_SELECTOR)
+        browser : browser object
+        wait_time : time to wait in seconds
+
+        Returns
+        -------
+        Returns element if found
+
+        """
+
+        if not browser:
+            browser = self.browser
+
+        try:
+            element = WebDriverWait(browser, wait_time).until(EC.presence_of_element_located((by, item)))
+        except TimeoutException:
+            print("Failed to find object...")
+            return None
+
+        if not element:
+            return None
+
+        return element
+
+    def perform_login(self, username, password, browser=None, ntries=5):
+        """
+        Log into the IMO website
+
+        Parameters
+        ----------
+        username : username
+        password : password
+        browser : browser object
+        ntries : number of tries to attempt to log in
+
+        Returns
+        -------
+
+        """
+
+        if not browser:
+            browser = self.browser
+
+        AUTHOR_CSS = "[id$=AuthorityType][class='form-control']"
+        LOGIN_FIELD_CSS = "[id$=txtUsername][class='form-control']"
+        PWD_FIELD_CSS = "[id$=txtPassword][class='form-control']"
+        LOGIN_BTN_CSS = "[id$=btnLogin][class='btn btn-default']"
+        SRCH_BTN = "[id$=btnSearchCompanies][class='button']"
+
+        browser.get(self.base)
+
+        button_search = self._wait_for_object(item=AUTHOR_CSS, by=By.CSS_SELECTOR)
+
+        if not button_search:
+            return False
+
+        author_select = Select(browser.find_element(By.CSS_SELECTOR, AUTHOR_CSS))
+        author_select.select_by_visible_text('Public Users')
+
+        username_select = WebDriverWait(browser, 10, ignored_exceptions=EC.StaleElementReferenceException). \
+            until(EC.element_to_be_clickable((By.CSS_SELECTOR, LOGIN_FIELD_CSS)))
+
+        # selenium doesn't support webelement refresh, so we have to retry manually
+
+        for i in range(0, 3):
+
+            try:
+                username_select = self.browser.find_element(By.CSS_SELECTOR, LOGIN_FIELD_CSS)
+
+                ActionChains(browser) \
+                    .click(username_select) \
+                    .send_keys(username) \
+                    .send_keys(Keys.ENTER) \
+                    .perform()
+
+                login_button = WebDriverWait(browser, 3, ignored_exceptions=EC.StaleElementReferenceException). \
+                    until(EC.element_to_be_clickable((By.CSS_SELECTOR, LOGIN_BTN_CSS)))
+            except TimeoutException:
+                continue
+            except EC.StaleElementReferenceException:
+                continue
+
+            break
+
+        pwd_field = self.browser.find_element(By.CSS_SELECTOR, PWD_FIELD_CSS)
+
+        if pwd_field is None:
+            return False
+
+        ActionChains(browser) \
+            .click(pwd_field) \
+            .send_keys(password) \
+            .send_keys(Keys.ENTER) \
+            .perform()
+
+        # verify we logged in
+        search_button = WebDriverWait(browser, 10, ignored_exceptions=EC.StaleElementReferenceException). \
+            until(EC.element_to_be_clickable((By.CSS_SELECTOR, SRCH_BTN)))
+
+        if not search_button:
+            return False
+
+        return True
+
+    def initialise_browser(self, options=None, browser=None, headless=False):
+        """
+        Initialise web browser
+
+        Parameters
+        ----------
+        options : webdriver options
+        browser : webdriver options
+
+        Returns
+        -------
+
+        """
+
+        if not options:
+            options = webdriver.ChromeOptions()
+            options.add_argument('ignore-certificate-errors')
+            if headless:
+                options.add_argument("--headless")
+
+        if not browser:
+            if not self.service: self.service = Service(ChromeDriverManager().install())
+            self.browser = webdriver.Chrome(service=self.service, options=options)
+        else:
+            self.browser = browser
+
+    def get_information(self, search_text, search_by='ImoNumber', browser=None):
+        """
+        Returns the registration and address of selected name or imo of company
+
+        Parameters
+        ----------
+        search_text : this can be the company name or imo
+        search_by : whether to search by name or imo (CompanyName or ImoNumber)
+        browser : browser object
+
+        Returns
+        -------
+        Returns the registration, address, name, imo
+
+        """
+
+        if not browser:
+            browser = self.browser
+
+        table_html = self._search_data(search_text=search_text, search_by=search_by)
+
+        if table_html:
+            table_df = pd.read_html(table_html)[0]
+
+            if table_df.empty:
+                return None
+
+            try:
+                registration, name, imo = table_df['Registered in'].values.tolist(), \
+                                          table_df['Name'].values.tolist(), \
+                                          table_df['IMO Company Number'].values.tolist()
+
+                return list(zip(registration, name, imo))
+
+            except KeyError:
+                return None
+
+        return None
+
+    def get_detailed_information(self, search_text, search_by='IMO'):
+        """
+        Find the address of selected imo/name
+
+        Parameters
+        ----------
+        search_by :
+        search_text : base text we search for to find the right table
+
+        Returns
+        -------
+        Returns detailed information dataframe
+
+        """
+
+        results_row = self.browser.find_element(By.XPATH, "//td[text()='{}']/..".format(search_text))
+
+        results_row.click()
+
+        address_table = WebDriverWait(self.browser, 10, ignored_exceptions=EC.StaleElementReferenceException). \
+            until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//td[contains(text(), '{}')]/ancestor::table[@class='table']".format(search_by))))
+
+        if address_table is None:
+            return None
+
+        table_df = pd.read_html(address_table.get_attribute('outerHTML'), index_col=0)[0].T
+
+        if table_df.empty:
+            return None
+
+        try:
+            address, status = table_df['Company address:'].values.tolist(), \
+                              table_df['Company status:'].values.tolist()
+
+            return list(zip(address, status))
+
+        except KeyError:
+            return None
+
+    def _search_data(self,
+                     search_text,
+                     search_by,
+                     loaded_text_css="[id$=gridCompanies][class='gridviewer_grid']",
+                     execute_css="[id$=btnSearchCompanies][class='button']",
+                     browser=None):
+        """
+        Searches the IMO website using the imo/company name given
+
+        Parameters
+        ----------
+        search_text : name or imo of company
+        search_by : CompanyName or ImoNumber
+        loaded_text_css : css we look for to determine page is loaded
+        execute_css : css we look for to click search
+        browser : bvrowser object
+
+        Returns
+        -------
+        HTML of found company information
+
+        """
+
+        if not browser:
+            browser = self.browser
+
+        browser.get(self.base)
+
+        button_search = self._wait_for_object(item=execute_css, by=By.CSS_SELECTOR)
+
+        if not button_search:
+            return None
+
+        COMPANY_SEARCH_CSS = "[id$=Company{}][type='text']".format(search_by)
+
+        input_box = browser.find_element(By.CSS_SELECTOR, COMPANY_SEARCH_CSS)
+
+        input_box.send_keys(search_text)
+
+        search = WebDriverWait(browser, 20).until(EC.element_to_be_clickable((By.CSS_SELECTOR, execute_css)))
+
+        if not search:
+            return None
+
+        search.click()
+
+        try:
+            table = WebDriverWait(browser, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, loaded_text_css)))
+        except TimeoutException:
+            return None
+
+        if table:
+            return table.get_attribute('outerHTML')
+
+        return None

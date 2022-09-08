@@ -111,6 +111,9 @@ class Equasis():
         except Exception as e:
             self._log("Error getting response")
             raise e
+        except requests.exceptions.HTTPError as e:
+            self._log("HTTP error")
+            raise e
 
         if "session has expired" in str(resp.content):
             self._login()

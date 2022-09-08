@@ -59,3 +59,6 @@ ENTSOG_TRANSMISSION_EXIT = "transmission_exit"
 
 # COMMODITY GROUPING
 COMMODITY_GROUPING_DEFAULT = "default"
+
+# IMO WEBSITE SCRAPING
+IMO_BASE_URL = "https://gisis.imo.org/public/ships/default.aspx"
