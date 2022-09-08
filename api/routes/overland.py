@@ -77,6 +77,10 @@ class PipelineFlowResource(Resource):
                         required=False, action='split', default=None)
     parser.add_argument('limit', type=int, help='how many result records do you want (default: keeps all)',
                         required=False, default=None)
+    parser.add_argument('keep_zeros',  type=inputs.boolean,
+                        help='keep lines with zeros',
+                        required=False,
+                        default=True)
 
     @routes_api.expect(parser)
     def get(self):
@@ -101,6 +105,7 @@ class PipelineFlowResource(Resource):
         currency = params.get("currency")
         sort_by = params.get("sort_by")
         limit = params.get("limit")
+        keep_zeros = params.get("keep_zeros")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -210,6 +215,11 @@ class PipelineFlowResource(Resource):
 
         if currency is not None:
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
+
+        if not keep_zeros:
+            flows_rich = flows_rich.filter(sa.or_(
+                sa.and_(PipelineFlow.value_tonne != sa.null(), PipelineFlow.value_tonne != 0),
+                sa.and_(PipelineFlow.value_m3 != sa.null(), PipelineFlow.value_m3 != 0)))
 
         # Aggregate
         query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)

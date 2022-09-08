@@ -83,6 +83,10 @@ class RussiaCounterResource(Resource):
     parser.add_argument('limit_by', action='split',
                         help='in which group do you want to limit to n records',
                         required=False, default=None)
+    parser.add_argument('keep_zeros',  type=inputs.boolean,
+                        help='keep lines with zeros',
+                        required=False,
+                        default=True)
 
     @routes_api.expect(parser)
     def get(self):
@@ -109,6 +113,7 @@ class RussiaCounterResource(Resource):
         pivot_value = params.get("pivot_value")
         limit = params.get("limit")
         limit_by = params.get("limit_by")
+        keep_zeros = params.get("keep_zeros")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -225,7 +230,8 @@ class RussiaCounterResource(Resource):
                                     limit=limit,
                                     aggregate_by=aggregate_by,
                                     sort_by=sort_by,
-                                    limit_by=limit_by)
+                                    limit_by=limit_by,
+                                    keep_zeros=keep_zeros)
 
         # Pivot
         counter = self.pivot_result(result=counter, pivot_by=pivot_by, pivot_value=pivot_value)
@@ -384,7 +390,10 @@ class RussiaCounterResource(Resource):
 
         return result
 
-    def limit_result(self, result, limit, aggregate_by, sort_by, limit_by):
+    def limit_result(self, result, limit, aggregate_by, sort_by, limit_by, keep_zeros):
+
+        if not keep_zeros:
+            result = result[(result.value_eur !=0) | (result.value_tonne !=0)]
 
         if not limit:
             return result

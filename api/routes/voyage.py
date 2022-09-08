@@ -30,6 +30,7 @@ from base.utils import update_geometry_from_wkb
 import country_converter as coco
 import base
 from engine.commodity import get_subquery as get_commodity_subquery
+from sqlalchemy.sql import extract
 
 
 @routes_api.route('/v0/voyage', strict_slashes=False)
@@ -47,14 +48,33 @@ class VoyageResource(Resource):
                         default=None, action='split', required=False)
     parser.add_argument('is_sts', help='denotes whether a shipment has had sts. Can be either True or False. Default: returns both',
                         default=None, required=False)
+
     parser.add_argument('date_from', help='start date for departure or arrival (format 2020-01-15)',
                         default=None, required=False)
     parser.add_argument('departure_date_from', help='start date for departure (format 2020-01-15)',
                         default=None, required=False)
     parser.add_argument('arrival_date_from', help='start date for arrival (format 2020-01-15)',
                         default=None, required=False)
-    parser.add_argument('date_to', type=str, help='end date for departure or arrival arrival (format 2020-01-15 or -7 for seven days before today)', required=False,
+
+
+    parser.add_argument('date_to', type=str, help='end date for departure or arrival (format 2020-01-15 or -7 for seven days before today)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('departure_date_to', type=str,
+                        help='end date for departure (format 2020-01-15 or -7 for seven days before today)',
+                        required=False,
+                        default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('arrival_date_to', type=str,
+                        help='end date for arrival (format 2020-01-15 or -7 for seven days before today)',
+                        required=False,
+                        default=dt.datetime.today().strftime("%Y-%m-%d"))
+
+    parser.add_argument('year', help='year(s) of departure or arrival e.g. 2021,2022', type=int,
+                        default=None, required=False, action='split')
+    parser.add_argument('departure_year', help='year(s) of departure e.g. 2021,2022', type=int,
+                        default=None, required=False, action='split')
+    parser.add_argument('arrival_year', help='year(s) of arrival e.g. 2021,2022', type=int,
+                        default=None, required=False, action='split')
+
     parser.add_argument('ship_imo', action='split', help='IMO identifier(s) of the ship(s)',
                         required=False,
                         default=None)
@@ -165,9 +185,11 @@ class VoyageResource(Resource):
         commodity = params.get("commodity")
         status = params.get("status")
         is_sts = params.get("is_sts")
+
         date_from = params.get("date_from")
         departure_date_from = params.get("departure_date_from")
         arrival_date_from = params.get("arrival_date_from")
+
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
         departure_iso2 = params.get("departure_iso2")
         departure_port_id = params.get("departure_port_id")
@@ -189,6 +211,14 @@ class VoyageResource(Resource):
         ship_insurer_region = params.get("ship_insurer_region")
 
         date_to = params.get("date_to")
+        departure_date_to = params.get("departure_date_to")
+        arrival_date_to = params.get("arrival_date_to")
+
+        year = params.get('year')
+        departure_year = params.get('departure_year')
+        arrival_year = params.get('arrival_year')
+
+
         ship_imo = params.get("ship_imo")
         aggregate_by = params.get("aggregate_by")
         format = params.get("format", "json")
@@ -203,6 +233,13 @@ class VoyageResource(Resource):
         pivot_by = params.get("pivot_by")
         pivot_value = params.get("pivot_value")
         select = params.get("select")
+
+        # Add the default date_from if none has been specified
+        date_filters = [date_from, departure_date_from, arrival_date_from,
+                        date_to, departure_date_to, arrival_date_to,
+                        year, departure_year, arrival_year]
+        if all([x is None for x in date_filters]):
+            date_from = VoyageResource.default_date_from
 
         DeparturePort = aliased(Port)
         ArrivalPort = aliased(Port)
@@ -219,6 +256,7 @@ class VoyageResource(Resource):
         ShipInsurerCountry = aliased(Country)
 
         DepartureCountry = aliased(Country)
+        ArrivalCountry = aliased(Country)
 
         DepartureBerth= aliased(Berth)
         ArrivalBerth = aliased(Berth)
@@ -292,8 +330,6 @@ class VoyageResource(Resource):
             [(DepartureBerth.name.ilike('Novorossiysk CPC%'), 'KZ')],
             else_=DeparturePort.iso2
         ).label('departure_iso2')
-
-
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
@@ -423,6 +459,7 @@ class VoyageResource(Resource):
                                     Arrival.date_utc.label("arrival_date_utc"),
                                     ArrivalPort.unlocode.label("arrival_unlocode"),
                                     ArrivalPort.iso2.label("arrival_iso2"),
+                                    ArrivalCountry.name.label("arrival_country"),
                                     ArrivalPort.name.label("arrival_port_name"),
                                     ArrivalPort.id.label("arrival_port_id"),
 
@@ -452,7 +489,7 @@ class VoyageResource(Resource):
 
                                     commodity_field,
                                     commodity_subquery.c.group.label("commodity_group"),
-
+                                    # commodity_subquery.c.group_name.label("commodity_group_name"),
 
                                     # Companies
                                     ShipManagerCompany.name.label("ship_manager"),
@@ -556,6 +593,7 @@ class VoyageResource(Resource):
              .outerjoin(ShipInsurerCountry, ShipInsurerCompany.country_iso2 == ShipInsurerCountry.iso2)
 
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
+             .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
              .filter(destination_iso2_field != "RU"))
 
         if id is not None:
@@ -576,6 +614,7 @@ class VoyageResource(Resource):
         if date_from is not None:
             shipments_rich = shipments_rich.filter(
                 sa.or_(
+                    Arrival.date_utc >= to_datetime(date_from),
                     Departure.date_utc >= to_datetime(date_from)
                 ))
 
@@ -585,16 +624,30 @@ class VoyageResource(Resource):
         if arrival_date_from is not None:
             shipments_rich = shipments_rich.filter(Arrival.date_utc >= to_datetime(arrival_date_from))
 
-        # Add the default date_from if none has been specified
-        if not date_from and not departure_date_from and not arrival_date_from:
-            shipments_rich = shipments_rich.filter(Departure.date_utc >= to_datetime(VoyageResource.default_date_from))
-
         if date_to is not None:
             shipments_rich = shipments_rich.filter(
                 sa.or_(
-                    # Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
+                    Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
                     Departure.date_utc <= to_datetime(date_to)
                 ))
+
+        if departure_date_to is not None:
+            shipments_rich = shipments_rich.filter(Departure.date_utc <= to_datetime(departure_date_to))
+
+        if arrival_date_to is not None:
+            shipments_rich = shipments_rich.filter(Arrival.date_utc <= to_datetime(arrival_date_to))
+
+        if year is not None:
+            shipments_rich = shipments_rich.filter(sa.or_(
+                extract('year', Departure.date_utc).in_(to_list(year)),
+                extract('year', Arrival.date_utc).in_(to_list(year))
+            ))
+
+        if departure_year is not None:
+            shipments_rich = shipments_rich.filter(extract('year', Departure.date_utc).in_(to_list(departure_year)))
+
+        if arrival_year is not None:
+            shipments_rich = shipments_rich.filter(extract('year', Arrival.date_utc).in_(to_list(arrival_year)))
 
         if departure_iso2 is not None:
             shipments_rich = shipments_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
@@ -687,7 +740,6 @@ class VoyageResource(Resource):
         response = self.build_response(result=result, format=format, nest_in_data=nest_in_data,
                                        aggregate_by=aggregate_by, download=download, routed_trajectory=routed_trajectory)
         return response
-
 
     def aggregate(self, query, aggregate_by):
         """Perform aggregation based on user parameters"""
