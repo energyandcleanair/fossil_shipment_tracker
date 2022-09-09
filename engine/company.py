@@ -526,7 +526,7 @@ class CompanyImoScraper:
         Parameters
         ----------
         options : webdriver options
-        browser : webdriver options
+        browser : webdriver
 
         Returns
         -------
@@ -564,7 +564,7 @@ class CompanyImoScraper:
         if not browser:
             browser = self.browser
 
-        table_html = self._search_data(search_text=search_text, search_by=search_by)
+        table_html = self._search_data(search_text=search_text, search_by=search_by, browser=browser)
 
         if table_html:
             table_df = pd.read_html(table_html)[0]
