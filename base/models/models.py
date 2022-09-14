@@ -52,7 +52,7 @@ from . import DB_TABLE_ALERT_CRITERIA_ASSOC
 
 class Ship(Base):
     imo = Column(String, primary_key=True)
-    mmsi = Column(String)
+    mmsi = Column(ARRAY(String))
     name = Column(String)
     type = Column(String)
     subtype = Column(String)
