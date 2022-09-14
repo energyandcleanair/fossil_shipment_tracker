@@ -4,12 +4,12 @@ import sqlalchemy as sa
 from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from sqlalchemy import case
-from sqlalchemy.dialects.postgresql import array, ARRAY
+from sqlalchemy.dialects.postgresql import array, ARRAY,BIGINT
 from sqlalchemy import cast, Text
 
 import base
 from base.db import session, engine
-from base.models import AlertInstance, Ship, Country, Shipment, AlertCriteria, Commodity,\
+from base.models import AlertInstance, Ship, Country, Shipment, AlertCriteria, Commodity, Port,\
         AlertConfig, AlertCriteriaAssociation, AlertRecipient, AlertRecipientAssociation, Departure
 from base.utils import to_list, to_datetime
 from base.logger import logger_slack
@@ -30,7 +30,8 @@ def manual_alert(destination_iso2=None,
                  destination_name_pattern=None,
                  min_dwt=None,
                  commodity=None,
-                 date_from=None):
+                 date_from=None,
+                 departure_port_ids=None):
     """
     A function to get what would be the resuts from an alert,
     without actually adding the alert_config and criteria in the db.
@@ -52,6 +53,7 @@ def manual_alert(destination_iso2=None,
                           Ship.name,
                           Ship.dwt,
                           Ship.commodity,
+                          Departure.port_id.label('departure_port_id'),
                           destination_iso2_field,
                           destination_name_field,
                           destination_date_field,
@@ -106,6 +108,9 @@ def manual_alert(destination_iso2=None,
     if commodity:
         query3 = query3.filter(query2.c.commodity.in_(to_list(commodity)))
 
+    if departure_port_ids:
+        query3 = query3.filter(query2.c.departure_port_id.in_(to_list(departure_port_ids)))
+
     query3 = query3 \
                 .order_by(query2.c.shipment_id, sa.desc(query2.c.destination_date)) \
                 .distinct(query2.c.shipment_id)
@@ -123,7 +128,11 @@ def get_new_alerts():
 
     # We use a trick for unnest to keep values with null rows
     NULL_ARTIFACT = '__null__'
+    NULL_ARTIFACT_BIGINT = -1
 
+    DepartureCountry = aliased(Country)
+    DeparturePort = aliased(Port)
+    
     min_date = dt.date.today() - dt.timedelta(days=7)
 
     query_shipment1 = session.query(Shipment.id.label('shipment_id'),
@@ -152,9 +161,14 @@ def get_new_alerts():
         Commodity.name.label('commodity_name'),
         Ship.dwt,
         Ship.imo,
-        Ship.name.label('ship_name')
+        Ship.name.label('ship_name'),
+        Departure.port_id.label('departure_port_id'),
+        DeparturePort.name.label('departure_port_name'),
+        DepartureCountry.name.label('departure_country')
        ) \
         .join(Departure, Departure.id == query_shipment1.c.departure_id) \
+        .join(DeparturePort, Departure.port_id == DeparturePort.id) \
+        .join(DepartureCountry, DepartureCountry.iso2 == DeparturePort.iso2) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .join(Commodity, Ship.commodity == Commodity.id) \
         .filter(query_shipment1.c.destination_date >= min_date) \
@@ -184,7 +198,8 @@ def get_new_alerts():
             AlertCriteria.commodity,
             AlertCriteria.min_dwt,
             AlertCriteria.new_destination_name_pattern,
-            func.unnest(func.coalesce(AlertCriteria.new_destination_iso2, [NULL_ARTIFACT])).label('destination_iso2')
+            AlertCriteria.departure_port_ids,
+            func.unnest(func.coalesce(AlertCriteria.new_destination_iso2, [NULL_ARTIFACT])).label('destination_iso2'),
         ) \
         .join(AlertCriteriaAssociation, AlertCriteriaAssociation.config_id == AlertConfig.id) \
         .join(AlertRecipientAssociation, AlertRecipientAssociation.config_id == AlertConfig.id) \
@@ -204,6 +219,7 @@ def get_new_alerts():
         query_alert1.c.recipient_id,
         query_alert1.c.recipient_email,
         query_alert1.c.destination_iso2,
+        query_alert1.c.departure_port_ids,
         func.unnest(func.coalesce(
                     case([(query_alert1.c.new_destination_name_pattern == cast([], ARRAY(Text)), sa.null())], else_=query_alert1.c.new_destination_name_pattern),
                     [NULL_ARTIFACT])).label('destination_name_pattern'),
@@ -221,9 +237,10 @@ def get_new_alerts():
         query_alert2.c.recipient_id,
         query_alert2.c.recipient_email,
         query_alert2.c.destination_iso2,
+        query_alert2.c.departure_port_ids,
         query_alert2.c.destination_name_pattern,
         func.unnest(func.coalesce(
-            case([(query_alert2.c.commodity==[], sa.null())], else_=query_alert2.c.commodity), [NULL_ARTIFACT])).label(
+            case([(query_alert2.c.commodity == [], sa.null())], else_=query_alert2.c.commodity), [NULL_ARTIFACT])).label(
             'commodity'),
         query_alert2.c.min_dwt
     )
@@ -231,7 +248,26 @@ def get_new_alerts():
     # alert3_df = pd.read_sql(query_alert3.statement, session.bind)
     query_alert3 = query_alert3.subquery()
 
-    query_alert = query_alert3
+    query_alert4 = session.query(
+        query_alert3.c.config_id,
+        query_alert3.c.config_name,
+        query_alert3.c.criteria_id,
+        query_alert3.c.recipient_id,
+        query_alert3.c.recipient_email,
+        query_alert3.c.destination_iso2,
+        query_alert3.c.destination_name_pattern,
+        query_alert3.c.commodity,
+        func.unnest(func.coalesce(
+            case([(query_alert3.c.departure_port_ids == cast([], ARRAY(BIGINT)), sa.null())],
+                 else_=query_alert3.c.departure_port_ids),
+            [NULL_ARTIFACT_BIGINT])).label('departure_port_id'),
+        query_alert3.c.min_dwt
+    )
+
+    # alert3_df = pd.read_sql(query_alert3.statement, session.bind)
+    query_alert4 = query_alert4.subquery()
+
+    query_alert = query_alert4
 
     # Join query alert and shipments
     query_alert_shipment = session.query(
@@ -247,6 +283,9 @@ def get_new_alerts():
                       sa.and_(query_alert.c.destination_iso2 == query_shipment.c.destination_iso2,
                               query_shipment.c.destination_iso2 != query_shipment.c.previous_destination_iso2),
                       query_alert.c.destination_iso2 == NULL_ARTIFACT),
+                  sa.or_(
+                      query_alert.c.departure_port_id == query_shipment.c.departure_port_id,
+                      query_alert.c.departure_port_id == NULL_ARTIFACT_BIGINT),
                   sa.or_(query_alert.c.destination_name_pattern == query_shipment.c.destination_name,
                              query_alert.c.destination_name_pattern == NULL_ARTIFACT),
                   sa.or_(query_alert.c.commodity == query_shipment.c.commodity,
@@ -254,10 +293,10 @@ def get_new_alerts():
                   query_shipment.c.dwt >= query_alert.c.min_dwt
               )
         ).distinct(
-        query_alert.c.config_id,
-        query_alert.c.recipient_email,
-        query_shipment.c.shipment_id,
-    )
+            query_alert.c.config_id,
+            query_alert.c.recipient_email,
+            query_shipment.c.shipment_id
+        )
     # alert_shipment_df = pd.read_sql(query_alert_shipment.statement, session.bind)
     query_alert_shipment = query_alert_shipment.subquery()
 
@@ -335,6 +374,7 @@ def build_email_table(alerts_df):
     table_df['dwt'] = table_df.dwt.apply(lambda x: "{:,.0f}".format(x))
     table_df['ship'] = table_df.ship_name + '<br><span class="commodity">' + table_df.commodity_name + '</span>' \
                        + '<br><span class="commodity">' + table_df.dwt + ' tonne</span>'
+    table_df['departure'] = table_df.departure_port_name + '<br>' + table_df.departure_country
     table_df['destination'] = table_df.destination_name + '<br>' + table_df.destination_country
     table_df['previous_destination'] = table_df.previous_destination_name + '<br>' + table_df.previous_destination_country
 
@@ -348,6 +388,7 @@ def build_email_table(alerts_df):
 
     table_columns = {
         'ship': 'Ship',
+        'departure': 'Departure',
         'destination': 'New destination',
         'previous_destination': 'Previous destination',
         'destination_date': 'Date',

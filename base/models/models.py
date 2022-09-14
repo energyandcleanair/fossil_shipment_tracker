@@ -640,6 +640,8 @@ class AlertCriteria(Base):
     new_destination_iso2 = Column(ARRAY(String))
     new_destination_name_pattern = Column(ARRAY(String))
 
+    departure_port_ids = Column(ARRAY(BigInteger)) # If null, all ports considered
+
     __tablename__ = DB_TABLE_ALERT_CRITERIA
 
 
