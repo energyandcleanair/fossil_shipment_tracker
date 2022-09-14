@@ -209,13 +209,154 @@ def ship_to_commodity(ship):
 
 
 def set_commodity(ship):
+    """
+
+    Parameters
+    ----------
+    ship :
+
+    Returns
+    -------
+
+    """
     [commodity, quantity, unit] = ship_to_commodity(ship)
     ship.commodity = commodity
     ship.quantity = quantity
     ship.unit = unit
     return ship
 
+def fix_duplicate_imo(ships=None):
+    """
+    Verify the ship table - check if there are any identical rows - this could happen with the historic version
+    of using '_v*' to iterate ships
+
+    Parameters
+    ----------
+    ships :
+
+    Returns
+    -------
+
+    """
+
+    def return_coalesced_data(ships):
+        """
+        Combine multiple ship object other data columns into one based on content
+
+        Parameters
+        ----------
+        ships :
+
+        Returns
+        -------
+
+        """
+        def return_all_values(d):
+            for v in d.values():
+                if isinstance(v, dict):
+                    yield from return_all_values(v)
+                else:
+                    if v is not None and v != '':
+                        yield v
+
+        # collapse all sources into lists, eg equasis, datalastic, marinetraffic
+        sources = {}
+        for ship in ships:
+            for source, data in ship.others.items():
+                sources[source] = sources.get(source, []) + [data]
+
+        # sort all data
+        for source, data in sources.items():
+            sources[source] = sorted(data, key=lambda item: len(list(return_all_values(item))), reverse=True)[0]
+
+        return sources
+
+    def update_ship_imo(old_imo, new_imo):
+        """
+        Correct any existing deparutres/portcalls with new imo
+
+        Parameters
+        ----------
+        old_imo :
+        new_imo :
+
+        Returns
+        -------
+
+        """
+        ship_portcalls = PortCall.query.filter(PortCall.ship_imo == old_imo).all()
+        for ship_portcall in ship_portcalls:
+            ship_portcall.ship_imo = new_imo
+
+        ship_departures = Departure.query.filter(Departure.ship_imo == old_imo).all()
+        for ship_departure in ship_departures:
+            ship_departure.ship_imo = new_imo
+
+        try:
+            session.commit()
+        except sa.exc.IntegrityError as e:
+            logger.error(e)
+            session.rollback()
+
+    if ships is None:
+        ships = session.query(
+            sa.func.split_part(Ship.imo, '_', 1).distinct().label('imo')
+                ) \
+        .filter(Ship.imo.op('~')('[_v]')) \
+        .all()
+
+    for ship in ships:
+        base_imo = ship.imo
+
+        ship_versions = session.query(
+            Ship
+        ) \
+        .filter(Ship.imo.op('~')(base_imo)) \
+        .all()
+
+        sources = [i for s in [s.others.keys() for s in ship_versions] for i in s]
+        other_data = return_coalesced_data(ship_versions)
+
+        # check if existing versions of ships have the same dwt - in which case we can simplify
+        if len(set([s.dwt for s in ship_versions])) == 1 and 'marinetraffic' in sources and 'datalastic' in sources:
+            # delete all duplicates except 1 - we keep records in priority of datalastic > mt
+            data_priority = {'datalastic':0, 'marinetraffic':1, 'equasis':2}
+
+            ship_versions = sorted(ship_versions, key=lambda item: min([data_priority[d] for d in item.others]))
+
+            ship_to_keep = ship_versions[0]
+
+            if '_v' in ship_to_keep.imo:
+                update_ship_imo(ship_to_keep.imo, base_imo)
+
+                # update the object we're keeping with all info we want to contain and collapse mmsis into list
+            ship_to_keep.imo = base_imo
+            ship_to_keep.others = other_data
+            ship_to_keep.mmsi = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
+            session.commit()
+
+            # fix the rest of the ship versions by changing departures/portcalls and deleting them after
+            for sv in ship_versions[1:]:
+                if sv.imo != base_imo:
+                    # update departures/port calls
+                    update_ship_imo(sv.imo, base_imo)
+                    # remove ship
+                    session.delete(sv)
+                    session.commit()
+
+        else:
+            # we have conflicting information -
+            # we fill ship using imo to get the latest data and make sure dwt is correct
+            pass
+
+
 def fix_mmsi_imo_discrepancy(date_from=None):
+    """
+
+    Parameters
+    ----------
+    date_from :
+    """
     query = session.query(PortCall.ship_imo, PortCall.ship_mmsi)
     if date_from is not None:
         query = query.filter(PortCall.date_utc >= to_datetime(date_from))
