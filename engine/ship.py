@@ -271,7 +271,7 @@ def fix_duplicate_imo(ships=None):
 
         return sources
 
-    def update_ship_imo(old_imo, new_imo):
+    def update_ship_imo(old_imo, new_imo, commit=True):
         """
         Correct any existing deparutres/portcalls with new imo
 
@@ -291,6 +291,9 @@ def fix_duplicate_imo(ships=None):
         ship_departures = Departure.query.filter(Departure.ship_imo == old_imo).all()
         for ship_departure in ship_departures:
             ship_departure.ship_imo = new_imo
+
+        if not commit:
+            return
 
         try:
             session.commit()
@@ -347,7 +350,15 @@ def fix_duplicate_imo(ships=None):
         else:
             # we have conflicting information -
             # we fill ship using imo to get the latest data and make sure dwt is correct
-            pass
+            for sv in ship_versions:
+                update_ship_imo(sv.imo, base_imo, commit=False)
+                session.delete(sv)
+
+            if fill(base_imo):
+                session.commit()
+            else:
+                logger.warning("Failed to find imo {} in datalastic or marinetraffic.".format(base_imo))
+                session.rollback()
 
 
 def fix_mmsi_imo_discrepancy(date_from=None):
