@@ -293,6 +293,7 @@ def fix_duplicate_imo(ships=None):
                 session.rollback()
                 logger.info("Duplicate portcall_id {} - deleting portcall, departure and associated shipments.".format(ship_portcall.id))
 
+                # find associated shipments to delete
                 shipments_to_delete = session.query(
                     Shipment
                 ) \
@@ -301,14 +302,16 @@ def fix_duplicate_imo(ships=None):
 
                 shipments_to_delete_list = [s.id for s in shipments_to_delete.all()]
 
-                shipments_to_delete.delete()
+                # delete in correct order to respect foreign keys
+                session.query(Shipment).filter(Shipment.id.in_(shipments_to_delete_list)).delete()
                 session.query(Departure).filter(Departure.portcall_id == ship_portcall.id).delete()
 
                 session.query(ShipmentDepartureBerth).filter(ShipmentDepartureBerth.shipment_id.in_(shipments_to_delete_list)).delete()
                 session.query(Trajectory).filter(Trajectory.shipment_id.in_(shipments_to_delete_list)).delete()
 
-
                 session.delete(ship_portcall)
+
+                # try and commit and if it fails undo
                 try:
                     session.commit()
                 except sa.exc.IntegrityError:
@@ -333,8 +336,8 @@ def fix_duplicate_imo(ships=None):
         .filter(Ship.imo.op('~')('[_v]')) \
         .all()
 
-    for ship in ships:
-        base_imo = ship.imo
+    for ship in tqdm(ships):
+        base_imo = ship.imos
 
         ship_versions = session.query(
             Ship
@@ -375,7 +378,6 @@ def fix_duplicate_imo(ships=None):
         else:
             # we have conflicting information -
             # we fill ship using imo to get the latest data and make sure dwt is correct
-            continue
             found_ship = Datalastic.get_ship(imo=base_imo)
             if found_ship is None: found_ship = Marinetraffic.get_ship(imo=base_imo)
 
@@ -403,6 +405,7 @@ def fix_duplicate_imo(ships=None):
                 try:
                     session.commit()
                 except sa.exc.IntegrityError:
+                    logger.error("Failed update existing portcalls/departures for ship imo {}.".format(base_imo))
                     session.rollback()
 
 
