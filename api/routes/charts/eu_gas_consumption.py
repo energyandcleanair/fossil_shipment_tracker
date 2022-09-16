@@ -46,6 +46,10 @@ class ChartEUGasConsumption(Resource):
     parser.add_argument('rolling_days', type=int,
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=7)
+    parser.add_argument('pivot_by_year', type=inputs.boolean,
+                        help='whether to pivot data by year or not',
+                        required=False, default=False)
+
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('download', help='Whether to return results as a file or not.',
@@ -59,11 +63,10 @@ class ChartEUGasConsumption(Resource):
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         rolling_days = params.get("rolling_days")
-        format = params.get("format")
         nest_in_data = params.get("nest_in_data")
+        pivot_by_year = params.get('pivot_by_year')
         format = params.get("format")
         download = params.get("download")
-
 
         params_entsog = {
             "format": "json",
@@ -127,6 +130,13 @@ class ChartEUGasConsumption(Resource):
         if date_to:
             wide = wide[wide.date <= pd.to_datetime(to_datetime(date_to))]
 
+        if pivot_by_year:
+            wide['year'] = pd.to_datetime(wide.date).dt.year
+            wide['date'] = pd.to_datetime("1900-"+pd.to_datetime(wide.date).dt.strftime('%m-%d'))
+            wide = wide[['date', 'year', implied_consumption, storage_drawdown, production, imports]] \
+                .melt(id_vars=['date', 'year'], value_vars=[implied_consumption, storage_drawdown, production, imports]) \
+                .pivot(index=['date','type'], columns='year', values='value') \
+                .reset_index()
 
         return self.build_response(result=wide,
                                    format=format,
