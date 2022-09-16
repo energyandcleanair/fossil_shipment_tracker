@@ -4,7 +4,7 @@ import base
 
 from base.db import session
 from base.logger import logger
-from base.models import Ship, PortCall, Departure, Shipment
+from base.models import Ship, PortCall, Departure, Shipment, ShipmentDepartureBerth, Trajectory
 from base.utils import to_datetime, to_list
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
@@ -271,7 +271,7 @@ def fix_duplicate_imo(ships=None):
 
         return sources
 
-    def update_ship_imo(old_imo, new_imo, commit=True):
+    def update_ship_imo(old_imo, new_imo):
         """
         Correct any existing deparutres/portcalls with new imo
 
@@ -287,13 +287,38 @@ def fix_duplicate_imo(ships=None):
         ship_portcalls = PortCall.query.filter(PortCall.ship_imo == old_imo).all()
         for ship_portcall in ship_portcalls:
             ship_portcall.ship_imo = new_imo
+            try:
+                session.commit()
+            except sa.exc.IntegrityError as e:
+                session.rollback()
+                logger.info("Duplicate portcall_id {} - deleting portcall, departure and associated shipments.".format(ship_portcall.id))
+
+                shipments_to_delete = session.query(
+                    Shipment
+                ) \
+                .join(Departure, Departure.id == Shipment.departure_id) \
+                .filter(Departure.portcall_id == ship_portcall.id)
+
+                shipments_to_delete_list = [s.id for s in shipments_to_delete.all()]
+
+                shipments_to_delete.delete()
+                session.query(Departure).filter(Departure.portcall_id == ship_portcall.id).delete()
+
+                session.query(ShipmentDepartureBerth).filter(ShipmentDepartureBerth.shipment_id.in_(shipments_to_delete_list)).delete()
+                session.query(Trajectory).filter(Trajectory.shipment_id.in_(shipments_to_delete_list)).delete()
+
+
+                session.delete(ship_portcall)
+                try:
+                    session.commit()
+                except sa.exc.IntegrityError:
+                    logger.error("Failed to delete portcall_id {} and associated objects.".format(ship_portcall.id))
+                    session.rollback()
+                    continue
 
         ship_departures = Departure.query.filter(Departure.ship_imo == old_imo).all()
         for ship_departure in ship_departures:
             ship_departure.ship_imo = new_imo
-
-        if not commit:
-            return
 
         try:
             session.commit()
@@ -350,15 +375,35 @@ def fix_duplicate_imo(ships=None):
         else:
             # we have conflicting information -
             # we fill ship using imo to get the latest data and make sure dwt is correct
-            for sv in ship_versions:
-                update_ship_imo(sv.imo, base_imo, commit=False)
-                session.delete(sv)
+            continue
+            found_ship = Datalastic.get_ship(imo=base_imo)
+            if found_ship is None: found_ship = Marinetraffic.get_ship(imo=base_imo)
 
-            if fill(base_imo):
-                session.commit()
+            if found_ship is not None:
+
+                found_ship.others = other_data
+                found_ship.mmsi = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
+
+                for sv in ship_versions:
+                    update_ship_imo(sv.imo, base_imo)
+                    session.delete(sv)
+
+                try:
+                    session.commit()
+                except sa.exc.IntegrityError:
+                    session.rollback()
+
+
             else:
-                logger.warning("Failed to find imo {} in datalastic or marinetraffic.".format(base_imo))
-                session.rollback()
+                logger.error("Failed to update ship_imo {}, we will use existing ship object.".format(base_imo))
+                for sv in ship_versions:
+                    if '_v' in sv.imo:
+                        update_ship_imo(sv.imo, base_imo)
+                        session.delete(sv)
+                try:
+                    session.commit()
+                except sa.exc.IntegrityError:
+                    session.rollback()
 
 
 def fix_mmsi_imo_discrepancy(date_from=None):
