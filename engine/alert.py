@@ -1,6 +1,7 @@
 import pandas as pd
 import datetime as dt
 import sqlalchemy as sa
+import numpy as np
 from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from sqlalchemy import case
@@ -10,7 +11,7 @@ from sqlalchemy import cast, Text
 import base
 from base.db import session, engine
 from base.models import AlertInstance, Ship, Country, Shipment, AlertCriteria, Commodity, Port,\
-        AlertConfig, AlertCriteriaAssociation, AlertRecipient, AlertRecipientAssociation, Departure
+        AlertConfig, AlertCriteriaAssociation, AlertRecipient, AlertRecipientAssociation, Departure, Arrival
 from base.utils import to_list, to_datetime
 from base.logger import logger_slack
 
@@ -31,7 +32,7 @@ def manual_alert(destination_iso2=None,
                  min_dwt=None,
                  commodity=None,
                  date_from=None,
-                 departure_port_ids=None):
+                 departure_port_id=None):
     """
     A function to get what would be the resuts from an alert,
     without actually adding the alert_config and criteria in the db.
@@ -44,22 +45,31 @@ def manual_alert(destination_iso2=None,
     :return:
     """
 
+    DeparturePort = aliased(Port)
+    ArrivalPort = aliased(Port)
+
     destination_iso2_field = func.unnest(Shipment.destination_iso2s).label('destination_iso2')
     destination_name_field = func.unnest(Shipment.destination_names).label('destination_name')
     destination_date_field = func.unnest(Shipment.destination_dates).label('destination_date')
 
     query = session.query(Shipment.id.label('shipment_id'),
+                          Shipment.status,
                           Ship.imo,
                           Ship.name,
                           Ship.dwt,
                           Ship.commodity,
                           Departure.port_id.label('departure_port_id'),
+                          DeparturePort.name.label('departure_port_name'),
                           destination_iso2_field,
                           destination_name_field,
                           destination_date_field,
+                          ArrivalPort.iso2.label('arrival_iso2'),
                           Commodity.name.label('commodity_name')) \
-                .join(Departure, Departure.id == Shipment.departure_id) \
-                .join(Ship, Ship.imo == Departure.ship_imo) \
+        .join(Departure, Departure.id == Shipment.departure_id) \
+        .join(DeparturePort, DeparturePort.id == Departure.port_id) \
+        .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
+        .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id) \
+        .join(Ship, Ship.imo == Departure.ship_imo) \
                 .outerjoin(Commodity, Commodity.id == Ship.commodity) \
         .subquery()
 
@@ -89,8 +99,12 @@ def manual_alert(destination_iso2=None,
 
     if destination_iso2:
         query3 = query3.filter(
-            sa.and_(query2.c.destination_iso2 != query2.c.previous_destination_iso2,
-                    query2.c.destination_iso2.in_(to_list(destination_iso2)))
+            sa.or_(
+                sa.and_(query2.c.destination_iso2 != query2.c.previous_destination_iso2,
+                        query2.c.destination_iso2.in_(to_list(destination_iso2))),
+                query2.c.arrival_iso2.in_(to_list(destination_iso2))
+            )
+
         )
     
     if destination_name_pattern:
@@ -108,8 +122,8 @@ def manual_alert(destination_iso2=None,
     if commodity:
         query3 = query3.filter(query2.c.commodity.in_(to_list(commodity)))
 
-    if departure_port_ids:
-        query3 = query3.filter(query2.c.departure_port_id.in_(to_list(departure_port_ids)))
+    if departure_port_id:
+        query3 = query3.filter(query2.c.departure_port_id.in_(to_list(departure_port_id)))
 
     query3 = query3 \
                 .order_by(query2.c.shipment_id, sa.desc(query2.c.destination_date)) \
@@ -132,11 +146,16 @@ def get_new_alerts():
 
     DepartureCountry = aliased(Country)
     DeparturePort = aliased(Port)
+
+    ArrivalCountry = aliased(Country)
+    ArrivalPort = aliased(Port)
     
     min_date = dt.date.today() - dt.timedelta(days=7)
 
     query_shipment1 = session.query(Shipment.id.label('shipment_id'),
                                     Shipment.departure_id,
+                                    Shipment.arrival_id,
+                                    Shipment.status,
                                     func.unnest(Shipment.destination_iso2s).label('destination_iso2'),
                                     func.unnest(Shipment.destination_names).label('destination_name'),
                                     func.unnest(Shipment.destination_dates).label('destination_date'),
@@ -147,6 +166,7 @@ def get_new_alerts():
     query_shipment2 = session.query(
         query_shipment1.c.shipment_id,
         query_shipment1.c.destination_iso2,
+        query_shipment1.c.status,
         func.lag(query_shipment1.c.destination_iso2).over(
                                partition_by=query_shipment1.c.shipment_id,
                                order_by=query_shipment1.c.destination_date)
@@ -164,11 +184,18 @@ def get_new_alerts():
         Ship.name.label('ship_name'),
         Departure.port_id.label('departure_port_id'),
         DeparturePort.name.label('departure_port_name'),
-        DepartureCountry.name.label('departure_country')
+        DepartureCountry.name.label('departure_country'),
+        Arrival.date_utc.label('arrival_date'),
+        ArrivalPort.name.label('arrival_port_name'),
+        ArrivalCountry.iso2.label('arrival_iso2'),
+        ArrivalCountry.name.label('arrival_country')
        ) \
         .join(Departure, Departure.id == query_shipment1.c.departure_id) \
         .join(DeparturePort, Departure.port_id == DeparturePort.id) \
         .join(DepartureCountry, DepartureCountry.iso2 == DeparturePort.iso2) \
+        .outerjoin(Arrival, Arrival.id == query_shipment1.c.arrival_id) \
+        .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id) \
+        .outerjoin(ArrivalCountry, ArrivalCountry.iso2 == ArrivalPort.iso2) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .join(Commodity, Ship.commodity == Commodity.id) \
         .filter(query_shipment1.c.destination_date >= min_date) \
@@ -182,7 +209,10 @@ def get_new_alerts():
         .outerjoin(prev_country, prev_country.iso2 == query_shipment2.c.previous_destination_iso2) \
         .filter(sa.or_(
             query_shipment2.c.destination_iso2 != query_shipment2.c.previous_destination_iso2,
-            query_shipment2.c.destination_name != query_shipment2.c.previous_destination_name))
+            query_shipment2.c.destination_name != query_shipment2.c.previous_destination_name,
+            query_shipment2.c.arrival_iso2 != sa.null()
+        ))
+
 
     query_shipment = query_shipment3
     # shipment_df = pd.read_sql(query_shipment.statement, session.bind)
@@ -282,6 +312,7 @@ def get_new_alerts():
                   sa.or_(
                       sa.and_(query_alert.c.destination_iso2 == query_shipment.c.destination_iso2,
                               query_shipment.c.destination_iso2 != query_shipment.c.previous_destination_iso2),
+                      query_alert.c.destination_iso2 == query_shipment.c.arrival_iso2,
                       query_alert.c.destination_iso2 == NULL_ARTIFACT),
                   sa.or_(
                       query_alert.c.departure_port_id == query_shipment.c.departure_port_id,
@@ -312,7 +343,8 @@ def get_new_alerts():
         .outerjoin(past_alerts, sa.and_(past_alerts.c.config_id == query_alert_shipment.c.config_id,
                                    past_alerts.c.recipient_id == query_alert_shipment.c.recipient_id)) \
         .filter(sa.or_(past_alerts.c.last_date_utc == sa.null(),
-                       query_alert_shipment.c.destination_date >= past_alerts.c.last_date_utc))
+                       query_alert_shipment.c.destination_date >= past_alerts.c.last_date_utc,
+                       query_alert_shipment.c.arrival_date >= past_alerts.c.last_date_utc))
 
     alerts_df = pd.read_sql(query_alert_shipment_new.statement, session.bind)
     alerts_df.replace({NULL_ARTIFACT: None}, inplace=True)
@@ -374,8 +406,14 @@ def build_email_table(alerts_df):
     table_df['dwt'] = table_df.dwt.apply(lambda x: "{:,.0f}".format(x))
     table_df['ship'] = table_df.ship_name + '<br><span class="commodity">' + table_df.commodity_name + '</span>' \
                        + '<br><span class="commodity">' + table_df.dwt + ' tonne</span>'
+    table_df['status'] = table_df.status.str.title()
     table_df['departure'] = table_df.departure_port_name + '<br>' + table_df.departure_country
+    table_df['arrival'] = table_df.arrival_port_name + '<br>' + table_df.arrival_country
     table_df['destination'] = table_df.destination_name + '<br>' + table_df.destination_country
+    # If there's an arrival, use arrival infornation. If not, use destination
+    table_df['destination'] = np.where(table_df.arrival_port_name.isnull(),
+                                       table_df.destination,
+                                       table_df.arrival)
     table_df['previous_destination'] = table_df.previous_destination_name + '<br>' + table_df.previous_destination_country
 
     def imo_to_links(imo):
@@ -384,12 +422,13 @@ def build_email_table(alerts_df):
                 .format(imo=imo).replace("\n","")
 
     table_df['links'] = table_df.imo.apply(imo_to_links)
-    table_df['destination_date'] = table_df.destination_date.dt.strftime('%d %b %Y %H:%M')
+    table_df['destination_date'] = table_df.destination_date.dt.strftime('%d %b %Y<br>%H:%M')
 
     table_columns = {
+        'status': 'Status',
         'ship': 'Ship',
         'departure': 'Departure',
-        'destination': 'New destination',
+        'destination': 'Destination',
         'previous_destination': 'Previous destination',
         'destination_date': 'Date',
         'links': 'Links'
