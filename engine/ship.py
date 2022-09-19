@@ -337,7 +337,7 @@ def fix_duplicate_imo(ships=None):
         .all()
 
     for ship in tqdm(ships):
-        base_imo = ship.imos
+        base_imo = ship.imo
 
         ship_versions = session.query(
             Ship
@@ -345,46 +345,66 @@ def fix_duplicate_imo(ships=None):
         .filter(Ship.imo.op('~')(base_imo)) \
         .all()
 
-        sources = [i for s in [s.others.keys() for s in ship_versions] for i in s]
+        # combine other data column to store for the future
         other_data = return_coalesced_data(ship_versions)
+        mmsis = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
 
         # check if existing versions of ships have the same dwt - in which case we can simplify
-        if len(set([s.dwt for s in ship_versions])) == 1 and 'marinetraffic' in sources and 'datalastic' in sources:
+        if len(set([s.dwt for s in ship_versions])) == 1:
             # delete all duplicates except 1 - we keep records in priority of datalastic > mt
-            data_priority = {'datalastic':0, 'marinetraffic':1, 'equasis':2}
+            data_priority = {'datalastic':4, 'marinetraffic':2, 'equasis':1}
 
-            ship_versions = sorted(ship_versions, key=lambda item: min([data_priority[d] for d in item.others]))
+            ship_versions = sorted(ship_versions, key=lambda item: sum([data_priority[d] for d in item.others]), reverse=True)
 
             ship_to_keep = ship_versions[0]
-
-            if '_v' in ship_to_keep.imo:
-                update_ship_imo(ship_to_keep.imo, base_imo)
-
-                # update the object we're keeping with all info we want to contain and collapse mmsis into list
-            ship_to_keep.imo = base_imo
-            ship_to_keep.others = other_data
-            ship_to_keep.mmsi = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
-            session.commit()
+            old_imo = ship_to_keep.imo
 
             # fix the rest of the ship versions by changing departures/portcalls and deleting them after
             for sv in ship_versions[1:]:
-                if sv.imo != base_imo:
-                    # update departures/port calls
-                    update_ship_imo(sv.imo, base_imo)
-                    # remove ship
-                    session.delete(sv)
-                    session.commit()
+
+                # fix departures/portcalls if necessary
+                update_ship_imo(sv.imo, old_imo)
+
+                # remove ship
+                session.delete(sv)
+
+            # we run flush to make sure the change is reflected, as we need to update ship we're keeping to existing
+            # imo
+            try:
+                session.flush()
+            except sa.exc.IntegrityError:
+                session.rollback()
+                continue
+
+            # update the object we're keeping with all info we want to contain and collapse mmsis into list
+            ship_to_keep.imo = base_imo
+            ship_to_keep.others = other_data
+            ship_to_keep.mmsi = mmsis
+
+            # fix portcalls/departures to base imo if original had _v naming
+            if '_v' in ship_to_keep.imo:
+                update_ship_imo(old_imo, base_imo)
+
+            try:
+                session.commit()
+            except sa.exc.IntegrityError:
+                session.rollback()
+                logger.error("Failed to fix ship imo {}.".format(base_imo))
 
         else:
-            # we have conflicting information -
+            # we have conflicting information for a minotiry of cases -
             # we fill ship using imo to get the latest data and make sure dwt is correct
             found_ship = Datalastic.get_ship(imo=base_imo)
             if found_ship is None: found_ship = Marinetraffic.get_ship(imo=base_imo)
 
             if found_ship is not None:
 
+                # add or over ride existing others data with newest
+                for source, data in found_ship.others.items():
+                    other_data[source] = data
+
                 found_ship.others = other_data
-                found_ship.mmsi = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
+                found_ship.mmsi = mmsis
 
                 for sv in ship_versions:
                     update_ship_imo(sv.imo, base_imo)
