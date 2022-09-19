@@ -26,7 +26,7 @@ from sqlalchemy import func
 import sqlalchemy as sa
 
 def update(
-        date_from="2021-11-01",
+        date_from="2022-01-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         ship_imo=None,
         commodities = [base.LNG,
@@ -37,6 +37,7 @@ def update(
         use_cache=False,
         cache_objects=False,
         force_rebuild=False,
+        between_existing_only=False,
         upload_unprocessed_events=True,
         limit=None):
     """
@@ -63,6 +64,7 @@ def update(
     ships = session.query(
             Departure.ship_imo.distinct().label("ship_imo"),
          ) \
+        .filter(Departure.date_utc > date_from) \
         .join(Port, Port.id == Departure.port_id) \
         .join(Ship, Departure.ship_imo == Ship.imo)
 
@@ -95,6 +97,9 @@ def update(
         # add ship to processed
         processed_ships.append(ship_imo)
 
+        # dates to query
+        date_bounds = []
+
         if not force_rebuild:
 
             # check whether we called this ship imo in the MTCall table and get latest date
@@ -106,25 +111,54 @@ def update(
                 .first()
 
             # if we did check this ship before and force rebuild is false, only query since last time
-            if last_event_call is not None:
+            if last_event_call and last_event_call is not None:
                 date_from = to_datetime(last_event_call.params['todate']) + dt.timedelta(minutes=1)
 
-        date_bounds = []
+        if force_rebuild and not between_existing_only:
+            date_bounds = [(date_from, date_to)]
 
-        day_delta = (date_to - date_from).days
-        polling_limit = datetime.timedelta(180)
+        if force_rebuild and between_existing_only:
+            event_calls = session.query(MarineTrafficCall) \
+                .filter(MarineTrafficCall.method == base.VESSEL_EVENTS,
+                        MarineTrafficCall.params['imo'].astext == ship_imo,
+                        MarineTrafficCall.status == base.HTTP_OK) \
+                .order_by(MarineTrafficCall.params['todate'].desc()) \
+                .all()
 
-        for _d in range(0, int(day_delta / 180)):
-            date_bounds.append([date_from, date_from+polling_limit])
-            date_from = date_from + polling_limit + datetime.timedelta(1)
+            event_date_froms = [to_datetime(date_from)] + [x.date_utc + dt.timedelta(minutes=1) for x in event_calls]
+            event_date_tos = [x.date_utc - dt.timedelta(minutes=1) for x in event_calls] + [to_datetime(date_to)]
+            date_bounds = list(zip(event_date_froms, event_date_tos))
 
-        date_bounds.append([date_from, date_to])
+        # there is a max query date for marinetraffic, so we need to possibly break down dates to <180 day difference
+        query_dates = []
 
         for dates in date_bounds:
             query_date_from = dates[0]
             query_date_to = dates[1]
 
-            if query_date_to < query_date_from:
+            if query_date_to <= query_date_from:
+                continue
+
+            day_delta = (query_date_to - query_date_from).days
+
+            if day_delta < 180:
+                query_dates.append(dates)
+                continue
+
+            polling_limit_days = 179
+            polling_limit = datetime.timedelta(polling_limit_days)
+
+            for _d in range(0, int(day_delta / polling_limit_days)):
+                query_dates.append([query_date_from, query_date_from+polling_limit])
+                query_date_from = query_date_from + polling_limit + datetime.timedelta(minutes=1)
+
+            query_dates.append([query_date_from, query_date_to])
+
+        for dates in query_dates:
+            query_date_from = dates[0]
+            query_date_to = dates[1]
+
+            if query_date_to <= query_date_from:
                 continue
 
             events = Marinetraffic.get_ship_events_between_dates(
