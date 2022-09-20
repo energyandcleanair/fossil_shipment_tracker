@@ -198,9 +198,9 @@ def get_flaring_amount(date, geometries):
 
     flares = flares_raw
     flares = flares[(flares.Temp_BB > 1200) &
-                    (flares.Temp_BB < 999999)]
-    flares.loc[:,'rhp'] = sigma * np.power(flares.Temp_BB,4) * np.power(flares.Area_BB, d)
-    flares.loc[:,'bcm_est'] = b1 * flares.rhp
+                    (flares.Temp_BB < 999999)].copy()
+    flares['rhp'] = sigma * np.power(flares.Temp_BB,4) * np.power(flares.Area_BB, d)
+    flares['bcm_est'] = b1 * flares.rhp
 
     flares = flares[['Date_LTZ', 'Lon_GMTCO', 'Lat_GMTCO', 'bcm_est']] \
         .rename(columns={'Date_LTZ': 'date',
