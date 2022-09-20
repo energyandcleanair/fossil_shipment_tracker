@@ -6,6 +6,7 @@ from sqlalchemy.orm import load_only
 from sqlalchemy.inspection import inspect
 from base.models import Shipment, ShipmentWithSTS
 
+
 def rebuild(date_from="2022-01-01"):
     logger_slack.info("=== Shipment rebuild ===")
     with open('engine/shipment_rebuild.sql', 'r') as file:
@@ -14,8 +15,8 @@ def rebuild(date_from="2022-01-01"):
     execute_statement(sql_rebuild, print_result=True)
 
     departure.update()
-
     update(date_from=date_from)
+
 
 def update(date_from="2022-01-01"):
     logger_slack.info("=== Shipment update ===")

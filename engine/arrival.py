@@ -5,9 +5,9 @@ from tqdm import tqdm
 import base
 from engine import departure
 from engine import portcall
-from base.logger import logger, logger_slack
+from base.logger import logger_slack
 from base.db import session
-from base.models import Arrival, Shipment, Port, PortCall, Departure, ShipmentArrivalBerth, Trajectory, ShipmentWithSTS
+from base.models import Arrival, Shipment, ShipmentWithSTS
 
 
 def get_dangling_arrivals():
@@ -26,6 +26,21 @@ def update(min_dwt=base.DWT_MIN,
            force_for_arrival_to_departure_greater_than=None,
            include_undetected_arrival_shipments=True,
            cache_only=False):
+    """
+
+    :param min_dwt:
+    :param limit:
+    :param date_from:
+    :param date_to:
+    :param commodities:
+    :param ship_imo:
+    :param unlocode:
+    :param port_id:
+    :param force_for_arrival_to_departure_greater_than:
+    :param include_undetected_arrival_shipments:
+    :param cache_only:
+    :return:
+    """
 
     logger_slack.info("=== Arrival update ===")
 
