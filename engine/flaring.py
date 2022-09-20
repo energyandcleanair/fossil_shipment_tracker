@@ -48,8 +48,8 @@ def update(date_from='2015-01-01',
         date_from = session.query(func.max(Flaring.date)).first()[0] or date_from
 
     flares = get_flaring_ts(facilities=facilities,
-                            date_from=date_from,
-                            date_to=date_to)
+                            date_from=to_datetime(date_from),
+                            date_to=to_datetime(date_to))
 
     upsert(df=flares,
            table=DB_TABLE_FLARING,
