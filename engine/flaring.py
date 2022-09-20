@@ -37,12 +37,16 @@ def fill():
     return
 
 
-def update():
+def update(date_from='2015-01-01',
+           date_to=-2,
+           force=False):
 
     facilities = pd.read_sql(session.query(FlaringFacility).statement, session.bind)
     facilities = update_geometry_from_wkb(facilities, to="shape")
-    date_from = session.query(func.max(Flaring.date)).first()[0] or '2018-01-01'
-    date_to = to_datetime(-2)
+
+    if not force:
+        date_from = session.query(func.max(Flaring.date)).first()[0] or date_from
+
     flares = get_flaring_ts(facilities=facilities,
                             date_from=date_from,
                             date_to=date_to)
