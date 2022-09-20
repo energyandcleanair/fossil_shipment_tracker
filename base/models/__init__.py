@@ -40,4 +40,11 @@ DB_TABLE_ALERT_CRITERIA = "alert_criteria"
 DB_TABLE_ALERT_CRITERIA_ASSOC = "alert_criteria_assoc"
 
 
+# Flaring related tables
+DB_TABLE_FLARING_FACILITY = "flaring_facility"
+DB_TABLE_FLARING = "flaring"
+DB_TABLE_FLARING_ANOMALY = "flaring_anomaly"
+DB_TABLE_FLARING_ANOMALY_ALGORITHM = "flaring_anomaly_algorithm"
+
+
 from .models import *

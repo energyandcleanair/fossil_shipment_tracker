@@ -49,6 +49,11 @@ from . import DB_TABLE_ALERT_RECIPIENT_ASSOC
 from . import DB_TABLE_ALERT_CRITERIA
 from . import DB_TABLE_ALERT_CRITERIA_ASSOC
 
+from . import DB_TABLE_FLARING
+from . import DB_TABLE_FLARING_FACILITY
+from . import DB_TABLE_FLARING_ANOMALY
+from . import DB_TABLE_FLARING_ANOMALY_ALGORITHM
+
 
 class Ship(Base):
     imo = Column(String, primary_key=True)
@@ -665,3 +670,43 @@ class AlertInstance(Base):
     sent_date_utc = Column(DateTime(timezone=False))
 
     __tablename__ = DB_TABLE_ALERT_INSTANCE
+
+
+class FlaringFacility(Base):
+    """Geometries of Oil/Gas related installations"""
+    id = Column(String, unique=True, primary_key=True)
+    type = Column(String)
+    name = Column(String)
+    url = Column(String)
+    commodity = Column(String)
+    geometry = Column(Geometry('GEOMETRY', srid=4326))
+
+    __tablename__ = DB_TABLE_FLARING_FACILITY
+
+
+class Flaring(Base):
+    """Geometries of Oil/Gas related installations"""
+    id = Column(BigInteger, unique=True, primary_key=True)
+    facility_id = Column(String, ForeignKey(DB_TABLE_FLARING_FACILITY + '.id', ondelete="CASCADE"), nullable=False)
+    date = Column(Date)
+    value = Column(Numeric)
+
+    __table_args__ = (UniqueConstraint('facility_id', 'date', name='unique_flaring'),)
+    __tablename__ = DB_TABLE_FLARING
+
+
+# class FlaringAnomaly(Base):
+#     """Geometries of Oil/Gas related installations"""
+#     id = Column(String, unique=True, primary_key=True)
+#     flaring_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING + '.id', ondelete="CASCADE"), nullable=False)
+#     algorithm = Column(Numeric)
+#
+#     __tablename__ = DB_TABLE_FLARING_ANOMALY
+#
+# class FlaringAnomalyAlgorithm(Base):
+#     """Geometries of Oil/Gas related installations"""
+#     id = Column(String, unique=True, primary_key=True)
+#     flaring_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING + '.id', ondelete="CASCADE"), nullable=False)
+#     algorithm = Column(Numeric)
+#
+#     __tablename__ = DB_TABLE_FLARING_ANOMALY_ALGORITHM
