@@ -225,7 +225,7 @@ def set_commodity(ship):
     ship.unit = unit
     return ship
 
-def fix_duplicate_imo(ships=None):
+def fix_duplicate_imo(ships=None, handle_not_found=True):
     """
     Verify the ship table - check if there are any identical rows - this could happen with the historic version
     of using '_v*' to iterate ships
@@ -251,6 +251,10 @@ def fix_duplicate_imo(ships=None):
         -------
 
         """
+
+        if not ships:
+            return None
+
         def return_all_values(d):
             for v in d.values():
                 if isinstance(v, dict):
@@ -262,6 +266,10 @@ def fix_duplicate_imo(ships=None):
         # collapse all sources into lists, eg equasis, datalastic, marinetraffic
         sources = {}
         for ship in ships:
+
+            if not ship.others:
+                continue
+
             for source, data in ship.others.items():
                 sources[source] = sources.get(source, []) + [data]
 
@@ -331,12 +339,31 @@ def fix_duplicate_imo(ships=None):
 
     if ships is None:
         ships = session.query(
-            sa.func.split_part(Ship.imo, '_', 1).distinct().label('imo')
-                ) \
-        .filter(Ship.imo.op('~')('[_v]')) \
+            sa.case(
+                [
+                    (Ship.imo.like('%_v%'), sa.func.split_part(Ship.imo, '_', 1))
+                ], else_ = sa.null()
+                ).label('imo'),
+            sa.case(
+                [
+                    (Ship.imo.like('%NOTFOUND%'), sa.func.split_part(Ship.imo, '_', 2))
+                ], else_=sa.null()
+            ).label('mmsi'),
+            Ship.imo.label('old_imo')
+        )\
+        .filter(sa.or_(
+            Ship.imo.op('~')('[_v]'),
+            Ship.imo.op('~')('[NOTFOUND]')
+        )) \
         .all()
 
     for ship in tqdm(ships):
+        logger.info("Checking vessel imo: {}, mmsi: {}.".format(ship.imo, ship.mmsi))
+
+        if not handle_not_found:
+            if 'NOTFOUND' in ship.old_imo:
+                continue
+
         base_imo = ship.imo
 
         ship_versions = session.query(
@@ -350,7 +377,7 @@ def fix_duplicate_imo(ships=None):
         mmsis = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
 
         # check if existing versions of ships have the same dwt - in which case we can simplify
-        if len(set([s.dwt for s in ship_versions])) == 1:
+        if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1:
             # delete all duplicates except 1 - we keep records in priority of datalastic > mt
             data_priority = {'datalastic':4, 'marinetraffic':2, 'equasis':1}
 
@@ -392,41 +419,54 @@ def fix_duplicate_imo(ships=None):
                 logger.error("Failed to fix ship imo {}.".format(base_imo))
 
         else:
-            # we have conflicting information for a minotiry of cases -
-            # we fill ship using imo to get the latest data and make sure dwt is correct
-            found_ship = Datalastic.get_ship(imo=base_imo)
-            if found_ship is None: found_ship = Marinetraffic.get_ship(imo=base_imo)
+            # first let's try and deal with NOTFOUND cases
+            if base_imo is None:
+                if fill([ship.mmsi]):
+                    logger.info("Found NOTFOUND ship (mmsi: {}).".format(ship.mmsi))
 
-            if found_ship is not None:
+                    found_ship = session.query(Ship).filter(Ship.mmsi == ship.mmsi).first()
 
-                # add or over ride existing others data with newest
-                for source, data in found_ship.others.items():
-                    other_data[source] = data
+                    update_ship_imo(Ship.old_imo, found_ship.imo)
 
-                found_ship.others = other_data
-                found_ship.mmsi = mmsis
-
-                for sv in ship_versions:
-                    update_ship_imo(sv.imo, base_imo)
-                    session.delete(sv)
-
-                try:
-                    session.commit()
-                except sa.exc.IntegrityError:
-                    session.rollback()
-
+                else:
+                    logger.warning("Could not find NOTFOUND ship (mmsi: {}).".format(ship.mmsi))
 
             else:
-                logger.error("Failed to update ship_imo {}, we will use existing ship object.".format(base_imo))
-                for sv in ship_versions:
-                    if '_v' in sv.imo:
+                # we have conflicting information for a minotiry of cases -
+                # we fill ship using imo to get the latest data and make sure dwt is correct
+                found_ship = Datalastic.get_ship(imo=base_imo)
+                if found_ship is None: found_ship = Marinetraffic.get_ship(imo=base_imo)
+
+                if found_ship is not None:
+
+                    # add or over ride existing others data with newest
+                    for source, data in found_ship.others.items():
+                        other_data[source] = data
+
+                    found_ship.others = other_data
+                    found_ship.mmsi = mmsis
+
+                    for sv in ship_versions:
                         update_ship_imo(sv.imo, base_imo)
                         session.delete(sv)
-                try:
-                    session.commit()
-                except sa.exc.IntegrityError:
-                    logger.error("Failed update existing portcalls/departures for ship imo {}.".format(base_imo))
-                    session.rollback()
+
+                    try:
+                        session.commit()
+                    except sa.exc.IntegrityError:
+                        session.rollback()
+
+
+                else:
+                    logger.error("Failed to update ship_imo {}, we will use existing ship object.".format(base_imo))
+                    for sv in ship_versions:
+                        if '_v' in sv.imo:
+                            update_ship_imo(sv.imo, base_imo)
+                            session.delete(sv)
+                    try:
+                        session.commit()
+                    except sa.exc.IntegrityError:
+                        logger.error("Failed update existing portcalls/departures for ship imo {}.".format(base_imo))
+                        session.rollback()
 
 
 def fix_mmsi_imo_discrepancy(date_from=None):
