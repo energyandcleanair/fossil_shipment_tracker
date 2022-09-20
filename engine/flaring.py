@@ -120,13 +120,6 @@ def date_to_localpath(date, ext='csv'):
 
 def download_nvf_date(date, force=False):
 
-#   library(httr)
-#   library(jsonlite)
-#   library(utils)
-#   library(R.utils)
-#   readRenviron(".Renviron")
-#   # Retrieve access token
-#
     date = to_datetime(date)
     output_file = date_to_localpath(date, ext='csv')
     output_file_gz = date_to_localpath(date, ext='csv.gz')
@@ -146,7 +139,7 @@ def download_nvf_date(date, force=False):
     response = requests.post(token_url, data=params, headers=headers)
     if response.status_code != 200:
         logger.warning("NVF: Failed to query NVF for %s" % (date,))
-        return None
+        return False
 
     access_token_list = response.json()
     access_token = access_token_list['access_token']
@@ -157,6 +150,9 @@ def download_nvf_date(date, force=False):
 
     # urllib.request.urlretrieve(data_url, data_url,  )
     r = requests.get(data_url, allow_redirects=True, headers={'Authorization': auth})
+    if r.status_code != 200:
+        return False
+
     open(output_file_gz, 'wb').write(r.content)
 
     with gzip.open(output_file_gz, 'rb') as f_in:
@@ -179,12 +175,19 @@ def download_nvf(date_from, date_to):
 
 def get_nvf(date):
     nvf_file = date_to_localpath(date)
-    download_nvf_date(date)
-    return pd.read_csv(nvf_file)
+    if not download_nvf_date(date):
+        return None
+
+    try:
+        return pd.read_csv(nvf_file)
+    except pd.errors.EmptyDataError:
+        return None
 
 
 def get_flaring_amount(date, geometries):
     flares_raw = get_nvf(date=date)
+    if flares_raw is None:
+        return None
 
     # Only keep relevant
     # https://www.mdpi.com/2072-4292/13/16/3078/htm
@@ -196,8 +199,8 @@ def get_flaring_amount(date, geometries):
     flares = flares_raw
     flares = flares[(flares.Temp_BB > 1200) &
                     (flares.Temp_BB < 999999)]
-    flares['rhp'] = sigma * np.power(flares.Temp_BB,4) * np.power(flares.Area_BB, d)
-    flares['bcm_est'] = b1 * flares.rhp
+    flares.loc[:,'rhp'] = sigma * np.power(flares.Temp_BB,4) * np.power(flares.Area_BB, d)
+    flares.loc[:,'bcm_est'] = b1 * flares.rhp
 
     flares = flares[['Date_LTZ', 'Lon_GMTCO', 'Lat_GMTCO', 'bcm_est']] \
         .rename(columns={'Date_LTZ': 'date',
@@ -248,6 +251,10 @@ def get_flaring_ts(facilities,
     for date in tqdm(dates):
         res.append(get_flaring_amount(date=date,
                            geometries=geometries))
+
+    res = [x for x in res if x is not None]
+    if not res:
+        return []
 
     res = pd.concat(res) \
         .groupby(['id', 'type', 'date'])[['bcm_est', 'count']] \
