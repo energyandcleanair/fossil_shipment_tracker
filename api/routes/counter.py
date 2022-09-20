@@ -90,8 +90,10 @@ class RussiaCounterResource(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-
         params = RussiaCounterResource.parser.parse_args()
+        return self.get_from_params(params)
+
+    def get_from_params(self, params):
         format = params.get("format")
         cumulate = params.get("cumulate")
         rolling_days = params.get("rolling_days")
@@ -206,7 +208,7 @@ class RussiaCounterResource(Resource):
 
         if rolling_days is not None and rolling_days > 1:
             counter = counter \
-                .groupby(intersect(["commodity", "commodity_group", 'commodity_group_name',
+                .groupby(intersect(["commodity", "commodity_name", "commodity_group", 'commodity_group_name',
                                     'destination_iso2',
                                     'destination_country',
                                     "destination_region", 'currency'], counter.columns)) \
@@ -350,17 +352,15 @@ class RussiaCounterResource(Resource):
                 sorting_groupers = [x for x in aggregate_by \
                                     if not x in aggregate_by_dependencies \
                                     and not x in ['date', 'month', 'year', 'currency'] \
+                                    and not x in by
                                     and x in result.columns]
 
-            sorted = result.groupby(sorting_groupers)[sort_by].sum() \
+            sorted = result.groupby(sorting_groupers)[by].sum() \
                 .reset_index() \
                 .sort_values(by=by, ascending=ascending) \
                 .drop(sort_by, axis=1)
 
             result = pd.merge(sorted, result, how='left')
-
-
-            # Sort commodity group manually
 
 
         return result

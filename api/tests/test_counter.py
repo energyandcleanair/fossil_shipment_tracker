@@ -257,7 +257,7 @@ def test_counter_matches_shipments(app):
         assert all(comparison.value_eur_x == comparison.value_eur_y)
 
 
-
+#TODO agree on sorting specification
 def test_counter_sorting(app):
 
     # We take a country without overland, or a commodity that is only traded through shipments

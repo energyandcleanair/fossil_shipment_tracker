@@ -489,7 +489,8 @@ class VoyageResource(Resource):
 
                                     commodity_field,
                                     commodity_subquery.c.group.label("commodity_group"),
-                                    # commodity_subquery.c.group_name.label("commodity_group_name"),
+                                    commodity_subquery.c.name.label("commodity_name"),
+                                    commodity_subquery.c.group_name.label("commodity_group_name"),
 
                                     # Companies
                                     ShipManagerCompany.name.label("ship_manager"),
@@ -767,8 +768,9 @@ class VoyageResource(Resource):
         # Aggregating
         aggregateby_cols_dict = {
             'currency': [subquery.c.currency],
-            'commodity': [subquery.c.commodity, subquery.c.commodity_group],
-            'commodity_group': [subquery.c.commodity_group],
+            'commodity': [subquery.c.commodity, subquery.c.commodity_name,
+                          subquery.c.commodity_group, subquery.c.commodity_group_name],
+            'commodity_group': [subquery.c.commodity_group, subquery.c.commodity_group_name],
 
             'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country, subquery.c.commodity_origin_region],
             'commodity_origin_country': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
@@ -876,9 +878,12 @@ class VoyageResource(Resource):
     def pivot_result(self, result, pivot_by, pivot_value):
 
         dependencies = {
-            'commodity': ['commodity_group', 'commodity_group_name'],
-            'commodity_group': ['commodity', 'commodity_group_name'],
-            'commodity_group_name': ['commodity', 'commodity_group'],
+            'commodity': ['commodity_name', 'commodity_group', 'commodity_group_name'],
+            'commodity_group': ['commodity', 'commodity_name', 'commodity_group_name'],
+            'commodity_group_name': ['commodity', 'commodity_name', 'commodity_group'],
+
+            'commodity_destination_country': ['commodity_destination_iso2', 'commodity_destination_region'],
+            'commodity_origin_country': ['commodity_origin_iso2', 'commodity_origin_region'],
 
             'ship_insurer_country': ['ship_insurer_region', 'ship_insurer_iso2'],
             'ship_owner_country': ['ship_owner_region', 'ship_owner_iso2'],
@@ -1000,7 +1005,8 @@ class VoyageResource(Resource):
 
         if aggregate_by:
             group_by = [x for x in aggregate_by \
-                        if not x.startswith('commodity') \
+                        if not x in ['commodity', 'commodity_group',
+                                     'commodity_name', 'commodity_group_name'] \
                         and not x in ['arrival_date', 'arrival_month', 'arrival_year',
                                       'departure_date', 'departure_month', 'departure_year',
                                       'date', 'month', 'year'] \
