@@ -674,7 +674,7 @@ class AlertInstance(Base):
 
 class FlaringFacility(Base):
     """Geometries of Oil/Gas related installations"""
-    id = Column(String, unique=True, primary_key=True)
+    id = Column(BigInteger, unique=True, primary_key=True)
     type = Column(String)
     name = Column(String)
     url = Column(String)
@@ -687,7 +687,7 @@ class FlaringFacility(Base):
 class Flaring(Base):
     """Geometries of Oil/Gas related installations"""
     id = Column(BigInteger, unique=True, primary_key=True)
-    facility_id = Column(String, ForeignKey(DB_TABLE_FLARING_FACILITY + '.id', ondelete="CASCADE"), nullable=False)
+    facility_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING_FACILITY + '.id', ondelete="CASCADE"), nullable=False)
     date = Column(Date)
     value = Column(Numeric)
 

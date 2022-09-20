@@ -64,10 +64,12 @@ def get_flaring_facilities():
     """
     fields = get_fields(gas_only=True)
     lines_points = get_infrastructure()
-    facilities = gpd.GeoDataFrame(pd.concat([fields[['id', 'type', 'geometry']],
-                                             lines_points[['id', 'type', 'geometry']]]))
-    facilities = facilities.dissolve(by="id").reset_index()
+    facilities = gpd.GeoDataFrame(pd.concat([fields[['name', 'type', 'geometry']],
+                                             lines_points[['name', 'type', 'geometry']]]))
+    facilities = facilities.dissolve(by="name").reset_index()
+    facilities['id'] = np.arange(len(facilities))
     return facilities
+
 
 def get_fields(gas_only=True):
 
@@ -85,7 +87,7 @@ def get_fields(gas_only=True):
         fields = fields.iloc[np.where(is_gas)]
 
     fields['type'] = 'field'
-    fields['id'] = fields.clusterCaption
+    fields['name'] = fields.clusterCaption
     return fields
 
 
@@ -112,7 +114,7 @@ def get_infrastructure():
     points['type'] = 'point'
     lines['type'] = 'pipeline'
 
-    return pd.concat([points, lines]).rename(columns={'project': 'id'})
+    return pd.concat([points, lines]).rename(columns={'project': 'name'})
 
 
 def date_to_localpath(date, ext='csv'):

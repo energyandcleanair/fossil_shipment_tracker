@@ -21,6 +21,9 @@ class DepartureResource(Resource):
     parser.add_argument('facility_id', help='facility id(s)',
                         type=str, action='split',
                         default=None, required=False)
+    parser.add_argument('facility_name', help='name(s) of facility',
+                        type=str, action='split',
+                        default=None, required=False)
     parser.add_argument('rolling_days', type=int,
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=None)
@@ -65,16 +68,17 @@ class DepartureResource(Resource):
 
         result = self.roll_average(result=result, rolling_days=rolling_days)
 
-        result = self.build_response(result=result,
+        response = self.build_response(result=result,
                                      format=format,
                                      nest_in_data=nest_in_data,
                                      download=download)
-
+        return response
 
     def build_response(self, result, format, nest_in_data, download):
 
         result.replace({np.nan: None}, inplace=True)
         if format == "csv":
+            result.drop('geometry', axis=1, inplace=True)
             return Response(
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
@@ -82,6 +86,7 @@ class DepartureResource(Resource):
                              "attachment; filename=flaring.csv"})
 
         if format == "json":
+            result.drop('geometry', axis=1, inplace=True)
             if nest_in_data:
                 resp_content = json.dumps({"data": result.to_dict(orient="records")}, cls=JsonEncoder)
             else:
