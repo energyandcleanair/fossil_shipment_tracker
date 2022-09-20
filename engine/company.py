@@ -365,7 +365,7 @@ def fill_using_imo_website():
         'St Vincent & The Grenadines':'VC'
     }
 
-    country_dict = db_countries | additional_countries
+    country_dict = {**db_countries, **additional_countries}
 
     companies = session.query(
         Company
