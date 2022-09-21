@@ -264,6 +264,9 @@ class VoyageResource(Resource):
         DestinationPort = aliased(Port)
         DestinationCountry = aliased(Country)
 
+        DepartureShip = aliased(Ship)
+        ArrivalShip = aliased(Ship)
+
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
 
@@ -291,34 +294,6 @@ class VoyageResource(Resource):
             else_ = Ship.commodity
         ).label('commodity')
 
-        # Price for all countries without country-specific price
-        default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
-
-        price_eur_per_tonne_field = (
-            func.coalesce(PortPrice.eur_per_tonne, Price.eur_per_tonne, default_price.c.eur_per_tonne)
-        ).label('price_eur_per_tonne')
-
-        value_eur_field = (
-            Ship.dwt * price_eur_per_tonne_field
-        ).label('value_eur')
-
-        # Technically, we could pivot long -> wide
-        # but since we know there's a single ship per shipment
-        # a rename will be faster
-        value_tonne_field = case(
-            [
-                (Ship.unit == 'tonne', Ship.quantity),
-            ],
-            else_=Ship.dwt
-        ).label('value_tonne')
-
-        value_m3_field = case(
-            [
-                (Ship.unit == 'm3', Ship.quantity)
-            ],
-            else_=sa.null()
-        ).label('value_m3')
-
         # Commodity origin and destination field
         commodity_origin_iso2_field = case(
             [(DepartureBerth.name == 'Novorossiysk CPC', 'KZ')],
@@ -331,12 +306,7 @@ class VoyageResource(Resource):
             else_=DeparturePort.iso2
         ).label('departure_iso2')
 
-        value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
-
         # combine sts shipment table with normal (non-sts) shipments
-
-        DepartureShip = aliased(Ship)
-        ArrivalShip = aliased(Ship)
 
         shipment_sts_departures = session.query(
                     ShipmentWithSTS,
@@ -360,6 +330,15 @@ class VoyageResource(Resource):
         .filter(Arrival.event_id != sa.null()) \
         .subquery()
 
+        shipment_sts_arrival_weights = session.query(
+            ShipmentWithSTS.id,
+            func.count(Arrival.id).over(partition_by=Arrival.portcall_id).label('arrival_weight')
+        ) \
+        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+        .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
+        .filter(Arrival.event_id == sa.null()) \
+        .subquery()
+
         shipments_sts_with_arrival = session.query(
             ShipmentWithSTS.id,
             ShipmentWithSTS.departure_id,
@@ -374,6 +353,10 @@ class VoyageResource(Resource):
                 [(shipment_sts_weights.c.dwt_average != sa.null(), shipment_sts_weights.c.dwt_average / shipment_sts_weights.c.dwt_total)],
                 else_=1.0
             ).label('weight'),
+            case(
+                [(shipment_sts_arrival_weights.c.arrival_weight != 0, 1.0 / shipment_sts_arrival_weights.c.arrival_weight)],
+                else_=1.0
+            ).label('arrival_weight'),
             sa.sql.expression.literal_column('True').label('is_sts'),
             ArrivalShip,
             Event.date_utc.label("event_date_utc")
@@ -383,12 +366,14 @@ class VoyageResource(Resource):
         .outerjoin(Event, Event.id == Arrival.event_id) \
         .outerjoin(shipment_sts_departures, shipment_sts_departures.c.departure_event_id == Arrival.event_id) \
         .outerjoin(shipment_sts_weights, shipment_sts_weights.c.id == ShipmentWithSTS.id) \
+        .outerjoin(shipment_sts_arrival_weights, shipment_sts_arrival_weights.c.id == shipment_sts_departures.c.id) \
         .outerjoin(ArrivalShip, ArrivalShip.imo == shipment_sts_weights.c.imo) \
         .filter(Departure.event_id == sa.null())
 
         shipments_non_sts = session.query(
             Shipment,
             sa.sql.expression.literal_column('1.0').label('weight'),
+            sa.sql.expression.literal_column('1.0').label('arrival_weight'),
             sa.sql.expression.literal_column('False').label('is_sts'),
             # Arrival ship is the same as departure ship for non sts shipments, so we just add this in so we can union
             Ship,
@@ -398,6 +383,37 @@ class VoyageResource(Resource):
         .join(Ship, Ship.imo == Departure.ship_imo)
 
         shipments_combined = shipments_non_sts.union(shipments_sts_with_arrival).subquery()
+
+        # generate value fields based on arrivalship dwt
+        # Price for all countries without country-specific price
+        default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
+
+        price_eur_per_tonne_field = (
+            func.coalesce(PortPrice.eur_per_tonne, Price.eur_per_tonne, default_price.c.eur_per_tonne)
+        ).label('price_eur_per_tonne')
+
+        value_eur_field = (
+                shipments_combined.c.ship_dwt * price_eur_per_tonne_field
+        ).label('value_eur')
+
+        # Technically, we could pivot long -> wide
+        # but since we know there's a single ship per shipment
+        # a rename will be faster
+        value_tonne_field = case(
+            [
+                (shipments_combined.c.ship_unit == 'tonne', shipments_combined.c.ship_quantity),
+            ],
+            else_=shipments_combined.c.ship_dwt
+        ).label('value_tonne')
+
+        value_m3_field = case(
+            [
+                (shipments_combined.c.ship_unit == 'm3', shipments_combined.c.ship_quantity)
+            ],
+            else_=sa.null()
+        ).label('value_m3')
+
+        value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
         # generate commodity destination field now, after combining shipment tables
         commodity_destination_iso2_field = case(
@@ -517,9 +533,11 @@ class VoyageResource(Resource):
 
                                     shipments_combined.c.weight.label('weight'),
 
-                                    sa.sql.label('value_tonne', value_tonne_field*shipments_combined.c.weight),
-                                    sa.sql.label('value_m3', value_m3_field*shipments_combined.c.weight),
-                                    sa.sql.label('value_eur', value_eur_field*shipments_combined.c.weight),
+                                    # we apply heuristic to decide what % of dwt gets transferred on STS, and also make sure
+                                    # if we have multiple arrivals at same portcall, we divide the value also
+                                    sa.sql.label('value_tonne', value_tonne_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
+                                    sa.sql.label('value_m3', value_m3_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
+                                    sa.sql.label('value_eur', value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
                                     Currency.currency,
                                     value_currency_field,
 
