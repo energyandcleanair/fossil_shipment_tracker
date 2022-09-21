@@ -21,7 +21,7 @@ import datetime as dt
 
 import re
 
-from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall, Port, Event
+from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall, Port, Event, Arrival
 from sqlalchemy import func
 import sqlalchemy as sa
 
@@ -34,10 +34,11 @@ def update(
                        base.OIL_PRODUCTS,
                        base.OIL_OR_CHEMICAL],
         min_dwt=base.DWT_MIN,
-        use_cache=False,
-        cache_objects=False,
         force_rebuild=False,
         between_existing_only=False,
+        between_shipments_only=False,
+        use_cache=False,
+        cache_objects=False,
         upload_unprocessed_events=True,
         limit=None):
     """
@@ -45,12 +46,13 @@ def update(
 
     Parameters
     ----------
+    between_shipments_only : will only query events between existing shipments and ignore them otherwise
+    between_existing_only : will only query between existing events
     date_from : date we want to query from
     date_to : date we want to query to
-    ship_imo : the ship imo(s)
+    ship_imo : the ship imo(s)s
     use_cache : whether we want to check cache
     cache_objects : whether we want to cache objects
-    only_ongoing : only query ongoing shipments
     force_rebuild : force rebuild ignoring previous calls
     upload_unprocessed_events : whether to upload events where we failed to get some date
     limit : the limit of the number of ships we want to process
@@ -114,10 +116,10 @@ def update(
             if last_event_call and last_event_call is not None:
                 date_from = to_datetime(last_event_call.params['todate']) + dt.timedelta(minutes=1)
 
-        if force_rebuild and not between_existing_only:
+        if force_rebuild and not between_existing_only and not between_shipments_only:
             date_bounds = [(date_from, date_to)]
 
-        if force_rebuild and between_existing_only:
+        if force_rebuild and between_existing_only and not between_shipments_only:
             event_calls = session.query(MarineTrafficCall) \
                 .filter(MarineTrafficCall.method == base.VESSEL_EVENTS,
                         MarineTrafficCall.params['imo'].astext == ship_imo,
@@ -128,6 +130,36 @@ def update(
             event_date_froms = [to_datetime(date_from)] + [x.date_utc + dt.timedelta(minutes=1) for x in event_calls]
             event_date_tos = [x.date_utc - dt.timedelta(minutes=1) for x in event_calls] + [to_datetime(date_to)]
             date_bounds = list(zip(event_date_froms, event_date_tos))
+
+        if force_rebuild and between_shipments_only:
+
+            # to reduce the amount of credits/unneeded events - we can query only between existing departures / arrivals
+            # for shipments in our db - if we do not have an arrival, we use the next departure date for undeteced
+            # arrival shipments, and otherwise todays date
+            shipments = session.query(
+                        Shipment.id.label('shipment_id'),
+                        Departure.date_utc.label('departure_date_utc'),
+                        Arrival.date_utc.label('arrival_date_utc'),
+                        sa.func.lag(Departure.date_utc).over(Departure.ship_imo, order_by=Departure.date_utc.desc()).label('next_departure_date')
+                    ) \
+                .join(Departure, Departure.id == Shipment.departure_id) \
+                .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
+                .filter(Departure.ship_imo == ship_imo,
+                        Departure.date_utc >= to_datetime(date_from),
+                        Departure.date_utc <= to_datetime(date_to)) \
+            .order_by(Departure.date_utc.asc()).subquery()
+
+            shipment_dates = session.query(
+                shipments.c.departure_date_utc.label('date_from'),
+                sa.case(
+                    [
+                        (shipments.c.arrival_date_utc != sa.null(), shipments.c.arrival_date_utc),
+                        (sa.and_(shipments.c.arrival_date_utc == sa.null(), shipments.c.next_departure_date != sa.null()), shipments.c.next_departure_date)
+                    ], else_=datetime.date.today()
+                ).label('date_to')
+            )
+
+            date_bounds = shipment_dates.all()
 
         # there is a max query date for marinetraffic, so we need to possibly break down dates to <180 day difference
         query_dates = []
