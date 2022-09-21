@@ -413,7 +413,8 @@ class VoyageResource(Resource):
             else_=sa.null()
         ).label('value_m3')
 
-        value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
+        # for now we will clauclate this in the main query so we can apply weights - we can clean this up all into one
+        #value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
         # generate commodity destination field now, after combining shipment tables
         commodity_destination_iso2_field = case(
@@ -539,7 +540,7 @@ class VoyageResource(Resource):
                                     sa.sql.label('value_m3', value_m3_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
                                     sa.sql.label('value_eur', value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
                                     Currency.currency,
-                                    value_currency_field,
+                                    (value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight * Currency.per_eur).label('value_currency'),
 
                                     DepartureBerth.id.label("departure_berth_id"),
                                     DepartureBerth.name.label("departure_berth_name"),
