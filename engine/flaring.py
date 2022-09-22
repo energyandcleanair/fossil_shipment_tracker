@@ -24,7 +24,8 @@ from base.db import session
 
 def fill():
     """
-    Used to fill infrastructure the first time
+    Used to fill infrastructure the first time.
+    Will erase all existing facilities.
     :return:
     """
     facilities = get_flaring_facilities()
@@ -64,8 +65,8 @@ def get_flaring_facilities():
     """
     fields = get_fields(gas_only=True)
     lines_points = get_infrastructure()
-    facilities = gpd.GeoDataFrame(pd.concat([fields[['name', 'type', 'geometry']],
-                                             lines_points[['name', 'type', 'geometry']]]))
+    facilities = gpd.GeoDataFrame(pd.concat([fields[['name', 'type', 'geometry', 'url']],
+                                             lines_points[['name', 'type', 'geometry', 'url']]]))
     facilities = facilities.dissolve(by="name").reset_index()
     facilities['id'] = np.arange(len(facilities))
     return facilities
@@ -78,6 +79,9 @@ def get_fields(gas_only=True):
     file_path = "assets/flaring/russia_oil_gas_fields.json"
     fields = gpd.read_file(file_path)
     fields['geometry'] = fields.geometry.map(lambda pt: shapely.ops.transform(lambda x, y: (y, x), pt))
+
+    pattern = r'(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}[-a-zA-Z0-9()@:%_+.~#?&/=]*)'
+    fields['url'] = fields['balloonContentHeader'].str.extract(pattern, expand=False).str.strip()
 
     if gas_only:
         with open(file_path, 'r') as file:
@@ -205,7 +209,7 @@ def get_flaring_amount(date, geometries):
     flares = flares_raw
     flares = flares[(flares.Temp_BB > 1200) &
                     (flares.Temp_BB < 999999)].copy()
-    flares['rhp'] = sigma * np.power(flares.Temp_BB,4) * np.power(flares.Area_BB, d)
+    flares['rhp'] = sigma * np.power(flares.Temp_BB, 4) * np.power(flares.Area_BB, d)
     flares['bcm_est'] = b1 * flares.rhp
 
     flares = flares[['Date_LTZ', 'Lon_GMTCO', 'Lat_GMTCO', 'bcm_est']] \
@@ -220,10 +224,14 @@ def get_flaring_amount(date, geometries):
 
     over = gpd.GeoDataFrame(geometries[['id', 'type', 'geometry']]) \
         .sjoin(flares_gdf, how="left")
+    over['date'] = over.date.fillna(date)
+
+    def count_non_na(x):
+        return sum(~np.isnan(x))
 
     result = over.groupby(['id', 'type', 'date']) \
         .agg(bcm_est=('bcm_est', np.nansum),
-                   count=('bcm_est', len))
+             count=('bcm_est', count_non_na))
 
     return result
 
@@ -256,7 +264,7 @@ def get_flaring_ts(facilities,
     res = []
     for date in tqdm(dates):
         res.append(get_flaring_amount(date=date,
-                           geometries=geometries))
+                                      geometries=geometries))
 
     res = [x for x in res if x is not None]
     if not res:

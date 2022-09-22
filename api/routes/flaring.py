@@ -52,7 +52,7 @@ class FlaringFacilityResource(Resource):
 
             result = [r for r in rs]
             result = pd.DataFrame(result)
-            result.columns = ["id", "name", "type", "geometry", "anomaly_index"]
+            result.columns = ["id", "name", "type", "url", "geometry", "anomaly_index"]
             result['geometry'] = result.geometry.apply(lambda x: wkb.loads(bytes(x)))
             result = result.sort_values('anomaly_index', axis=0, ascending=False)
 
