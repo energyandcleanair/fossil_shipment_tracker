@@ -1,6 +1,7 @@
 with stats as
 (select facility_id, avg(value) as mean, stddev(value) as stddev
  from flaring
+ where date <= '2022-02-24'
  group by 1),
 
 scores as (
@@ -26,7 +27,7 @@ year_scores_wide as (
     group by 1
 )
 
-select facility_id, name, type, ST_AsBinary(geometry), current_year-not_current_year as anomaly_index
+select facility_id, name, type, url, ST_AsBinary(geometry), current_year-not_current_year as anomaly_index
 from year_scores_wide
 left join flaring_facility on facility_id=flaring_facility.id
 
