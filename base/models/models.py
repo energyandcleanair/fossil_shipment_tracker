@@ -677,6 +677,7 @@ class FlaringFacility(Base):
     id = Column(BigInteger, unique=True, primary_key=True)
     type = Column(String)
     name = Column(String)
+    name_en = Column(String)
     url = Column(String)
     commodity = Column(String)
     geometry = Column(Geometry('GEOMETRY', srid=4326))
@@ -690,6 +691,7 @@ class Flaring(Base):
     facility_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING_FACILITY + '.id', ondelete="CASCADE"), nullable=False)
     date = Column(Date)
     value = Column(Numeric)
+    buffer_km = Column(Numeric)
 
     __table_args__ = (UniqueConstraint('facility_id', 'date', name='unique_flaring'),)
     __tablename__ = DB_TABLE_FLARING

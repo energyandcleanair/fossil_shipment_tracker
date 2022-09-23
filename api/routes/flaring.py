@@ -22,7 +22,7 @@ class FlaringFacilityResource(Resource):
     parser.add_argument('facility_id', help='facility id(s)',
                         type=str, action='split',
                         default=None, required=False)
-    parser.add_argument('add_anomaly_index', help='Add an anomaly index to detect anomaly after 2022-02-24',
+    parser.add_argument('with_anomaly_index', help='Add an anomaly index to detect anomaly after 2022-02-24',
                         type=inputs.boolean, default=True)
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
                         type=inputs.boolean, default=True)
@@ -36,12 +36,12 @@ class FlaringFacilityResource(Resource):
 
         params = FlaringFacilityResource.parser.parse_args()
         facility_id = params.get("facility_id")
-        add_anomaly_index = params.get("add_anomaly_index")
+        with_anomaly_index = params.get("with_anomaly_index")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
         download = params.get("download")
 
-        if add_anomaly_index:
+        if with_anomaly_index:
 
             with open('engine/flaring_anomaly_index.sql', 'r') as file:
                 sql_content = file.read()
@@ -52,8 +52,8 @@ class FlaringFacilityResource(Resource):
 
             result = [r for r in rs]
             result = pd.DataFrame(result)
-            result.columns = ["id", "name", "type", "url", "geometry", "anomaly_index"]
-            result['geometry'] = result.geometry.apply(lambda x: wkb.loads(bytes(x)))
+            result.columns = ["id", "name", "name_en", "type", "url", "geometry", "anomaly_index"]
+            result['geometry'] = result.geometry.apply(lambda x: wkb.loads(bytes(x)) if x else None)
             result = result.sort_values('anomaly_index', axis=0, ascending=False)
 
         else:

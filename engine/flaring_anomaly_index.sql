@@ -5,7 +5,10 @@ with stats as
  group by 1),
 
 scores as (
-    select  flaring.facility_id, DATE_PART('year', date) as year, (value - mean) / stddev as zscore
+    select  flaring.facility_id, DATE_PART('year', date) as year,
+      case
+        when stddev != 0 then (value - mean) / stddev
+        else 0 end as zscore
      from flaring
      left join stats on stats.facility_id = flaring.facility_id
      where DATE_PART('doy', date) >= DATE_PART('doy', '2022-02-24'::timestamp)
@@ -27,7 +30,7 @@ year_scores_wide as (
     group by 1
 )
 
-select facility_id, name, type, url, ST_AsBinary(geometry), current_year-not_current_year as anomaly_index
+select facility_id, name, name_en, type, url, ST_AsBinary(geometry), current_year-not_current_year as anomaly_index
 from year_scores_wide
 left join flaring_facility on facility_id=flaring_facility.id
 
