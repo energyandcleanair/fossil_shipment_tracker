@@ -693,7 +693,7 @@ class Flaring(Base):
     value = Column(Numeric)
     buffer_km = Column(Numeric)
 
-    __table_args__ = (UniqueConstraint('facility_id', 'date', name='unique_flaring'),)
+    __table_args__ = (UniqueConstraint('facility_id', 'date', 'buffer_km', name='unique_flaring'),)
     __tablename__ = DB_TABLE_FLARING
 
 
