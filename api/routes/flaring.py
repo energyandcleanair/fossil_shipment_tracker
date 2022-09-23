@@ -155,6 +155,7 @@ class FlaringResource(Resource):
 
         query = session.query(FlaringFacility.id,
                               FlaringFacility.name,
+                              FlaringFacility.name_en,
                               FlaringFacility.type,
                               Flaring.date,
                               Flaring.value,
