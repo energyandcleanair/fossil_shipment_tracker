@@ -256,15 +256,20 @@ def get_flaring_ts(facilities,
                    date_from="2018-01-01",
                    date_to=to_datetime(-3),
                    buffer_km_fields=10,
-                   buffer_km_lines_points=5):
+                   buffer_km_infra=5):
 
 
     # Get geomtries, buffer, dissolve
-    geometries = pd.concat([
-        buffer(facilities[facilities.type=='field'], buffer_km_fields),
-        buffer(facilities[facilities.type != 'field'], buffer_km_lines_points),
-    ], ignore_index=True)
+    buffered_fields = buffer(facilities[facilities.type == 'Field'], buffer_km_fields)
+    buffered_fields['buffer_km'] = buffer_km_fields
 
+    buffered_infra = buffer(facilities[facilities.type != 'Field'], buffer_km_infra)
+    buffered_infra['buffer_km'] = buffer_km_infra
+
+    geometries = pd.concat([
+        buffered_fields,
+        buffered_infra
+    ], ignore_index=True)
 
     # Get flaring amount
     dates = pd.date_range(to_datetime(date_from), to_datetime(date_to))
@@ -282,9 +287,12 @@ def get_flaring_ts(facilities,
         .sum() \
         .reset_index()
 
+    # Adding buffer info
+    res = res.merge(geometries[['id', 'buffer_km']])
+
     # Format for table
-    res = res[['id', 'date', 'bcm_est']].rename(columns={'id': 'facility_id',
-                                                'bcm_est': 'value'})
+    res = res[['id', 'date', 'bcm_est', 'buffer_km']] \
+        .rename(columns={'id': 'facility_id', 'bcm_est': 'value'})
 
     return res
 
