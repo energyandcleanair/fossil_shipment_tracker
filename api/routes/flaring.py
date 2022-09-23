@@ -157,7 +157,8 @@ class FlaringResource(Resource):
                               FlaringFacility.name,
                               FlaringFacility.type,
                               Flaring.date,
-                              Flaring.value) \
+                              Flaring.value,
+                              Flaring.buffer_km) \
                 .join(Flaring, FlaringFacility.id == Flaring.facility_id)
 
         if facility_id is not None:
