@@ -69,6 +69,12 @@ def get_flaring_facilities():
                                              lines_points[['name', 'type', 'geometry', 'url']]]))
     facilities = facilities.dissolve(by="name").reset_index()
     facilities['id'] = np.arange(len(facilities))
+
+    # Add English name
+    english_lookup = pd.read_csv('assets/flaring/english_lookup.csv')
+    facilities = facilities.merge(english_lookup[['name', 'name_en']], on='name')
+    facilities['name_en'] = facilities.name_en.combine_first(facilities.name)
+
     return facilities
 
 
@@ -90,7 +96,7 @@ def get_fields(gas_only=True):
         is_gas = ['gas.svg' in x['options']['iconImageHref'] for x in data['features']]
         fields = fields.iloc[np.where(is_gas)]
 
-    fields['type'] = 'field'
+    fields['type'] = 'Field'
     fields['name'] = fields.clusterCaption
     return fields
 
@@ -101,8 +107,8 @@ def get_infrastructure():
     infra = pd.read_csv(url)
     infra = infra[infra.countries.str.contains('Russia')]
 
-    lines = infra[(infra.geom == 'line') & (infra.status == 'operating')]
-    points = infra[(infra.geom == 'point') & ((infra.status == 'operating') | infra.project.str.contains('Portovaya'))]
+    lines = infra[(infra.geom == 'line') & (infra.status == 'operating')].copy()
+    points = infra[(infra.geom == 'point') & ((infra.status == 'operating') | infra.project.str.contains('Portovaya'))].copy()
 
     def route_to_linestring(route):
         # multiline = infra.route.str.contains(';')
@@ -115,8 +121,9 @@ def get_infrastructure():
     lines['geometry'] = lines.route.apply(route_to_linestring)
     lines['geometry'] = lines.geometry.map(lambda pt: shapely.ops.transform(lambda x, y: (y, x), pt))
 
-    points['type'] = 'point'
-    lines['type'] = 'pipeline'
+    points['geometry'] = gpd.points_from_xy(points.lng, points.lat)
+    points['type'] = 'LNG Terminal'
+    lines['type'] = 'Pipeline'
 
     return pd.concat([points, lines]).rename(columns={'project': 'name'})
 
@@ -248,10 +255,10 @@ def buffer(df, buffer_km):
 def get_flaring_ts(facilities,
                    date_from="2018-01-01",
                    date_to=to_datetime(-3),
-                   buffer_km_fields=20,
-                   buffer_km_lines_points=10):
-    
-    
+                   buffer_km_fields=10,
+                   buffer_km_lines_points=5):
+
+
     # Get geomtries, buffer, dissolve
     geometries = pd.concat([
         buffer(facilities[facilities.type=='field'], buffer_km_fields),
