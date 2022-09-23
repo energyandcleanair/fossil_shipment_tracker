@@ -16,6 +16,8 @@ from engine import rscript
 from engine import commodity
 from engine import entsog
 from engine import alert
+from engine import mtevents
+from engine import flaring
 from base.db import init_db
 import base
 
@@ -91,6 +93,7 @@ def update():
             62257 #Reliance SEZ/Jamnagar
         ]
 
+    # departure.update(date_from='2021-01-01')
     # portcall.update_departures_from_russia(
     #     port_id=indian_port_ids,
     #     date_from='2021-10-01',
@@ -158,23 +161,37 @@ def update():
     # arrival.update(date_from=dt.date.today() - dt.timedelta(days=180))
     # currency.update()
     # shipment.update()
+    # portcall.fill_missing_port_id()
     # company.fill_country()
     # commodity.fill()
     # country.fill()
-    # company.fill_country()
+    # company.update()
     # portcall.fill_missing_port_id()
     # position.update()
+    # mtevents.update(date_from='2020-11-01', force_rebuild=True,
+    #                 commodities=[
+    #                     # base.LNG,
+    #                     base.CRUDE_OIL,
+    #                     base.OIL_PRODUCTS,
+    #                     # base.OIL_OR_CHEMICAL
+    #                 ],
+    #                 )
+    # shipment.rebuild('2020-07-01')
     # destination.update()
     # position.get_missing_berths()
     # berth.update()
-    entsog.update(date_from=-21, nodata_error_date_from=-4)
+    # entsog.update(date_from=-21, nodata_error_date_from=-4)
     # rscript.update()
+    # trajectory.reroute()
+    # trajectory.reroute(shipment_id=[528612, 490038])
     # trajectory.update(shipment_id=359731)
     # berth.update()
     # alert.update()
-    # counter.update()
+    # counter.update(date_from='2021-01-01')
+    flaring.update()
     # berth.update()
     # commodity.fill()
+    # flaring.update()
     return
 
 

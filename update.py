@@ -15,6 +15,7 @@ from engine import entsog
 from engine import alert
 from engine import company
 from engine import mtevents
+from engine import flaring
 import integrity
 import base
 
@@ -37,6 +38,7 @@ def update():
     entsog.update(date_from=-21, nodata_error_date_from=-4)
     rscript.update()
     trajectory.update()
+    flaring.update()
     alert.update()
     counter.update()
     integrity.check()

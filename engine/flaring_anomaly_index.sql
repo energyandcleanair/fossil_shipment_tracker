@@ -1,5 +1,7 @@
 with stats as
-(select facility_id, avg(value) as mean, stddev(value) as stddev
+(select facility_id,
+  avg(value) as mean,
+  greatest(stddev(value), 1000) as stddev
  from flaring
  where date <= '2022-02-24'
  group by 1),
@@ -8,7 +10,7 @@ scores as (
     select  flaring.facility_id, DATE_PART('year', date) as year,
       case
         when stddev != 0 then (value - mean) / stddev
-        else 0 end as zscore
+        else 1000 end as zscore
      from flaring
      left join stats on stats.facility_id = flaring.facility_id
      where DATE_PART('doy', date) >= DATE_PART('doy', '2022-02-24'::timestamp)
