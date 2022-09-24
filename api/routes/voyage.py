@@ -247,6 +247,11 @@ class VoyageResource(Resource):
         CommodityOriginCountry = aliased(Country)
         CommodityDestinationCountry = aliased(Country)
 
+        #TODO Find a better way, so that we can also keep information for older shipments
+        ShipOwnerDistinct = ShipOwner.query.distinct(ShipOwner.ship_imo).subquery()
+        ShipManagerDistinct = ShipManager.query.distinct(ShipManager.ship_imo).subquery()
+        ShipInsurerDistinct = ShipInsurer.query.distinct(ShipInsurer.ship_imo).subquery()
+
         ShipOwnerCompany = aliased(Company)
         ShipManagerCompany = aliased(Company)
         ShipInsurerCompany = aliased(Company)
@@ -448,7 +453,7 @@ class VoyageResource(Resource):
         commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
 
         # Query with joined information
-        shipments_rich = (session.query(shipments_combined.c.shipment_id.distinct().label('id'), # Potential introducers of duplicates: ShipinOwner, Insurer etc.
+        shipments_rich = (session.query(shipments_combined.c.shipment_id.label('id'),
                                         shipments_combined.c.shipment_status.label('status'),
 
                                     # STS related columns
@@ -588,33 +593,34 @@ class VoyageResource(Resource):
              .outerjoin(CommodityDestinationCountry, CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
 
-             .outerjoin(ShipOwner, sa.and_(
-                            ShipOwner.ship_imo == Departure.ship_imo,
+             .outerjoin(ShipOwnerDistinct, sa.and_(
+                            ShipOwnerDistinct.c.ship_imo == Departure.ship_imo,
                             sa.or_(
-                                    Departure.date_utc >= ShipOwner.date_from,
-                                    ShipOwner.date_from == sa.null())))
-             .outerjoin(ShipOwnerCompany, ShipOwner.company_id == ShipOwnerCompany.id)
+                                    Departure.date_utc >= ShipOwnerDistinct.c.date_from,
+                                    ShipOwnerDistinct.c.date_from == sa.null())))
+             .outerjoin(ShipOwnerCompany, ShipOwnerDistinct.c.company_id == ShipOwnerCompany.id)
              .outerjoin(ShipOwnerCountry, ShipOwnerCompany.country_iso2 == ShipOwnerCountry.iso2)
 
-             .outerjoin(ShipManager, sa.and_(
-                    ShipManager.ship_imo == Departure.ship_imo,
+             .outerjoin(ShipManagerDistinct, sa.and_(
+                    ShipManagerDistinct.c.ship_imo == Departure.ship_imo,
                     sa.or_(
-                        Departure.date_utc >= ShipManager.date_from,
-                        ShipManager.date_from == sa.null())))
-             .outerjoin(ShipManagerCompany, ShipManager.company_id == ShipManagerCompany.id)
+                        Departure.date_utc >= ShipManagerDistinct.c.date_from,
+                        ShipManagerDistinct.c.date_from == sa.null())))
+             .outerjoin(ShipManagerCompany, ShipManagerDistinct.c.company_id == ShipManagerCompany.id)
              .outerjoin(ShipManagerCountry, ShipManagerCompany.country_iso2 == ShipManagerCountry.iso2)
 
-             .outerjoin(ShipInsurer, sa.and_(
-                    ShipInsurer.ship_imo == Departure.ship_imo,
+             .outerjoin(ShipInsurerDistinct, sa.and_(
+                    ShipInsurerDistinct.c.ship_imo == Departure.ship_imo,
                     sa.or_(
-                        Departure.date_utc >= ShipInsurer.date_from,
-                        ShipInsurer.date_from == sa.null())))
-             .outerjoin(ShipInsurerCompany, ShipInsurer.company_id == ShipInsurerCompany.id)
+                        Departure.date_utc >= ShipInsurerDistinct.c.date_from,
+                        ShipInsurerDistinct.c.date_from == sa.null())))
+             .outerjoin(ShipInsurerCompany, ShipInsurerDistinct.c.company_id == ShipInsurerCompany.id)
              .outerjoin(ShipInsurerCountry, ShipInsurerCompany.country_iso2 == ShipInsurerCountry.iso2)
 
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
-             .filter(destination_iso2_field != "RU"))
+             .filter(destination_iso2_field != "RU")
+            )
 
         if id is not None:
             shipments_rich = shipments_rich.filter(shipments_combined.c.shipment_id.in_(id))
