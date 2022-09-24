@@ -61,7 +61,7 @@ def update(date_from=dt.date(2022, 1, 1),
         currencies = exchanges.currency.unique()
         idx = pd.MultiIndex.from_product((dates, currencies), names=['date', 'currency'])
         exchanges = exchanges.set_index(['date', 'currency']).reindex(idx).reset_index()
-        exchanges['per_eur'].fillna(method='ffill', inplace=True)
+        exchanges['per_eur'] = exchanges.groupby('currency')['per_eur'].transform(lambda v: v.ffill())
         exchanges['estimated'] = pd.isna(exchanges.estimated)
         
 
