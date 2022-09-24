@@ -108,11 +108,12 @@ def update_info_from_equasis():
         .all()
 
     imos = [x[0] for x in imos]
-    itry = 0
     ntries = 3
-    equasis_infos = None
 
     for imo in tqdm(imos):
+
+        itry = 0
+        equasis_infos = None
 
         while equasis_infos is None and itry <= ntries:
             itry += 1
@@ -122,6 +123,8 @@ def update_info_from_equasis():
                 logger.warning("Failed to get equasis ship info, trying again.")
 
         if equasis_infos is not None:
+
+
 
             # Insurer
             if equasis_infos.get('insurer'):
