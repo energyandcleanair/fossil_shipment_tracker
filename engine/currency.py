@@ -53,7 +53,8 @@ def update(date_from=dt.date(2022, 1, 1),
     except RatesNotAvailableError:
         # Prolong historical value
         last = session.query(Currency)\
-                    .filter(Currency.date == last_date)
+                    .filter(Currency.date == last_date,
+                            sa.not_(Currency.estimated))
         exchanges = pd.read_sql(last.statement, session.bind).drop('id', axis=1)
         exchanges['date'] = pd.to_datetime(exchanges.date)
 
