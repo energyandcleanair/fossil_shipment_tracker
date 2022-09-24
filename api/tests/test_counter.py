@@ -320,11 +320,10 @@ def test_pricing_gt0(app):
         data = response.json["data"]
         pipeline_df = pd.DataFrame(data).sort_values(['date'], ascending=False)
 
-
         pipeline_notgas = pipeline_df.loc[pipeline_df.commodity != 'natural_gas']
 
-        assert pd.to_datetime(pipeline_df.date).max() > dt.date.today() - dt.timedelta(days=3)
+        assert pd.to_datetime(pipeline_df.date).max().date() > dt.date.today() - dt.timedelta(days=3)
         assert all(pipeline_df.value_eur > 0)
 
-        assert pd.to_datetime(pipeline_notgas.date).max() > dt.date.today() - dt.timedelta(days=3)
+        assert pd.to_datetime(pipeline_notgas.date).max().date() > dt.date.today() - dt.timedelta(days=3)
         assert all(pipeline_notgas.value_eur > 0)
