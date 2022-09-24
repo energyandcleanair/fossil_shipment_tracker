@@ -572,6 +572,7 @@ class Currency(Base):
     date = Column(Date)
     currency = Column(String)
     per_eur = Column(Numeric) # All currencies
+    estimated = Column(Boolean) # Whether it is actual value or estimated (useful when API is down)
 
     __table_args__ = (UniqueConstraint('date', 'currency', name='unique_currency'),)
     __tablename__ = DB_TABLE_CURRENCY
