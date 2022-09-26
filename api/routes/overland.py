@@ -18,6 +18,7 @@ from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
 from base.logger import logger
+from base import PRICING_DEFAULT
 from engine.commodity import get_subquery as get_commodity_subquery
 
 
@@ -55,6 +56,10 @@ class PipelineFlowResource(Resource):
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
+    parser.add_argument('pricing_scenario', help='Pricing scenario (standard or pricecap)',
+                        action='split',
+                        default=[PRICING_DEFAULT],
+                        required=False)
 
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
@@ -106,16 +111,22 @@ class PipelineFlowResource(Resource):
         sort_by = params.get("sort_by")
         limit = params.get("limit")
         keep_zeros = params.get("keep_zeros")
+        pricing_scenario = params.get("pricing_scenario")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
 
         # Price for all countries without country-specific price
-        default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
+        SelectedPrice = Price.query.filter(Price.scenario.in_(pricing_scenario)).subquery()
+        default_price = session.query(SelectedPrice).filter(SelectedPrice.c.country_iso2 == sa.null()).subquery()
 
         value_eur_field = (
-            PipelineFlow.value_tonne * func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne)
+            PipelineFlow.value_tonne * func.coalesce(SelectedPrice.c.eur_per_tonne, default_price.c.eur_per_tonne)
         ).label('value_eur')
+
+        pricing_scenario_field = (
+                func.coalesce(SelectedPrice.c.scenario, default_price.c.scenario)
+        ).label('pricing_scenario')
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
@@ -126,6 +137,7 @@ class PipelineFlowResource(Resource):
 
         DepartureCountry = aliased(Country)
         DestinationCountry = aliased(Country)
+
 
         # commodity_origin_iso2_field = case(
         #     [(DepartureCountry.iso2.in_(['BY', 'TR']), 'RU'),
@@ -162,19 +174,20 @@ class PipelineFlowResource(Resource):
                                     PipelineFlow.value_m3,
                                     value_eur_field,
                                     Currency.currency,
-                                    value_currency_field)
+                                    value_currency_field,
+                                    pricing_scenario_field)
              .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
              .outerjoin(DestinationCountry, PipelineFlow.destination_iso2 == DestinationCountry.iso2)
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
              .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(commodity_subquery, PipelineFlow.commodity == commodity_subquery.c.id)
-             .outerjoin(Price,
-                        sa.and_(Price.date == PipelineFlow.date,
-                                Price.commodity == commodity_subquery.c.pricing_commodity,
+             .outerjoin(SelectedPrice,
+                        sa.and_(SelectedPrice.c.date == PipelineFlow.date,
+                                SelectedPrice.c.commodity == commodity_subquery.c.pricing_commodity,
                                 sa.or_(
-                                    sa.and_(Price.country_iso2 == sa.null(), PipelineFlow.destination_iso2 == sa.null()),
-                                    Price.country_iso2 == PipelineFlow.destination_iso2)
+                                    sa.and_(SelectedPrice.c.country_iso2 == sa.null(), PipelineFlow.destination_iso2 == sa.null()),
+                                    SelectedPrice.c.country_iso2 == PipelineFlow.destination_iso2)
                                 )
                         )
              .outerjoin(default_price,
@@ -266,12 +279,13 @@ class PipelineFlowResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['currency']
+        must_group_by = ['currency', 'pricing_scenario']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
+            'pricing_scenario': [subquery.c.pricing_scenario],
             'currency': [subquery.c.currency],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],

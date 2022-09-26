@@ -454,9 +454,10 @@ class Price(Base):
     commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
     date = Column(DateTime(timezone=False))
     eur_per_tonne = Column(Numeric)
+    scenario = Column(String, nullable=False)
 
     __tablename__ = DB_TABLE_PRICE
-    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', name='unique_price'),
+    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', scenario, name='unique_price'),
                       CheckConstraint("eur_per_tonne >= 0", name="price_positive"),
                       # We add a unique index to be sure because the constraint above doesn't work if country_iso2 is null
                       Index(
@@ -476,9 +477,10 @@ class PortPrice(Base):
     commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
     date = Column(DateTime(timezone=False))
     eur_per_tonne = Column(Numeric)
+    scenario = Column(String, nullable=False)
 
     __tablename__ = DB_TABLE_PORTPRICE
-    __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', name='unique_portprice'),
+    __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', 'scenario', name='unique_portprice'),
                       CheckConstraint("eur_per_tonne >= 0", name="portprice_positive"),
                       Index("idx_portprice_commodity", "commodity"))
 
@@ -533,10 +535,10 @@ class Counter(Base):
     date = Column(DateTime(timezone=False))
     value_tonne = Column(Numeric)
     value_eur = Column(Numeric)
-    type = Column(String) # observed or estimated
+    pricing_scenario = Column(String)
 
     __tablename__ = DB_TABLE_COUNTER
-    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_iso2', name='unique_counter_tmp'),)
+    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_iso2', 'pricing_scenario', name='unique_counter'),)
 
 
 class Commodity(Base):

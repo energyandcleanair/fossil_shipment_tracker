@@ -11,7 +11,7 @@ import datetime as dt
 from base.models import Position, ShipmentArrivalBerth
 from base.db import session
 from base.utils import to_datetime
-
+from base import PRICING_DEFAULT, PRICING_PRICECAP
 
 def test_counter_last(app):
 
@@ -327,3 +327,21 @@ def test_pricing_gt0(app):
 
         assert pd.to_datetime(pipeline_notgas.date).max().date() > dt.date.today() - dt.timedelta(days=3)
         assert all(pipeline_notgas.value_eur > 0)
+
+
+def test_pricing_scenario(app):
+    with app.test_client() as test_client:
+        response = test_client.get('/v0/counter')
+        assert response.status_code == 200
+        data = response.json["data"]
+        counter_df = pd.DataFrame(data)
+        assert list(counter_df.pricing_scenario.unique()) == [PRICING_DEFAULT]
+        default_sum = counter_df.value_eur.sum()
+
+        params =  {'pricing_scenario': PRICING_PRICECAP}
+        response = test_client.get('/v0/counter' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        counter_df = pd.DataFrame(data)
+        assert list(counter_df.pricing_scenario.unique()) == [PRICING_DEFAULT]
+        default_sum = counter_df.value_eur.sum()

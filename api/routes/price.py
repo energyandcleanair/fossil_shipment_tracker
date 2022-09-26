@@ -10,6 +10,7 @@ from base.models import Price, PortPrice
 from base.encoder import JsonEncoder
 from base.db import session
 from base.utils import to_list, to_datetime
+from base import PRICING_DEFAULT
 from . import routes_api
 
 
@@ -24,6 +25,11 @@ class PriceResource(Resource):
 
     parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+
+    parser.add_argument('scenario', help='Pricing scenario (standard or pricecap)',
+                        default=PRICING_DEFAULT,
+                        required=False)
+
     parser.add_argument('nest_in_data', help='Whether to nest the json content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
@@ -35,11 +41,13 @@ class PriceResource(Resource):
         params = PriceResource.parser.parse_args()
         commodity = params.get("commodity")
         date_from = params.get("date_from")
+        scenario = params.get("scenario")
         date_to = params.get("date_to")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
 
-        query = Price.query
+        query = Price.query.filter(Price.scenario==scenario)
+
         if commodity is not None:
             query = query.filter(Price.commodity.in_(to_list(commodity)))
 
@@ -82,6 +90,9 @@ class PortPriceResource(Resource):
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('scenario', help='Pricing scenario (standard or pricecap)',
+                        default=PRICING_DEFAULT,
+                        required=False)
     parser.add_argument('nest_in_data', help='Whether to nest the json content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
@@ -94,10 +105,12 @@ class PortPriceResource(Resource):
         commodity = params.get("commodity")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
+        scenario = params.get("scenario")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
 
-        query = PortPrice.query
+        query = PortPrice.query.filter(PortPrice.scenario == scenario)
+
         if commodity is not None:
             query = query.filter(PortPrice.commodity.in_(to_list(commodity)))
 

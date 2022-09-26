@@ -8,6 +8,7 @@ from base.models import Counter, Port, Country, Berth, Commodity
 from base.models import DB_TABLE_COUNTER
 from base.utils import to_datetime
 from base.logger import logger_slack
+from base import PRICING_DEFAULT, PRICING_PRICECAP
 
 try:
     from api.routes.voyage import VoyageResource
@@ -19,7 +20,7 @@ except ImportError:
 import base
 
 
-def update(date_from='2021-11-01'):
+def update(date_from='2021-01-01'):
     """
     Fill counter
     :return:
@@ -35,7 +36,8 @@ def update(date_from='2021-11-01'):
         "commodity_origin_iso2": ["RU"],
         "aggregate_by": ["commodity_origin_iso2", "commodity_destination_iso2", "commodity", "date"],
         "nest_in_data": False,
-        "currency": "EUR"
+        "currency": "EUR",
+        "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
     }
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
@@ -56,7 +58,8 @@ def update(date_from='2021-11-01'):
         "commodity_origin_iso2": ['RU'],
         "aggregate_by": ['commodity_origin_iso2', "commodity_destination_iso2", "commodity", "arrival_date", "status"],
         "nest_in_data": False,
-        "currency": 'EUR'
+        "currency": 'EUR',
+        "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
     }
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
@@ -71,22 +74,23 @@ def update(date_from='2021-11-01'):
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
     result = pd.concat([pipelineflows, voyages]) \
         .sort_values(['date', 'commodity']) \
-        [["commodity", 'commodity_group', 'commodity_destination_region', "commodity_destination_iso2", "date", "value_tonne", "value_eur"]]
+        [["commodity", 'commodity_group', 'commodity_destination_region', "commodity_destination_iso2", "date", "value_tonne", "value_eur",
+          "pricing_scenario"]]
     result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
     result = result \
-        .groupby(["commodity", 'commodity_group', "commodity_destination_iso2", 'commodity_destination_region']) \
+        .groupby(["commodity", 'commodity_group', "commodity_destination_iso2", 'commodity_destination_region', 'pricing_scenario']) \
         .apply(lambda x: x.set_index("date") \
                .resample("D").sum() \
                .fillna(0)) \
         .reset_index()
 
-    result["type"] = base.COUNTER_OBSERVED
+    resut = result[~pd.isna(result.pricing_scenario)]
 
     # Progressively phase out pipeline_lng in n days
     result = remove_pipeline_lng(result)
 
     # Sanity check before updating counter
-    ok, global_new, global_old, eu_new, eu_old = sanity_check(result)
+    ok, global_new, global_old, eu_new, eu_old = sanity_check(result.loc[result.pricing_scenario == PRICING_DEFAULT])
 
     if not ok:
         logger_slack.error("[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (global_new / 1e9, global_old / 1e9))
@@ -104,9 +108,6 @@ def update(date_from='2021-11-01'):
                   if_exists="append",
                   index=False)
         session.commit()
-
-    # Add estimates
-    # add_estimates(result)
 
 
 def sanity_check(result):
@@ -127,6 +128,10 @@ def sanity_check(result):
     for_orders = result[(result.commodity_destination_iso2 == base.FOR_ORDERS)]
     if len(for_orders) > 0:
         logger_slack.error("Counter has for_orders")
+        ok = ok and False
+
+    if len(result[pd.isna(result.pricing_scenario)]) > 0:
+        logger_slack.error("Missing pricing scenario")
         ok = ok and False
 
     coal_ban = result[(result.commodity_destination_region == 'EU') & \

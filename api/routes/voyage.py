@@ -17,7 +17,7 @@ from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from base.logger import logger
-
+from base import PRICING_DEFAULT
 
 from http import HTTPStatus
 from flask import Response
@@ -74,6 +74,11 @@ class VoyageResource(Resource):
                         default=None, required=False, action='split')
     parser.add_argument('arrival_year', help='year(s) of arrival e.g. 2021,2022', type=int,
                         default=None, required=False, action='split')
+
+    parser.add_argument('pricing_scenario', help='Pricing scenario (standard or pricecap)',
+                        action='split',
+                        default=[PRICING_DEFAULT],
+                        required=False)
 
     parser.add_argument('ship_imo', action='split', help='IMO identifier(s) of the ship(s)',
                         required=False,
@@ -218,6 +223,7 @@ class VoyageResource(Resource):
         departure_year = params.get('departure_year')
         arrival_year = params.get('arrival_year')
 
+        pricing_scenario = params.get("pricing_scenario")
 
         ship_imo = params.get("ship_imo")
         aggregate_by = params.get("aggregate_by")
@@ -391,11 +397,19 @@ class VoyageResource(Resource):
 
         # generate value fields based on arrivalship dwt
         # Price for all countries without country-specific price
-        default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
+        SelectedPrice = Price.query.filter(Price.scenario.in_(pricing_scenario)).subquery()
+        SelectedPortPrice = PortPrice.query.filter(PortPrice.scenario.in_(pricing_scenario)).subquery()
+
+        default_price = session.query(SelectedPrice).filter(SelectedPrice.c.country_iso2 == sa.null()).subquery()
 
         price_eur_per_tonne_field = (
-            func.coalesce(PortPrice.eur_per_tonne, Price.eur_per_tonne, default_price.c.eur_per_tonne)
+            func.coalesce(SelectedPortPrice.c.eur_per_tonne, SelectedPrice.c.eur_per_tonne, default_price.c.eur_per_tonne)
         ).label('price_eur_per_tonne')
+
+        pricing_scenario_field = (
+            func.coalesce(SelectedPortPrice.c.scenario, SelectedPrice.c.scenario,
+                          default_price.c.scenario)
+        ).label('pricing_scenario')
 
         value_eur_field = (
                 shipments_combined.c.ship_dwt * price_eur_per_tonne_field
@@ -546,6 +560,7 @@ class VoyageResource(Resource):
                                     sa.sql.label('value_eur', value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
                                     Currency.currency,
                                     (value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight * Currency.per_eur).label('value_currency'),
+                                    pricing_scenario_field,
 
                                     DepartureBerth.id.label("departure_berth_id"),
                                     DepartureBerth.name.label("departure_berth_name"),
@@ -569,12 +584,12 @@ class VoyageResource(Resource):
              .outerjoin(Destination, shipments_combined.c.shipment_last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
              .outerjoin(commodity_subquery, commodity_subquery.c.id == commodity_field)
-             .outerjoin(Price,
-                        sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
-                                Price.commodity == commodity_subquery.c.pricing_commodity,
+             .outerjoin(SelectedPrice,
+                        sa.and_(SelectedPrice.c.date == func.date_trunc('day', Departure.date_utc),
+                                SelectedPrice.c.commodity == commodity_subquery.c.pricing_commodity,
                                 sa.or_(
-                                    sa.and_(Price.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
-                                    Price.country_iso2 == destination_iso2_field)
+                                    sa.and_(SelectedPrice.c.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
+                                    SelectedPrice.c.country_iso2 == destination_iso2_field)
                                 )
                         )
              .outerjoin(default_price,
@@ -582,11 +597,11 @@ class VoyageResource(Resource):
                                  default_price.c.commodity == commodity_subquery.c.pricing_commodity
                                  )
                         )
-             .outerjoin(PortPrice,
+             .outerjoin(SelectedPortPrice,
                         sa.and_(
-                            PortPrice.port_id == DeparturePort.id,
-                            PortPrice.commodity == commodity_subquery.c.pricing_commodity,
-                            PortPrice.date == func.date_trunc('day', Departure.date_utc)
+                            SelectedPortPrice.c.port_id == DeparturePort.id,
+                            SelectedPortPrice.c.commodity == commodity_subquery.c.pricing_commodity,
+                            SelectedPortPrice.c.date == func.date_trunc('day', Departure.date_utc)
                         ))
              .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
@@ -786,12 +801,13 @@ class VoyageResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['currency']
+        must_group_by = ['currency', 'pricing_scenario']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
+            'pricing_scenario': [subquery.c.pricing_scenario],
             'currency': [subquery.c.currency],
             'commodity': [subquery.c.commodity, subquery.c.commodity_name,
                           subquery.c.commodity_group, subquery.c.commodity_group_name],
