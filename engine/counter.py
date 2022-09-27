@@ -9,6 +9,7 @@ from base.models import DB_TABLE_COUNTER
 from base.utils import to_datetime
 from base.logger import logger_slack
 from base import PRICING_DEFAULT, PRICING_PRICECAP
+from base.db_utils import upsert
 
 try:
     from api.routes.voyage import VoyageResource
@@ -37,7 +38,7 @@ def update(date_from='2021-01-01'):
         "aggregate_by": ["commodity_origin_iso2", "commodity_destination_iso2", "commodity", "date"],
         "nest_in_data": False,
         "currency": "EUR",
-        "pricing_scenario": [PRICING_DEFAULT]
+        "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
     }
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
@@ -98,16 +99,23 @@ def update(date_from='2021-01-01'):
         logger_slack.info("[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)" %
                           (global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9))
 
-        # Erase and replace everything
         result.drop(['commodity_destination_region', 'commodity_group'], axis=1, inplace=True)
         result.rename(columns={'commodity_destination_iso2': 'destination_iso2'}, inplace=True)
-        Counter.query.delete()
-        session.commit()
-        result.to_sql(DB_TABLE_COUNTER,
-                  con=engine,
-                  if_exists="append",
-                  index=False)
-        session.commit()
+
+        if True:
+            # Erase and replace everything
+            Counter.query.delete()
+            session.commit()
+            result.to_sql(DB_TABLE_COUNTER,
+                      con=engine,
+                      if_exists="append",
+                      index=False)
+            session.commit()
+        else:
+            # For manual purposes
+            upsert(df=result[result.pricing_scenario == PRICING_PRICECAP],
+                   table=DB_TABLE_COUNTER,
+                   constraint_name="unique_counter")
 
 
 def sanity_check(result):
@@ -148,7 +156,8 @@ def sanity_check(result):
                                              Country.region.label('commodity_destination_region'),
                                              Commodity.group.label('commodity_group')) \
                                .join(Country, Country.iso2 == Counter.destination_iso2) \
-                               .join(Commodity, Commodity.id == Counter.commodity).statement,
+                               .join(Commodity, Commodity.id == Counter.commodity) \
+                               .filter(Counter.pricing_scenario == PRICING_DEFAULT).statement,
                                session.bind)
         old = old_data \
             .loc[old_data.date >= '2022-02-24'] \

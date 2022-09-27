@@ -182,18 +182,19 @@ class PipelineFlowResource(Resource):
              .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(commodity_subquery, PipelineFlow.commodity == commodity_subquery.c.id)
+             .outerjoin(default_price,
+                         sa.and_(default_price.c.date == PipelineFlow.date,
+                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
+                                 )
+                         )
              .outerjoin(SelectedPrice,
                         sa.and_(SelectedPrice.c.date == PipelineFlow.date,
                                 SelectedPrice.c.commodity == commodity_subquery.c.pricing_commodity,
                                 sa.or_(
                                     sa.and_(SelectedPrice.c.country_iso2 == sa.null(), PipelineFlow.destination_iso2 == sa.null()),
-                                    SelectedPrice.c.country_iso2 == PipelineFlow.destination_iso2)
-                                )
-                        )
-             .outerjoin(default_price,
-                         sa.and_(default_price.c.date == PipelineFlow.date,
-                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
-                                 )
+                                    SelectedPrice.c.country_iso2 == PipelineFlow.destination_iso2),
+                                SelectedPrice.c.scenario == default_price.c.scenario
+                                ),
                         )
              .outerjoin(Currency, Currency.date == PipelineFlow.date)
              .filter(PipelineFlow.destination_iso2 != "RU"))
@@ -336,6 +337,7 @@ class PipelineFlowResource(Resource):
                 .reset_index()
 
         return result
+
 
     def spread_currencies(self, result):
         len_before = len(result)
