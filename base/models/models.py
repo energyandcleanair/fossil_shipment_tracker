@@ -457,13 +457,14 @@ class Price(Base):
     scenario = Column(String, nullable=False)
 
     __tablename__ = DB_TABLE_PRICE
-    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', scenario, name='unique_price'),
+    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', 'scenario', name='unique_price'),
                       CheckConstraint("eur_per_tonne >= 0", name="price_positive"),
                       # We add a unique index to be sure because the constraint above doesn't work if country_iso2 is null
                       Index(
                           "unique_price_additional_constraint",
                           "date",
                           "commodity",
+                          "scenario",
                           unique=True,
                           postgresql_where=country_iso2.is_(None)
                       ),

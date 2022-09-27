@@ -154,7 +154,7 @@ class RussiaCounterResource(Resource):
             .join(Country, Counter.destination_iso2 == Country.iso2) \
             .outerjoin(Currency, Counter.date == Currency.date) \
             .filter(Counter.date >= to_datetime(date_from)) \
-            .filter(Counter.pricing_scenario.in_(pricing_scenario))
+            .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
         if destination_iso2:
             query = query.filter(Counter.destination_iso2.in_(to_list(destination_iso2)))

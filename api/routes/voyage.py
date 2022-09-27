@@ -397,8 +397,8 @@ class VoyageResource(Resource):
 
         # generate value fields based on arrivalship dwt
         # Price for all countries without country-specific price
-        SelectedPrice = Price.query.filter(Price.scenario.in_(pricing_scenario)).subquery()
-        SelectedPortPrice = PortPrice.query.filter(PortPrice.scenario.in_(pricing_scenario)).subquery()
+        SelectedPrice = Price.query.filter(Price.scenario.in_(to_list(pricing_scenario))).subquery()
+        SelectedPortPrice = PortPrice.query.filter(PortPrice.scenario.in_(to_list(pricing_scenario))).subquery()
 
         default_price = session.query(SelectedPrice).filter(SelectedPrice.c.country_iso2 == sa.null()).subquery()
 
@@ -407,8 +407,7 @@ class VoyageResource(Resource):
         ).label('price_eur_per_tonne')
 
         pricing_scenario_field = (
-            func.coalesce(SelectedPortPrice.c.scenario, SelectedPrice.c.scenario,
-                          default_price.c.scenario)
+            func.coalesce(SelectedPortPrice.c.scenario, SelectedPrice.c.scenario, default_price.c.scenario)
         ).label('pricing_scenario')
 
         value_eur_field = (
@@ -584,24 +583,27 @@ class VoyageResource(Resource):
              .outerjoin(Destination, shipments_combined.c.shipment_last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
              .outerjoin(commodity_subquery, commodity_subquery.c.id == commodity_field)
+             .outerjoin(default_price,
+                         sa.and_(default_price.c.date == func.date_trunc('day', Departure.date_utc),
+                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
+                                 )
+                         )
              .outerjoin(SelectedPrice,
                         sa.and_(SelectedPrice.c.date == func.date_trunc('day', Departure.date_utc),
                                 SelectedPrice.c.commodity == commodity_subquery.c.pricing_commodity,
                                 sa.or_(
                                     sa.and_(SelectedPrice.c.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
-                                    SelectedPrice.c.country_iso2 == destination_iso2_field)
+                                    SelectedPrice.c.country_iso2 == destination_iso2_field),
+                                SelectedPrice.c.scenario == default_price.c.scenario
+
                                 )
-                        )
-             .outerjoin(default_price,
-                         sa.and_(default_price.c.date == func.date_trunc('day', Departure.date_utc),
-                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
-                                 )
                         )
              .outerjoin(SelectedPortPrice,
                         sa.and_(
                             SelectedPortPrice.c.port_id == DeparturePort.id,
                             SelectedPortPrice.c.commodity == commodity_subquery.c.pricing_commodity,
-                            SelectedPortPrice.c.date == func.date_trunc('day', Departure.date_utc)
+                            SelectedPortPrice.c.date == func.date_trunc('day', Departure.date_utc),
+                            SelectedPortPrice.c.scenario == default_price.c.scenario
                         ))
              .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
@@ -749,7 +751,6 @@ class VoyageResource(Resource):
 
         # Query
         result = pd.read_sql(query.statement, session.bind)
-
         if len(result) == 0:
             return Response(
                 status=HTTPStatus.NO_CONTENT,

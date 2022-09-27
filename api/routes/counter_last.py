@@ -13,6 +13,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import case
 
 import base
+from base import PRICING_DEFAULT
 from . import routes_api
 from base.encoder import JsonEncoder
 from base.logger import logger
@@ -45,6 +46,10 @@ class RussiaCounterLastResource(Resource):
     parser.add_argument('commodity_grouping', type=str,
                         help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
                         default='default')
+    parser.add_argument('pricing_scenario', help='Pricing scenario (standard or pricecap)',
+                        action='split',
+                        default=[PRICING_DEFAULT],
+                        required=False)
     parser.add_argument('aggregate_by', help='aggregation e.g. commodity_group,destination_region',
                         required=False, default=['commodity','destination_region'], action='split')
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
@@ -60,7 +65,7 @@ class RussiaCounterLastResource(Resource):
         date_to = params.get("date_to")
         commodity_grouping = params.get("commodity_grouping")
         aggregate_by = params.get("aggregate_by")
-        fill_with_estimates = params.get("fill_with_estimates")
+        pricing_scenario = params.get("pricing_scenario")
         use_eu = params.get("use_eu")
         format = params.get("format")
 
@@ -76,7 +81,6 @@ class RussiaCounterLastResource(Resource):
 
         commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
 
-
         query = session.query(
             Counter.commodity,
             commodity_subquery.c.group.label("commodity_group"),
@@ -85,12 +89,14 @@ class RussiaCounterLastResource(Resource):
             destination_region_field,
             Counter.date,
             func.sum(Counter.value_tonne).label("value_tonne"),
-            func.sum(Counter.value_eur).label("value_eur")
+            func.sum(Counter.value_eur).label("value_eur"),
+            Counter.pricing_scenario
         ) \
             .join(commodity_subquery, Counter.commodity == commodity_subquery.c.id) \
             .join(Country, Country.iso2 == Counter.destination_iso2) \
             .group_by(Counter.commodity, Counter.destination_iso2, Country.name, destination_region_field,
-                      Counter.date, commodity_subquery.c.group)
+                      Counter.date, commodity_subquery.c.group, Counter.pricing_scenario) \
+            .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
         if destination_region:
             query = query.filter(destination_region_field.in_(to_list(destination_region)))
@@ -104,8 +110,6 @@ class RussiaCounterLastResource(Resource):
         if date_to:
             query = query.filter(Counter.date <= to_datetime(date_to))
 
-        if not fill_with_estimates:
-            query = query.filter(Counter.type != base.COUNTER_ESTIMATED)
 
         # Important to force this
         # so that future flows (e.g. fixed pipeline) aren't included
@@ -118,11 +122,13 @@ class RussiaCounterLastResource(Resource):
         counter.replace({np.nan: None}, inplace=True)
 
         groupby_cols = set([x for x in ['destination_iso2', 'destination_country',
-                                        'destination_region', 'commodity', 'commodity_group'] if
+                                        'destination_region', 'commodity', 'commodity_group',
+                                        'pricing_scenario'] if
                         aggregate_by is None or not aggregate_by or x in aggregate_by])
 
         if 'commodity' in groupby_cols:
             groupby_cols.add('commodity_group')
+
         if 'destination_iso2' in groupby_cols or 'destination_country' in groupby_cols:
             groupby_cols.update(['destination_iso2', 'destination_country'])
 
@@ -227,7 +233,7 @@ class RussiaCounterLastResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['date']
+        must_group_by = ['date', 'pricing_scenario']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
@@ -235,6 +241,7 @@ class RussiaCounterLastResource(Resource):
         # Aggregating
         aggregateby_cols_dict = {
             'date': [subquery.c.date],
+            'pricing_scenario': [subquery.c.pricing_scenario],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region],

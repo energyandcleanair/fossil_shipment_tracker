@@ -117,7 +117,7 @@ class PipelineFlowResource(Resource):
             aggregate_by.remove('')
 
         # Price for all countries without country-specific price
-        SelectedPrice = Price.query.filter(Price.scenario.in_(pricing_scenario)).subquery()
+        SelectedPrice = Price.query.filter(Price.scenario.in_(to_list(pricing_scenario))).subquery()
         default_price = session.query(SelectedPrice).filter(SelectedPrice.c.country_iso2 == sa.null()).subquery()
 
         value_eur_field = (

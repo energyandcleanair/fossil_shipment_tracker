@@ -37,7 +37,7 @@ def update(date_from='2021-01-01'):
         "aggregate_by": ["commodity_origin_iso2", "commodity_destination_iso2", "commodity", "date"],
         "nest_in_data": False,
         "currency": "EUR",
-        "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
+        "pricing_scenario": [PRICING_DEFAULT]
     }
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
@@ -84,7 +84,7 @@ def update(date_from='2021-01-01'):
                .fillna(0)) \
         .reset_index()
 
-    resut = result[~pd.isna(result.pricing_scenario)]
+    result = result[~pd.isna(result.pricing_scenario)]
 
     # Progressively phase out pipeline_lng in n days
     result = remove_pipeline_lng(result)
