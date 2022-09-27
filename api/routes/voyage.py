@@ -370,7 +370,8 @@ class VoyageResource(Resource):
             ).label('arrival_weight'),
             sa.sql.expression.literal_column('True').label('is_sts'),
             ArrivalShip,
-            Event.date_utc.label("event_date_utc")
+            Event.date_utc.label('event_date_utc'),
+            Event.ship_closest_position.label('sts_position')
         ) \
         .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
         .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
@@ -388,7 +389,8 @@ class VoyageResource(Resource):
             sa.sql.expression.literal_column('False').label('is_sts'),
             # Arrival ship is the same as departure ship for non sts shipments, so we just add this in so we can union
             Ship,
-            sa.null().label('event_date_utc')
+            sa.null().label('event_date_utc'),
+            sa.null().label('sts_position')
         ) \
         .join(Departure, Departure.id == Shipment.departure_id) \
         .join(Ship, Ship.imo == Departure.ship_imo)
@@ -472,6 +474,7 @@ class VoyageResource(Resource):
                                     # STS related columns
                                     shipments_combined.c.is_sts,
                                     shipments_combined.c.event_date_utc,
+                                    shipments_combined.c.sts_position,
 
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
