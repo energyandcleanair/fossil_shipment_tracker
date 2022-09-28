@@ -101,7 +101,7 @@ def fill(imos=[], mmsis=[]):
         return [x for x in imos if str(x) not in existing_imos]
 
     def get_missing_ships_mmsis(mmsis):
-        existing_mmsis = [value for value, in session.query(Ship.mmsi).all()]
+        existing_mmsis = [mmsi for s in session.query(Ship).all() for mmsi in s.mmsi]
         return [x for x in mmsis if str(x) not in existing_mmsis]
 
     if not get_missing_ships_imos(imos) and not get_missing_ships_mmsis(mmsis):
@@ -150,8 +150,9 @@ def upload_ships(ships):
                 logger.warning("Please check ship imo {}, we have more than one ship in db.".format(ship.imo))
             if len(imo_ships) == 1:
                 # add new shop mmsi to existing ship imo
-                imo_ships[0].mmsi.append(ship.mmsi)
-                session.commit()
+                if ship.mmsi not in imo_ships[0].mmsi:
+                    imo_ships[0].mmsi.append(ship.mmsi)
+                    session.commit()
             else:
                 raise ValueError("Problem inserting ship: %s"%(str(e),))
 
