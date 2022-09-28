@@ -90,6 +90,9 @@ def update(date_from='2021-01-01'):
     # Progressively phase out pipeline_lng in n days
     result = remove_pipeline_lng(result)
 
+    # Remove EU coal shipments following coal ban
+    result = remove_coal_to_eu(result)
+
     # Sanity check before updating counter
     ok, global_new, global_old, eu_new, eu_old = sanity_check(result.loc[result.pricing_scenario == PRICING_DEFAULT])
 
@@ -217,6 +220,13 @@ def remove_pipeline_lng(result, n_days=10,
                ["value_eur", "value_tonne"]] = 0
     result.loc[(result.commodity == 'lng_pipeline') & (pd.to_datetime(result.date) <= pd.to_datetime(date_stop)),
                ["value_eur", "value_tonne"]] *= max(0, 1 - 1 / n_days * (dt.date.today() - date_stop).days)
+    return result
+
+def remove_coal_to_eu(result, date_stop=dt.date(2022,8,11)):
+    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'coal')
+               & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
+               ["value_eur", "value_tonne"]] = 0
+
     return result
 
 
