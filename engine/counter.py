@@ -93,6 +93,10 @@ def update(date_from='2021-01-01'):
     # Remove EU coal shipments following coal ban
     result = remove_coal_to_eu(result)
 
+    # Remove new EU oil pipeline that we missed before
+    # After 100bn release, we'll need to reinclude it progressively
+    result = remove_pipeline_oil_eu(result)
+
     # Sanity check before updating counter
     ok, global_new, global_old, eu_new, eu_old = sanity_check(result.loc[result.pricing_scenario == PRICING_DEFAULT])
 
@@ -222,6 +226,7 @@ def remove_pipeline_lng(result, n_days=10,
                ["value_eur", "value_tonne"]] *= max(0, 1 - 1 / n_days * (dt.date.today() - date_stop).days)
     return result
 
+
 def remove_coal_to_eu(result, date_stop=dt.date(2022,8,11)):
     result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'coal')
                & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
@@ -229,6 +234,13 @@ def remove_coal_to_eu(result, date_stop=dt.date(2022,8,11)):
 
     return result
 
+
+def remove_pipeline_oil_eu(result, date_stop=dt.date(2022, 9, 1)):
+    #TODO restore progressively
+    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'pipeline_oil')
+               & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
+               ["value_eur", "value_tonne"]] = 0
+    return result
 
 # def remove_kipi_flows(pipelineflows,
 #                       date_stop=dt.datetime(2022, 6, 16),
