@@ -392,7 +392,6 @@ def fill_using_imo_website():
         # add reg iso2 to record and commit
         try:
             company.registration_country_iso2 = country_dict[company_info[0]]
-            session.add(company)
             session.commit()
         except KeyError:
             logger.warning("We did not find the ISO2 for imo {}, country {}. Considering adding manually.".format(company.imo, company_info[0]))
