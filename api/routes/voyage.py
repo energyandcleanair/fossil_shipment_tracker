@@ -597,8 +597,7 @@ class VoyageResource(Resource):
                                 sa.or_(
                                     sa.and_(SelectedPrice.c.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
                                     SelectedPrice.c.country_iso2 == destination_iso2_field),
-                                SelectedPrice.c.scenario == default_price.c.scenario
-
+                                                                SelectedPrice.c.scenario == default_price.c.scenario
                                 )
                         )
              .outerjoin(SelectedPortPrice,
@@ -673,7 +672,7 @@ class VoyageResource(Resource):
         if date_to is not None:
             shipments_rich = shipments_rich.filter(
                 sa.or_(
-                    Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
+                    Arrival.date_utc <= to_datetime(date_to),
                     Departure.date_utc <= to_datetime(date_to)
                 ))
 
@@ -1155,7 +1154,6 @@ class VoyageResource(Resource):
                     status=200,
                     mimetype='application/kml',
                     headers=headers)
-
 
         return Response(response="Unknown format. Should be either csv, json, geojson or kml",
                         status=HTTPStatus.BAD_REQUEST,
