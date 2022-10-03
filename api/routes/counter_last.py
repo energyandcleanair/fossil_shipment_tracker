@@ -265,7 +265,8 @@ class RussiaCounterLastResource(Resource):
 
 
     def fix_100bn(self, counter_last,
-                  datetime_100bn_utc=dt.datetime(2022, 10, 4, 5, 52)):
+                  datetime_100bn_utc=dt.datetime(2022, 10, 4, 5, 52),
+                  start_slope_utc=dt.datetime(2022, 10, 3, 21, 00)):
         """
         TEMPORARILY set the time at which 100bn will be reached,
         and ensure cathing up afterwards
@@ -298,11 +299,18 @@ class RussiaCounterLastResource(Resource):
         df['new_eur_per_day'] = df.eur_per_day
         df.loc[idx_eu, 'new_eur_per_day'] = df[idx_eu]['eur_per_day'] * \
                                             (100e9 - df[idx_eu].total_eur.sum()) / df[idx_eu].eur_per_day.sum() \
-                                            / ((datetime_100bn_utc - df[idx_eu].now.iloc[0]).seconds / 24 / 3600)
+                                            / ((datetime_100bn_utc - start_slope_utc).seconds / 24 / 3600)
 
         assert np.all(counter_last['eur_per_day'] == df['eur_per_day'])
+
         counter_last['eur_per_day'] = df['new_eur_per_day']
         counter_last.replace({np.nan: 0}, inplace=True)
+
+        # fix the total
+        counter_last['total_eur'] = np.where(counter_last['destination_region'] != 'EU',
+                                             counter_last['total_eur'],
+                                             counter_last['total_eur'] + (((dt.datetime.utcnow() - start_slope_utc).seconds / (24*3600)) * counter_last['eur_per_day']))
+
         # Fixed start
         # from csv: commodity x region
         #value_now_bn = 99.2
