@@ -145,6 +145,9 @@ class RussiaCounterLastResource(Resource):
 
         counter_last = counter_last.groupby(groupby_cols).sum()
 
+        # 100bn catchup fix
+        counter_last = self.fix_100bn(counter_last)
+
         # Add total
         total = pd.DataFrame(counter_last.sum()).T
         total[list(counter_last.index.names)] = "total"
@@ -259,3 +262,31 @@ class RussiaCounterLastResource(Resource):
 
         query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
         return query
+
+
+    def fix_100bn(self, counter_last,
+                  datetime_100bn_utc=dt.datetime(2022, 10, 4, 5, 52),
+                  n_days=10):
+        """
+        TEMPORARILY set the time at which 100bn will be reached,
+        and ensure cathing up afterwards
+        :param counter_last:
+        :param datetime_100bn_utc: date at which we want the counter to reach 100bn
+        :param n_days: number of days to catch up
+        :return:
+        """
+
+
+        # Fixed start
+        # from csv: commodity x region
+        #value_now_bn = 99.2
+        #date_now = dt.datetime(2022, 10, 3 ,X,Y,Z)
+
+        # Two goals, one constraint
+        # Reach EU 100bn at datetime_100bn_utc
+        # Tend towards the new counter value generally
+        # Prevent a huge bump
+
+
+
+        return counter_last
