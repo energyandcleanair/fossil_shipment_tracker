@@ -275,6 +275,9 @@ class RussiaCounterLastResource(Resource):
         :return:
         """
 
+        if not 'destination_region' in counter_last.columns:
+            return counter_last
+
         if counter_last[counter_last.destination_region == 'EU'].total_eur.sum() > 100E9:
             idx_eu = (counter_last.destination_region == 'EU')
             if counter_last[idx_eu].eur_per_day.sum() == 0:
@@ -298,6 +301,7 @@ class RussiaCounterLastResource(Resource):
 
         assert np.all(counter_last['eur_per_day'] == df['eur_per_day'])
         counter_last['eur_per_day'] = df['new_eur_per_day']
+        counter_last.replace({np.nan: 0}, inplace=True)
         # Fixed start
         # from csv: commodity x region
         #value_now_bn = 99.2
