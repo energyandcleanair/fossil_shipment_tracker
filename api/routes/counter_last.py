@@ -143,10 +143,10 @@ class RussiaCounterLastResource(Resource):
         if "commodity_group" in counter_last.columns:
             counter_last = counter_last.loc[~counter_last.commodity_group.isna()]
 
-        counter_last = counter_last.groupby(groupby_cols).sum()
-
         # 100bn catchup fix
         counter_last = self.fix_100bn(counter_last)
+
+        counter_last = counter_last.groupby(groupby_cols).sum()
 
         # Add total
         total = pd.DataFrame(counter_last.sum()).T
@@ -197,8 +197,8 @@ class RussiaCounterLastResource(Resource):
                 .fillna(0)
             # cut 2 last days and take the 7-day mean
             # but only on last ten days to avoid old shipments (like US)
-            means = x.loc[x.index >= dt.datetime.today() - dt.timedelta(days=10)] \
-                          [["value_tonne", "value_eur"]].shift(shift_days).tail(7) \
+            means = x.loc[x.index >= dt.datetime.today() - dt.timedelta(days=shift_days + n_days + 1)] \
+                          [["value_tonne", "value_eur"]].shift(shift_days).tail(n_days) \
                 .mean() \
                 .fillna(0)
 
@@ -265,8 +265,7 @@ class RussiaCounterLastResource(Resource):
 
 
     def fix_100bn(self, counter_last,
-                  datetime_100bn_utc=dt.datetime(2022, 10, 4, 5, 52),
-                  n_days=10):
+                  datetime_100bn_utc=dt.datetime(2022, 10, 4, 5, 52)):
         """
         TEMPORARILY set the time at which 100bn will be reached,
         and ensure cathing up afterwards
@@ -276,7 +275,29 @@ class RussiaCounterLastResource(Resource):
         :return:
         """
 
+        if counter_last[counter_last.destination_region == 'EU'].total_eur.sum() > 100E9:
+            idx_eu = (counter_last.destination_region == 'EU')
+            if counter_last[idx_eu].eur_per_day.sum() == 0:
+                counter_last[idx_eu & (counter_last.commodity == 'crude_oil')]['eur_per_day'] = 13000 * 24 * 3600
+            return counter_last
 
+        # TODO REMOVE
+        df = counter_last.reset_index().copy()
+        idx_eu = (df.destination_region == 'EU')
+
+        if df[idx_eu].eur_per_day.sum() == 0:
+            df[idx_eu & (df.commodity == 'crude_oil')]['eur_per_day'] = 1
+
+        eu_total = df[df.destination_region == 'EU'].total_eur.sum()
+        df['old_total_eur'] = df.total_eur - (df.now - df.date).dt.days * df.eur_per_day
+
+        df['new_eur_per_day'] = df.eur_per_day
+        df.loc[idx_eu, 'new_eur_per_day'] = df[idx_eu]['eur_per_day'] * \
+                                            (100e9 - df[idx_eu].total_eur.sum()) / df[idx_eu].eur_per_day.sum() \
+                                            / ((datetime_100bn_utc - df[idx_eu].now.iloc[0]).seconds / 24 / 3600)
+
+        assert np.all(counter_last['eur_per_day'] == df['eur_per_day'])
+        counter_last['eur_per_day'] = df['new_eur_per_day']
         # Fixed start
         # from csv: commodity x region
         #value_now_bn = 99.2
@@ -286,7 +307,4 @@ class RussiaCounterLastResource(Resource):
         # Reach EU 100bn at datetime_100bn_utc
         # Tend towards the new counter value generally
         # Prevent a huge bump
-
-
-
         return counter_last
