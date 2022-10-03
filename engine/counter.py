@@ -93,9 +93,8 @@ def update(date_from='2021-01-01'):
     # Remove EU coal shipments following coal ban
     result = remove_coal_to_eu(result)
 
-    # Remove new EU oil pipeline that we missed before
-    # After 100bn release, we'll need to reinclude it progressively
-    result = remove_pipeline_oil_eu(result)
+    # Progressively restore new EU oil pipeline that we missed before
+    result = resume_pipeline_oil_eu(result)
 
     # Sanity check before updating counter
     ok, global_new, global_old, eu_new, eu_old = sanity_check(result.loc[result.pricing_scenario == PRICING_DEFAULT])
@@ -235,44 +234,22 @@ def remove_coal_to_eu(result, date_stop=dt.date(2022,8,11)):
     return result
 
 
-def remove_pipeline_oil_eu(result, date_stop=dt.date(2022, 9, 1)):
-    #TODO restore progressively
+def resume_pipeline_oil_eu(result, n_days=14,
+                           date_start_resuming = dt.date(2022, 10, 4),
+                           date_break = dt.date(2022, 9, 1)):
+    """
+    We missed EU pipeline oil for a couple weeks but didn't want to restore it
+    in one go just before the 100 bn counter. We're adding a slow catchup
+    :param result:
+    :param n_days:
+    :param date_stop:
+    :return:
+    """
     result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'pipeline_oil')
-               & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
-               ["value_eur", "value_tonne"]] = 0
+               & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
+               ["value_eur", "value_tonne"]] *= min(1, max(0, (dt.date.today() - date_start_resuming).days / n_days))
+
     return result
-
-# def remove_kipi_flows(pipelineflows,
-#                       date_stop=dt.datetime(2022, 6, 16),
-#                       n_days=10):
-#     """
-#         Assuming gas transiting from Turkey through Kipi point
-#         is originating in Azerbaidjan.
-#
-#         n_days: number of days to phase it out to avoid jumps in counter
-#         date_stop: date of immediate cut (everything before will be progressively removed,
-#                                           everything after will be removed immediately)
-#         :return:
-#         """
-#
-#     idx = (pipelineflows.departure_iso2 == 'TR') & (pipelineflows.destination_iso2 == 'GR')
-#
-#     idx_after = idx & (pd.to_datetime(pipelineflows.date) >= date_stop)
-#     idx_before = idx & (pd.to_datetime(pipelineflows.date) <= date_stop)
-#
-#     factor_after = 0
-#     factor_before = max(0, 1 - (1 / n_days * (dt.date.today() - date_stop.date()).days))
-#
-#     pipelineflows.loc[idx_after, 'value_tonne'] = pipelineflows.loc[idx_after, 'value_tonne'] * factor_after
-#     pipelineflows.loc[idx_after, 'value_m3'] = pipelineflows.loc[idx_after, 'value_m3'] * factor_after
-#     pipelineflows.loc[idx_after, 'value_eur'] = pipelineflows.loc[idx_after, 'value_eur'] * factor_after
-#
-#     pipelineflows.loc[idx_before, 'value_tonne'] = pipelineflows.loc[idx_before, 'value_tonne'] * factor_before
-#     pipelineflows.loc[idx_before, 'value_m3'] = pipelineflows.loc[idx_before, 'value_m3'] * factor_before
-#     pipelineflows.loc[idx_before, 'value_eur'] = pipelineflows.loc[idx_before, 'value_eur'] * factor_before
-#
-#     return pipelineflows
-
 
 
 def add_estimates(result):
