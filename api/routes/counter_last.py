@@ -276,6 +276,7 @@ class RussiaCounterLastResource(Resource):
         """
 
         if not 'destination_region' in counter_last.columns:
+            counter_last['eur_per_day'] *= (counter_last.eur_per_day.sum() + 1139818113) / counter_last.eur_per_day.sum()
             return counter_last
 
         if counter_last[counter_last.destination_region == 'EU'].total_eur.sum() > 100E9:
