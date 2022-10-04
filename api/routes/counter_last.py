@@ -266,7 +266,7 @@ class RussiaCounterLastResource(Resource):
 
     def fix_100bn(self, counter_last,
                   datetime_100bn_utc=dt.datetime(2022, 10, 4, 5, 52),
-                  start_slope_utc=dt.datetime(2022, 10, 3, 21, 00)):
+                  start_slope_utc=dt.datetime(2022, 10, 3, 21, 0)):
         """
         TEMPORARILY set the time at which 100bn will be reached,
         and ensure cathing up afterwards
@@ -291,9 +291,11 @@ class RussiaCounterLastResource(Resource):
         idx_eu = (df.destination_region == 'EU')
 
         if df[idx_eu].eur_per_day.sum() == 0:
-            df[idx_eu & (df.commodity == 'crude_oil')]['eur_per_day'] = 1
+            if 'commodity' in df.columns:
+                df.loc[idx_eu & (df.commodity == 'crude_oil'), 'eur_per_day'] = 1
+            if 'commodity_group' in df.columns:
+                df.loc[idx_eu & (df.commodity_group == 'oil'), 'eur_per_day'] = 1
 
-        eu_total = df[df.destination_region == 'EU'].total_eur.sum()
         df['old_total_eur'] = df.total_eur - (df.now - df.date).dt.days * df.eur_per_day
 
         df['new_eur_per_day'] = df.eur_per_day
@@ -301,7 +303,7 @@ class RussiaCounterLastResource(Resource):
                                             (100e9 - df[idx_eu].total_eur.sum()) / df[idx_eu].eur_per_day.sum() \
                                             / ((datetime_100bn_utc - start_slope_utc).seconds / 24 / 3600)
 
-        assert np.all(counter_last['eur_per_day'] == df['eur_per_day'])
+        # assert np.all(counter_last['eur_per_day'] == df['eur_per_day'])
 
         counter_last['eur_per_day'] = df['new_eur_per_day']
         counter_last.replace({np.nan: 0}, inplace=True)
