@@ -42,6 +42,9 @@ from . import DB_TABLE_CURRENCY
 from . import DB_TABLE_MTEVENT_TYPE
 from . import DB_TABLE_EVENT
 from . import DB_TABLE_SHIPMENT_WITH_STS
+from . import DB_TABLE_STS_LOCATIONS
+from . import DB_TABLE_STSARRIVALLOCATION
+from . import DB_TABLE_STSDEPARTURELOCATION
 
 from . import DB_TABLE_ALERT_INSTANCE
 from . import DB_TABLE_ALERT_CONFIG
@@ -136,6 +139,44 @@ class Berth(Base):
 
     __tablename__ = DB_TABLE_BERTH
 
+class STSLocation(Base):
+    id = Column(String, unique=True, primary_key=True)
+    name = Column(String)
+    geometry = Column(Geometry('GEOMETRY', srid=4326))
+
+    __tablename__ = DB_TABLE_STS_LOCATIONS
+
+class ShipmentArrivalLocationSTS(Base):
+    """
+    For each shipment, lists the berth detected as well as the method used to find it
+    """
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    shipment_id = Column(BigInteger, unique=True)
+    sts_location_id = Column(String, ForeignKey(DB_TABLE_STS_LOCATIONS + '.id', onupdate="CASCADE", ondelete="CASCADE"))
+
+    # Optional
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"))
+    method_id = Column(String)
+
+    __tablename__ = DB_TABLE_STSARRIVALLOCATION
+    __table_args__ = (UniqueConstraint('shipment_id', 'sts_location_id', name='unique_shipmentstsarrivallocation'),
+                      )
+
+class ShipmentDepartureLocationSTS(Base):
+    """
+    For each shipment, lists the berth detected as well as the method used to find it
+    """
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    shipment_id = Column(BigInteger, unique=True)
+    sts_location_id = Column(String, ForeignKey(DB_TABLE_STS_LOCATIONS + '.id', onupdate="CASCADE", ondelete="CASCADE"))
+
+    # Optional
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"))
+    method_id = Column(String)
+
+    __tablename__ = DB_TABLE_STSDEPARTURELOCATION
+    __table_args__ = (UniqueConstraint('shipment_id', 'sts_location_id', name='unique_shipmentstsdeparturelocation'),
+                      )
 
 class Country(Base):
     iso2 = Column(String, unique=True, primary_key=True)
