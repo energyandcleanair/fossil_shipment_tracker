@@ -18,7 +18,8 @@ from . import routes_api
 from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
-from base.models import Counter, Commodity, Country, Currency
+from base.models import Country
+from base.models import Counter100bn as Counter # TODO REPLACE WITH COUNTER WHEN FIXED
 from base.utils import to_datetime, to_list, intersect
 from engine.commodity import get_subquery as get_commodity_subquery
 
@@ -262,6 +263,68 @@ class RussiaCounterLastResource(Resource):
 
         query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
         return query
+
+
+    def fix_post100bn(self,
+                      counter_last,
+                      datetime_100bn_utc=dt.datetime(2022, 10, 4, 5, 52),
+                      start_slope_utc=dt.datetime(2022, 10, 3, 21, 0)):
+        """
+        TEMPORARILY set the time at which 100bn will be reached,
+        and ensure cathing up afterwards
+        :param counter_last:
+        :param datetime_100bn_utc: date at which we want the counter to reach 100bn
+        :param n_days: number of days to catch up
+        :return:
+        """
+
+        if not 'destination_region' in counter_last.columns:
+            counter_last['eur_per_day'] *= (counter_last.eur_per_day.sum() + 1139818113) / counter_last.eur_per_day.sum()
+            return counter_last
+
+        if counter_last[counter_last.destination_region == 'EU'].total_eur.sum() > 100E9:
+            idx_eu = (counter_last.destination_region == 'EU')
+            if counter_last[idx_eu].eur_per_day.sum() == 0:
+                counter_last[idx_eu & (counter_last.commodity == 'crude_oil')]['eur_per_day'] = 13000 * 24 * 3600
+            return counter_last
+
+        # TODO REMOVE
+        df = counter_last.reset_index().copy()
+        idx_eu = (df.destination_region == 'EU')
+
+        if df[idx_eu].eur_per_day.sum() == 0:
+            if 'commodity' in df.columns:
+                df.loc[idx_eu & (df.commodity == 'crude_oil'), 'eur_per_day'] = 1
+            if 'commodity_group' in df.columns:
+                df.loc[idx_eu & (df.commodity_group == 'oil'), 'eur_per_day'] = 1
+
+        df['old_total_eur'] = df.total_eur - (df.now - df.date).dt.days * df.eur_per_day
+
+        df['new_eur_per_day'] = df.eur_per_day
+        df.loc[idx_eu, 'new_eur_per_day'] = df[idx_eu]['eur_per_day'] * \
+                                            (100e9 - df[idx_eu].total_eur.sum()) / df[idx_eu].eur_per_day.sum() \
+                                            / ((datetime_100bn_utc - start_slope_utc).seconds / 24 / 3600)
+
+        # assert np.all(counter_last['eur_per_day'] == df['eur_per_day'])
+
+        counter_last['eur_per_day'] = df['new_eur_per_day']
+        counter_last.replace({np.nan: 0}, inplace=True)
+
+        # fix the total
+        counter_last['total_eur'] = np.where(counter_last['destination_region'] != 'EU',
+                                             counter_last['total_eur'],
+                                             counter_last['total_eur'] + (((dt.datetime.utcnow() - start_slope_utc).seconds / (24*3600)) * counter_last['eur_per_day']))
+
+        # Fixed start
+        # from csv: commodity x region
+        #value_now_bn = 99.2
+        #date_now = dt.datetime(2022, 10, 3 ,X,Y,Z)
+
+        # Two goals, one constraint
+        # Reach EU 100bn at datetime_100bn_utc
+        # Tend towards the new counter value generally
+        # Prevent a huge bump
+        return counter_last
 
 
     def fix_100bn(self, counter_last,

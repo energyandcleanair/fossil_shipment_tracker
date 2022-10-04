@@ -34,6 +34,7 @@ from . import DB_TABLE_PRICE
 from . import DB_TABLE_PORTPRICE
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
+from . import DB_TABLE_COUNTER100BN
 from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
@@ -540,6 +541,21 @@ class Counter(Base):
 
     __tablename__ = DB_TABLE_COUNTER
     __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_iso2', 'pricing_scenario', name='unique_counter'),)
+
+
+class Counter100bn(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
+
+    destination_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
+
+    date = Column(DateTime(timezone=False))
+    value_tonne = Column(Numeric)
+    value_eur = Column(Numeric)
+    pricing_scenario = Column(String)
+
+    __tablename__ = DB_TABLE_COUNTER100BN
+    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_iso2', 'pricing_scenario', name='unique_counter_100bn'),)
 
 
 class Commodity(Base):

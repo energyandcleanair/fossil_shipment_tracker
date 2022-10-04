@@ -28,6 +28,7 @@ DB_TABLE_SHIPMENT_WITH_STS = "shipment_with_sts"
 
 DB_TABLE_PIPELINEFLOW = "pipelineflow"
 DB_TABLE_COUNTER = "counter"
+DB_TABLE_COUNTER100BN = "counter_100bn"
 
 # Marine Traffic cache
 DB_TABLE_MTVOYAGEINFO = "voyageinfo"
