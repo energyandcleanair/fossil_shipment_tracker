@@ -97,6 +97,18 @@ def to_wkt(x):
 
 
 def update_geometry_from_wkb(df, to="shape"):
+    """
+    converts wkb to wkt or shapely geometry object
+
+    Parameters
+    ----------
+    df : dataframe to convert
+    to : conversion, either shape or wkt
+
+    Returns
+    -------
+
+    """
     if to == "shape":
         df["geometry"] = df.geometry.apply(wkb_to_shape)
     if to == "wkt":
