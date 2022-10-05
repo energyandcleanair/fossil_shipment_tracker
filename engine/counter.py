@@ -94,7 +94,10 @@ def update(date_from='2021-01-01'):
     result = remove_coal_to_eu(result)
 
     # Progressively restore new EU oil pipeline that we missed before
-    result = resume_pipeline_oil_eu(result)
+    # result = resume_pipeline_oil_eu(result, n_days=3)
+
+    # # Progressively resume EU shipments that have been paused to reached 100bn
+    # result = resume_eu_shipments(result, n_days=3)
 
     # Sanity check before updating counter
     ok, global_new, global_old, eu_new, eu_old = sanity_check(result.loc[result.pricing_scenario == PRICING_DEFAULT])
@@ -247,9 +250,28 @@ def resume_pipeline_oil_eu(result, n_days=14,
     """
     result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'pipeline_oil')
                & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
-               ["value_eur", "value_tonne"]] *= min(1, max(0, (dt.date.today() - date_start_resuming).days / n_days))
+               ["value_eur", "value_tonne"]] *= min(1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days))
 
     return result
+
+
+def resume_eu_shipments(result, n_days=10,
+                        date_start_resuming = dt.date(2022, 10, 4),
+                        date_break = dt.date(2022, 9, 26)):
+    """
+    We missed EU pipeline oil for a couple weeks but didn't want to restore it
+    in one go just before the 100 bn counter. We're adding a slow catchup
+    :param result:
+    :param n_days:
+    :param date_stop:
+    :return:
+    """
+    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity.isin(['lng', 'crude_oil', 'oil_products']))
+               & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
+               ["value_eur", "value_tonne"]] *= min(1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600  / 24 / n_days))
+
+    return result
+
 
 
 def add_estimates(result):

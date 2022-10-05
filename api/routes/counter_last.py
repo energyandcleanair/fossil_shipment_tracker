@@ -19,7 +19,7 @@ from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
 from base.models import Country
-from base.models import Counter100bn as Counter # TODO REPLACE WITH COUNTER WHEN FIXED
+from base.models import Counter
 from base.utils import to_datetime, to_list, intersect
 from engine.commodity import get_subquery as get_commodity_subquery
 
