@@ -214,7 +214,7 @@ class Datalastic:
         positions = cls.get_positions(imo, date_from=date_from, date_to=date_to)
 
         if not positions:
-            logger.warning("No positions found for ship (imo: {}) between dates: {}, {}.".format(imo, date_from, date_to))
+            logger.warning("Datalastic: no positions found for ship (imo: {}) between dates: {}, {}.".format(imo, date_from, date_to))
             return None
 
         return min(positions, key=lambda p: abs(p.date_utc - date))
@@ -286,7 +286,7 @@ class Datalastic:
             "speed": x["speed"],
             "date_utc": dt.datetime.strptime(x["last_position_UTC"], "%Y-%m-%dT%H:%M:%SZ"),
             "destination_name": x["destination"]
-        }) for x in response_data["positions"] if abs(x["lat"] > 1e-4)]
+        }) for x in response_data["positions"] if abs(float(x["lat"])) > 1e-4]
 
         return positions
 
