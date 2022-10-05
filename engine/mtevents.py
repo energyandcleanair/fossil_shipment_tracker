@@ -25,14 +25,15 @@ from base.models import MarineTrafficEventType, Shipment, Departure, Ship, Marin
 from sqlalchemy import func
 import sqlalchemy as sa
 
+
 def update(
         date_from="2022-01-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         ship_imo=None,
-        commodities = [base.LNG,
-                       base.CRUDE_OIL,
-                       base.OIL_PRODUCTS,
-                       base.OIL_OR_CHEMICAL],
+        commodities=[base.LNG,
+                     base.CRUDE_OIL,
+                     base.OIL_PRODUCTS,
+                     base.OIL_OR_CHEMICAL],
         min_dwt=base.DWT_MIN,
         force_rebuild=False,
         between_existing_only=False,
@@ -64,8 +65,8 @@ def update(
     logger_slack.info("=== Updating events for ships ===")
 
     ships = session.query(
-            Departure.ship_imo.distinct().label("ship_imo"),
-         ) \
+        Departure.ship_imo.distinct().label("ship_imo"),
+    ) \
         .filter(Departure.date_utc > date_from) \
         .join(Port, Port.id == Departure.port_id) \
         .join(Ship, Departure.ship_imo == Ship.imo)
@@ -132,29 +133,30 @@ def update(
             date_bounds = list(zip(event_date_froms, event_date_tos))
 
         if force_rebuild and between_shipments_only:
-
             # to reduce the amount of credits/unneeded events - we can query only between existing departures / arrivals
             # for shipments in our db - if we do not have an arrival, we use the next departure date for undeteced
             # arrival shipments, and otherwise todays date
             shipments = session.query(
-                        Shipment.id.label('shipment_id'),
-                        Departure.date_utc.label('departure_date_utc'),
-                        Arrival.date_utc.label('arrival_date_utc'),
-                        sa.func.lag(Departure.date_utc).over(Departure.ship_imo, order_by=Departure.date_utc.desc()).label('next_departure_date')
-                    ) \
+                Shipment.id.label('shipment_id'),
+                Departure.date_utc.label('departure_date_utc'),
+                Arrival.date_utc.label('arrival_date_utc'),
+                sa.func.lag(Departure.date_utc).over(Departure.ship_imo, order_by=Departure.date_utc.desc()).label(
+                    'next_departure_date')
+            ) \
                 .join(Departure, Departure.id == Shipment.departure_id) \
                 .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
                 .filter(Departure.ship_imo == ship_imo,
                         Departure.date_utc >= to_datetime(date_from),
                         Departure.date_utc <= to_datetime(date_to)) \
-            .order_by(Departure.date_utc.asc()).subquery()
+                .order_by(Departure.date_utc.asc()).subquery()
 
             shipment_dates = session.query(
                 shipments.c.departure_date_utc.label('date_from'),
                 sa.case(
                     [
                         (shipments.c.arrival_date_utc != sa.null(), shipments.c.arrival_date_utc),
-                        (sa.and_(shipments.c.arrival_date_utc == sa.null(), shipments.c.next_departure_date != sa.null()), shipments.c.next_departure_date)
+                        (sa.and_(shipments.c.arrival_date_utc == sa.null(),
+                                 shipments.c.next_departure_date != sa.null()), shipments.c.next_departure_date)
                     ], else_=datetime.date.today()
                 ).label('date_to')
             )
@@ -181,7 +183,7 @@ def update(
             polling_limit = datetime.timedelta(polling_limit_days)
 
             for _d in range(0, int(day_delta / polling_limit_days)):
-                query_dates.append([query_date_from, query_date_from+polling_limit])
+                query_dates.append([query_date_from, query_date_from + polling_limit])
                 query_date_from = query_date_from + polling_limit + datetime.timedelta(minutes=1)
 
             query_dates.append([query_date_from, query_date_to])
@@ -207,7 +209,8 @@ def update(
             event_process_state = [add_interacting_ship_details_to_event(e) for e in events]
 
             if event_process_state.count(False) > 0:
-                print("Failed to process {} events out of {}".format(event_process_state.count(False), len(event_process_state)))
+                print("Failed to process {} events out of {}".format(event_process_state.count(False),
+                                                                     len(event_process_state)))
 
             # Store them in db so that we won't query them
             for event in events:
@@ -228,6 +231,7 @@ def update(
                     session.rollback()
                     continue
 
+
 def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
     """
     Calculates the distance closest to the event time within a specific margin
@@ -244,40 +248,47 @@ def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
 
     """
     # get closest position in time and add to event
-    ship_position, intship_position = Datalastic.get_position(imo=ship_one_imo, date=event_time),\
+    ship_position, intship_position = Datalastic.get_position(imo=ship_one_imo, date=event_time), \
                                       Datalastic.get_position(imo=ship_two_imo, date=event_time)
 
-    if not ship_position or not intship_position:
+
+    if ship_position is None:
+        ship_position = Marinetraffic.get_closest_position(imo=ship_one_imo, date=event_time)
+    if intship_position is None and ship_position is not None:
+        intship_position = Marinetraffic.get_closest_position(imo=ship_two_imo, date=event_time)
+
+    if ship_position is None or intship_position is None:
         print("Failed to find ship positions. try increasing time window...")
         return ship_position, intship_position, None, None
 
     ship_position_geom, intship_position_geom = ship_position.geometry, intship_position.geometry
 
     # TODO: is there a better way to handle the SRID section?
-    d = distance_between_points(ship_position_geom.replace("SRID=4326;", ""), intship_position_geom.replace("SRID=4326;", ""))
+    d = distance_between_points(ship_position_geom.replace("SRID=4326;", ""),
+                                intship_position_geom.replace("SRID=4326;", ""))
 
     if d:
         print("Distance between ships was {} at {}".format(d, event_time))
 
     # we calculate the time difference at the point the position is taken with an extra 0.5 hour buffer
-    time_difference = 0.5+abs((ship_position.date_utc - intship_position.date_utc).total_seconds()/3600.)
+    time_difference = 0.5 + abs((ship_position.date_utc - intship_position.date_utc).total_seconds() / 3600.)
 
     return ship_position_geom, \
            intship_position_geom, \
            d, \
            time_difference
 
-def find_ships_in_db(interacting_ship_name):
 
+def find_ships_in_db(interacting_ship_name):
     ships = session.query(Ship) \
-            .filter(func.lower(Ship.name).ilike(func.lower(interacting_ship_name)),
-                    Ship.dwt > base.DWT_MIN,
-                    sqlalchemy.not_(Ship.name.contains('NOTFOUND'))).all()
+        .filter(func.lower(Ship.name).ilike(func.lower(interacting_ship_name)),
+                Ship.dwt > base.DWT_MIN,
+                sqlalchemy.not_(Ship.name.contains('NOTFOUND'))).all()
 
     return ships
 
 
-def add_interacting_ship_details_to_event(event, distance_check = 30000):
+def add_interacting_ship_details_to_event(event, distance_check=30000):
     """
     This function adds the interacting ship details to an mt event by:
         - finding the vessel using fuzzy search on datalastic
@@ -316,12 +327,12 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
     # first, try and find the ship in our database and check if position is satisfied
     if int_ships:
         for intship in int_ships:
-            ship_position, intship_position, d, position_time_diff = check_distance_between_ships(ship_imo, intship.imo, event_time)
+            ship_position, intship_position, d, position_time_diff = check_distance_between_ships(ship_imo, intship.imo,
+                                                                                                  event_time)
 
             # check if two ships are within a distance of each other based on avg speed and time difference of positions
             # we multiply by 2 in the max case of them moving opposite to each other
-            if d is not None and d < position_time_diff*base.AVG_TANKER_SPEED_KMH*1000*2:
-
+            if d is not None and d < (position_time_diff * base.AVG_TANKER_SPEED_KMH * 1000 * 2):
                 event.interacting_ship_imo = intship.imo
                 event.ship_closest_position = ship_position
                 event.interacting_ship_closest_position = intship_position
@@ -389,20 +400,23 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
             continue
 
         # get closest position in time and add to event
-        ship_position, intship_position, d, position_time_diff = check_distance_between_ships(ship_imo, intship.imo, event_time)
+        ship_position, intship_position, d, position_time_diff = check_distance_between_ships(ship_imo, intship.imo,
+                                                                                              event_time)
 
-        if d is not None and d < position_time_diff*base.AVG_TANKER_SPEED_KMH*2*1000:
-                event.interacting_ship_imo = intship.imo
-                event.ship_closest_position = ship_position
-                event.interacting_ship_closest_position = intship_position
-                event.interacting_ship_details = {"distance_meters": int(d)}
-                return True
+        if d is not None and d < (position_time_diff * base.AVG_TANKER_SPEED_KMH * 2 * 1000):
+            event.interacting_ship_imo = intship.imo
+            event.ship_closest_position = ship_position
+            event.interacting_ship_closest_position = intship_position
+            event.interacting_ship_details = {"distance_meters": int(d)}
+            return True
 
     # before returning false, let's try and add in imo locally
     int_ship_imo_local = find_ship_imo_locally(intship_name)
     if int_ship_imo_local is not None: event.interacting_ship_imo = int_ship_imo_local
 
     return False
+
+
 def find_ship_imo_locally(ship_name):
     '''
     Finds the imo of a ship using its name either in previous events or in the database using exact match
@@ -413,8 +427,8 @@ def find_ship_imo_locally(ship_name):
     int_ship_found = session.query(
         Event
     ) \
-    .filter(Event.interacting_ship_name == ship_name) \
-    .filter(Event.interacting_ship_imo != sa.null()).first()
+        .filter(Event.interacting_ship_name == ship_name) \
+        .filter(Event.interacting_ship_imo != sa.null()).first()
 
     if int_ship_found is not None:
         logger.info("Found match for ship name in previous events.")
@@ -429,6 +443,33 @@ def find_ship_imo_locally(ship_name):
 
         return None
 
+
+def back_fill_ship_position():
+    """
+    Function to try and find ship positions using both Datalastic and MT for older events
+
+    Returns
+    -------
+
+    """
+    events = session.query(
+        Event
+    ) \
+        .filter(Event.interacting_ship_imo != sa.null(),
+                Event.ship_closest_position == sa.null())
+
+    for e in tqdm(events.all()):
+
+        logger.info("Processing event id {}.".format(e.id))
+        # Attempt to get the closest position in time and add to event
+        ship_position, intship_position, d, position_time_diff = check_distance_between_ships(e.ship_imo, e.interacting_ship_imo,
+                                                                                              e.date_utc)
+
+        if d is not None and d < (position_time_diff * base.AVG_TANKER_SPEED_KMH * 2 * 1000):
+            e.ship_closest_position = ship_position
+            e.interacting_ship_closest_position = intship_position
+            e.interacting_ship_details = {"distance_meters": int(d)}
+            session.commit()
 def back_fill_ship_imo():
     '''
     Function to find and add ship_imo for ships which did not meet legacy distance check logic or which we were
@@ -439,7 +480,7 @@ def back_fill_ship_imo():
     events = session.query(
         Event
     ) \
-    .filter(Event.interacting_ship_imo == sa.null())
+        .filter(Event.interacting_ship_imo == sa.null())
 
     for e in tqdm(events.all()):
         # first try and find a ship has been seen in STS events and we have confirmed imo for
@@ -450,6 +491,7 @@ def back_fill_ship_imo():
         if interacting_ship_imo is not None:
             e.interacting_ship_imo = interacting_ship_imo
             session.commit()
+
 
 def create_mtevent_type_table(force_rebuild=False):
     """
