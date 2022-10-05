@@ -229,6 +229,20 @@ def update(
                     continue
 
 def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
+    """
+    Calculates the distance closest to the event time within a specific margin
+
+    Parameters
+    ----------
+    ship_one_imo : ship imo
+    ship_two_imo : ship imo
+    event_time : time of the event
+
+    Returns
+    -------
+    position of ship1, position of ship2, distance between them, time difference of the reporting time of the 2 positions
+
+    """
     # get closest position in time and add to event
     ship_position, intship_position = Datalastic.get_position(imo=ship_one_imo, date=event_time),\
                                       Datalastic.get_position(imo=ship_two_imo, date=event_time)
@@ -377,7 +391,7 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
         # get closest position in time and add to event
         ship_position, intship_position, d, position_time_diff = check_distance_between_ships(ship_imo, intship.imo, event_time)
 
-        if d is not None and d < position_time_diff*base.AVG_TANKER_SPEED_KMH*2:
+        if d is not None and d < position_time_diff*base.AVG_TANKER_SPEED_KMH*2*1000:
                 event.interacting_ship_imo = intship.imo
                 event.ship_closest_position = ship_position
                 event.interacting_ship_closest_position = intship_position
