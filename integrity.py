@@ -1,3 +1,5 @@
+import sys
+
 from base.db import session, check_if_table_exists
 from base.models import Trajectory, ShipmentWithSTS, Shipment, ShipmentArrivalBerth, ShipmentDepartureBerth, Departure, Arrival
 from api.tests import test_counter
@@ -7,13 +9,22 @@ from base.logger import logger, logger_slack
 def check():
 
     logger_slack.info("Checking integrity: shipment, portcall and berth relationship.")
-    test_shipment_table()
-    test_portcall_relationship()
-    test_berths()
 
-    logger_slack.info("Checking integrity: counter, voyage and pricing")
-    test_counter.test_counter_against_voyage(app)
-    test_counter.test_pricing_gt0(app)
+    try:
+        test_shipment_table()
+        test_portcall_relationship()
+        test_berths()
+    except AssertionError:
+        logger_slack.error("Failed integrity: shipment, portcall and berth relationship.")
+        raise
+
+    try:
+        logger_slack.info("Checking integrity: counter, voyage and pricing")
+        test_counter.test_counter_against_voyage(app)
+        test_counter.test_pricing_gt0(app)
+    except AssertionError:
+        logger_slack.error("Failed integrity: counter, voyage and pricing")
+        raise
 def test_shipment_table():
 
     # check that the shipment table respect unique departures and arrivals
