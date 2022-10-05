@@ -35,7 +35,7 @@ def distance_between_points(p1, p2, wkt=True, ellps = 'WGS84'):
 
 def latlon_to_point(lat, lon, wkt=True):
     try:
-        return "SRID=4326;" + geometry.Point(float(lon), lat).wkt
+        return "SRID=4326;" + geometry.Point(float(lon), float(lat)).wkt
     except TypeError:
         return None
 
