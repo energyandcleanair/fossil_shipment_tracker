@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import sqlalchemy
 from tqdm import tqdm
+from shapely import wkb
 
 import base
 from base.logger import logger, logger_slack
@@ -264,8 +265,11 @@ def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
     ship_position_geom, intship_position_geom = ship_position.geometry, intship_position.geometry
 
     # TODO: is there a better way to handle the SRID section?
-    d = distance_between_points(ship_position_geom.replace("SRID=4326;", ""),
-                                intship_position_geom.replace("SRID=4326;", ""))
+    try:
+        d = distance_between_points(ship_position_geom.replace("SRID=4326;", ""),
+                                    intship_position_geom.replace("SRID=4326;", ""))
+    except AttributeError:
+        return ship_position, intship_position, None, None
 
     if d:
         print("Distance between ships was {} at {}".format(d, event_time))
