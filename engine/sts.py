@@ -126,7 +126,7 @@ def detect_sts_arrival_location(shipment_id=None):
 
     # Look for shipments to update
     shipments_to_update = session.query(ShipmentWithSTS.id).filter(
-        ShipmentWithSTS.id.notin_(session.query(ShipmentDepartureLocationSTS.shipment_id)))
+        ShipmentWithSTS.id.notin_(session.query(ShipmentArrivalLocationSTS.shipment_id)))
 
     if shipment_id is not None:
         shipment_id = to_list(shipment_id)
