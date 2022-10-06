@@ -22,8 +22,9 @@ import datetime as dt
 
 import re
 
-from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall, Port, Event, Arrival
-from sqlalchemy import func
+from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall, Port, Event, Arrival, \
+    Position
+from sqlalchemy import func, text
 import sqlalchemy as sa
 
 
@@ -233,7 +234,7 @@ def update(
                     continue
 
 
-def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
+def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time, window_hours = 2, use_cache = True, cache_only= False):
     """
     Calculates the distance closest to the event time within a specific margin
 
@@ -248,15 +249,32 @@ def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
     position of ship1, position of ship2, distance between them, time difference of the reporting time of the 2 positions
 
     """
+
+    ship_position, intship_position = None, None
+
+    # if we are using check db, look in the databse first
+    if use_cache:
+        ship_position = session.query(Position).filter(Position.ship_imo == ship_one_imo,
+                                                       func.abs(func.extract('epoch', Position.date_utc - event_time)) <= (3600.*2)) \
+                                                        .order_by(func.abs(func.extract('epoch', Position.date_utc - event_time)).desc()).first()
+        intship_position = session.query(Position).filter(Position.ship_imo == ship_two_imo,
+                                                       func.abs(func.extract('epoch', Position.date_utc - event_time)) <= (3600.*2)) \
+                                                        .order_by(func.abs(func.extract('epoch', Position.date_utc - event_time)).desc()).first()
+
+    if use_cache and cache_only and (ship_position is None or intship_position is None):
+        return ship_position, intship_position, None, None
+
     # get closest position in time and add to event
-    ship_position, intship_position = Datalastic.get_position(imo=ship_one_imo, date=event_time), \
-                                      Datalastic.get_position(imo=ship_two_imo, date=event_time)
+    if ship_position is None and not cache_only:
+        ship_position = Datalastic.get_position(imo=ship_one_imo, date=event_time, window=24)
+    if intship_position is None and not cache_only:
+        intship_position = Datalastic.get_position(imo=ship_two_imo, date=event_time, window=24)
 
 
-    if ship_position is None:
-        ship_position = Marinetraffic.get_closest_position(imo=ship_one_imo, date=event_time)
-    if intship_position is None and ship_position is not None:
-        intship_position = Marinetraffic.get_closest_position(imo=ship_two_imo, date=event_time)
+    if ship_position is None and not cache_only:
+        ship_position = Marinetraffic.get_closest_position(imo=ship_one_imo, date=event_time, window_hours=window_hours, interval_mins=5)
+    if intship_position is None and ship_position is not None and not cache_only:
+        intship_position = Marinetraffic.get_closest_position(imo=ship_two_imo, date=event_time, window_hours=window_hours, interval_mins=5)
 
     if ship_position is None or intship_position is None:
         print("Failed to find ship positions. try increasing time window...")
@@ -265,11 +283,7 @@ def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
     ship_position_geom, intship_position_geom = ship_position.geometry, intship_position.geometry
 
     # TODO: is there a better way to handle the SRID section?
-    try:
-        d = distance_between_points(ship_position_geom.replace("SRID=4326;", ""),
-                                    intship_position_geom.replace("SRID=4326;", ""))
-    except AttributeError:
-        return ship_position, intship_position, None, None
+    d = distance_between_points(ship_position_geom, intship_position_geom)
 
     if d:
         print("Distance between ships was {} at {}".format(d, event_time))
@@ -462,12 +476,28 @@ def back_fill_ship_position():
         .filter(Event.interacting_ship_imo != sa.null(),
                 Event.ship_closest_position == sa.null())
 
+    mtcalls = session.query(
+        MarineTrafficCall.params['imo'].astext.label('ship_imo'),
+        MarineTrafficCall.params['fromdate'].label('fromdate'),
+        MarineTrafficCall.params['todate'].label('todate')
+    ) \
+        .filter(MarineTrafficCall.status == base.HTTP_OK) \
+        .filter(MarineTrafficCall.method == base.VESSEL_POSITION) \
+        .filter(MarineTrafficCall.date_utc > '2022-10-05 20:50')
+
     for e in tqdm(events.all()):
+
+        #previous_calls = mtcalls.filter(MarineTrafficCall.params['imo'].astext == e.ship_imo).all()
+        #matches = [q for q in previous_calls if to_datetime(q.fromdate) <= to_datetime(e.date_utc) <= to_datetime(q.todate)]
+
+        # We have queried this event before
+        #if len(matches) > 0:
+        #    continue
 
         logger.info("Processing event id {}.".format(e.id))
         # Attempt to get the closest position in time and add to event
         ship_position, intship_position, d, position_time_diff = check_distance_between_ships(e.ship_imo, e.interacting_ship_imo,
-                                                                                              e.date_utc)
+                                                                                              e.date_utc, use_cache=True, cache_only=True)
 
         if d is not None and d < (position_time_diff * base.AVG_TANKER_SPEED_KMH * 2 * 1000):
             e.ship_closest_position = ship_position
