@@ -6,6 +6,7 @@ from base.logger import logger_slack
 import sqlalchemy as sa
 from sqlalchemy import func
 from base.models import PortCall, Departure, Arrival, Ship, Port, Shipment, Event, ShipmentWithSTS
+from engine import shipment
 
 
 
@@ -52,11 +53,14 @@ def get_departures_with_arrival_too_remote_from_next_departure(min_timedelta,
 
 def get_departures_without_arrival(min_dwt=None, commodities=None,
                                    date_from=None, ship_imo=None, date_to=None,
-                                   unlocode=None, port_id=None):
+                                   unlocode=None, port_id=None, shipment_id=None):
 
     subquery = session.query(Arrival.departure_id).filter(Arrival.departure_id != sa.null())
 
+    shipments = shipment.return_combined_shipments(session)
+
     query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
+        .join(shipments, shipments.c.shipment_departure_id == Departure.id) \
         .join(Ship, Departure.ship_imo == Ship.imo) \
         .join(Port, Departure.port_id == Port.id, isouter=True)
 
@@ -74,6 +78,9 @@ def get_departures_without_arrival(min_dwt=None, commodities=None,
 
     if ship_imo is not None:
         query = query.filter(Ship.imo.in_(to_list(ship_imo)))
+
+    if shipment_id is not None:
+        query = query.filter(shipments.c.shipment_id.in_(to_list(shipment_id)))
 
     if unlocode is not None:
         query = query.filter(Port.unlocode.in_(to_list(unlocode)))
