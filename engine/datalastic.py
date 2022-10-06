@@ -3,11 +3,14 @@ import json
 import datetime as dt
 
 import base
+from base.db import session
 from base.utils import latlon_to_point
 from base.utils import to_datetime
 from base.env import get_env
 from base.logger import logger
 from base.models import Ship, Position, Port
+
+from sqlalchemy.exc import IntegrityError
 
 from difflib import SequenceMatcher
 import numpy as np
@@ -191,18 +194,20 @@ class Datalastic:
         return Ship(**data)
 
     @classmethod
-    def get_position(cls, imo, date, window=72):
+    def get_position(cls, imo, date, upload=False, window=72):
         """
         Returns the position of the boat at the closest referenced time in datalastic
 
         Parameters
         ----------
-        imo :
-        date :
+        imo : ship imo
+        date : date to get closest positions to
         window : this is the time window within which to look to find closest position in time
+        upload: whether to upload positions to db or not
 
         Returns
         -------
+        Returns closest Position object by time to the date given
 
         """
         date = to_datetime(date)
@@ -216,6 +221,14 @@ class Datalastic:
         if not positions:
             logger.warning("Datalastic: no positions found for ship (imo: {}) between dates: {}, {}.".format(imo, date_from, date_to))
             return None
+
+        if upload:
+            for p in positions:
+                try:
+                    session.add(p)
+                    session.commit()
+                except IntegrityError:
+                    session.rollback()
 
         return min(positions, key=lambda p: abs(p.date_utc - date))
 
