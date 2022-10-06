@@ -15,6 +15,7 @@ PIPELINE_OIL = "pipeline_oil"
 # MARINE TRAFFIC METHODS
 VESSEL_DATA = "vesselmasterdata/"
 VESSEL_EVENTS = "vesselevents/"
+VESSEL_POSITION = "exportvesseltrack/"
 HTTP_OK = "200"
 
 
