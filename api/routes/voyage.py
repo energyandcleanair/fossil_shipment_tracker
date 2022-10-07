@@ -12,7 +12,8 @@ from flask_restx import inputs
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     ShipOwner, ShipInsurer, ShipManager, Company, \
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
-    Destination, Price, Country, PortPrice, Currency, ShipmentWithSTS, Event
+    Destination, Price, Country, PortPrice, Currency, ShipmentWithSTS, Event, \
+    ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, STSLocation
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
@@ -58,7 +59,7 @@ class VoyageResource(Resource):
 
 
     parser.add_argument('date_to', type=str, help='end date for departure or arrival (format 2020-01-15 or -7 for seven days before today)', required=False,
-                        default=dt.datetime.today().strftime("%Y-%m-%d"))
+                        default=None)
     parser.add_argument('departure_date_to', type=str,
                         help='end date for departure (format 2020-01-15 or -7 for seven days before today)',
                         required=False,
@@ -66,7 +67,7 @@ class VoyageResource(Resource):
     parser.add_argument('arrival_date_to', type=str,
                         help='end date for arrival (format 2020-01-15 or -7 for seven days before today)',
                         required=False,
-                        default=dt.datetime.today().strftime("%Y-%m-%d"))
+                        default=None)
 
     parser.add_argument('year', help='year(s) of departure or arrival e.g. 2021,2022', type=int,
                         default=None, required=False, action='split')
@@ -272,6 +273,9 @@ class VoyageResource(Resource):
         DepartureBerth= aliased(Berth)
         ArrivalBerth = aliased(Berth)
 
+        DepartureSTSLocation = aliased(STSLocation)
+        ArrivalSTSLocation = aliased(STSLocation)
+
         DestinationPort = aliased(Port)
         DestinationCountry = aliased(Country)
 
@@ -474,7 +478,12 @@ class VoyageResource(Resource):
                                     # STS related columns
                                     shipments_combined.c.is_sts,
                                     shipments_combined.c.event_date_utc,
-                                    shipments_combined.c.sts_position,
+                                    shipments_combined.c.sts_position.label('sts_position_geometry'),
+                                    func.ST_Y(shipments_combined.c.sts_position).label('sts_position_lat'),
+                                    func.ST_X(shipments_combined.c.sts_position).label('sts_position_lon'),
+                                    # for now departure sts location == arrival sts location as we cant have departures
+                                    # from sts locations, this can be modified once we do
+                                    ArrivalSTSLocation.name.label('sts_location_name'),
 
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
@@ -583,6 +592,10 @@ class VoyageResource(Resource):
              .outerjoin(ShipmentArrivalBerth, shipments_combined.c.shipment_id == ShipmentArrivalBerth.shipment_id)
              .outerjoin(DepartureBerth, DepartureBerth.id == ShipmentDepartureBerth.berth_id)
              .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
+             .outerjoin(ShipmentArrivalLocationSTS, shipments_combined.c.shipment_id == ShipmentArrivalLocationSTS.shipment_id)
+             .outerjoin(ArrivalSTSLocation, ArrivalSTSLocation.id == ShipmentArrivalLocationSTS.sts_location_id)
+             .outerjoin(ShipmentDepartureLocationSTS, shipments_combined.c.shipment_id == ShipmentDepartureLocationSTS.shipment_id)
+             .outerjoin(DepartureSTSLocation, DepartureSTSLocation.id == ShipmentDepartureLocationSTS.sts_location_id)
              .outerjoin(Destination, shipments_combined.c.shipment_last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
              .outerjoin(commodity_subquery, commodity_subquery.c.id == commodity_field)
