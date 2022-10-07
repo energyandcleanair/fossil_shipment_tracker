@@ -60,13 +60,14 @@ def update(date_from='2021-01-01'):
         "aggregate_by": ['commodity_origin_iso2', "commodity_destination_iso2", "commodity", "arrival_date", "status"],
         "nest_in_data": False,
         "currency": 'EUR',
+        "status": 'completed',
         "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
     }
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
     voyages = pd.DataFrame(voyages)
     voyages = voyages.loc[voyages.commodity_origin_iso2 == 'RU'] # Just to confirm
-    voyages = voyages.loc[voyages.status == base.COMPLETED]
+    voyages = voyages.loc[voyages.status == base.COMPLETED] # just to confirm
     voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
 
     # Aggregate
