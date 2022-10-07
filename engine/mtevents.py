@@ -462,7 +462,7 @@ def find_ship_imo_locally(ship_name):
         return None
 
 
-def back_fill_ship_position():
+def back_fill_ship_position(force_rebuild=True):
     """
     Function to try and find ship positions using both Datalastic and MT for older events
 
@@ -487,17 +487,18 @@ def back_fill_ship_position():
 
     for e in tqdm(events.all()):
 
-        #previous_calls = mtcalls.filter(MarineTrafficCall.params['imo'].astext == e.ship_imo).all()
-        #matches = [q for q in previous_calls if to_datetime(q.fromdate) <= to_datetime(e.date_utc) <= to_datetime(q.todate)]
+        if not force_rebuild:
+            previous_calls = mtcalls.filter(MarineTrafficCall.params['imo'].astext == e.ship_imo).all()
+            matches = [q for q in previous_calls if to_datetime(q.fromdate) <= to_datetime(e.date_utc) <= to_datetime(q.todate)]
 
-        # We have queried this event before
-        #if len(matches) > 0:
-        #    continue
+            # We have queried this event before
+            if len(matches) > 0:
+                continue
 
         logger.info("Processing event id {}.".format(e.id))
         # Attempt to get the closest position in time and add to event
         ship_position, intship_position, d, position_time_diff = check_distance_between_ships(e.ship_imo, e.interacting_ship_imo,
-                                                                                              e.date_utc, use_cache=True, cache_only=True)
+                                                                                              e.date_utc, use_cache=True, cache_only=False)
 
         if d is not None and d < (position_time_diff * base.AVG_TANKER_SPEED_KMH * 2 * 1000):
             e.ship_closest_position = ship_position
