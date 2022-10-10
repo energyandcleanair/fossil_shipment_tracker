@@ -664,7 +664,7 @@ class VoyageResource(Resource):
             shipments_rich = shipments_rich.filter(commodity_field.in_(to_list(commodity)))
 
         if status is not None:
-            shipments_rich = shipments_rich.filter(shipments_combined.c.shipment_status.in_(status))
+            shipments_rich = shipments_rich.filter(shipments_combined.c.shipment_status.in_(to_list(status)))
 
         if is_sts is not None:
             shipments_rich = shipments_rich.filter(shipments_combined.c.is_sts == is_sts)
