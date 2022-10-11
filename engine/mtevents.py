@@ -119,6 +119,8 @@ def update(
             if last_event_call and last_event_call is not None:
                 date_from = to_datetime(last_event_call.params['todate']) + dt.timedelta(minutes=1)
 
+            date_bounds = [(date_from, date_to)]
+
         if force_rebuild and not between_existing_only and not between_shipments_only:
             date_bounds = [(date_from, date_to)]
 
