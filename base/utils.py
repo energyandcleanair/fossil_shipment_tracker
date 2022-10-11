@@ -26,12 +26,21 @@ def distance_between_points(p1, p2, ellps = 'WGS84'):
     geod = pyproj.Geod(ellps=ellps)
 
     try:
+
         if isinstance(p1, WKBElement):
-            p1, p2 = wkb_to_shape(p1), wkb_to_shape(p2)
+            p1 = wkb_to_shape(p1)
         else:
-            p1, p2 = shapely.wkt.loads(p1.replace("SRID=4326;", "")), shapely.wkt.loads(p2.replace("SRID=4326;", ""))
-        angle1, angle2, distance = geod.inv(p1.x, p1.y, p2.x, p2.y)
-        return distance
+            p1 = shapely.wkt.loads(p1.replace("SRID=4326;", ""))
+        if isinstance(p2, WKBElement):
+            p2 = wkb_to_shape(p2)
+        else:
+            p2 = shapely.wkt.loads(p2.replace("SRID=4326;", ""))
+
+        try:
+            angle1, angle2, distance = geod.inv(p1.x, p1.y, p2.x, p2.y)
+            return distance
+        except AttributeError:
+            return None
     except TypeError:
         return None
 
