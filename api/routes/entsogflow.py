@@ -131,9 +131,10 @@ class EntsogFlowResource(Resource):
         DestinationCountry = aliased(Country)
 
         commodity_origin_iso2_field = case(
-            [(DepartureCountry.iso2.in_(['BY', 'TR']), 'RU'),
+            [
              (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 == 'GR'), 'AZ'), # Kipoi
              (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 != 'GR'), 'RU'),
+             (DepartureCountry.iso2.in_(['BY']), 'RU'),
              ],
             else_=DepartureCountry.iso2
         ).label('commodity_origin_iso2')
