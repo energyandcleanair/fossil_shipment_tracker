@@ -166,7 +166,8 @@ class EntsogFlowResource(Resource):
                                     EntsogFlow.value_m3,
                                     value_eur_field,
                                     Currency.currency,
-                                    value_currency_field
+                                    value_currency_field,
+                                    pricing_scenario_field
                                     )
              .join(DepartureCountry, DepartureCountry.iso2 == EntsogFlow.departure_iso2)
              .outerjoin(DestinationCountry, EntsogFlow.destination_iso2 == DestinationCountry.iso2)
@@ -277,9 +278,11 @@ class EntsogFlowResource(Resource):
             'date': [subquery.c.date],
             'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
                                       subquery.c.commodity_origin_region],
+            'commodity_origin_region': [subquery.c.commodity_origin_region],
             'commodity_destination_iso2': [subquery.c.commodity_destination_iso2,
                                            subquery.c.commodity_destination_country,
                                            subquery.c.commodity_destination_region],
+            'commodity_destination_region': [subquery.c.commodity_destination_region],
             'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country,
                                     subquery.c.departure_region],
             'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country,
