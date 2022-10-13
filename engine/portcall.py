@@ -8,13 +8,13 @@ from base.logger import logger, logger_slack
 from base.db import session
 from base.db_utils import upsert
 from base.models import DB_TABLE_PORTCALL
-from base.utils import to_datetime, to_list
+from base.utils import to_datetime, to_list, collapse_dates
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
 from engine.datalastic import Datalastic
 
-from base.models import PortCall, Port, Ship, Event
+from base.models import PortCall, Port, Ship, Event, MarineTrafficCall
 
 
 def initial_fill(limit=None):
@@ -204,9 +204,12 @@ def get_next_portcall(date_from,
                       unlocode=None,
                       filter=None,
                       use_cache=True,
+                      force_rebuild=False,
                       cache_only=False,
                       go_backward=False,
                       use_call_based=False):
+
+    date_from, date_to = to_datetime(date_from), to_datetime(date_to)
 
     # First look in DB
     if use_cache:
@@ -248,6 +251,39 @@ def get_next_portcall(date_from,
 
     if cache_only:
         return None
+
+    if not force_rebuild:
+        # check whether we called this ship imo in the MTCall table and get latest date
+        portcall_queries = session.query(
+            MarineTrafficCall.params['fromdate'].astext.label('datefrom'),
+            MarineTrafficCall.params['todate'].astext.label('dateto')
+        ) \
+            .filter(MarineTrafficCall.method == base.VESSEL_PORTCALLS,
+                    MarineTrafficCall.status == base.HTTP_OK,
+                    sa.or_(
+                        MarineTrafficCall.params.op('?')('imo'),
+                        MarineTrafficCall.params.op('?')('unlocode')
+                           ),
+                    sa.or_(
+                        sa.and_(
+                            (MarineTrafficCall.params['fromdate'].astext).cast(sa.TIMESTAMP) >= date_from,
+                            (MarineTrafficCall.params['fromdate'].astext).cast(sa.TIMESTAMP) <= date_to
+                    ),
+                        sa.and_(
+                            (MarineTrafficCall.params['todate'].astext).cast(sa.TIMESTAMP) >= date_from,
+                            (MarineTrafficCall.params['todate'].astext).cast(sa.TIMESTAMP) <= date_to
+                        )
+                )
+            ) \
+        .order_by(MarineTrafficCall.params['todate'].astext.cast(sa.TIMESTAMP).asc())
+
+        if imo is not None:
+            portcall_queries = portcall_queries.filter(MarineTrafficCall.params['imo'].astext == imo)
+
+        if unlocode is not None:
+            portcall_queries = portcall_queries.filter(Marinetraffic.params['unlocode'].astext == unlocode)
+
+        portcall_query_dates = collapse_dates([(to_datetime(p.datefrom), to_datetime(p.dateto)) for p in portcall_queries.all()])
 
     # If not, query MarineTraffic
     flush = True
