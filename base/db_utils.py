@@ -1,23 +1,24 @@
 import sqlalchemy
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import insert
-
 import geopandas as gpd
 import pandas as pd
-
-from base.db import engine
-from base.db import meta
 from tqdm import tqdm
 
-def execute_statement(stmt, print_result=False):
+from base.db import engine
+from base.logger import logger, logger_slack
+
+
+def execute_statement(stmt, print_result=False, slack_result=False):
     with engine.connect() as con:
         con = con.execution_options(isolation_level="AUTOCOMMIT")
-        if print_result:
+        if print_result or slack_result:
             rs = con.execute(stmt)
-            for row in rs:
-                print(row)
+            rows = [x for x in rs]
+            for row in rows:
+                if print_result:
+                    print(row)
+            if slack_result:
+                logger_slack.info('\n'.join(rows))
         else:
             con.execute(stmt)
 
