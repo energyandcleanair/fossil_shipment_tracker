@@ -24,7 +24,7 @@ from base import PRICING_DEFAULT
 from engine.commodity import get_subquery as get_commodity_subquery
 
 
-@routes_api.route('/v0/entsogflow', strict_slashes=False, doc=False)
+@routes_api.route('/v0/entsogflow', strict_slashes=False, doc=True)
 class EntsogFlowResource(Resource):
 
     parser = reqparse.RequestParser()
