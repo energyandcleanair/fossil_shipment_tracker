@@ -16,6 +16,7 @@ PIPELINE_OIL = "pipeline_oil"
 VESSEL_DATA = "vesselmasterdata/"
 VESSEL_EVENTS = "vesselevents/"
 VESSEL_POSITION = "exportvesseltrack/"
+VESSEL_PORTCALLS = "portcalls/"
 HTTP_OK = "200"
 
 
