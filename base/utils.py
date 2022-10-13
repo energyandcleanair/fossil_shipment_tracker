@@ -26,7 +26,38 @@ def daterange_intersection(daterange1, daterange2):
     else:
         return None
 
-def subtract_daterange(base_daterange, subtract_daterange):
+def remove_dates(base_daterange, dateranges):
+    """
+
+
+    Parameters
+    ----------
+    base_daterange :
+    dateranges :
+
+    Returns
+    -------
+
+    """
+
+    current_date, valid_dateranges = base_daterange[0], []
+
+    for i in [daterange_intersection(base_daterange, d) for d in dateranges]:
+
+        if i is None:
+            continue
+
+        if i[0] != base_daterange[0]:
+            valid_dateranges.append((current_date, i[0]))
+
+        current_date = i[1]
+
+    valid_dateranges.append((current_date, base_daterange[1]))
+
+    return valid_dateranges
+
+
+def subtract_daterange_from_other(base_daterange, subtract_daterange):
     """
     Remove one date range from another - this could maybe be done more nicely geomatrically with the idea of
         lines
@@ -37,23 +68,23 @@ def subtract_daterange(base_daterange, subtract_daterange):
 
     """
 
-    union = daterange_intersection(base_daterange, subtract_daterange)
+    intersection = daterange_intersection(base_daterange, subtract_daterange)
 
-    if union is None:
-        return base_daterange
+    if intersection is None:
+        return [base_daterange]
 
     # base contains all of subtract daterange
-    if union == base_daterange:
+    if intersection == base_daterange:
         return([(base_daterange[0], subtract_daterange[0]), (subtract_daterange[1], base_daterange[1])])
     # our base is fully contained within our subtraction
-    if union == subtract_daterange:
+    if intersection == subtract_daterange:
         return []
 
     # else return the daterange with the removal of the unioned section
-    if union[0] == base_daterange[0]:
-        return [(union[1], base_daterange[1])]
+    if intersection[0] == base_daterange[0]:
+        return [(intersection[1], base_daterange[1])]
     else:
-        return [(base_daterange[0]), union[0]]
+        return [(base_daterange[0]), intersection[0]]
 
 
 def collapse_dates(date_list, buffer_seconds=120):
@@ -66,6 +97,9 @@ def collapse_dates(date_list, buffer_seconds=120):
     :return:
     Returns a list of date tuples
     """
+
+    if len(date_list) == 0:
+        return []
 
     # force sort
     date_list.sort(key=lambda date_pair: date_pair[0])
