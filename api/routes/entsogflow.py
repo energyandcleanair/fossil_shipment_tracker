@@ -134,7 +134,7 @@ class EntsogFlowResource(Resource):
             [
              (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 == 'GR'), 'AZ'), #Already done in entsog.py # Kipoi
              (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 != 'GR'), 'RU'),
-             (DepartureCountry.iso2.in_(['BY', 'MD']), 'RU'),
+             (DepartureCountry.iso2.in_(['BY', 'MD', 'UA']), 'RU'),
              ],
             else_=DepartureCountry.iso2
         ).label('commodity_origin_iso2')
