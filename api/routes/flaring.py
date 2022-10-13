@@ -5,12 +5,14 @@ import numpy as np
 import geopandas as gpd
 from shapely import wkb
 from sqlalchemy.sql import text
+from sqlalchemy import func
 from flask import Response
 from flask_restx import Resource, reqparse, inputs
 from base.models import Flaring, FlaringFacility
 from base.encoder import JsonEncoder
 from base.db import session, engine
 from base.utils import to_datetime, to_list, update_geometry_from_wkb
+from base.logger import logger
 
 from . import routes_api
 
@@ -136,10 +138,15 @@ class FlaringResource(Resource):
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
                         type=inputs.boolean, default=True)
+    parser.add_argument('aggregate_by', type=str, action='split',
+                        default=None,
+                        help='which variables to aggregate by. Could be any of facility, facility_type, date')
+
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
                         required=False, default="json")
     parser.add_argument('download', help='Whether to return results as a file or not.',
                         type=inputs.boolean, default=False)
+
 
     @routes_api.expect(parser)
     def get(self):
@@ -152,6 +159,7 @@ class FlaringResource(Resource):
         nest_in_data = params.get("nest_in_data")
         rolling_days = params.get("rolling_days")
         download = params.get("download")
+        aggregate_by = params.get("aggregate_by")
 
         query = session.query(FlaringFacility.id,
                               FlaringFacility.name,
@@ -171,6 +179,7 @@ class FlaringResource(Resource):
         if date_to is not None:
             query = query.filter(Flaring.date <= to_datetime(date_to))
 
+        query = self.aggregate(query=query, aggregate_by=aggregate_by)
         result = pd.read_sql(query.statement, session.bind)
 
         result = self.roll_average(result=result, rolling_days=rolling_days)
@@ -180,6 +189,7 @@ class FlaringResource(Resource):
                                      nest_in_data=nest_in_data,
                                      download=download)
         return response
+
 
     def build_response(self, result, format, nest_in_data, download):
 
@@ -248,3 +258,43 @@ class FlaringResource(Resource):
                 .reset_index()
 
         return result
+
+
+    def aggregate(self, query, aggregate_by):
+        """Perform aggregation based on user agparameters"""
+
+        if not aggregate_by:
+            return query
+
+        subquery = query.subquery()
+        # Aggregate
+        value_cols = [
+            func.sum(subquery.c.value).label("value")
+        ]
+
+        # Adding must have grouping columns
+        must_group_by = ['buffer_km']
+
+        aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
+        if '' in aggregate_by:
+            aggregate_by.remove('')
+
+        # Aggregating
+        aggregateby_cols_dict = {
+            'facility': [subquery.c.id, subquery.c.name, subquery.c.name_en,
+                         subquery.c.type],
+            'facility_type': [subquery.c.type],
+            'date': [subquery.c.date],
+            'buffer_km': [subquery.c.buffer_km]
+        }
+
+        if any([x not in aggregateby_cols_dict for x in aggregate_by]):
+            logger.warning("aggregate_by can only be a selection of %s" % (",".join(aggregateby_cols_dict.keys())))
+            aggregate_by = [x for x in aggregate_by if x in aggregateby_cols_dict]
+
+        groupby_cols = []
+        for x in aggregate_by:
+            groupby_cols.extend(aggregateby_cols_dict[x])
+
+        query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
+        return query
