@@ -8,7 +8,83 @@ from base.encoder import JsonEncoder
 import json
 import numpy as np
 
-def distance_between_points(p1, p2, ellps = 'WGS84'):
+def daterange_intersection(daterange1, daterange2):
+    """
+    Returns the intersection of two date ranges
+
+    :param daterange1:
+    :param datarange2:
+    :return:
+    Intersection of the two date ranges, otherwise None
+    """
+
+    latest_start = max(daterange1[0], daterange2[0])
+    earliest_end = min(daterange1[1], daterange2[1])
+
+    if latest_start <= earliest_end:
+        return (latest_start, earliest_end)
+    else:
+        return None
+
+def subtract_daterange(base_daterange, subtract_daterange):
+    """
+    Remove one date range from another - this could maybe be done more nicely geomatrically with the idea of
+        lines
+
+    :param base_daterange: the daterange we want to subtract from
+    :param subtract_daterange: the daterange we want to remove from another
+    :return:
+
+    """
+
+    union = daterange_intersection(base_daterange, subtract_daterange)
+
+    if union is None:
+        return base_daterange
+
+    # base contains all of subtract daterange
+    if union == base_daterange:
+        return([(base_daterange[0], subtract_daterange[0]), (subtract_daterange[1], base_daterange[1])])
+    # our base is fully contained within our subtraction
+    if union == subtract_daterange:
+        return []
+
+    # else return the daterange with the removal of the unioned section
+    if union[0] == base_daterange[0]:
+        return [(union[1], base_daterange[1])]
+    else:
+        return [(base_daterange[0]), union[0]]
+
+
+def collapse_dates(date_list, buffer_seconds=120):
+    """
+    Takes a list of datefrom/tos and collapses any that are overlapping within a certain buffer limit
+
+    :param date_list: list of date tuples to collapse
+    :param buffer_seconds: the maximum time difference between date ranges to collapse. if set to 0 will only collapse
+        date ranges which fully overlap
+    :return:
+    Returns a list of date tuples
+    """
+
+    # force sort
+    date_list.sort(key=lambda date_pair: date_pair[0])
+
+    collapsed, current = [], date_list[0]
+
+    for d in date_list[1:]:
+        if (d[0] - current[1]).total_seconds() <= buffer_seconds:
+            current = (min(current[0], d[0]), max(current[1], d[1]))
+        else:
+            collapsed.append(current)
+            current = d
+    else:
+        collapsed.append(current)
+
+    return collapsed
+
+
+def distance_between_points(p1, p2, ellps='WGS84'):
     """
     Returns distance in meters between two points; if wkt=False assumed to be shapely Point objects
 
@@ -43,6 +119,7 @@ def distance_between_points(p1, p2, ellps = 'WGS84'):
             return None
     except TypeError:
         return None
+
 
 def latlon_to_point(lat, lon, wkt=True):
     try:
@@ -142,6 +219,5 @@ def df_to_json(df, nest_in_data=False):
 
 
 def split(list_, chunk_size):
-
-  for i in range(0, len(list_), chunk_size):
-    yield list_[i:i + chunk_size]
+    for i in range(0, len(list_), chunk_size):
+        yield list_[i:i + chunk_size]
