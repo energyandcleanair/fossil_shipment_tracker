@@ -8,7 +8,7 @@ from base.logger import logger, logger_slack
 from base.db import session
 from base.db_utils import upsert
 from base.models import DB_TABLE_PORTCALL
-from base.utils import to_datetime, to_list, collapse_dates
+from base.utils import to_datetime, to_list, collapse_dates, remove_dates
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
@@ -253,6 +253,11 @@ def get_next_portcall(date_from,
         return None
 
     if not force_rebuild:
+
+        date_from_query, date_to_query = date_from, date_to
+        if go_backward:
+            date_from_query, date_to_query = date_to, date_from
+
         # check whether we called this ship imo in the MTCall table and get latest date
         portcall_queries = session.query(
             MarineTrafficCall.params['fromdate'].astext.label('datefrom'),
@@ -266,12 +271,12 @@ def get_next_portcall(date_from,
                            ),
                     sa.or_(
                         sa.and_(
-                            (MarineTrafficCall.params['fromdate'].astext).cast(sa.TIMESTAMP) >= date_from,
-                            (MarineTrafficCall.params['fromdate'].astext).cast(sa.TIMESTAMP) <= date_to
+                            (MarineTrafficCall.params['fromdate'].astext).cast(sa.TIMESTAMP) >= date_from_query,
+                            (MarineTrafficCall.params['fromdate'].astext).cast(sa.TIMESTAMP) <= date_to_query
                     ),
                         sa.and_(
-                            (MarineTrafficCall.params['todate'].astext).cast(sa.TIMESTAMP) >= date_from,
-                            (MarineTrafficCall.params['todate'].astext).cast(sa.TIMESTAMP) <= date_to
+                            (MarineTrafficCall.params['todate'].astext).cast(sa.TIMESTAMP) >= date_from_query,
+                            (MarineTrafficCall.params['todate'].astext).cast(sa.TIMESTAMP) <= date_to_query
                         )
                 )
             ) \
@@ -292,43 +297,57 @@ def get_next_portcall(date_from,
         portcalls = []
         direction = -1 if go_backward else 1
         cached_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
+
         #IMPORTANT marinetraffic uses UTC for filtering
         date_froms = [to_datetime(date_from)] + [x.date_utc for x in cached_portcalls]
         date_tos = [x.date_utc for x in cached_portcalls] + [to_datetime(date_to)]
+
         for dates in list(zip(date_froms, date_tos)):
             date_from = dates[0] + direction * dt.timedelta(minutes=1)
             date_to = dates[1] - direction * dt.timedelta(minutes=1) if dates[1] else dt.datetime.utcnow()
 
-            filtered_portcall, portcalls_interval = Marinetraffic.get_next_portcall(imo=imo,
-                                                   unlocode=unlocode,
-                                                   date_from=date_from,
-                                                   date_to=date_to,
-                                                   filter=filter,
-                                                   arrival_or_departure=arrival_or_departure,
-                                                   go_backward=go_backward,
-                                                   use_call_based=use_call_based
-                                                   )
+            intervals = [(date_from, date_to)]
+            if not force_rebuild:
+                intervals = remove_dates((date_from, date_to), portcall_query_dates, go_backward=go_backward)
 
-            if flush:
-                upload_portcalls(portcalls_interval)
-            else:
-                portcalls.extend(portcalls_interval)
-            if filtered_portcall:
-                break
+            for i in intervals:
+                filtered_portcall, portcalls_interval = Marinetraffic.get_next_portcall(imo=imo,
+                                                       unlocode=unlocode,
+                                                       date_from=i[0],
+                                                       date_to=i[1],
+                                                       filter=filter,
+                                                       arrival_or_departure=arrival_or_departure,
+                                                       go_backward=go_backward,
+                                                       use_call_based=use_call_based
+                                                       )
+
+                if flush:
+                    upload_portcalls(portcalls_interval)
+                else:
+                    portcalls.extend(portcalls_interval)
+                if filtered_portcall:
+                    return filtered_portcall
 
     else:
-        filtered_portcall, portcalls = Marinetraffic.get_next_portcall(imo=imo,
-                                                                       unlocode=unlocode,
-                                                                       date_from=date_from,
-                                                                       date_to=date_to,
-                                                                       filter=filter,
-                                                                       arrival_or_departure=arrival_or_departure,
-                                                                       go_backward=go_backward,
-                                                                       use_call_based=use_call_based)
+        intervals = [(date_from, date_to)]
+        if not force_rebuild:
+            intervals = remove_dates((date_from, date_to), portcall_query_dates, go_backward=go_backward)
 
-        upload_portcalls(portcalls)
+        for i in intervals:
+            filtered_portcall, portcalls = Marinetraffic.get_next_portcall(imo=imo,
+                                                                           unlocode=unlocode,
+                                                                           date_from=i[0],
+                                                                           date_to=i[1],
+                                                                           filter=filter,
+                                                                           arrival_or_departure=arrival_or_departure,
+                                                                           go_backward=go_backward,
+                                                                           use_call_based=use_call_based)
 
-    return filtered_portcall
+            upload_portcalls(portcalls)
+            if filtered_portcall:
+                return filtered_portcall
+
+    return None
 
 
 def update_departures_from_russia(
