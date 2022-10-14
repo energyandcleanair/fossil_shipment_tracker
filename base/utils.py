@@ -8,6 +8,7 @@ from base.encoder import JsonEncoder
 import json
 import numpy as np
 
+
 def daterange_intersection(daterange1, daterange2):
     """
     Returns the intersection of two date ranges
@@ -26,9 +27,10 @@ def daterange_intersection(daterange1, daterange2):
     else:
         return None
 
-def remove_dates(base_daterange, dateranges):
-    """
 
+def remove_dates(base_daterange, dateranges, go_backward=False):
+    """
+    This function takes a date range and a list of dateranges and removes the list of dateranges from daterange
 
     Parameters
     ----------
@@ -40,19 +42,38 @@ def remove_dates(base_daterange, dateranges):
 
     """
 
+    # if going backward reverse input for intersection checking
+    if go_backward:
+        base_daterange = base_daterange[::-1]
+
     current_date, valid_dateranges = base_daterange[0], []
 
-    for i in [daterange_intersection(base_daterange, d) for d in dateranges]:
+    for daterange in dateranges:
 
-        if i is None:
+        intersection = daterange_intersection(base_daterange, daterange)
+
+        # our remove date does not intersect with base date
+        if intersection is None:
             continue
 
-        if i[0] != base_daterange[0]:
-            valid_dateranges.append((current_date, i[0]))
+        # our remove date contains all of our base date range
+        if intersection == base_daterange:
+            return []
 
-        current_date = i[1]
+        # if we are not at the starting point of the date range we add valid range
+        if intersection[0] != base_daterange[0]:
+            valid_dateranges.append((current_date, intersection[0]))
 
-    valid_dateranges.append((current_date, base_daterange[1]))
+        # otherwise we move our pointer to the next end point
+        current_date = intersection[1]
+
+    # add final section
+    if current_date != base_daterange[1]:
+        valid_dateranges.append((current_date, base_daterange[1]))
+
+    # if we switched order, now reverse back to return in correct order
+    if go_backward:
+        return [(a,b) for b,a in valid_dateranges]
 
     return valid_dateranges
 
@@ -75,7 +96,7 @@ def subtract_daterange_from_other(base_daterange, subtract_daterange):
 
     # base contains all of subtract daterange
     if intersection == base_daterange:
-        return([(base_daterange[0], subtract_daterange[0]), (subtract_daterange[1], base_daterange[1])])
+        return ([(base_daterange[0], subtract_daterange[0]), (subtract_daterange[1], base_daterange[1])])
     # our base is fully contained within our subtraction
     if intersection == subtract_daterange:
         return []
