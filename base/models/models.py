@@ -497,6 +497,7 @@ class Price(Base):
     date = Column(DateTime(timezone=False))
     eur_per_tonne = Column(Numeric)
     scenario = Column(String, nullable=False)
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_PRICE
     __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', 'scenario', name='unique_price'),
@@ -521,6 +522,7 @@ class PortPrice(Base):
     date = Column(DateTime(timezone=False))
     eur_per_tonne = Column(Numeric)
     scenario = Column(String, nullable=False)
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_PORTPRICE
     __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', 'scenario', name='unique_portprice'),
