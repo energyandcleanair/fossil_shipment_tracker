@@ -9,7 +9,6 @@ import sqlalchemy.sql.expression
 from .. import routes_api
 from flask_restx import inputs
 
-
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     ShipOwner, ShipInsurer, ShipManager, Company, \
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
@@ -18,6 +17,7 @@ from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from base.logger import logger
+from base import PRICING_DEFAULT
 
 
 from http import HTTPStatus
@@ -76,7 +76,8 @@ class ChartEUGasConsumption(Resource):
             "nest_in_data": False,
             'rolling_days': rolling_days,
             'type': ['distribution', 'consumption', 'storage_entry', 'storage_exit', 'crossborder', 'production'],
-            'currency': 'EUR'
+            'currency': 'EUR',
+            'pricing_scenario': [PRICING_DEFAULT]
         }
         
         entsog_resp = EntsogFlowResource().get_from_params(params=params_entsog)
@@ -125,7 +126,7 @@ class ChartEUGasConsumption(Resource):
         wide[implied_consumption] = wide[imports] + wide.production + wide[storage_drawdown]
 
         if date_from:
-            wide = wide[wide.date >=pd.to_datetime(to_datetime(date_from))]
+            wide = wide[wide.date >= pd.to_datetime(to_datetime(date_from))]
 
         if date_to:
             wide = wide[wide.date <= pd.to_datetime(to_datetime(date_to))]
