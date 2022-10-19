@@ -32,6 +32,7 @@ from base.models import Departure, PortCall, Ship, MarineTrafficCall, Arrival, P
 
 tqdm.pandas()
 
+
 def update_history():
 
     # This call is to update history using the CALL-BASED MARINE TRAFFIC KEY
@@ -41,14 +42,19 @@ def update_history():
     #
     # We use it to fill past data
 
-    # update_departures_portcalls(date_from='2020-07-01', date_to='2021-01-01')
+    update_departures_portcalls(date_from='2020-07-01', date_to='2021-01-01')
     # departure.update(date_from='2020-07-01')
     update_arrival_portcalls(date_from='2020-07-01', date_to='2022-01-01')
+    # arrival.update(commodities=[base.OIL_OR_CHEMICAL],
+    #                date_from='2020-11-01',
+    #                date_to='2022-02-01')
     # update_sts_events()
 
     # Get gaps for each ship
 
+
 def update_arrival_portcalls(date_from, date_to):
+
     query_departure = session.query(
                           Departure.id,
                           Departure.ship_imo.label('imo'),
@@ -57,7 +63,7 @@ def update_arrival_portcalls(date_from, date_to):
                           Departure.date_utc.label('departure_date')) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .outerjoin(Arrival, Arrival.departure_id == Departure.id) \
-        .filter(Ship.commodity.in_([base.OIL_OR_CHEMICAL, base.COAL]))
+        .filter(Ship.commodity.in_([base.OIL_OR_CHEMICAL]))
         # .filter(Arrival.id == sa.null())
 
     queried = session.query(
@@ -145,14 +151,16 @@ def update_arrival_portcalls(date_from, date_to):
                 # Might as well query more, same cost
                 interval[1] = max(interval[1], interval[0] + delta_time)
 
-            portcalls = portcall.get_next_portcall(date_from=interval[0],
-                                                   date_to=interval[1],
-                                                   arrival_or_departure=None,
-                                                   imo=imo,
-                                                   use_call_based=use_call_based,
-                                                   use_cache=False,
-                                                   filter=lambda x: False
-                                                   )
+                portcalls = portcall.get_next_portcall(date_from=interval[0],
+                                                       date_to=interval[1],
+                                                       arrival_or_departure=None,
+                                                       imo=imo,
+                                                       use_call_based=use_call_based,
+                                                       use_cache=False,
+                                                       filter=lambda x: False
+                                                       )
+            else:
+                continue
     return
 
 
@@ -172,7 +180,7 @@ def update_departures_portcalls(date_from, date_to):
         start += delta_time
 
     for port in tqdm(ports):
-        print("Port %s" % (port.marinetraffic_id,))
+        # print("Port %s" % (port.marinetraffic_id,))
         for interval in intervals:
 
            # Check if this call has already been made
@@ -180,7 +188,10 @@ def update_departures_portcalls(date_from, date_to):
                MarineTrafficCall.params['portid'].astext == (port.unlocode or port.marinetraffic_id),
                MarineTrafficCall.params['fromdate'].astext == interval[0].strftime('%Y-%m-%d %H:%M'),
                MarineTrafficCall.params['todate'].astext == interval[1].strftime('%Y-%m-%d %H:%M'),
-               MarineTrafficCall.status == base.HTTP_OK
+               sa.or_(
+                   MarineTrafficCall.status.in_([base.HTTP_OK]),
+                   MarineTrafficCall.status.op('~*')('404')
+               )
            ).count()
            if not found:
                portcalls = Marinetraffic.get_portcalls_between_dates(arrival_or_departure="departure",
