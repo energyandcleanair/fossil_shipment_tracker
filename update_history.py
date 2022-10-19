@@ -42,9 +42,9 @@ def update_history():
     #
     # We use it to fill past data
 
-    update_departures_portcalls(date_from='2020-07-01', date_to='2021-01-01')
+    update_departures_portcalls(date_from='2019-07-01', date_to='2021-01-01')
     # departure.update(date_from='2020-07-01')
-    update_arrival_portcalls(date_from='2020-07-01', date_to='2022-01-01')
+    update_arrival_portcalls(date_from='2019-07-01', date_to='2021-01-01')
     # arrival.update(commodities=[base.OIL_OR_CHEMICAL],
     #                date_from='2020-11-01',
     #                date_to='2022-02-01')
@@ -63,7 +63,7 @@ def update_arrival_portcalls(date_from, date_to):
                           Departure.date_utc.label('departure_date')) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .outerjoin(Arrival, Arrival.departure_id == Departure.id) \
-        .filter(Ship.commodity.in_([base.OIL_OR_CHEMICAL]))
+        .filter(Ship.commodity.in_([base.CRUDE_OIL]))
         # .filter(Arrival.id == sa.null())
 
     queried = session.query(
