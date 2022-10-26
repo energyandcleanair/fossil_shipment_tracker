@@ -4,7 +4,7 @@ import geopandas as gpd
 import pandas as pd
 from tqdm import tqdm
 
-from base.db import engine
+from base.db import engine, meta #KEEP meta, even though it is greyed out by IDE
 from base.logger import logger, logger_slack
 
 
