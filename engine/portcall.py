@@ -204,7 +204,7 @@ def get_next_portcall(date_from,
                       unlocode=None,
                       filter=None,
                       use_cache=True,
-                      force_rebuild=False,
+                      force_rebuild=True,
                       cache_only=False,
                       go_backward=False,
                       use_call_based=False):
