@@ -240,8 +240,7 @@ def get_flaring_amount(date, geometries):
     over = gpd.GeoDataFrame(geometries[['id', 'type', 'geometry']]) \
         .sjoin(flares_gdf, how="left")
 
-    # Only take date of tile, otherwise we'll miss data with upsert
-    over['date'] = date
+    over['date'] = over.date.fillna(date)
 
     def count_non_na(x):
         return sum(~np.isnan(x))
@@ -259,9 +258,7 @@ def get_flaring_amount(date, geometries):
     combined = [ids, units]
     merger = pd.DataFrame(columns=['id', 'unit'], data=list(itertools.product(*combined)))
     result = merger.merge(result, how='left').fillna(0)
-    # Avoid timezone issues
-    result['date'] = date
-
+    result['date'] = result.date.fillna(date)
 
     return result
 
