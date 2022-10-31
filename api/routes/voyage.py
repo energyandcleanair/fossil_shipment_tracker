@@ -457,6 +457,10 @@ class VoyageResource(Resource):
                 # Looks like StS only
                 (ArrivalPort.name.ilike('Lakonikos Gulf%'), sa.null()),
 
+                # Removal of dardaneles discharges + bosphorus strait
+                (ArrivalPort.name.ilike('DARDANELES WAIT AREA'), sa.null()),
+                (ArrivalPort.name.ilike('BOSPHORUS N ANCH'), sa.null()),
+
                 # For completed shipments, we don't use declared destination
                 # but only actual one
                 (shipments_combined.c.shipment_status == base.COMPLETED, ArrivalPort.iso2)
