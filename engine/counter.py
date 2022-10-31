@@ -80,7 +80,8 @@ def update(date_from='2021-01-01'):
           "pricing_scenario"]]
     result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
     result = result \
-        .groupby(["commodity", 'commodity_group', "commodity_destination_iso2", 'commodity_destination_region', 'pricing_scenario']) \
+        .groupby(["commodity", 'commodity_group', "commodity_destination_iso2", 'commodity_destination_region', 'pricing_scenario'],
+                 dropna=False) \
         .apply(lambda x: x.set_index("date") \
                .resample("D").sum() \
                .fillna(0)) \
@@ -172,14 +173,14 @@ def sanity_check(result):
         old = old_data \
             .loc[old_data.date >= '2022-02-24'] \
             .loc[old_data.date <= pd.to_datetime(dt.date.today())] \
-            .groupby(compared_cols) \
+            .groupby(compared_cols, dropna=False) \
             .agg(old_eur=('value_eur', np.nansum)) \
             .replace(np.nan, 0)
 
         new = result \
             .loc[result.date >= '2022-02-24'] \
             .loc[result.date <= pd.to_datetime(dt.date.today())] \
-            .groupby(compared_cols) \
+            .groupby(compared_cols, dropna=False) \
             .agg(new_eur=('value_eur', np.nansum))
 
         comparison = pd.merge(old, new,
