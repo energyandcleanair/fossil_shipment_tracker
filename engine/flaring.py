@@ -217,8 +217,6 @@ def get_flaring_amount(date, geometries):
 
     # Flares in 'BCM'
     flares_bcm = flares_raw.copy()
-    flares_bcm = flares_bcm[(flares_bcm.Temp_BB > 1200) &
-                    (flares_bcm.Temp_BB < 999999)]
     flares_bcm['rhp'] = sigma * np.power(flares_bcm.Temp_BB, 4) * np.power(flares_bcm.Area_BB, d)
     flares_bcm['value'] = b1 * flares_bcm.rhp
     flares_bcm['unit'] = 'index' #Until we're confident this is bcm...
@@ -226,7 +224,7 @@ def get_flaring_amount(date, geometries):
     # Flares in MW
     flares_mw = flares_raw.copy()
     flares_mw['value'] = flares_mw.RH
-    flares_mw['unit'] = 'MW'
+    flares_mw['unit'] = 'mw'
 
     flares = pd.concat([flares_bcm, flares_mw], ignore_index=True)
 
@@ -318,7 +316,9 @@ def get_flaring_ts(facilities,
 #     mutate(year=lubridate::year(date),
 #            date000=`year<-`(date, 2000)) %>%
 #     ggplot() +
-#       geom_line(aes(date000, bcm_est, col=factor(year))) +
+#       geom_line(aes(date000,
+#
+#       , col=factor(year))) +
 #     scale_x_date(date_labels = '%b') +
 #     scale_colour_brewer(palette='Reds', name=NULL) +
 #     rcrea::theme_crea() +
