@@ -143,7 +143,6 @@ def download_nvf_date(date, force=False):
     if os.path.exists(output_file) and not force:
         return True
 
-
     params = {
         'client_id': 'eogdata_oidc',
         'client_secret': get_env('NVF_MINES_SECRET'),
@@ -283,7 +282,10 @@ def get_flaring_ts(facilities,
     # Get flaring amount
     dates = pd.date_range(to_datetime(date_from), to_datetime(date_to))
     res = []
-    for date in tqdm(dates):
+    pbar = tqdm(dates)
+
+    for date in pbar:
+        pbar.set_description("Processing %s" % date)
         res.append(get_flaring_amount(date=date,
                                       geometries=geometries))
 
