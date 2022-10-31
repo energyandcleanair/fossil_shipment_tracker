@@ -130,19 +130,25 @@ def update(date_from="2022-01-01"):
     add(date_from=date_from, unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
                      commodities=base.GENERAL_CARGO)
 
+    # add turkish ports which account for 80% of shipments by value_eur
+    add(date_from=date_from, unlocode=['TRCKZ', 'TRIST', 'TRIDS', 'TRCEY', 'TRNEM', 'TRKFZ', 'ESLIA', 'TRMAR', 'TRISK', 'TRDIL', 'TRMER'],
+        commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.COAL])
+
+    add(date_from=date_from, marinetraffic_id=['22737', '22433', '24832', '21972', '17855'],
+        commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.COAL])
+
     # Only keep oil related for India
     remove(unlocode=['INSIK'],
-                     port_id=114313,
-                     commodities=[base.LNG, base.COAL, base.BULK])
+           commodities=[base.LNG, base.COAL, base.BULK])
 
     remove(port_name='SIKKA ANCH',
-                     commodities=[base.LNG, base.COAL, base.BULK])
+           commodities=[base.LNG, base.COAL, base.BULK])
 
     remove(unlocode=['EGMAH'],
-                     commodities=[base.LNG, base.COAL, base.BULK])
+           commodities=[base.LNG, base.COAL, base.BULK])
 
     remove(port_name='MERSA EL HAMRA ANCH',
-                     commodities=[base.LNG, base.COAL, base.BULK])
+           commodities=[base.LNG, base.COAL, base.BULK])
 
 
 def add(date_from="2022-01-01",
@@ -156,7 +162,8 @@ def add(date_from="2022-01-01",
                         base.BULK],
            ship_imo=None,
            unlocode=None,
-           port_id=None
+           port_id=None,
+           marinetraffic_id=None,
            ):
     logger_slack.info("=== Update departures ===")
     # Look for relevant PortCalls without associated departure
@@ -188,6 +195,9 @@ def add(date_from="2022-01-01",
 
     if port_id is not None:
         dangling_portcalls = dangling_portcalls.filter(Port.id.in_(to_list(port_id)))
+
+    if marinetraffic_id is not None:
+        dangling_portcalls = dangling_portcalls.filter(Port.marinetraffic_id.in_(to_list(marinetraffic_id)))
 
     dangling_portcalls = dangling_portcalls.all()
 
