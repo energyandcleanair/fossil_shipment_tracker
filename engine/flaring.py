@@ -309,7 +309,7 @@ def get_flaring_ts(facilities,
         return []
 
     res = pd.concat(res) \
-        .groupby(['id', 'type', 'date', 'unit'])[['value', 'count']] \
+        .groupby(['id', 'date', 'unit'])[['value', 'count']] \
         .sum() \
         .reset_index()
 
