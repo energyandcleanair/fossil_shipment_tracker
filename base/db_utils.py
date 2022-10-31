@@ -18,7 +18,7 @@ def execute_statement(stmt, print_result=False, slack_result=False):
                 if print_result:
                     print(row)
             if slack_result:
-                logger_slack.info('\n'.join([str(r) for r in rows]))
+                logger_slack.info('\n'.join(rows))
         else:
             con.execute(stmt)
 
