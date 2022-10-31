@@ -25,6 +25,8 @@ def check():
     except AssertionError:
         logger_slack.error("Failed integrity: counter, voyage and pricing")
         raise
+
+    
 def test_shipment_table():
 
     # check that the shipment table respect unique departures and arrivals

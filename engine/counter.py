@@ -182,7 +182,6 @@ def sanity_check(result):
             .groupby(compared_cols) \
             .agg(new_eur=('value_eur', np.nansum))
 
-
         comparison = pd.merge(old, new,
                  how='outer',
                  left_on=compared_cols,
