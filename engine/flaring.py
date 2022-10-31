@@ -257,8 +257,9 @@ def get_flaring_amount(date, geometries):
     units = ['mw', 'index']
     combined = [ids, units]
     merger = pd.DataFrame(columns=['id', 'unit'], data=list(itertools.product(*combined)))
-    result = merger.merge(result, how='left').fillna(0)
+    result = merger.merge(result, how='left')
     result['date'] = result.date.fillna(date)
+    result['value'] = result.value.fillna(0)
 
     return result
 
