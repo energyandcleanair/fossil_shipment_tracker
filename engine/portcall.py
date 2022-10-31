@@ -357,7 +357,8 @@ def update_departures_from_russia(
         marinetraffic_port_id=None,
         port_id=None,
         force_rebuild=False,
-        between_existing_only=False):
+        between_existing_only=False,
+        ignore_check_departure=False):
     """
     If force rebuild, we ignore cache port calls. Should only be used if we suspect
     we missed some port calls (e.g. in the initial fill using manually downloaded data)
@@ -366,7 +367,10 @@ def update_departures_from_russia(
     :return:
     """
     logger_slack.info("=== Update departures (Portcall) ===")
-    ports = Port.query.filter(Port.check_departure)\
+    ports = session.query(Port)
+
+    if not ignore_check_departure:
+        ports = ports.filter(Port.check_departure)
 
     if unlocode is not None:
         ports = ports.filter(Port.unlocode.in_(to_list(unlocode)))
