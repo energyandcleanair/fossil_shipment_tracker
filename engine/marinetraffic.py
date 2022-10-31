@@ -62,7 +62,7 @@ class Marinetraffic:
             call_log['credits'] = len(api_result.json()) * credits_per_record
             call_log['status'] = str(api_result.status_code)
 
-        if  (call_log['records'] > 0) or save_empty_record:
+        if (call_log['records'] > 0) or save_empty_record:
             session.add(MarineTrafficCall(**call_log))
             session.commit()
 
@@ -227,7 +227,7 @@ class Marinetraffic:
                                               api_key=api_key,
                                               params=params,
                                               credits_per_record=4,
-                                              save_empty_record=False)
+                                              save_empty_record=use_call_based)
 
         if response_datas is None:
             if not imo or not '_v2' in imo:
