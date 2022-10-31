@@ -130,7 +130,7 @@ def update(date_from="2022-01-01"):
     add(date_from=date_from, unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
                      commodities=base.GENERAL_CARGO)
 
-    # add turkish ports which account for 80% of shipments by value_eur
+    # add Turkish ports which account for 80% of shipments by value_eur
     add(date_from=date_from, unlocode=['TRCKZ', 'TRIST', 'TRIDS', 'TRCEY', 'TRNEM', 'TRKFZ', 'ESLIA', 'TRMAR', 'TRISK', 'TRDIL', 'TRMER'],
         commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.COAL])
 
@@ -224,7 +224,9 @@ def remove(commodities, unlocode=None, port_id=None, port_name=None):
         .join(Ship, Ship.imo==Departure.ship_imo) \
         .join(PortCall, PortCall.id == Departure.portcall_id) \
         .join(Port, PortCall.port_id == Port.id) \
-        .filter(Ship.commodity.in_(to_list(commodities)))
+        .filter(Ship.commodity.in_(to_list(commodities))) \
+        .outerjoin(Shipment, Shipment.departure_id == Departure.id) \
+        .filter(Shipment.id == sa.null())
 
     if unlocode:
         departures = departures \
