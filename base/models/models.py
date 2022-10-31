@@ -753,10 +753,11 @@ class Flaring(Base):
     id = Column(BigInteger, unique=True, primary_key=True)
     facility_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING_FACILITY + '.id', ondelete="CASCADE"), nullable=False)
     date = Column(Date)
+    unit = Column(String, nullable=False)
     value = Column(Numeric)
     buffer_km = Column(Numeric)
 
-    __table_args__ = (UniqueConstraint('facility_id', 'date', 'buffer_km', name='unique_flaring'),)
+    __table_args__ = (UniqueConstraint('facility_id', 'date', 'buffer_km', 'unit', name='unique_flaring'),)
     __tablename__ = DB_TABLE_FLARING
 
 

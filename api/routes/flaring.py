@@ -129,6 +129,11 @@ class FlaringResource(Resource):
     parser.add_argument('facility_name', help='name(s) of facility',
                         type=str, action='split',
                         default=None, required=False)
+    parser.add_argument('unit', help='bcm_est,mw',
+                        type=str,
+                        action='split',
+                        default=['bcm_est'],
+                        required=False)
     parser.add_argument('rolling_days', type=int,
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=None)
@@ -153,6 +158,7 @@ class FlaringResource(Resource):
 
         params = FlaringResource.parser.parse_args()
         facility_id = params.get("facility_id")
+        unit = params.get("unit")
         format = params.get("format")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
@@ -166,12 +172,16 @@ class FlaringResource(Resource):
                               FlaringFacility.name_en,
                               FlaringFacility.type,
                               Flaring.date,
+                              Flaring.unit,
                               Flaring.value,
                               Flaring.buffer_km) \
                 .join(Flaring, FlaringFacility.id == Flaring.facility_id)
 
         if facility_id is not None:
             query = query.filter(FlaringFacility.id.in_(to_list(facility_id)))
+
+        if unit is not None:
+            query = query.filter(Flaring.unit.in_(to_list(unit)))
 
         if date_from is not None:
             query = query.filter(Flaring.date >= to_datetime(date_from))
@@ -182,7 +192,8 @@ class FlaringResource(Resource):
         query = self.aggregate(query=query, aggregate_by=aggregate_by)
         result = pd.read_sql(query.statement, session.bind)
 
-        result = self.roll_average(result=result, rolling_days=rolling_days)
+        if len(result) > 0:
+            result = self.roll_average(result=result, rolling_days=rolling_days)
 
         response = self.build_response(result=result,
                                      format=format,
@@ -273,7 +284,7 @@ class FlaringResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['buffer_km']
+        must_group_by = ['buffer_km', 'unit']
 
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
@@ -285,6 +296,7 @@ class FlaringResource(Resource):
                          subquery.c.type],
             'facility_type': [subquery.c.type],
             'date': [subquery.c.date],
+            'unit': [subquery.c.unit],
             'buffer_km': [subquery.c.buffer_km]
         }
 

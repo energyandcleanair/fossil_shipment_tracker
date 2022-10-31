@@ -213,13 +213,24 @@ def get_flaring_amount(date, geometries):
     b1 = 0.0294
     d = 0.7
 
-    flares = flares_raw
-    flares = flares[(flares.Temp_BB > 1200) &
-                    (flares.Temp_BB < 999999)].copy()
-    flares['rhp'] = sigma * np.power(flares.Temp_BB, 4) * np.power(flares.Area_BB, d)
-    flares['bcm_est'] = b1 * flares.rhp
+    flares_raw = flares_raw[(flares_raw.Temp_BB > 1200) & (flares_raw.Temp_BB < 999999)]
 
-    flares = flares[['Date_LTZ', 'Lon_GMTCO', 'Lat_GMTCO', 'bcm_est']] \
+    # Flares in 'BCM'
+    flares_bcm = flares_raw.copy()
+    flares_bcm = flares_bcm[(flares_bcm.Temp_BB > 1200) &
+                    (flares_bcm.Temp_BB < 999999)]
+    flares_bcm['rhp'] = sigma * np.power(flares_bcm.Temp_BB, 4) * np.power(flares_bcm.Area_BB, d)
+    flares_bcm['value'] = b1 * flares_bcm.rhp
+    flares_bcm['unit'] = 'index' #Until we're confident this is bcm...
+
+    # Flares in MW
+    flares_mw = flares_raw.copy()
+    flares_mw['value'] = flares_mw.RH
+    flares_mw['unit'] = 'MW'
+
+    flares = pd.concat([flares_bcm, flares_mw], ignore_index=True)
+
+    flares = flares[['Date_LTZ', 'Lon_GMTCO', 'Lat_GMTCO', 'value', 'unit']] \
         .rename(columns={'Date_LTZ': 'date',
                          'Lon_GMTCO': 'lon',
                          'Lat_GMTCO': 'lat'})
@@ -236,9 +247,9 @@ def get_flaring_amount(date, geometries):
     def count_non_na(x):
         return sum(~np.isnan(x))
 
-    result = over.groupby(['id', 'type', 'date']) \
-        .agg(bcm_est=('bcm_est', np.nansum),
-             count=('bcm_est', count_non_na))
+    result = over.groupby(['id', 'type', 'date', 'unit']) \
+        .agg(value=('value', np.nansum),
+             count=('value', count_non_na))
 
     return result
 
@@ -283,7 +294,7 @@ def get_flaring_ts(facilities,
         return []
 
     res = pd.concat(res) \
-        .groupby(['id', 'type', 'date'])[['bcm_est', 'count']] \
+        .groupby(['id', 'type', 'date', 'unit'])[['value', 'count']] \
         .sum() \
         .reset_index()
 
@@ -291,14 +302,13 @@ def get_flaring_ts(facilities,
     res = res.merge(geometries[['id', 'buffer_km']])
 
     # Format for table
-    res = res[['id', 'date', 'bcm_est', 'buffer_km']] \
-        .rename(columns={'id': 'facility_id', 'bcm_est': 'value'})
+    res = res[['id', 'date', 'unit', 'value', 'buffer_km']] \
+        .rename(columns={'id': 'facility_id'})
 
     return res
 
 
 
-#
 #
 #   # Global tendencies
 #   flare_amounts %>%
