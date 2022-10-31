@@ -228,6 +228,9 @@ def remove(commodities, unlocode=None, port_id=None, port_name=None):
         .outerjoin(Shipment, Shipment.departure_id == Departure.id) \
         .filter(Shipment.id == sa.null())
 
+        #TODO find why there were shipments from these departures
+        #that required the last two lines
+
     if unlocode:
         departures = departures \
          .filter(Port.unlocode.in_(to_list(unlocode)))
