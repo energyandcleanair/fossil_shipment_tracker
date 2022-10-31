@@ -230,6 +230,7 @@ def remove(commodities, unlocode=None, port_id=None, port_name=None):
 
         #TODO find why there were shipments from these departures
         #that required the last two lines
+        # Oh probably because Sikka remove had two contradicting arguments before
 
     if unlocode:
         departures = departures \
