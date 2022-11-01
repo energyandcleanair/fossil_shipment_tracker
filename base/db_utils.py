@@ -13,7 +13,7 @@ def execute_statement(stmt, print_result=False, slack_result=False):
         con = con.execution_options(isolation_level="AUTOCOMMIT")
         if print_result or slack_result:
             rs = con.execute(stmt)
-            rows = [x for x in rs]
+            rows = [str(x) for x in rs]
             for row in rows:
                 if print_result:
                     print(row)
