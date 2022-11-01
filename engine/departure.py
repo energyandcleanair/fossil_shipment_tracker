@@ -131,11 +131,12 @@ def update(date_from="2022-01-01"):
                      commodities=base.GENERAL_CARGO)
 
     # add Turkish ports which account for 80% of shipments by value_eur
-    add(date_from=date_from, unlocode=['TRCKZ', 'TRIST', 'TRIDS', 'TRCEY', 'TRNEM', 'TRKFZ', 'ESLIA', 'TRMAR', 'TRISK', 'TRDIL', 'TRMER'],
-        commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.COAL])
+    # Only keep oil related for Turkey for now
+    remove(unlocode=['TRCKZ', 'TRIST', 'TRIDS', 'TRCEY', 'TRNEM', 'TRKFZ', 'ESLIA', 'TRMAR', 'TRISK', 'TRDIL', 'TRMER'],
+        commodities=[base.LNG, base.COAL, base.BULK])
 
-    add(date_from=date_from, marinetraffic_id=['22737', '22433', '24832', '21972', '17855'],
-        commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.COAL])
+    remove(marinetraffic_id=['22737', '22433', '24832', '21972', '17855'],
+        commodities=[base.LNG, base.COAL, base.BULK])
 
     # Only keep oil related for India
     remove(unlocode=['INSIK'],
@@ -218,7 +219,7 @@ def add(date_from="2022-01-01",
     session.commit()
 
 
-def remove(commodities, unlocode=None, port_id=None, port_name=None):
+def remove(commodities, unlocode=None, port_id=None, port_name=None, marinetraffic_id=None):
 
     departures = session.query(Departure.id) \
         .join(Ship, Ship.imo==Departure.ship_imo) \
@@ -239,6 +240,10 @@ def remove(commodities, unlocode=None, port_id=None, port_name=None):
     if port_id:
         departures = departures \
             .filter(Port.id.in_(to_list(port_id)))
+
+    if marinetraffic_id:
+        departures = departures.filter(
+            Port.marinetraffic_id.in_(to_list(marinetraffic_id)))
 
     if port_name:
         departures = departures \
