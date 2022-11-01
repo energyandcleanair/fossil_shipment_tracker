@@ -226,20 +226,19 @@ def add(date_from="2022-01-01",
     session.commit()
 
 
-def remove(commodities, unlocode=None, port_id=None, port_name=None, marinetraffic_id=None,
+def remove(commodities=None, unlocode=None, port_id=None, port_name=None, marinetraffic_id=None,
            date_to=None):
 
     departures = session.query(Departure.id) \
         .join(Ship, Ship.imo==Departure.ship_imo) \
         .join(PortCall, PortCall.id == Departure.portcall_id) \
         .join(Port, PortCall.port_id == Port.id) \
-        .filter(Ship.commodity.in_(to_list(commodities))) \
         .outerjoin(Shipment, Shipment.departure_id == Departure.id) \
         .filter(Shipment.id == sa.null())
 
-        #TODO find why there were shipments from these departures
-        #that required the last two lines
-        # Oh probably because Sikka remove had two contradicting arguments before
+    if commodities:
+        departures = departures \
+            .filter(Ship.commodity.in_(to_list(commodities)))
 
     if unlocode:
         departures = departures \
