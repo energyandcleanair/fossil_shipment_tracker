@@ -138,6 +138,13 @@ def update(date_from="2022-01-01"):
     remove(marinetraffic_id=['22737', '22433', '24832', '21972', '17855'],
         commodities=[base.LNG, base.COAL, base.BULK])
 
+    # Only keep those after 2022-10-01 for now
+    remove(unlocode=['TRCKZ', 'TRIST', 'TRIDS', 'TRCEY', 'TRNEM', 'TRKFZ', 'ESLIA', 'TRMAR', 'TRISK', 'TRDIL', 'TRMER'],
+           date_to='2022-09-30')
+
+    remove(marinetraffic_id=['22737', '22433', '24832', '21972', '17855'],
+           date_to='2022-09-30')
+
     # Only keep oil related for India
     remove(unlocode=['INSIK'],
            commodities=[base.LNG, base.COAL, base.BULK])
@@ -219,7 +226,8 @@ def add(date_from="2022-01-01",
     session.commit()
 
 
-def remove(commodities, unlocode=None, port_id=None, port_name=None, marinetraffic_id=None):
+def remove(commodities, unlocode=None, port_id=None, port_name=None, marinetraffic_id=None,
+           date_to=None):
 
     departures = session.query(Departure.id) \
         .join(Ship, Ship.imo==Departure.ship_imo) \
@@ -248,6 +256,10 @@ def remove(commodities, unlocode=None, port_id=None, port_name=None, marinetraff
     if port_name:
         departures = departures \
             .filter(Port.name.in_(to_list(port_name)))
+
+    if date_to:
+        departures = departures \
+            .filter(Departure.date_utc <= to_datetime(date_to))
 
     session.query(Departure) \
         .filter(Departure.id.in_(departures.scalar_subquery().subquery())) \
