@@ -74,7 +74,7 @@ FROM
     LEFT JOIN port ON portcall.port_id = port.id
         LEFT JOIN ship ON ship.imo = portcall.ship_imo
     WHERE
-        date_utc >= '2021-11-01'
+        date_utc >= '2021-01-01'
         AND ship.commodity != 'unknown'
         AND move_type = 'departure'
     ORDER BY
