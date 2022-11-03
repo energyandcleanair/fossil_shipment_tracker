@@ -127,7 +127,8 @@ class RussiaCounterResource(Resource):
                 (sa.and_(use_eu, Counter.destination_iso2 == 'GB'), 'United Kingdom'),
                 (sa.and_(use_eu, Country.region == 'EU28', Counter.destination_iso2 != 'GB'), 'EU'),
                 (sa.and_(not use_eu, Counter.destination_iso2 == 'GB'), 'EU28'),
-                (sa.and_(not use_eu, Country.region == 'EU'), 'EU28')
+                (sa.and_(not use_eu, Country.region == 'EU'), 'EU28'),
+                (Country.iso2 == sa.null(), 'Others')
             ],
             else_=Country.region
         ).label('destination_region')
@@ -151,7 +152,7 @@ class RussiaCounterResource(Resource):
                 Counter.pricing_scenario
             ) \
             .outerjoin(commodity_subquery, Counter.commodity == commodity_subquery.c.id) \
-            .join(Country, Counter.destination_iso2 == Country.iso2) \
+            .outerjoin(Country, Counter.destination_iso2 == Country.iso2) \
             .outerjoin(Currency, Counter.date == Currency.date) \
             .filter(Counter.date >= to_datetime(date_from)) \
             .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
