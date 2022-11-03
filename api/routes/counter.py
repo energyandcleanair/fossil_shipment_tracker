@@ -194,7 +194,7 @@ class RussiaCounterResource(Resource):
                               'currency', 'pricing_scenario'], counter.columns)
 
             counter = counter \
-                .groupby(cols) \
+                .groupby(cols, dropna=False) \
                 .apply(lambda x: x.set_index("date") \
                        .resample("D") \
                        .sum() \
