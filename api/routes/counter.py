@@ -208,9 +208,9 @@ class RussiaCounterResource(Resource):
         if cumulate and "date" in counter:
             groupby_cols = [x for x in ['commodity', 'commodity_group', 'commodity_group_name', 'destination_iso2',
                                         'destination_country', 'destination_region', 'currency', 'pricing_scenario'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
-            counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
-            counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
-            counter['value_currency'] = counter.groupby(groupby_cols)['value_currency'].transform(pd.Series.cumsum)
+            counter['value_eur'] = counter.groupby(groupby_cols, dropna=False)['value_eur'].transform(pd.Series.cumsum)
+            counter['value_tonne'] = counter.groupby(groupby_cols, dropna=False)['value_tonne'].transform(pd.Series.cumsum)
+            counter['value_currency'] = counter.groupby(groupby_cols, dropna=False)['value_currency'].transform(pd.Series.cumsum)
 
 
         if rolling_days is not None and rolling_days > 1:
@@ -218,7 +218,8 @@ class RussiaCounterResource(Resource):
                 .groupby(intersect(["commodity", "commodity_name", "commodity_group", 'commodity_group_name',
                                     'destination_iso2',
                                     'destination_country',
-                                    "destination_region", 'currency', 'pricing_scenario'], counter.columns)) \
+                                    "destination_region", 'currency', 'pricing_scenario'], counter.columns),
+                         dropna=False) \
                 .apply(lambda x: x.set_index('date') \
                        .resample("D").sum() \
                        .reindex(daterange) \
@@ -363,7 +364,7 @@ class RussiaCounterResource(Resource):
                                     and not x in by
                                     and x in result.columns]
 
-            sorted = result.groupby(sorting_groupers)[by].sum() \
+            sorted = result.groupby(sorting_groupers, dropna=False)[by].sum() \
                 .reset_index() \
                 .sort_values(by=by, ascending=ascending) \
                 .drop(sort_by, axis=1)
@@ -422,13 +423,13 @@ class RussiaCounterResource(Resource):
 
         # Can only take one
         sort_by = to_list(sort_by)[0]
-        top = result.groupby(group_by) \
+        top = result.groupby(group_by, dropna=False) \
             .agg({sort_by: 'sum'}) \
             .reset_index() \
             .sort_values(limit_by + to_list(sort_by), ascending=False)
 
         if limit_by:
-            top = top.groupby(limit_by, as_index=False)
+            top = top.groupby(limit_by, as_index=False, dropna=False)
 
         top = top \
             .head(limit) \
