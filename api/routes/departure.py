@@ -7,6 +7,7 @@ from flask_restx import Resource, reqparse, inputs
 from base.models import Departure
 from base.encoder import JsonEncoder
 from base.db import session
+from base.utils import to_datetime
 from . import routes_api
 
 
@@ -41,10 +42,10 @@ class DepartureResource(Resource):
             query = query.filter(Departure.port_unlocode.in_(unlocode))
 
         if date_from is not None:
-            query = query.filter(Departure.date_utc >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
+            query = query.filter(Departure.date_utc >= to_datetime(date_from))
 
         if date_to is not None:
-            query = query.filter(Departure.date_utc >= dt.datetime.strptime(date_to, "%Y-%m-%d"))
+            query = query.filter(Departure.date_utc <= to_datetime(date_to))
 
         departures_df = pd.read_sql(query.statement, session.bind)
 
