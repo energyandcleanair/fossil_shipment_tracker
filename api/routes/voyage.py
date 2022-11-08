@@ -658,7 +658,9 @@ class VoyageResource(Resource):
 
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
-             .filter(destination_iso2_field != "RU")
+             .filter(
+                    sa.or_(destination_iso2_field != "RU",
+                           destination_iso2_field == sa.null()))
             )
 
         if id is not None:
