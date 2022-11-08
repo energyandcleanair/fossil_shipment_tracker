@@ -242,10 +242,8 @@ def get_next_portcall(date_from,
 
     if filtered_cached_portcalls:
         # We found a matching portcall in db
-        if go_backward:
-            filtered_cached_portcalls.sort(key=lambda x: x.date_utc, reverse=True)
-        else:
-            filtered_cached_portcalls.sort(key=lambda x: x.date_utc)
+        filtered_cached_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
+
         if cache_only:
             return filtered_cached_portcalls[0]
 
@@ -327,6 +325,13 @@ def get_next_portcall(date_from,
                     portcalls.extend(portcalls_interval)
                 if filtered_portcall:
                     return filtered_portcall
+
+        # If we haven't found any new portcall,
+        # we return the portcall that was already existing
+        if filtered_cached_portcalls:
+            return filtered_cached_portcalls[0]
+        else:
+            return None
 
     else:
         intervals = [(date_from, date_to)]
