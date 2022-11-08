@@ -166,7 +166,7 @@ def sanity_check(result):
                                              Counter.destination_iso2.label('commodity_destination_iso2'),
                                              Country.region.label('commodity_destination_region'),
                                              Commodity.group.label('commodity_group')) \
-                               .join(Country, Country.iso2 == Counter.destination_iso2) \
+                               .outerjoin(Country, Country.iso2 == Counter.destination_iso2) \
                                .join(Commodity, Commodity.id == Counter.commodity) \
                                .filter(Counter.pricing_scenario == PRICING_DEFAULT).statement,
                                session.bind)
