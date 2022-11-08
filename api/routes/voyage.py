@@ -294,7 +294,10 @@ class VoyageResource(Resource):
                          DepartureBerth.commodity.ilike('%coal%'),
                          # Lauri: For Taiwan, please exclude coal shipments without identified berth.
                          # I've done that for data I've provided to Taiwan because too much of the rest is iron ore, scrap etc
-                         ArrivalPort.iso2 != 'TW'), 'coal'),
+                         sa.or_(
+                             ArrivalPort.iso2 == sa.null(),
+                             ArrivalPort.iso2 != 'TW')
+                         ), 'coal'),
 
                 (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
                          ArrivalPort.iso2 == 'TW',
