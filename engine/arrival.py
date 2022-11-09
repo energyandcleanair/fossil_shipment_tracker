@@ -23,6 +23,7 @@ def update(min_dwt=base.DWT_MIN,
            ship_imo=None,
            unlocode=None,
            port_id=None,
+           departure_port_iso2=None,
            shipment_id=None,
            force_for_arrival_to_departure_greater_than=None,
            include_undetected_arrival_shipments=True,
@@ -54,6 +55,7 @@ def update(min_dwt=base.DWT_MIN,
                                                                    ship_imo=ship_imo,
                                                                    unlocode=unlocode,
                                                                    port_id=port_id,
+                                                                   departure_port_iso2=departure_port_iso2,
                                                                    shipment_id=shipment_id)
 
     if not include_undetected_arrival_shipments:

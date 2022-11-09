@@ -53,7 +53,7 @@ def get_departures_with_arrival_too_remote_from_next_departure(min_timedelta,
 
 def get_departures_without_arrival(min_dwt=None, commodities=None,
                                    date_from=None, ship_imo=None, date_to=None,
-                                   unlocode=None, port_id=None, shipment_id=None):
+                                   unlocode=None, port_id=None, departure_port_iso2=None, shipment_id=None):
 
     subquery = session.query(Arrival.departure_id).filter(Arrival.departure_id != sa.null())
 
@@ -87,6 +87,9 @@ def get_departures_without_arrival(min_dwt=None, commodities=None,
 
     if port_id is not None:
         query = query.filter(Port.id.in_(to_list(port_id)))
+
+    if departure_port_iso2 is not None:
+        query = query.filter(Port.iso2.in_(to_list(departure_port_iso2)))
 
     return query.order_by(Departure.date_utc).all()
 
@@ -129,21 +132,6 @@ def update(date_from="2022-01-01"):
 
     add(date_from=date_from, unlocode=['RUVYP', 'RUULU', 'RUMMK', 'RULGA', 'RUVNN', 'RUAZO'],
                      commodities=base.GENERAL_CARGO)
-
-    # add Turkish ports which account for 80% of shipments by value_eur
-    # Only keep oil related for Turkey for now
-    remove(unlocode=['TRCKZ', 'TRIST', 'TRIDS', 'TRCEY', 'TRNEM', 'TRKFZ', 'ESLIA', 'TRMAR', 'TRISK', 'TRDIL', 'TRMER'],
-        commodities=[base.LNG, base.COAL, base.BULK])
-
-    remove(marinetraffic_id=['22737', '22433', '24832', '21972', '17855'],
-        commodities=[base.LNG, base.COAL, base.BULK])
-
-    # Only keep those after 2022-10-01 for now
-    remove(unlocode=['TRCKZ', 'TRIST', 'TRIDS', 'TRCEY', 'TRNEM', 'TRKFZ', 'ESLIA', 'TRMAR', 'TRISK', 'TRDIL', 'TRMER'],
-           date_to='2022-09-30')
-
-    remove(marinetraffic_id=['22737', '22433', '24832', '21972', '17855'],
-           date_to='2022-09-30')
 
     # Only keep oil related for India
     remove(unlocode=['INSIK'],
