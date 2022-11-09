@@ -66,7 +66,8 @@ def update(date_from='2021-01-01'):
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
     voyages = pd.DataFrame(voyages)
-    voyages = voyages.loc[voyages.commodity_origin_iso2 == 'RU'] # Just to confirm
+    voyages = voyages.loc[voyages.commodity_origin_iso2 == 'RU']
+    voyages = voyages.loc[voyages.commodity_destination_iso2 != 'RU']
     voyages = voyages.loc[voyages.status == base.COMPLETED] # just to confirm
     voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
 
