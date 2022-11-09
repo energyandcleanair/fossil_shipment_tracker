@@ -13,7 +13,7 @@ from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     ShipOwner, ShipInsurer, ShipManager, Company, \
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
     Destination, Price, Country, PortPrice, Currency, ShipmentWithSTS, Event, \
-    ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, STSLocation
+    ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, STSLocation, PortCall
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
@@ -282,6 +282,8 @@ class VoyageResource(Resource):
         DepartureShip = aliased(Ship)
         ArrivalShip = aliased(Ship)
 
+        NextDeparturePortcall = aliased(PortCall)
+
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
 
@@ -323,6 +325,7 @@ class VoyageResource(Resource):
             [(DepartureBerth.name.ilike('Novorossiysk CPC%'), 'KZ')],
             else_=DeparturePort.iso2
         ).label('departure_iso2')
+
 
         # combine sts shipment table with normal (non-sts) shipments
 
@@ -511,6 +514,7 @@ class VoyageResource(Resource):
 
                                     # Arrival
                                     Arrival.date_utc.label("arrival_date_utc"),
+                                    NextDeparturePortcall.date_utc.label('arrival_detected_date_utc'),
                                     ArrivalPort.unlocode.label("arrival_unlocode"),
                                     ArrivalPort.iso2.label("arrival_iso2"),
                                     ArrivalCountry.name.label("arrival_country"),
@@ -599,6 +603,7 @@ class VoyageResource(Resource):
              .outerjoin(ShipmentArrivalBerth, shipments_combined.c.shipment_id == ShipmentArrivalBerth.shipment_id)
              .outerjoin(DepartureBerth, DepartureBerth.id == ShipmentDepartureBerth.berth_id)
              .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
+             .outerjoin(NextDeparturePortcall, NextDeparturePortcall.id == Arrival.nextdeparture_portcall_id)
              .outerjoin(ShipmentArrivalLocationSTS, shipments_combined.c.shipment_id == ShipmentArrivalLocationSTS.shipment_id)
              .outerjoin(ArrivalSTSLocation, ArrivalSTSLocation.id == ShipmentArrivalLocationSTS.sts_location_id)
              .outerjoin(ShipmentDepartureLocationSTS, shipments_combined.c.shipment_id == ShipmentDepartureLocationSTS.shipment_id)
@@ -864,6 +869,7 @@ class VoyageResource(Resource):
             'departure_year': [func.date_trunc('year', subquery.c.departure_date_utc).label("departure_year")],
 
             'arrival_date': [func.date_trunc('day', subquery.c.arrival_date_utc).label('arrival_date')],
+            'arrival_detected_date': [func.date_trunc('day', subquery.c.arrival_detected_date_utc).label('arrival_detected_date')],
             'arrival_month': [func.date_trunc('month', subquery.c.arrival_date_utc).label('arrival_month')],
             'arrival_year': [func.date_trunc('year', subquery.c.arrival_date_utc).label('arrival_year')],
 

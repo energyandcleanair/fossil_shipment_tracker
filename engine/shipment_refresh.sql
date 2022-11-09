@@ -209,6 +209,7 @@ shipments AS (
         ship_imo,
         departure_date_utc,
         arrival_portcall_id,
+        nextdeparture_portcall_id,
         departure_id,
         arrival_id,
         status
@@ -221,6 +222,7 @@ shipments AS (
         ship_imo,
         departure_date_utc,
         NULL::bigint AS arrival_portcall_id,
+        NULL::bigint AS nextdeparture_portcall_id,
         departure_id,
         arrival_id,
         status
@@ -246,14 +248,15 @@ INSERT INTO departure (id, port_id, ship_imo, date_utc, method_id, portcall_id)
             portcall_id
 ),
 inserted_arrivals AS (
-INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id)
+INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id, nextdeparture_portcall_id)
     SELECT
         arrival_id,
         inserted_departures.id,
         arrival_date_utc,
         'postgres',
         arrival_port_id,
-        arrival_portcall_id
+        arrival_portcall_id,
+        nextdeparture_portcall_id
     FROM
         completed_shipments
         LEFT JOIN inserted_departures ON completed_shipments.departure_portcall_id = inserted_departures.portcall_id
