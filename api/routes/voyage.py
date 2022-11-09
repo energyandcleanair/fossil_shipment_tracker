@@ -102,6 +102,10 @@ class VoyageResource(Resource):
                         help='unlocode of departure ports to consider',
                         required=False,
                         default=None)
+    parser.add_argument('departure_port_area', action='split',
+                        help='area of departure ports to consider e.g. Baltic,Arctic,Pacific,Black Sea,Caspian Sea',
+                        required=False,
+                        default=None)
     parser.add_argument('destination_iso2', action='split', help='iso2(s) of destination',
                         required=False,
                         default=None)
@@ -201,6 +205,7 @@ class VoyageResource(Resource):
         departure_port_id = params.get("departure_port_id")
         departure_berth_id = params.get("departure_berth_id")
         departure_port_unlocode = params.get("departure_port_unlocode")
+        departure_port_area = params.get("departure_port_area")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
@@ -511,6 +516,7 @@ class VoyageResource(Resource):
                                     DepartureCountry.region.label("departure_region"),
                                     DeparturePort.name.label("departure_port_name"),
                                     DeparturePort.id.label("departure_port_id"),
+                                    DeparturePort.area.label("departure_port_area"),
 
                                     # Arrival
                                     Arrival.date_utc.label("arrival_date_utc"),
@@ -709,6 +715,9 @@ class VoyageResource(Resource):
         if arrival_date_to is not None:
             shipments_rich = shipments_rich.filter(Arrival.date_utc <= to_datetime(arrival_date_to))
 
+        if departure_port_area is not None:
+            shipments_rich = shipments_rich.filter(func.lower(DeparturePort.area).in_([x.lower() for x  in to_list(departure_port_area)]))
+
         if year is not None:
             shipments_rich = shipments_rich.filter(sa.or_(
                 extract('year', Departure.date_utc).in_(to_list(year)),
@@ -873,8 +882,9 @@ class VoyageResource(Resource):
             'arrival_month': [func.date_trunc('month', subquery.c.arrival_date_utc).label('arrival_month')],
             'arrival_year': [func.date_trunc('year', subquery.c.arrival_date_utc).label('arrival_year')],
 
-            'departure_port': [subquery.c.departure_port_name, subquery.c.departure_unlocode,
+            'departure_port': [subquery.c.departure_port_name, subquery.c.departure_port_area, subquery.c.departure_unlocode,
                                subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
+            'departure_port_area': [subquery.c.departure_port_area],
             'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
             'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
 

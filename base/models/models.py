@@ -112,6 +112,7 @@ class Port(Base):
     check_arrival = Column(Boolean)
     geometry = Column(Geometry('POINT', srid=4326))
     others = Column(JSONB)
+    area = Column(String)
 
     __tablename__ = DB_TABLE_PORT
     __table_args__ = (Index('idx_port_unlocode', "unlocode"),

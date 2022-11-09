@@ -2,7 +2,7 @@ import pandas as pd
 import geopandas as gpd
 import sqlalchemy as sa
 from tqdm import tqdm
-
+from sqlalchemy import func
 
 from base.logger import logger
 from base.db import session
@@ -147,4 +147,19 @@ def insert_new_port(iso2, unlocode, name=None, marinetraffic_id=None):
 
     for new_port in new_ports:
         session.add(new_port)
+    session.commit()
+
+
+def update_area():
+
+    session.query(Port).filter(Port.iso2 == 'RU').update(
+        {'area': sa.case(
+            [(func.ST_X(Port.geometry) > 100, 'Pacific'),
+             (func.ST_Y(Port.geometry) > 62, 'Arctic'),
+             (func.ST_Y(Port.geometry) > 50, 'Baltic'),
+             (func.ST_X(Port.geometry) > 47, 'Caspian Sea'),
+             ],
+            else_='Black sea')},
+        synchronize_session=False)
+
     session.commit()
