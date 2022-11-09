@@ -961,6 +961,7 @@ class VoyageResource(Resource):
 
         dependencies = {
             'commodity': ['commodity_name', 'commodity_group', 'commodity_group_name'],
+            'commodity_name': ['commodity', 'commodity_group', 'commodity_group_name'],
             'commodity_group': ['commodity', 'commodity_name', 'commodity_group_name'],
             'commodity_group_name': ['commodity', 'commodity_name', 'commodity_group'],
 
