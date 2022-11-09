@@ -152,6 +152,7 @@ previous_arrival AS (
         nextd.departure_unlocode,
         nextd.departure_port_id,
         nextd.departure_portcall_id,
+        nextd.nextdeparture_portcall_id,
         preva.id AS arrival_portcall_id,
         preva.date_utc AS arrival_date_utc,
         preva.port_id AS arrival_port_id
