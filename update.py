@@ -24,10 +24,10 @@ import datetime as dt
 
 def update():
     integrity.check()
-    portcall.update_departures_from_russia()
+    portcall.update_departures(departure_port_iso2=['RU', 'IN', 'EG'])
     ship.update()
     departure.update()
-    arrival.update(date_from = dt.date.today() - dt.timedelta(days=90))
+    arrival.update(date_from=dt.date.today() - dt.timedelta(days=90), departure_port_iso2=['RU', 'IN', 'EG'])
     currency.update()
     company.update()
     mtevents.update()
@@ -43,7 +43,6 @@ def update():
     counter.update()
     integrity.check()
     return
-
 
 
 if __name__ == "__main__":

@@ -355,16 +355,19 @@ def get_next_portcall(date_from,
     return None
 
 
-def update_departures_from_russia(
+def update_departures(
         date_from="2022-01-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         unlocode=None,
         marinetraffic_port_id=None,
         port_id=None,
+        departure_port_iso2=None,
         force_rebuild=False,
         between_existing_only=False,
         ignore_check_departure=False):
     """
+    This function collects departure portcalls for ports which we have selected
+
     If force rebuild, we ignore cache port calls. Should only be used if we suspect
     we missed some port calls (e.g. in the initial fill using manually downloaded data)
     :param date_from:
@@ -385,6 +388,9 @@ def update_departures_from_russia(
 
     if port_id is not None:
         ports = ports.filter(Port.id.in_(to_list(port_id)))
+
+    if departure_port_iso2 is not None:
+        ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
 
     ports = ports.all()
     for port in tqdm(ports):
