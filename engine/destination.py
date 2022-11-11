@@ -90,15 +90,15 @@ def update_matching():
 
         # Looking for country names in destination.name
         country_regexps = {
-            'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$','^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$', '^RU[\w]{3}$'
+            'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$', '^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$', '^RU[\w]{3}$'
                    '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$', 'YEISK$', 'RUKOR$', 'AZOU$', '^PKC$',
-                   'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|^RU |KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$', 'RUAZOV$','RUVFP$'],
+                   'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$', 'RUAZOV$', 'RUVFP$'],
             'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$',
                    '^TOROS$', 'CANAKALE$', 'IZMIT$', 'TR[/]?ZON$', 'SAMSUN/TR$', 'ST[A]?NBUL$', 'TR[ ]?IST$'],
             'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$', ' SKAW$|SKGEN$|^SKAW$'],
             'BR': ['[ |,|_]{1}BRAZIL$', '^BR ?PRM|BRPEE'],
             'SE': ['[ |,|_]{1}SWEDEN$'],
-            'IN': ['[ |,|_]{1}INDIA$','^INDIA$','SIKKA$','HAZIRA SPM$'],
+            'IN': ['[ |,|_]{1}INDIA$','^INDIA$','SIKKA$','HAZIRA SPM$', '[ |,|>]{1}IN[ |,|_]{1}[\w]{3}$'],
             'IT': ['RAVENNA$'],
             'GR': ['[ |,|_]{1}GRE[E]?CE$','^VATIKA$','^KALAMATA$', 'LACONIA BAY$', 'LIMNOS GR'],
             'EG': ['[ |,|_]{1}EGYPT$', 'PORT SAID$'],
