@@ -410,7 +410,8 @@ class PortCall(Base):
     created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
 
     __tablename__ = DB_TABLE_PORTCALL
-    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),
+                      Index('idx_portcall_ship_imo', "ship_imo"),)
 
 
     @validates('port_unlocode')
