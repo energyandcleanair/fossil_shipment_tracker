@@ -2,6 +2,8 @@ import pandas as pd
 import datetime as dt
 import sqlalchemy as sa
 from tqdm import tqdm
+from sqlalchemy import func
+
 
 import base
 from base.logger import logger, logger_slack
@@ -14,7 +16,7 @@ from engine import port
 from engine.marinetraffic import Marinetraffic
 from engine.datalastic import Datalastic
 
-from base.models import PortCall, Port, Ship, Event, MarineTrafficCall
+from base.models import PortCall, Port, Ship, Event, MarineTrafficCall, Shipment, Departure, Arrival
 
 
 def initial_fill(limit=None):
@@ -502,8 +504,7 @@ def find_arrival(departure,
     if not next_departure \
             or not next_departure_russia \
             or next_departure.port_id in [originally_checked_port_ids] \
-            or to_datetime(next_departure.date_utc) > to_datetime(
-        next_departure_russia.date_utc):  # to_datetime(p.date_utc) + dt.timedelta(hours=24):
+            or to_datetime(next_departure.date_utc) > to_datetime(next_departure_russia.date_utc):
 
         next_departure_date_to = next_departure_russia.date_utc - dt.timedelta(
             minutes=1) if next_departure_russia else to_datetime(date_to)
@@ -622,40 +623,63 @@ def fill_departure_gaps(imo=None,
     #     find_arrival(departure_portcall=p, date_to=date_to)
 
 
-def fill_arrival_gaps(imo=None, date_from=None, min_dwt=base.DWT_MIN):
+def fill_gaps_within_shipments(ship_imo=None,
+                               date_from=None,
+                               min_dwt=base.DWT_MIN,
+                               max_time_delta=dt.timedelta(days=7)):
     """
-    We missed quite a lot of arrival data in the original filling. Since by default,
-     the program is looking at arrivals after last departure, it will never look again
-     at arrivals for previous departures.
-     To solve this, we query again first arrival after problematic departures.
-    :param imo:
-    :param date_from:
-    :param filter:
-    :return:
+    For all completed shipments, look at departure portcalls.
+    If gap between two departures is too wide, we query portcalls inbetween.
     """
 
-    query = PortCall.query
-    if imo is not None:
-        query = query.filter(PortCall.ship_imo == imo)
+    portcalls = session.query(PortCall,
+                              func.lead(PortCall.date_utc).over(
+                              partition_by=PortCall.ship_imo,
+                              order_by=PortCall.date_utc).label('next_date_utc')
+                              ) \
+        .filter(PortCall.move_type=='departure') \
+        .subquery()
+
+    query = session.query(Shipment.id,
+                          Departure.ship_imo,
+                          portcalls.c.date_utc,
+                          portcalls.c.next_date_utc) \
+    .join(Departure, Departure.id == Shipment.departure_id) \
+    .join(Arrival, Arrival.id == Shipment.arrival_id) \
+    .join(portcalls, sa.and_(portcalls.c.ship_imo == Departure.ship_imo,
+                             portcalls.c.date_utc >= Departure.date_utc,
+                             portcalls.c.date_utc <= Arrival.date_utc)) \
+    .join(Ship, Departure.ship_imo == Ship.imo) \
+    .filter((portcalls.c.next_date_utc - portcalls.c.date_utc) >= max_time_delta)
+
+    if ship_imo is not None:
+        query = query.filter(Departure.ship_imo.in_(to_list(ship_imo)))
 
     if min_dwt is not None:
-        query = query.join(Ship).filter(Ship.dwt >= min_dwt)
+        query = query.filter(Ship.dwt >= min_dwt)
 
     if date_from is not None:
-        query = query.filter(PortCall.date_utc >= to_datetime(date_from))
+        query = query.filter(portcalls.c.date_utc >= to_datetime(date_from))
 
-    portcall_df = pd.read_sql(query.statement, session.bind)
+    gaps = pd.read_sql(query.statement, session.bind)
 
-    # Isolate problematic ones: departure portcalls that are followed by another departure portcall
-    portcall_df = portcall_df[~pd.isnull(portcall_df.port_unlocode)].copy()
-    portcall_df['next_move_type'] = portcall_df.sort_values(['ship_imo', 'date_utc']) \
-        .groupby("ship_imo")['move_type'].shift(-1)
+    filter_departure = lambda x: x.port_operation in ["discharge", "both"]
 
-    portcall_df = portcall_df.sort_values(['ship_imo', 'date_utc'])
-    problematic_df = portcall_df[(portcall_df.move_type=="departure") \
-                                 & (portcall_df.next_move_type=="departure") \
-                                 & (portcall_df.load_status == base.FULLY_LADEN) #TOOD this is just to start with most important ones
-        ]
+    # For each shipment, we only fill gaps progressively,
+    # until we find a matching departure portcall to save credits
+    shipment_ids = gaps.id.unique()
+    for shipment_id in tqdm(shipment_ids):
 
-    for index, row in tqdm(problematic_df.iterrows(), total=problematic_df.shape[0]):
-        new_portcall = get_next_portcall(arrival_or_departure="arrival", imo=row.ship_imo, date_from=to_datetime(row.date_utc), use_cache=False)
+        shipment_gaps = gaps[gaps.id == shipment_id].sort_values(['date_utc'])
+        next_portcall = None
+        i = 0
+        while not next_portcall and (i < len(shipment_gaps)):
+            gap = shipment_gaps.iloc[i,]
+            new_portcall = get_next_portcall(
+                arrival_or_departure="departure",
+                imo=gap.ship_imo,
+                date_from=to_datetime(gap.date_utc) + dt.timedelta(minutes=1),
+                date_to=to_datetime(gap.next_date_utc)  - dt.timedelta(minutes=1),
+                use_cache=False,
+                filter=filter_departure)
+            i=i+1
