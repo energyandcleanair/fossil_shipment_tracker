@@ -69,6 +69,7 @@ departure_portcalls AS (
 --     WHERE
 --         preva.date_utc < pc.date_utc
 --         AND preva.move_type = 'arrival'
+    WHERE move_type='departure'
     ORDER BY
     pc.id
 --     preva.date_utc DESC

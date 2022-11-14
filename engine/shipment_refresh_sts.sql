@@ -55,30 +55,47 @@ deleted_trajectory_sts AS (
             deleted_sts_shipments
     )
 ),
+
+portcall_w_prev AS (
+    SELECT *,
+    lead(portcall.load_status, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_load_status,
+    lead(portcall.move_type, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_move_type,
+    lead(portcall.date_utc, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_date_utc,
+    lead(portcall.port_id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_port_id,
+    lead(portcall.id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_portcall_id
+    FROM portcall
+    WHERE date_utc >= '2021-01-01'
+),
+
 -- CLEAN UP END
 departure_portcalls AS (
     SELECT
-        portcall.id,
-        portcall.date_utc,
-        portcall.port_id,
-        load_status,
-        move_type,
-        port_operation,
+        pc.id,
+        pc.date_utc,
+        pc.port_id,
+        pc.load_status,
+        pc.move_type,
+        pc.port_operation,
         port.unlocode,
         port.name,
         port.check_departure,
-        portcall.ship_imo,
-        lead(load_status, -1) OVER (PARTITION BY ship_imo ORDER BY date_utc) AS previous_load_status
+        pc.ship_imo,
+
+        pc.previous_load_status,
+        pc.previous_move_type,
+        pc.previous_portcall_id,
+        pc.previous_date_utc,
+        pc.previous_port_id
 FROM
-    portcall
-    LEFT JOIN port ON portcall.port_id = port.id
-        LEFT JOIN ship ON ship.imo = portcall.ship_imo
+    portcall_w_prev pc
+    LEFT JOIN port ON pc.port_id = port.id
+    LEFT JOIN ship ON ship.imo = pc.ship_imo
     WHERE
-        date_utc >= '2021-01-01'
+        pc.date_utc >= '2021-01-01'
         AND ship.commodity != 'unknown'
         AND move_type = 'departure'
     ORDER BY
-        date_utc
+        pc.date_utc
 ),
 ships_in_ballast AS (
     SELECT DISTINCT
@@ -150,7 +167,8 @@ FROM
             AND (p.port_operation = 'discharge'
                 OR (p.previous_load_status = 'fully_laden'
                     AND p.load_status = 'in_ballast')
-                OR p.port_operation = 'load')
+                OR p.port_operation = 'load'
+                )
         ORDER BY
             d.ship_imo,
             d.id,
@@ -229,7 +247,12 @@ next_departure AS (
                     FROM
                         ships_in_ballast)
                     AND nextd.previous_load_status = 'fully_laden'
-                    AND nextd.load_status = 'partially_laden'))
+                    AND nextd.load_status = 'partially_laden')
+             -- When a ship is discharging and loading at the same port (e.g. UST-Luga ANCH)
+            OR (nextd.port_operation = 'load'
+                AND nextd.previous_load_status = 'in_ballast' -- this one is an arrival
+                AND nextd.load_status = 'fully_laden'
+            ))
         ORDER BY
             departure_portcall_id,
             nextd.date_utc
