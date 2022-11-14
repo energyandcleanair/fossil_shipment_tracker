@@ -174,8 +174,8 @@ def update_arrival_portcalls(date_from, date_to, commodities, departure_port_iso
     else:
         missing_dates = departure_dates
 
-    missing_ship_dates = missing_dates[missing_dates.dates <= pd.to_datetime(date_to) &
-                                        missing_dates.dates >= pd.to_datetime(date_from)] \
+    missing_ship_dates = missing_dates[(missing_dates.dates <= pd.to_datetime(date_to)) &
+                                       (missing_dates.dates >= pd.to_datetime(date_from))] \
         .groupby('imo').agg(date_from=('dates', min),
                             date_to=('dates', max)) \
         .reset_index()
