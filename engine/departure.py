@@ -80,7 +80,7 @@ def get_departures_without_arrival(min_dwt=None, commodities=None,
     query = session.query(Departure).filter(~Departure.id.in_(subquery)) \
         .outerjoin(shipments, shipments.c.shipment_departure_id == Departure.id) \
         .join(Ship, Departure.ship_imo == Ship.imo) \
-        .join(Port, Departure.port_id == Port.id, isouter=True)
+        .outerjoin(Port, Departure.port_id == Port.id)
 
     if min_dwt is not None:
         query = query.filter(Ship.dwt >= min_dwt)
@@ -107,7 +107,12 @@ def get_departures_without_arrival(min_dwt=None, commodities=None,
         query = query.filter(Port.id.in_(to_list(port_id)))
 
     if departure_port_iso2 is not None:
-        query = query.filter(Port.iso2.in_(to_list(departure_port_iso2)))
+        # if sts event we cannot filter by departure port iso
+        query = query.filter(sa.or_(
+            Port.iso2.in_(to_list(departure_port_iso2)),
+            Departure.event_id != sa.null()
+            )
+        )
 
     return query.order_by(Departure.date_utc).all()
 
