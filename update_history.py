@@ -21,7 +21,7 @@ from engine import mtevents
 import integrity
 import base
 from base.db import session
-from base.utils import to_datetime
+from base.utils import to_datetime, to_list
 import datetime as dt
 
 import sqlalchemy as sa
@@ -42,9 +42,11 @@ def update_history():
     #
     # We use it to fill past data
 
-    update_departures_portcalls(date_from='2019-07-01', date_to='2021-01-01')
+    # update_departures_portcalls(date_from='2020-12-01', date_to='2021-01-01')
     # departure.update(date_from='2020-07-01')
-    update_arrival_portcalls(date_from='2019-07-01', date_to='2021-01-01')
+    update_arrival_portcalls(date_from='2021-01-01', date_to='2021-01-05',
+                             commodities=[base.CRUDE_OIL, base.LNG]
+                             )
     # arrival.update(commodities=[base.OIL_OR_CHEMICAL],
     #                date_from='2020-11-01',
     #                date_to='2022-02-01')
@@ -53,7 +55,7 @@ def update_history():
     # Get gaps for each ship
 
 
-def update_arrival_portcalls(date_from, date_to):
+def update_arrival_portcalls(date_from, date_to, commodities):
 
     query_departure = session.query(
                           Departure.id,
@@ -63,7 +65,10 @@ def update_arrival_portcalls(date_from, date_to):
                           Departure.date_utc.label('departure_date')) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
         .outerjoin(Arrival, Arrival.departure_id == Departure.id) \
-        .filter(Ship.commodity.in_([base.CRUDE_OIL]))
+        .filter(Ship.commodity.in_(to_list(commodities))) \
+        .filter(Departure.date_utc >= to_datetime(date_from),
+                Departure.date_utc <= to_datetime(date_to),
+                )
         # .filter(Arrival.id == sa.null())
 
     queried = session.query(
@@ -122,7 +127,8 @@ def update_arrival_portcalls(date_from, date_to):
     else:
         missing_dates = departure_dates
 
-    missing_ship_dates = missing_dates[missing_dates.dates <= pd.to_datetime(date_to)] \
+    missing_ship_dates = missing_dates[missing_dates.dates <= pd.to_datetime(date_to) &
+                                        missing_dates.dates >= pd.to_datetime(date_from)] \
         .groupby('imo').agg(date_from=('dates', min),
                             date_to=('dates', max)) \
         .reset_index()
