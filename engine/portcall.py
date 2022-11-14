@@ -298,6 +298,11 @@ def get_next_portcall(date_from,
         direction = -1 if go_backward else 1
         cached_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
 
+        # Only keep required intervals if we already have found matching ones in db
+        if filtered_cached_portcalls:
+            cached_portcalls = [x for x in cached_portcalls if go_backward != (x.date_utc < filtered_cached_portcalls[0].date_utc)]
+            date_to = filtered_cached_portcalls[0].date_utc
+
         #IMPORTANT marinetraffic uses UTC for filtering
         date_froms = [to_datetime(date_from)] + [x.date_utc for x in cached_portcalls]
         date_tos = [x.date_utc for x in cached_portcalls] + [to_datetime(date_to)]
@@ -488,7 +493,7 @@ def find_arrival(departure,
                                  or x.port_operation in ["discharge", "both"]
     filter_arrival = lambda x: x.port_id is not None
 
-    # We query new departures only if there is none between current portcall and next departure from russia
+    # We query new departures if there is none between current portcall and next departure from Russia
     next_departure = get_next_portcall(date_from=date_utc + dt.timedelta(minutes=1),
                                        arrival_or_departure="departure",
                                        imo=ship_imo,
@@ -502,9 +507,8 @@ def find_arrival(departure,
                                               filter=filter_departure_russia)
 
     if not next_departure \
-            or not next_departure_russia \
             or next_departure.port_id in [originally_checked_port_ids] \
-            or to_datetime(next_departure.date_utc) > to_datetime(next_departure_russia.date_utc):
+            or (next_departure_russia and to_datetime(next_departure.date_utc) > to_datetime(next_departure_russia.date_utc)):
 
         next_departure_date_to = next_departure_russia.date_utc - dt.timedelta(
             minutes=1) if next_departure_russia else to_datetime(date_to)
