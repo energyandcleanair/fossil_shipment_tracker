@@ -25,7 +25,8 @@ def update(min_dwt=base.DWT_MIN,
            port_id=None,
            departure_port_iso2=None,
            shipment_id=None,
-           force_for_arrival_to_departure_greater_than=None,
+           force_for_arrival_to_next_portcall_greater_than=None,
+           force_for_arrival_to_prev_portcall_greater_than=None,
            include_undetected_arrival_shipments=True,
            cache_only=False):
     """
@@ -67,15 +68,29 @@ def update(min_dwt=base.DWT_MIN,
                                [y[0] for y in undetected_arrival_departures]]
 
 
-    if force_for_arrival_to_departure_greater_than is not None:
-        dangling_departures.extend(departure.get_departures_with_arrival_too_remote_from_next_departure(
-            min_timedelta=force_for_arrival_to_departure_greater_than,
+    if force_for_arrival_to_next_portcall_greater_than is not None:
+        dangling_departures.extend(
+            departure.get_departures_with_gap_around_arrival(
+            min_gap_after=force_for_arrival_to_next_portcall_greater_than,
             min_dwt=min_dwt,
             commodities=commodities,
             date_from=date_from,
             date_to=date_to,
             ship_imo=ship_imo,
-            unlocode=unlocode))
+            unlocode=unlocode)
+        )
+
+    if force_for_arrival_to_prev_portcall_greater_than is not None:
+        dangling_departures.extend(
+            departure.get_departures_with_gap_around_arrival(
+            min_gap_before=force_for_arrival_to_prev_portcall_greater_than,
+            min_dwt=min_dwt,
+            commodities=commodities,
+            date_from=date_from,
+            date_to=date_to,
+            ship_imo=ship_imo,
+            unlocode=unlocode)
+        )
 
 
     if limit is not None:
