@@ -85,7 +85,10 @@ departure_portcalls AS (
         pc.previous_move_type,
         pc.previous_portcall_id,
         pc.previous_date_utc,
-        pc.previous_port_id
+        pc.previous_port_id,
+
+        -- We need both previous arrival status AND previous departure status
+        lead(pc.load_status, -1) OVER (PARTITION BY pc.ship_imo ORDER BY pc.date_utc) AS previous_departure_load_status
 FROM
     portcall_w_prev pc
     LEFT JOIN port ON pc.port_id = port.id
@@ -236,7 +239,7 @@ next_departure AS (
         AND (d.next_russia_departure_date_utc IS NULL
             OR nextd.date_utc <= d.next_russia_departure_date_utc)
         AND (nextd.port_operation = 'discharge'
-            OR (nextd.previous_load_status = 'fully_laden'
+            OR (nextd.previous_departure_load_status = 'fully_laden'
                 AND nextd.load_status = 'in_ballast')
             -- some boats never seem to reach "in_ballast" or have "discharge"
             -- if a new departure exist from russia afterwards, then we loosen conditions
@@ -246,7 +249,7 @@ next_departure AS (
                         ship_imo
                     FROM
                         ships_in_ballast)
-                    AND nextd.previous_load_status = 'fully_laden'
+                    AND nextd.previous_departure_load_status = 'fully_laden'
                     AND nextd.load_status = 'partially_laden')
              -- When a ship is discharging and loading at the same port (e.g. UST-Luga ANCH)
             OR (nextd.port_operation = 'load'
