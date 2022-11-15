@@ -28,7 +28,8 @@ def update(min_dwt=base.DWT_MIN,
            force_for_arrival_to_next_portcall_greater_than=None,
            force_for_arrival_to_prev_portcall_greater_than=None,
            include_undetected_arrival_shipments=True,
-           cache_only=False):
+           cache_only=False,
+           exclude_sts=False):
     """
 
     :param min_dwt:
@@ -107,6 +108,9 @@ def update(min_dwt=base.DWT_MIN,
     # Until we fix arrival detection, the first hundreds of dangling departures
     # will take lot of time for not much
     # dangling_departures.sort(key=lambda x: x.date_utc, reverse=True)
+
+    if exclude_sts:
+        dangling_departures = [x for x in dangling_departures if x.event_id is None]
 
     for d in tqdm(dangling_departures):
         arrival_portcall = portcall.find_arrival(departure=d,
