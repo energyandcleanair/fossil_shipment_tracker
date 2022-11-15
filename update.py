@@ -24,7 +24,10 @@ import datetime as dt
 
 def update():
     integrity.check()
-    portcall.update_departures(departure_port_iso2=['RU', 'IN', 'EG'])
+    portcall.update_departures(departure_port_iso2=['RU', 'IN', 'EG'],
+                               date_from=-14,
+                               force_rebuild=True,
+                               between_existing_only=True)
     ship.update()
     departure.update()
     arrival.update(date_from=dt.date.today() - dt.timedelta(days=90), departure_port_iso2=['RU', 'IN', 'EG'])
