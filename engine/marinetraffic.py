@@ -304,7 +304,7 @@ class Marinetraffic:
 
 
     @classmethod
-    def get_next_portcall(cls, date_from, arrival_or_departure, date_to=None, imo=None, unlocode=None,
+    def get_next_portcall(cls, date_from, arrival_or_departure=None, date_to=None, imo=None, unlocode=None,
                           filter=None, go_backward=False, use_call_based=False):
         """
         The function returns collects arrival portcalls until it finds one matching
