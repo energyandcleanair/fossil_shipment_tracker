@@ -1,3 +1,4 @@
+import tqdm
 from geoalchemy2 import Geometry, func
 import geopandas as gpd
 import pandas as pd
@@ -13,7 +14,48 @@ from base.models import Berth, Port, Shipment, ShipmentWithSTS, ShipmentArrivalB
 from base.utils import update_geometry_from_wkb, to_list
 from base.db_utils import upsert
 
-from base.models import DB_TABLE_BERTH, DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, DB_TABLE_STSARRIVALLOCATION
+from base.models import DB_TABLE_BERTH, DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, \
+    DB_TABLE_STSARRIVALLOCATION
+
+from engine import portcall
+
+def fill_portcalls_around_sts():
+    """
+    The purpose of this function is to find the first preceeding and proceeding portcall for sts events
+
+    Returns
+    -------
+
+    """
+    sts_shipments = session.query(
+            ShipmentWithSTS.id,
+            Departure.ship_imo,
+            Event.date_utc,
+            Event.id) \
+        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+        .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
+        .outerjoin(Event, Event.id == Arrival.event_id) \
+        .filter(Departure.event_id == sa.null()).all()
+
+    filter_departure = lambda x: x.port_operation in ["discharge", "both"]
+
+    for shipment in tqdm.tqdm(sts_shipments):
+        portcall.get_next_portcall(imo = shipment.ship_imo,
+                                   date_from=shipment.date_utc,
+                                   arrival_or_departure='departure',
+                                   filter=filter_departure)
+
+
+def update():
+    """
+    Update departure and arrival STS locations
+
+    Returns
+    -------
+
+    """
+    detect_sts_departure_location()
+    detect_sts_arrival_location()
 
 
 def generate_geojson():
@@ -111,6 +153,7 @@ def detect_sts_departure_location(shipment_id=None):
     locations_df = locations_df[["shipment_id", "sts_location_id", "event_id", "method_id"]]
     upsert(df=locations_df, table=DB_TABLE_STSDEPARTURELOCATION, constraint_name='unique_shipmentstsdeparturelocation')
     return
+
 
 def detect_sts_arrival_location(shipment_id=None):
     """
