@@ -37,13 +37,10 @@ def fill_portcalls_around_sts():
         .outerjoin(Event, Event.id == Arrival.event_id) \
         .filter(Departure.event_id == sa.null()).all()
 
-    filter_departure = lambda x: x.port_operation in ["discharge", "both"]
-
     for shipment in tqdm.tqdm(sts_shipments):
         portcall.get_next_portcall(imo = shipment.ship_imo,
                                    date_from=shipment.date_utc,
-                                   arrival_or_departure='departure',
-                                   filter=filter_departure)
+                                   arrival_or_departure=None)
 
 
 def update():
