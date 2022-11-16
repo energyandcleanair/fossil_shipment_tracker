@@ -200,7 +200,7 @@ def upload_portcalls(portcalls):
 
 
 def get_next_portcall(date_from,
-                      arrival_or_departure,
+                      arrival_or_departure=None,
                       date_to=None,
                       imo=None,
                       unlocode=None,
@@ -215,7 +215,9 @@ def get_next_portcall(date_from,
 
     # First look in DB
     if use_cache:
-        cached_portcalls = PortCall.query.filter(PortCall.move_type == arrival_or_departure)
+        cached_portcalls = PortCall.query
+        if arrival_or_departure:
+            cached_portcalls = cached_portcalls.filter(PortCall.move_type == arrival_or_departure)
         if go_backward:
             direction = -1
             cached_portcalls = cached_portcalls.filter(PortCall.date_utc <= date_from)
