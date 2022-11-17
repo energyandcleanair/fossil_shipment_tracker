@@ -59,7 +59,9 @@ deleted_trajectory_sts AS (
 portcall_w_prev AS (
     SELECT *,
     lead(portcall.load_status, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_load_status,
+    lead(portcall.load_status, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_load_status,
     lead(portcall.move_type, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_move_type,
+    lead(portcall.move_type, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_move_type,
     lead(portcall.date_utc, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_date_utc,
     lead(portcall.port_id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_port_id,
     lead(portcall.id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_portcall_id
@@ -74,7 +76,9 @@ departure_portcalls AS (
         pc.date_utc,
         pc.port_id,
         pc.load_status,
+        pc.next_load_status,
         pc.move_type,
+        pc.next_move_type,
         pc.port_operation,
         port.unlocode,
         port.name,
@@ -191,6 +195,11 @@ FROM
             AND ev.date_utc BETWEEN dr.date_utc
             AND CURRENT_DATE
           )
+        )
+        AND (
+            (dr.load_status = 'fully_laden' AND dr.next_load_status = 'partially_laden') OR
+            (dr.load_status = 'fully_laden' AND dr.next_load_status = 'in_ballast') OR
+            (dr.load_status = 'partially_laden' AND dr.next_load_status = 'in_ballast')
         )
       )
     WHERE
