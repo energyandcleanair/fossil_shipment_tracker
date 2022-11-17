@@ -202,13 +202,16 @@ next_departure_full AS (
                 completed_departure_portcalls
             WHERE
                 id IS NOT NULL)
-    AND nextdeparture_previous_portcall_id NOT IN (
-             SELECT
+    AND (
+        nextdeparture_previous_portcall_id NOT IN (
+            SELECT
                 id
             FROM
                 completed_arrival_portcalls
             WHERE
                 id IS NOT NULL)
+         OR
+         nextdeparture_previous_portcall_id IS NULL)
 ),
 
 previous_arrival AS (
@@ -272,6 +275,7 @@ FROM
             FROM
                 previous_arrival)
 ),
+
 shipments AS (
     SELECT
         departure_portcall_id,
