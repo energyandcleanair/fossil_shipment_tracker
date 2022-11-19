@@ -344,8 +344,10 @@ class VoyageResource(Resource):
 
         shipment_sts_weights = session.query(
             ShipmentWithSTS.id,
+                Arrival.event_id.label('arrival_event_id'),
                 func.coalesce(ArrivalShip.dwt, func.avg(ArrivalShip.dwt).over(partition_by=ShipmentWithSTS.departure_id)).label('dwt_average'),
                 func.sum(ArrivalShip.dwt).over(partition_by=ShipmentWithSTS.departure_id).label('dwt_total'),
+                Departure.ship_imo.label('departure_ship_imo'),
                 ArrivalShip.imo
         ) \
         .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
@@ -358,9 +360,14 @@ class VoyageResource(Resource):
 
         shipment_sts_arrival_weights = session.query(
             ShipmentWithSTS.id,
-            func.count(Arrival.id).over(partition_by=Arrival.portcall_id).label('arrival_weight')
+            func.least(1.0, ArrivalShip.dwt / func.sum(
+                DepartureShip.dwt * (shipment_sts_weights.c.dwt_average / shipment_sts_weights.c.dwt_total)).over(
+                partition_by=Arrival.portcall_id)).label('arrival_weight')
         ) \
         .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+        .join(ArrivalShip, ArrivalShip.imo == Departure.ship_imo) \
+        .join(shipment_sts_weights, shipment_sts_weights.c.arrival_event_id == Departure.event_id) \
+        .join(DepartureShip, DepartureShip.imo == shipment_sts_weights.c.departure_ship_imo) \
         .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
         .filter(Arrival.event_id == sa.null()) \
         .subquery()
@@ -379,10 +386,7 @@ class VoyageResource(Resource):
                 [(shipment_sts_weights.c.dwt_average != sa.null(), shipment_sts_weights.c.dwt_average / shipment_sts_weights.c.dwt_total)],
                 else_=1.0
             ).label('weight'),
-            case(
-                [(shipment_sts_arrival_weights.c.arrival_weight != 0, 1.0 / shipment_sts_arrival_weights.c.arrival_weight)],
-                else_=1.0
-            ).label('arrival_weight'),
+            shipment_sts_arrival_weights.c.arrival_weight,
             sa.sql.expression.literal_column('True').label('is_sts'),
             ArrivalShip,
             Event.date_utc.label('event_date_utc'),
@@ -428,7 +432,7 @@ class VoyageResource(Resource):
         ).label('pricing_scenario')
 
         value_eur_field = (
-                shipments_combined.c.ship_dwt * price_eur_per_tonne_field
+                Ship.dwt * price_eur_per_tonne_field
         ).label('value_eur')
 
         # Technically, we could pivot long -> wide
@@ -436,14 +440,14 @@ class VoyageResource(Resource):
         # a rename will be faster
         value_tonne_field = case(
             [
-                (shipments_combined.c.ship_unit == 'tonne', shipments_combined.c.ship_quantity),
+                (Ship.unit == 'tonne', Ship.quantity),
             ],
-            else_=shipments_combined.c.ship_dwt
+            else_=Ship.dwt
         ).label('value_tonne')
 
         value_m3_field = case(
             [
-                (shipments_combined.c.ship_unit == 'm3', shipments_combined.c.ship_quantity)
+                (Ship.unit == 'm3', Ship.quantity)
             ],
             else_=sa.null()
         ).label('value_m3')
