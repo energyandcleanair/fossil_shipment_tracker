@@ -43,7 +43,18 @@ def get_upsert_method(constraint_name, show_progress=True):
     return upsert
 
 
-def upsert(df, table, constraint_name, dtype={}, show_progress=True):
+def upsert(df, table, constraint_name, dtype={}, show_progress=True, chunksize=100):
+    """
+    This function upserts data into a specific table using chunks determined by chunksize
+
+    :param df:
+    :param table:
+    :param constraint_name:
+    :param dtype:
+    :param show_progress:
+    :param chunksize:
+    :return:
+    """
     global meta
     if meta is None:
         meta = sqlalchemy.MetaData()
@@ -65,4 +76,5 @@ def upsert(df, table, constraint_name, dtype={}, show_progress=True):
                   if_exists="append",
                   index=False,
                   method=get_upsert_method(constraint_name, show_progress=show_progress),
+                  chunksize=chunksize,
                   dtype=dtype)
