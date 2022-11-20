@@ -114,6 +114,8 @@ class VoyageResource(Resource):
                         default=None)
     parser.add_argument('commodity_destination_iso2', action='split', help='ISO2(s) of commodity destination country',
                         required=False, default=None)
+    parser.add_argument('commodity_destination_iso2_not', action='split', help='ISO2(s) of commodity destination country TO EXCLUDE',
+                        required=False, default=None)
     parser.add_argument('commodity_destination_region', action='split',
                         help='region(s) of commodity destination e.g. EU28,Turkey',
                         required=False,
@@ -209,6 +211,7 @@ class VoyageResource(Resource):
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
+        commodity_destination_iso2_not = params.get("commodity_destination_iso2_not")
         commodity_destination_region = params.get("commodity_destination_region")
         commodity_grouping = params.get("commodity_grouping")
 
@@ -666,7 +669,6 @@ class VoyageResource(Resource):
                         ShipInsurerDistinct.c.date_from == sa.null())))
              .outerjoin(ShipInsurerCompany, ShipInsurerDistinct.c.company_id == ShipInsurerCompany.id)
              .outerjoin(ShipInsurerCountry, ShipInsurerCompany.country_iso2 == ShipInsurerCountry.iso2)
-
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
             )
@@ -750,6 +752,9 @@ class VoyageResource(Resource):
 
         if commodity_destination_iso2 is not None:
             shipments_rich = shipments_rich.filter(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2)))
+
+        if commodity_destination_iso2_not is not None:
+            shipments_rich = shipments_rich.filter(sa.not_(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2_not))))
 
         if commodity_destination_region is not None:
             shipments_rich = shipments_rich.filter(CommodityDestinationCountry.region.in_(to_list(commodity_destination_region)))
