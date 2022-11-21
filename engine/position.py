@@ -137,7 +137,6 @@ def update(commodities=None,
         )
     )
     ) \
-        .filter(shipments_all.c.shipment_status != base.UNDETECTED_ARRIVAL) \
         .filter(sa.not_(Departure.ship_imo.contains('NOTFOUND')),
                 sa.not_(Departure.ship_imo.contains('_v')))
 
