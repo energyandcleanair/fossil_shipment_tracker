@@ -1,5 +1,7 @@
 import sys
 
+import sqlalchemy as sa
+
 from base.db import session, check_if_table_exists
 from base.models import Trajectory, ShipmentWithSTS, Shipment, ShipmentArrivalBerth, ShipmentDepartureBerth, Departure, Arrival
 from api.tests import test_counter
@@ -12,6 +14,7 @@ def check():
 
     try:
         test_shipment_table()
+        test_shipment_portcall_integrity()
         test_portcall_relationship()
         test_berths()
     except AssertionError:
@@ -26,7 +29,23 @@ def check():
         logger_slack.error("Failed integrity: counter, voyage and pricing")
         raise
 
-    
+
+def test_shipment_portcall_integrity():
+
+    # check that shipments exist with some expected/hardcoded portcalls
+    shipments = session.query(Shipment.id) \
+        .join(Departure, Departure.id == Shipment.departure_id) \
+        .join(Arrival, Arrival.id == Shipment.arrival_id) \
+    .filter(sa.or_(
+        sa.and_(Departure.portcall_id == 121521, Arrival.portcall_id == 129614),
+        sa.and_(Departure.portcall_id == 121840, Arrival.portcall_id == 122068),
+        sa.and_(Departure.portcall_id == 627232, Arrival.portcall_id == 643501),
+        sa.and_(Departure.portcall_id == 143588, Arrival.portcall_id == 318245),
+        sa.and_(Departure.portcall_id == 170033, Arrival.portcall_id == 497229)
+    )).all()
+
+    assert len(shipments) == 5
+
 def test_shipment_table():
 
     # check that the shipment table respect unique departures and arrivals
