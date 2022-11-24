@@ -298,6 +298,7 @@ class Marinetraffic:
             "load_status": response_data.get("LOAD_STATUS"),
             "move_type": response_data["MOVE_TYPE"],
             "port_operation": response_data.get("PORT_OPERATION"),
+            "draught": response_data.get("DRAUGHT"),
             "others": {"marinetraffic": response_data}
         }
         return PortCall(**data)

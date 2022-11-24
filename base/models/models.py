@@ -399,6 +399,7 @@ class PortCall(Base):
     load_status = Column(String)  # (0 : N/A, 1 : In Ballast, 2 : Partially Laden, 3 : Fully Laden)
     move_type = Column(String)  # "1": "departure", "0":"arrival"
     port_operation = Column(String) # (0: N / A, 1: load, 2: discharge, 3: both, 4: none)
+    draught = Column(Numeric)
 
     # Optional
     terminal_id = Column(String, ForeignKey(DB_TABLE_TERMINAL + '.id', onupdate="CASCADE"))
