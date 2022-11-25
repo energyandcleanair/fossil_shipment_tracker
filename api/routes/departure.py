@@ -4,10 +4,10 @@ import datetime as dt
 
 from flask import Response
 from flask_restx import Resource, reqparse, inputs
-from base.models import Departure
+from base.models import Departure, Port
 from base.encoder import JsonEncoder
 from base.db import session
-from base.utils import to_datetime
+from base.utils import to_datetime, to_list
 from . import routes_api
 
 
@@ -18,6 +18,7 @@ class DepartureResource(Resource):
 
     parser = reqparse.RequestParser()
     parser.add_argument('unlocode', required=False, help='unlocode(s) of departure port', action='split')
+    parser.add_argument('iso2', required=False, help='iso2(s) of departure port', action='split')
     parser.add_argument('date_from', help='start date for arrival (format 2020-01-15)',
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date for arrival (format 2020-01-15)', required=False,
@@ -32,14 +33,22 @@ class DepartureResource(Resource):
 
         params = DepartureResource.parser.parse_args()
         unlocode = params.get("unlocode")
+        iso2 = params.get("iso2")
         format = params.get("format")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         nest_in_data = params.get("nest_in_data")
 
-        query = Departure.query
+        query = session.query(Departure,
+                              Port.name,
+                              Port.iso2) \
+            .join(Port, Departure.port_id == Port.id)
+
         if unlocode is not None:
-            query = query.filter(Departure.port_unlocode.in_(unlocode))
+            query = query.filter(Departure.port_unlocode.in_(to_list(unlocode)))
+
+        if iso2 is not None:
+            query = query.filter(Port.iso2.in_(to_list(iso2)))
 
         if date_from is not None:
             query = query.filter(Departure.date_utc >= to_datetime(date_from))
