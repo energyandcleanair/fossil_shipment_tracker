@@ -60,6 +60,7 @@ portcall_w_prev AS (
     SELECT *,
     lead(portcall.load_status, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_load_status,
     lead(portcall.load_status, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_load_status,
+    lead(portcall.draught, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_draught,
     lead(portcall.move_type, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_move_type,
     lead(portcall.move_type, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_move_type,
     lead(portcall.date_utc, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_date_utc,
@@ -77,6 +78,8 @@ departure_portcalls AS (
         pc.port_id,
         pc.load_status,
         pc.next_load_status,
+        pc.draught,
+        pc.next_draught,
         pc.move_type,
         pc.next_move_type,
         pc.port_operation,
@@ -196,15 +199,18 @@ FROM
             AND CURRENT_DATE
           )
         )
-        AND (
-            (dr.load_status = 'fully_laden' AND dr.next_load_status = 'partially_laden') OR
-            (dr.load_status = 'fully_laden' AND dr.next_load_status = 'in_ballast') OR
-            (dr.load_status = 'partially_laden' AND dr.next_load_status = 'in_ballast')
-        )
       )
+    JOIN ship mainship ON mainship.imo = dr.ship_imo
+    JOIN ship intship ON intship.imo = ev.interacting_ship_imo
     WHERE
       ev.type_id = '21'
       AND ev.interacting_ship_imo IS NOT NULL
+      AND dr.draught > dr.next_draught
+      AND (
+        (mainship.commodity = intship.commodity) OR
+        (mainship.commodity = 'oil_products' AND intship.commodity = 'oil_or_chemical') OR
+        ((intship.commodity = 'oil_products' AND mainship.commodity = 'oil_or_chemical'))
+      )
   ) AS next_departure_events
 ORDER BY
   next_departure_events.ship_imo,
