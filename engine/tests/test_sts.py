@@ -1,13 +1,17 @@
 from base.db import session, check_if_table_exists
 from base.models import STSLocation, ShipmentArrivalLocationSTS, ShipmentDepartureLocationSTS, ShipmentWithSTS
 from engine.sts import fill, generate_geojson, detect_sts_departure_location, detect_sts_arrival_location
-from engine import shipment, arrival
+from engine import shipment, arrival, sts
 from engine.marinetraffic import Marinetraffic
 from engine.mtevents import back_fill_ship_position
+import datetime as dt
+
+
+def test_find_portcall():
+    sts.fill_portcalls_around_sts()
 
 
 def test_arrival_sts_shipment_update():
-
     sts_shipment_ids = [s.id for s in session.query(ShipmentWithSTS.id).all()]
 
     arrival.update(date_from='2021-09-01', date_to='2023-01-01', shipment_id=sts_shipment_ids)

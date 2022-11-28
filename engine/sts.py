@@ -4,6 +4,7 @@ import geopandas as gpd
 import pandas as pd
 import shapely
 import sqlalchemy as sa
+from sqlalchemy.orm import aliased
 from fiona.drvsupport import supported_drivers
 
 from base.logger import logger, logger_slack
@@ -19,28 +20,50 @@ from base.models import DB_TABLE_BERTH, DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPA
 
 from engine import portcall
 
-def fill_portcalls_around_sts():
+
+def fill_portcalls_around_sts(go_backward=True,
+                              for_departing=True,
+                              for_arriving=False):
     """
     The purpose of this function is to find the first preceeding and proceeding portcall for sts events
 
-    Returns
-    -------
-
+    :param go_backward:
+    :param for_departing:
+    :return:
     """
+
+    DepartureEvent = aliased(Event)
+    ArrivalEvent = aliased(Event)
+
     sts_shipments = session.query(
-            ShipmentWithSTS.id,
-            Departure.ship_imo,
-            Event.date_utc,
-            Event.id) \
+        ShipmentWithSTS.id,
+        Departure.ship_imo,
+        ArrivalEvent.date_utc,
+        DepartureEvent.date_utc,
+        Departure.event_id) \
         .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
         .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
-        .outerjoin(Event, Event.id == Arrival.event_id) \
-        .filter(Departure.event_id == sa.null()).all()
+        .outerjoin(ArrivalEvent, ArrivalEvent.id == Arrival.event_id) \
+        .outerjoin(DepartureEvent, DepartureEvent.id == Departure.event_id)
+
+    if not for_departing:
+        sts_shipments = sts_shipments.filter(Departure.event_id == sa.null())
+
+    if not for_arriving:
+        sts_shipments = sts_shipments.filter(Arrival.event_id == sa.null())
+
+    sts_shipments = sts_shipments.all()
 
     for shipment in tqdm.tqdm(sts_shipments):
-        portcall.get_next_portcall(imo = shipment.ship_imo,
+        portcall.get_next_portcall(imo=shipment.ship_imo,
                                    date_from=shipment.date_utc,
                                    arrival_or_departure=None)
+
+        if go_backward:
+            portcall.get_next_portcall(imo=shipment.ship_imo,
+                                       date_from=shipment.date_utc,
+                                       arrival_or_departure=None,
+                                       go_backward=go_backward)
 
 
 def update():
