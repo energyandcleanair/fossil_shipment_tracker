@@ -58,9 +58,10 @@ deleted_trajectory_sts AS (
 
 portcall_w_prev AS (
     SELECT *,
-    lead(portcall.load_status, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_load_status,
     lead(portcall.load_status, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_load_status,
     lead(portcall.draught, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_draught,
+    lead(portcall.date_utc, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_date_utc,
+    lead(portcall.load_status, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_load_status,
     lead(portcall.move_type, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_move_type,
     lead(portcall.move_type, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_move_type,
     lead(portcall.date_utc, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_date_utc,
@@ -200,16 +201,22 @@ FROM
           )
         )
       )
+    LEFT JOIN portcall_w_prev pprev_ship ON
+        (pprev_ship.ship_imo = ev.ship_imo AND ev.date_utc BETWEEN pprev_ship.date_utc AND pprev_ship.next_date_utc)
+    LEFT JOIN portcall_w_prev pprev_intship ON
+        (pprev_intship.ship_imo = ev.interacting_ship_imo AND ev.date_utc BETWEEN pprev_intship.date_utc AND pprev_intship.next_date_utc)
     JOIN ship mainship ON mainship.imo = dr.ship_imo
     JOIN ship intship ON intship.imo = ev.interacting_ship_imo
     WHERE
       ev.type_id = '21'
       AND ev.interacting_ship_imo IS NOT NULL
-      AND dr.draught > dr.next_draught
+      AND ev.interacting_ship_details ->> 'distance_meters' IS NOT NULL
+      AND pprev_ship.draught > pprev_ship.next_draught
+      AND pprev_intship.draught < pprev_intship.next_draught
       AND (
         (mainship.commodity = intship.commodity) OR
         (mainship.commodity = 'oil_products' AND intship.commodity = 'oil_or_chemical') OR
-        ((intship.commodity = 'oil_products' AND mainship.commodity = 'oil_or_chemical'))
+        (intship.commodity = 'oil_products' AND mainship.commodity = 'oil_or_chemical')
       )
   ) AS next_departure_events
 ORDER BY
