@@ -6,7 +6,7 @@ from sqlalchemy import func
 import sqlalchemy as sa
 from base.db_utils import execute_statement
 from difflib import SequenceMatcher
-
+import re
 import base
 from base.db import session
 from base.env import get_env
@@ -109,6 +109,9 @@ def update_info_from_equasis():
 
     imos = [x[0] for x in imos]
     ntries = 3
+
+    # Remove thos we know can't be found
+    imos = [x for x in imos if x is not None and not re.search('_v|NOTFOUND_', x, re.IGNORECASE)]
 
     for imo in tqdm(imos):
 
