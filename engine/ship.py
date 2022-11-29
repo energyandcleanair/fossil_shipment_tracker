@@ -183,7 +183,7 @@ def ship_to_commodity(ship):
         elif re.match('Bulk', type, re.IGNORECASE) \
              or re.match('Bulk', subtype, re.IGNORECASE):
             commodity = base.BULK
-        elif re.match('cargo', type, re.IGNORECASE):
+        elif re.search('cargo', type, re.IGNORECASE):
             commodity = base.GENERAL_CARGO
         else:
             commodity = base.UNKNOWN_COMMODITY
