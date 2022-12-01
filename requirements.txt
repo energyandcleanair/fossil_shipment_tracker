@@ -32,3 +32,4 @@ selenium~=4.4.3
 matplotlib~=3.5.2
 lxml~=4.9.1
 webdriver_manager~=3.8.3
+seaborn~=0.12.1

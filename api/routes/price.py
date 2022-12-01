@@ -6,7 +6,7 @@ from flask import Response
 from flask_restx import Resource, reqparse, inputs
 
 
-from base.models import Price, PortPrice
+from base.models import Price, PortPrice, Port, Currency
 from base.encoder import JsonEncoder
 from base.db import session
 from base.utils import to_list, to_datetime
@@ -84,6 +84,8 @@ class PriceResource(Resource):
 class PortPriceResource(Resource):
 
     parser = reqparse.RequestParser()
+    parser.add_argument('unlocode', help='UNLOCODE',
+                        default=None, action='split', required=False)
     parser.add_argument('commodity', help='commodity(ies) of interest. Default: returns all of them',
                         default=None, action='split', required=False)
     parser.add_argument('date_from', help='start date (format 2020-01-15)',
@@ -102,6 +104,7 @@ class PortPriceResource(Resource):
     def get(self):
 
         params = PortPriceResource.parser.parse_args()
+        unlocode = params.get("unlocode")
         commodity = params.get("commodity")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
@@ -109,19 +112,30 @@ class PortPriceResource(Resource):
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
 
-        query = PortPrice.query.filter(PortPrice.scenario == scenario)
+        query = session.query(PortPrice,
+                              (Currency.per_eur * PortPrice.eur_per_tonne).label('usd_per_tonne'),
+                              (Currency.per_eur * PortPrice.eur_per_tonne * 0.138).label('usd_per_barrel')
+                              ) \
+            .join(Port, Port.id == PortPrice.port_id) \
+            .join(Currency, Currency.date == PortPrice.date) \
+            .filter(PortPrice.scenario == scenario,
+                    Currency.currency == 'USD')
+
+        if unlocode is not None:
+            query = query.filter(Port.unlocode.in_(to_list(unlocode)))
 
         if commodity is not None:
             query = query.filter(PortPrice.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
-            query = query.filter(PortPrice.date >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
+            query = query.filter(PortPrice.date >= to_datetime(date_from))
 
         if date_to is not None:
-            query = query.filter(PortPrice.date <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
+            query = query.filter(PortPrice.date <= to_datetime(date_to))
 
         price_df = pd.read_sql(query.statement, session.bind)
         price_df.replace({np.nan: None}, inplace=True)
+        price_df.sort_values(['date'], inplace=True)
 
         if format == "csv":
             return Response(

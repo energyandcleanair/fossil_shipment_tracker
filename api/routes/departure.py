@@ -4,7 +4,7 @@ import datetime as dt
 
 from flask import Response
 from flask_restx import Resource, reqparse, inputs
-from base.models import Departure, Port
+from base.models import Departure, Port, Ship
 from base.encoder import JsonEncoder
 from base.db import session
 from base.utils import to_datetime, to_list
@@ -41,8 +41,12 @@ class DepartureResource(Resource):
 
         query = session.query(Departure,
                               Port.name,
-                              Port.iso2) \
-            .join(Port, Departure.port_id == Port.id)
+                              Port.iso2,
+                              Ship.name,
+                              Ship.commodity,
+                              Ship.dwt) \
+            .join(Port, Departure.port_id == Port.id) \
+            .join(Ship, Departure.ship_imo == Ship.imo)
 
         if unlocode is not None:
             query = query.filter(Departure.port_unlocode.in_(to_list(unlocode)))
