@@ -85,7 +85,7 @@ class ChartDepartureOwnership(Resource):
             g7 = ['CA','FR','DE','IT','JP','GB', 'US']
             res = np.where((ship_owner_region == 'EU') | ship_owner_iso2.isin(g7) \
                      | (ship_insurer_region == 'EU') | ship_insurer_iso2.isin(g7),
-                           'Owned or insured in EU & G7',
+                           'Owned and / or insured in EU & G7',
                   np.where(ship_insurer_iso2 == 'NO', 'Insured in Norway',
                   np.where(pd.isna(ship_owner_iso2), 'Unknown',
                    'Others')))
