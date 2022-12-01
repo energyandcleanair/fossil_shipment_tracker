@@ -474,6 +474,7 @@ class VoyageResource(Resource):
 
                 # Looks like StS only
                 (ArrivalPort.name.ilike('Lakonikos Gulf%'), sa.null()),
+                (ArrivalPort.iso2 == 'GI', sa.null()),
 
                 # Removal of dardaneles discharges + bosphorus strait
                 (ArrivalPort.name.ilike('DARDANELES WAIT AREA'), sa.null()),
