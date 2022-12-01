@@ -19,11 +19,17 @@ class ChartMonthlyPayments(Resource):
 
 
     parser = reqparse.RequestParser()
+
     parser.add_argument('date_from', type=str, help='start date for counter data (format 2020-01-15)',
                         default="2021-01-01", required=False)
     parser.add_argument('date_to', type=str, help='start date for counter data (format 2020-01-15)',
                         default=-5,
                         required=False)
+
+    parser.add_argument('aggregate_by', type=str, action='split',
+                        default=['destination_region', 'commodity_group', 'date'],
+                        help='which variables to aggregate by. Could be any of commodity, type, destination_region, date')
+
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('download', help='Whether to return results as a file or not.',
@@ -39,11 +45,10 @@ class ChartMonthlyPayments(Resource):
         nest_in_data = params.get('nest_in_data')
 
         params.update(**{
-            'aggregate_by': ['destination_region','commodity_group','date'],
             'pivot_by': ['commodity_group_name'],
             'pivot_value': 'value_eur',
             'use_eu': True,
-            'date_from': '2022-01-01',
+            # 'date_from': '2022-01-01',
             'sort_by': ['value_eur'],
             'currency': 'EUR',
             'keep_zeros': True,
