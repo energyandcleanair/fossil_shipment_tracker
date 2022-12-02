@@ -92,7 +92,8 @@ def update_matching():
         country_regexps = {
             'RU': ['[ |,|_|\.]{1}RU[S]?[SIA]?$', '^RU [\s|\w]*$', '^ROSTOV NO DON$', '^ROSTOU$', '^RU[\w]{3}$'
                    '^BUKHTA ', '[ |,|_|\.]{1}RU[\w]{3}$', 'YEISK$', 'RUKOR$', 'AZOU$', '^PKC$',
-                   'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$', 'RUAZOV$', 'RUVFP$'],
+                   'RUSSIA|RUSNVS$|RU_PGN$|TAUPSE|KAV?KAZ$', '^RUS TOCHINO$', '^VLDV$', 'RUAZOV$', 'RUVFP$',
+                   'UST-LUGA( PILOT)?$'],
             'TR': ['[ |,|_]{1}TURKEY$','^TR [\s|\w]*$', '[ |,|_]{1}ISTANBUL', '[ |,|_]{1}TR$',
                    '^TOROS$', 'CANAKALE$', 'IZMIT$', 'TR[/]?ZON$', 'SAMSUN/TR$', 'ST[A]?NBUL$', 'TR[ ]?IST$'],
             'DK': ['[ |,|_]{1}DENMARK$','[ |,|_|>]{1}DK$', ' SKAW$|SKGEN$|^SKAW$'],
