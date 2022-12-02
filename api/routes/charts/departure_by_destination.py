@@ -90,7 +90,7 @@ class ChartDepartureDestination(Resource):
                 data.loc[data.destination_region == 'EU', 'destination_iso2'] = 'EU'
 
                 n = int(country_grouping.replace('top_', ''))
-                top_n = data[data.departure_date >= max(data.departure_date) - dt.timedelta(days=61)] \
+                top_n = data[data.departure_date >= max(data.departure_date) - dt.timedelta(days=30)] \
                         .groupby(['commodity_group', 'destination_country']) \
                     .value_tonne.sum() \
                     .reset_index() \
