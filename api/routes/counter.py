@@ -204,6 +204,7 @@ class RussiaCounterResource(Resource):
                 .reset_index() \
                 .sort_values(intersect(['commodity', 'date'], counter.columns))
 
+            counter['date'] = counter.date.dt.date
 
         if cumulate and "date" in counter:
             groupby_cols = [x for x in ['commodity', 'commodity_group', 'commodity_group_name', 'destination_iso2',
@@ -379,7 +380,9 @@ class RussiaCounterResource(Resource):
         dependencies = {
             'commodity': ['commodity_group', 'commodity_group_name'],
             'commodity_group': ['commodity', 'commodity_group_name'],
-            'commodity_group_name': ['commodity', 'commodity_group']
+            'commodity_group_name': ['commodity', 'commodity_group'],
+            'destination_country': ['destination_iso2', 'destination_region'],
+            'destination_iso2': ['destination_country', 'destination_region'],
         }
 
         if pivot_by:
@@ -390,12 +393,13 @@ class RussiaCounterResource(Resource):
                         and x not in to_list(pivot_by)
                         and x not in pivot_by_dependencies]
 
-            result = result.pivot_table(index=index,
+            result['variable'] = pivot_value
+            result = result.pivot_table(index=index + ['variable'],
                                         columns=to_list(pivot_by),
                                         values=pivot_value,
                                         sort=False,
                                         fill_value=0).reset_index()
-            result['variable'] = pivot_value
+
 
         return result
 

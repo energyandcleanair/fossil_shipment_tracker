@@ -34,6 +34,7 @@ def slack_webhook_ok(url):
 logger_slack = logging.getLogger('FOSSIL_SHIPMENT_TRACKER_SLACK')
 logger_slack.setLevel(logging.INFO)
 
+sh = None
 if slack_webhook_ok(get_env('SLACK_WEBHOOK')):
     sh = SlackHandler(get_env('SLACK_WEBHOOK'))
     sh.setFormatter(SlackFormatter())
