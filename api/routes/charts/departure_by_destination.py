@@ -1,6 +1,8 @@
 import pandas as pd
 import json
 import numpy as np
+import datetime as dt
+import re
 from flask_restx import inputs
 from http import HTTPStatus
 from flask import Response
@@ -21,9 +23,14 @@ class ChartDepartureDestination(Resource):
 
     parser.add_argument('departure_date_from', type=str, help='start date for counter data (format 2020-01-15)',
                         default="2021-12-01", required=False)
+
     parser.add_argument('date_to', type=str, help='start date for counter data (format 2020-01-15)',
                         default=-7,
                         required=False)
+
+    parser.add_argument('country_grouping', type=str,
+                        help="How to group countries. Can be 'region' or 'top_n' (e.g. top_5)",
+                        default='top_8')
 
     parser.add_argument('commodity_grouping', type=str,
                         help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
@@ -35,7 +42,7 @@ class ChartDepartureDestination(Resource):
                         default=['crude_oil', 'oil_products', 'oil_or_chemical'])
 
     parser.add_argument('aggregate_by', type=str, action='split',
-                        default=['destination_region', 'commodity_group', 'departure_date'],
+                        default=['destination_country', 'commodity_group', 'departure_date'],
                         help='which variables to aggregate by. Could be any of commodity, type, destination_region, date')
 
     parser.add_argument('rolling_days', type=int,
@@ -56,11 +63,12 @@ class ChartDepartureDestination(Resource):
         params_chart = ChartDepartureDestination.parser.parse_args()
         format = params_chart.get('format')
         nest_in_data = params_chart.get('nest_in_data')
+        country_grouping = params_chart.get('country_grouping')
 
         params.update(**params_chart)
         params.update(**{
-            'pivot_by': ['destination_region'],
-            'pivot_value': 'value_tonne',
+            # 'pivot_by': ['destination_region'],
+            # 'pivot_value': 'value_tonne',
             'use_eu': True,
             'commodity_origin_iso2': 'RU',
             # 'date_from': '2022-01-01',
@@ -72,31 +80,71 @@ class ChartDepartureDestination(Resource):
             'nest_in_data': True
         })
 
+
+
+        def group_countries(data, country_grouping):
+            import re
+            if re.search('top_[0-9]*', country_grouping):
+                # Make EU a country
+                data.loc[data.destination_region == 'EU', 'destination_country'] = 'EU'
+                data.loc[data.destination_region == 'EU', 'destination_iso2'] = 'EU'
+
+                n = int(country_grouping.replace('top_', ''))
+                top_n = data[data.departure_date >= max(data.departure_date) - dt.timedelta(days=61)] \
+                        .groupby(['commodity_group', 'destination_country']) \
+                    .value_tonne.sum() \
+                    .reset_index() \
+                    .sort_values('value_tonne', ascending=False) \
+                    .groupby(['commodity_group']) \
+                    .head(n)
+
+                top_n['region'] = top_n.destination_country
+                # Keeping the same for all commodities
+                # Otherwise Flourish will show empty lines
+                # which might make viewer things values are actually 0
+                top_n = top_n[['destination_country', 'region']].drop_duplicates()
+                data = data \
+                    .merge(top_n[['destination_country', 'region']],
+                           how='left') \
+                    .fillna({'region': 'Others'})
+
+                # Keep for orders
+                data.loc[data.destination_iso2 == base.FOR_ORDERS, 'region'] = 'For orders'
+
+            else:
+                data['region'] = data.destination_region
+
+            data = data.groupby(['commodity_group', 'commodity_group_name',
+                                 'region', 'departure_date'])['value_tonne'].sum() \
+                .reset_index() \
+                .sort_values(['departure_date'])
+
+            return data
+
+        def pivot_data(data, variable='value_tonne'):
+
+            # Add the variable for transparency sake
+            data['variable'] = variable
+            result = data.groupby(['region', 'departure_date', 'commodity_group_name', 'variable']) \
+                .value_tonne.sum() \
+                .reset_index() \
+                .pivot_table(index=['commodity_group_name', 'departure_date', 'variable'],
+                             columns=['region'],
+                             values=variable,
+                             sort=False,
+                             fill_value=0) \
+                .reset_index()
+            return result
+
         response = VoyageResource().get_from_params(params)
         data = pd.DataFrame(response.json['data'])
         data['departure_date'] = pd.to_datetime(data.departure_date)
-        data['Others'] = data.Others + data['For orders']
-        data.drop(['For orders'], axis=1, inplace=True)
-        data.rename(columns={base.UNKNOWN: 'Unknown'}, inplace=True)
-        # data['month'] = pd.to_datetime(data.date).dt.to_period('M').dt.to_timestamp()
-        #
-        # data = data.groupby(['destination_region', 'month', 'variable']) \
-        #     .agg(Oil=('Oil', np.average),
-        #          Gas=('Gas', np.average),
-        #          Coal = ('Coal', np.average),
-        #          ndays=('Oil', len)) \
-        #     .reset_index()
-        # data = data[data.ndays >= 10].drop(['ndays'], axis=1)
-        #
-        # # Sort by region
-        # data['Total'] = data.Coal + data.Oil + data.Gas
-        # regions = data.groupby(['destination_region'])['Total'].sum().sort_values(ascending=False).reset_index()[['destination_region']]
-        # data = regions.merge(data).drop('Total', axis=1)
-
-        return self.build_response(result=data,
+        data.replace({base.UNKNOWN: 'Unknown'}, inplace=True)
+        data = group_countries(data, country_grouping)
+        result = pivot_data(data)
+        return self.build_response(result=result,
                                    format=format,
                                    nest_in_data=nest_in_data)
-
 
 
     def build_response(self, result, format, nest_in_data):
