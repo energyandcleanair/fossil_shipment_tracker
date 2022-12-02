@@ -13,7 +13,7 @@ from geoalchemy2 import Geometry
 from sqlalchemy import func
 
 from base.env import get_env
-from base.logger import logger
+from base.logger import logger, logger_slack
 from base.utils import to_datetime
 from base.utils import update_geometry_from_wkb
 from base.db_utils import upsert
@@ -42,6 +42,7 @@ def update(date_from='2015-01-01',
            date_to=-2,
            force=False):
 
+    logger_slack.info("=== Flaring update ===")
     facilities = pd.read_sql(session.query(FlaringFacility).statement, session.bind)
     facilities = update_geometry_from_wkb(facilities, to="shape")
 
@@ -319,94 +320,3 @@ def get_flaring_ts(facilities,
         .rename(columns={'id': 'facility_id'})
 
     return res
-
-
-
-#
-#   # Global tendencies
-#   flare_amounts %>%
-#     group_by(type, date) %>%
-#     summarise_at(c('bcm_est'), sum, na.rm=T) %>%
-#     rcrea::utils.running_average(14, vars_to_avg = c('bcm_est'), min_values = 10) %>%
-#     mutate(year=lubridate::year(date),
-#            date000=`year<-`(date, 2000)) %>%
-#     ggplot() +
-#       geom_line(aes(date000,
-#
-#       , col=factor(year))) +
-#     scale_x_date(date_labels = '%b') +
-#     scale_colour_brewer(palette='Reds', name=NULL) +
-#     rcrea::theme_crea() +
-#     facet_wrap(~type) +
-#     labs(title='Fire radiative power around Russian gas infrastructure',
-#          subtitle='14-day running average of radiative power within 20km of gas fields and 5km of gas infrastructure',
-#          y='MW',
-#          x=NULL,
-#          caption='Source: CREA analysis based on VIIRS, EnergyBase.ru and Global Energy Monitor.')
-#
-#   ggsave('flaring.jpg', width=6, height=4, scale=1.5, dpi=150)
-#
-#
-#   # Top fields
-#   top_fields <- flare_amounts %>%
-#     filter(type=='pipeline') %>%
-#     group_by(id) %>%
-#     summarise(bcm_est=sum(bcm_est, na.rm=T)) %>%
-#     arrange(desc(bcm_est)) %>%
-#     pull(id) %>%
-#     head(20)
-#
-#
-#   flare_amounts %>%
-#     filter(id %in% top_fields) %>%
-#     rcrea::utils.running_average(14, vars_to_avg = c('bcm_est', 'count'),
-#                                  min_values=10) %>%
-#     mutate(year=lubridate::year(date),
-#            date000=`year<-`(date, 2000)) %>%
-#     ggplot() +
-#     geom_line(aes(date000, bcm_est, col=factor(year))) +
-#     scale_x_date(date_labels = '%b') +
-#     facet_wrap(~id, scales='free_y') +
-#     scale_colour_brewer(palette='Reds', name=NULL) +
-#     rcrea::theme_crea()
-#
-#
-#   # Top fields
-#   flare_amounts %>%
-#     # filter(type=='pipeline') %>%
-#     filter(id %in% 'Nord Stream Gas Pipeline') %>%
-#     # rcrea::utils.running_average(14, vars_to_avg = c('bcm_est')) %>%
-#     mutate(year=lubridate::year(date),
-#            date000=`year<-`(date, 2000)) %>%
-#     ggplot() +
-#     geom_bar(aes(date, bcm_est), stat='identity') +
-#     # scale_x_date(date_labels = '%b') +
-#     facet_wrap(~id, scales='free_y')
-#
-#   dir.create('cache', F)
-#   saveRDS(flare_amounts, 'cache/flaring.RDS')
-#
-#   return(flare_amounts)
-# }
-#
-#
-# flaring.detect_anomalies <- function(flare_amounts){
-#
-#   library(anomalize)
-#
-#   d <- flare_amounts %>%
-#     filter(grepl('Northern Lights Gas Pipeline', id, ignore.case = T))
-#
-#
-#  decomposed <- flare_amounts %>%
-#     group_by(id) %>%
-#    group_map(function(x, id){
-#      print(head(id))
-#      x %>%
-#        time_decompose(bcm_est, method = "stl") %>%
-#        anomalize(remainder, method = "iqr")
-#    })
-#
-#
-# }
-#
