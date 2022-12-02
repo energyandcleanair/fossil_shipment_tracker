@@ -1,11 +1,16 @@
+from sqlalchemy.orm import load_only
+from sqlalchemy.inspection import inspect
+import json
+import pandas as pd
+import seaborn as sns
+import tempfile
+
+from engine import departure
 from base.db_utils import execute_statement
 from base.utils import to_list, to_datetime
 from base.logger import logger_slack
-from engine import departure
-from sqlalchemy.orm import load_only
-from sqlalchemy.inspection import inspect
 from base.models import Shipment, ShipmentWithSTS
-
+from base import PRICING_DEFAULT
 
 def rebuild(date_from="2021-01-01"):
     logger_slack.info("=== Shipment rebuild ===")
@@ -83,3 +88,37 @@ def return_combined_shipments(session, columns=None):
         .options(load_only(*columns))
 
     return non_sts_shipments.union(sts_shipments).subquery()
+
+
+def send_diagnostic_chart():
+    from api.routes.voyage import VoyageResource
+
+    params = {'aggregate_by': ['departure_date', 'status', 'commodity'],
+              'commodity': ['crude_oil', 'oil_products', 'lng', 'coal'],
+              # 'commodity_origin_iso2': 'RU',
+              'departure_date_from': '2021-01-01',
+              'rolling_days': 14,
+              'currency': 'EUR',
+              'pricing_scenario' : [PRICING_DEFAULT],
+              'commodity_grouping': 'default'
+              }
+
+    v = VoyageResource().get_from_params(params=params)
+    v = pd.DataFrame(json.loads(v.response[0]))
+
+    v['value_tonne'] = pd.to_numeric(v.value_tonne)
+    v['departure_date'] = pd.to_datetime(v.departure_date)
+
+    sns.relplot(data=v,
+                kind='line',
+                x='departure_date',
+                y='value_tonne',
+                hue='status',
+                errorbar=None,
+                col="commodity",
+                col_wrap=2,
+                facet_kws={'sharey': False, 'sharex': True})
+
+    #TODO send to slack
+
+
