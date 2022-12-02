@@ -102,9 +102,6 @@ class ChartProductOnWater(Resource):
             (data['commodity'] != 'unknown')
             & (data['commodity'] != 'Others')
             & (data['commodity'].notnull())
-            #& (data['commodity_destination_region'].notnull())
-            #& (data['pricing_scenario'].notnull())
-            #& (data['arrival_detected_date_utc'].notnull())
             ]
 
         data['commodity_destination_region'] = np.where(data['commodity_destination_country'] == 'United Kingdom', 'EU',
