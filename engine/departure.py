@@ -272,7 +272,7 @@ def remove(commodities=None, unlocode=None, port_id=None, port_name=None, marine
             .filter(Departure.date_utc <= to_datetime(date_to))
 
     session.query(Departure) \
-        .filter(Departure.id.in_(departures.scalar_subquery().subquery())) \
+        .filter(Departure.id.in_(departures.scalar_subquery())) \
         .delete(synchronize_session=False)
 
     session.commit()
