@@ -16,6 +16,7 @@ from engine import alert
 from engine import company
 from engine import mtevents
 from engine import flaring
+from engine import sts
 import integrity
 import base
 
@@ -38,6 +39,7 @@ def update():
     position.update()
     destination.update()
     berth.update()
+    sts.update_sts_locations()
     entsog.update(date_from=-21, nodata_error_date_from=-4)
     rscript.update()
     trajectory.update()
