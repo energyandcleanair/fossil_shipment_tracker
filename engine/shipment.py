@@ -8,7 +8,8 @@ import tempfile
 from engine import departure
 from base.db_utils import execute_statement
 from base.utils import to_list, to_datetime
-from base.logger import logger_slack
+from base.logger import logger_slack, slacker
+from slack_sdk.errors import SlackApiError
 from base.models import Shipment, ShipmentWithSTS
 from base import PRICING_DEFAULT
 
@@ -109,7 +110,7 @@ def send_diagnostic_chart():
     v['value_tonne'] = pd.to_numeric(v.value_tonne)
     v['departure_date'] = pd.to_datetime(v.departure_date)
 
-    sns.relplot(data=v,
+    shipment_diagnostic = sns.relplot(data=v,
                 kind='line',
                 x='departure_date',
                 y='value_tonne',
@@ -117,8 +118,19 @@ def send_diagnostic_chart():
                 errorbar=None,
                 col="commodity",
                 col_wrap=2,
-                facet_kws={'sharey': False, 'sharex': True})
+                facet_kws={'sharey': False, 'sharex': True},
+                height=8)
 
-    #TODO send to slack
+    shipment_diagnostic.figure.savefig('./misc/diagnostics/shipment_diagnostics.png')
+
+    try:
+        filepath = './misc/diagnostics/shipment_diagnostics.png'
+        response = slacker.files_upload(channels='#log-russia-counter', file=filepath)
+        assert response["file"]  # the uploaded file
+    except SlackApiError as e:
+        # You will get a SlackApiError if "ok" is False
+        assert e.response["ok"] is False
+        assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
+        logger_slack.error(f"Got an error: {e.response['error']}")
 
 
