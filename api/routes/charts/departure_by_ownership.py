@@ -23,7 +23,7 @@ class ChartDepartureOwnership(Resource):
                         default="2021-12-01", required=False)
 
     parser.add_argument('date_to', type=str, help='start date for counter data (format 2020-01-15)',
-                        default=-7,
+                        default=-3,
                         required=False)
 
     parser.add_argument('commodity_grouping', type=str,
@@ -67,6 +67,7 @@ class ChartDepartureOwnership(Resource):
             # 'pivot_value': 'value_tonne',
             'use_eu': True,
             'commodity_origin_iso2': 'RU',
+            'commodity_destination_iso2_not': 'RU',
             # 'date_from': '2022-01-01',
             'pricing_scenario': [base.PRICING_DEFAULT],
             # 'sort_by': ['value_tonne'],

@@ -25,7 +25,7 @@ class ChartDepartureDestination(Resource):
                         default="2021-12-01", required=False)
 
     parser.add_argument('date_to', type=str, help='start date for counter data (format 2020-01-15)',
-                        default=-7,
+                        default=-3,
                         required=False)
 
     parser.add_argument('country_grouping', type=str,
@@ -71,6 +71,7 @@ class ChartDepartureDestination(Resource):
             # 'pivot_value': 'value_tonne',
             'use_eu': True,
             'commodity_origin_iso2': 'RU',
+            'commodity_destination_iso2_not': 'RU',
             # 'date_from': '2022-01-01',
             'pricing_scenario': [base.PRICING_DEFAULT],
             # 'sort_by': ['value_tonne'],
@@ -79,8 +80,6 @@ class ChartDepartureDestination(Resource):
             'format': 'json',
             'nest_in_data': True
         })
-
-
 
         def group_countries(data, country_grouping):
             import re
@@ -138,6 +137,7 @@ class ChartDepartureDestination(Resource):
 
         response = VoyageResource().get_from_params(params)
         data = pd.DataFrame(response.json['data'])
+        data = data[data.destination_iso2 != 'RU']
         data['departure_date'] = pd.to_datetime(data.departure_date)
         data.replace({base.UNKNOWN: 'Unknown'}, inplace=True)
         data = group_countries(data, country_grouping)
