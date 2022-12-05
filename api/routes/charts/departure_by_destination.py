@@ -45,6 +45,9 @@ class ChartDepartureDestination(Resource):
                         default=['destination_country', 'commodity_group', 'departure_date'],
                         help='which variables to aggregate by. Could be any of commodity, type, destination_region, date')
 
+    parser.add_argument('language', type=str, help='en or ua',
+                        default="en", required=False)
+
     parser.add_argument('rolling_days', type=int,
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=30)
@@ -64,6 +67,7 @@ class ChartDepartureDestination(Resource):
         format = params_chart.get('format')
         nest_in_data = params_chart.get('nest_in_data')
         country_grouping = params_chart.get('country_grouping')
+        language = params_chart.get('language')
 
         params.update(**params_chart)
         params.update(**{
@@ -135,14 +139,27 @@ class ChartDepartureDestination(Resource):
                 .reset_index()
             return result
 
+        def translate(data, language):
+            if language != "en":
+                file_path = "assets/language/%s.json" % (language)
+                with open(file_path, 'r') as file:
+                    translate_dict = json.load(file)
+
+                data = data.replace(translate_dict)
+                data.columns = [translate_dict.get(x, x) for x in data.columns]
+
+            return data
+
+
         response = VoyageResource().get_from_params(params)
         data = pd.DataFrame(response.json['data'])
         data = data[data.destination_iso2 != 'RU']
         data['departure_date'] = pd.to_datetime(data.departure_date)
         data.replace({base.UNKNOWN: 'Unknown'}, inplace=True)
         data = group_countries(data, country_grouping)
-        result = pivot_data(data)
-        return self.build_response(result=result,
+        data = pivot_data(data)
+        data = translate(data=data, language=language)
+        return self.build_response(result=data,
                                    format=format,
                                    nest_in_data=nest_in_data)
 

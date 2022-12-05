@@ -43,6 +43,9 @@ class ChartDepartureOwnership(Resource):
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=30)
 
+    parser.add_argument('language', type=str, help='en or ua',
+                        default="en", required=False)
+
     parser.add_argument('group_eug7_insurernorwary', type=inputs.boolean, default=True)
 
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
@@ -59,6 +62,7 @@ class ChartDepartureOwnership(Resource):
         params_chart = ChartDepartureOwnership.parser.parse_args()
         format = params_chart.get('format')
         nest_in_data = params_chart.get('nest_in_data')
+        language = params_chart.get('language')
         group_eug7_insurernorwary = params_chart.get('group_eug7_insurernorwary')
 
         params.update(**params_chart)
@@ -92,6 +96,17 @@ class ChartDepartureOwnership(Resource):
                    'Others')))
             return res
 
+        def translate(data, language):
+            if language != "en":
+                file_path = "assets/language/%s.json" % (language)
+                with open(file_path, 'r') as file:
+                    translate_dict = json.load(file)
+
+                data = data.replace(translate_dict)
+                data.columns = [translate_dict.get(x, x) for x in data.columns]
+
+            return data
+
         if group_eug7_insurernorwary:
             data['region'] = recode_eug7(data.ship_owner_region,
                                          data.ship_owner_iso2,
@@ -113,6 +128,10 @@ class ChartDepartureOwnership(Resource):
                            sort=False,
                            fill_value=0) \
             .reset_index()
+
+        result = translate(data=result, language=language)
+
+
 
 
         return self.build_response(result=result,

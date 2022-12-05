@@ -37,6 +37,9 @@ class ChartProductOnWater(Resource):
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=None)
 
+    parser.add_argument('language', type=str, help='en or ua',
+                        default="en", required=False)
+
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
                         type=inputs.boolean, default=True)
 
@@ -52,6 +55,7 @@ class ChartProductOnWater(Resource):
         params = VoyageResource.parser.parse_args()
         params_chart = ChartProductOnWater.parser.parse_args()
         format = params_chart.get('format')
+        language = params_chart.get('language')
         nest_in_data = params_chart.get('nest_in_data')
 
         params.update(**params_chart)
@@ -86,6 +90,17 @@ class ChartProductOnWater(Resource):
             "general_cargo": "Others",
             "oil_or_ore": "Others"
         }
+
+        def translate(data, language):
+            if language != "en":
+                file_path = "assets/language/%s.json" % (language)
+                with open(file_path, 'r') as file:
+                    translate_dict = json.load(file)
+
+                data = data.replace(translate_dict)
+                data.columns = [translate_dict.get(x, x) for x in data.columns]
+
+            return data
 
         response = VoyageResource().get_from_params(params)
         data = pd.DataFrame(response.json['data'])
@@ -125,6 +140,8 @@ class ChartProductOnWater(Resource):
             sort=False,
             fill_value=0) \
         .reset_index()
+
+        result = translate(data=result, language=language)
 
         return self.build_response(result=result,
                                    format=format,
