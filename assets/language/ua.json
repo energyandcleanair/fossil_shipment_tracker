@@ -11,9 +11,12 @@
   "Russia": "Росія",
   "United Arab Emirates": "Об’єднані Арабські Емірати",
 
+
   "Coal": "Вугілля",
   "Crude oil": "Сира нафта",
   "Oil products and chemicals" :"Нафтопродукти та хімікати",
+  "Oil products" :"Нафтопродукти",
+  "LNG": "ЗПГ",
   "Others": "Інше",
   "Unknown" : "Невідомо",
 
