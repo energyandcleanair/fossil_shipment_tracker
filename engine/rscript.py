@@ -35,11 +35,17 @@ def update():
         ]
     }
 
-    url = "http://engine.crea-aq-data.appspot.com"
-    # url = "http://localhost:8080"
-    res = requests.post(url=url, json=payload)
+    itry = 0
+    maxtries = 2
+    success = False
 
-    if res.status_code != 200:
-        logger_slack.error("R script failed")
+    while not success and itry < maxtries:
+        url = "http://engine.crea-aq-data.appspot.com"
+        res = requests.post(url=url, json=payload)
+        itry += 1
+        success = res.status_code == 200
+
+    if not success:
+        logger_slack.info("R script failed")
     else:
         logger_slack.info("R script succeeded")
