@@ -25,13 +25,24 @@ completed_arrival_portcalls AS (
         portcall_id IS NOT NULL
 ),
 
+ship_draught AS (
+    SELECT
+        ship_imo,
+        -- min(draught) can yield very low values.
+        max(draught * (load_status='in_ballast')::integer) as draught_min,
+        max(draught) as draught_max
+    FROM portcall
+    GROUP BY 1
+),
+
 portcall_w_prev AS (
     SELECT *,
     lead(portcall.load_status, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_load_status,
     lead(portcall.move_type, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_move_type,
     lead(portcall.date_utc, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_date_utc,
     lead(portcall.port_id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_port_id,
-    lead(portcall.id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_portcall_id
+    lead(portcall.id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_portcall_id,
+    lead(portcall.draught, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_draught,
     FROM portcall
     WHERE date_utc >= '2021-01-01'
 ),
@@ -49,6 +60,9 @@ departure_portcalls AS (
         port.name,
         port.check_departure,
         pc.ship_imo,
+        pc.draught,
+        ship_draught.draught_min,
+        ship_draught.draught_max,
 
         pc.previous_load_status,
         pc.previous_move_type,
@@ -63,6 +77,7 @@ departure_portcalls AS (
     FROM portcall_w_prev pc
     LEFT JOIN port ON pc.port_id = port.id
     LEFT JOIN ship ON ship.imo = pc.ship_imo
+    LEFT JOIN ship_draught ON ship_draught.ship_imo = pc.ship_imo
 --     LEFT JOIN portcall preva --previous portcall used for load_status
 --     ON preva.ship_imo = pc.ship_imo
 --     WHERE
@@ -153,7 +168,10 @@ next_departure AS (
              -- When a ship is discharging and loading at the same port (e.g. UST-Luga ANCH)
             OR (nextd.port_operation = 'load'
 --                 AND nextd.previous_departure_load_status = 'fully_laden'
-                AND nextd.previous_load_status = 'in_ballast' -- this one is an arrival
+                AND (
+                    nextd.previous_load_status = 'in_ballast' -- this one is an arrival
+                    OR (nextd.previous_load_status = 'partially_laden'
+                        AND nextd.previous_draught <= nextd.draught_min + 0.1 * (nextd.draught_max - nextd.draught_min)))
                 AND nextd.load_status = 'fully_laden'
             ))
 

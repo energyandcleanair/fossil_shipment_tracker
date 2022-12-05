@@ -33,7 +33,7 @@ from base.models import Departure, PortCall, Ship, MarineTrafficCall, Arrival, P
 tqdm.pandas()
 
 
-def update_history(date_from, date_to, departure_port_iso2, commodities=[base.CRUDE_OIL, base.LNG]):
+def update_history(date_from, date_to, departure_port_iso2, commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG]):
 
     # This call is to update history using the CALL-BASED MARINE TRAFFIC KEY
     # meaning we'll try to maximize number of records captured per call
@@ -154,7 +154,7 @@ def update_arrival_portcalls(date_from, date_to, commodities, departure_port_iso
     departure_dates['dates'] = departure_dates.apply(
         lambda row: pd.date_range(row.date_from.floor('H'), row.date_to.floor('H'), freq='H'),
         axis=1)
-    departure_dates = departure_dates[['imo','dates']].explode('dates').drop_duplicates().sort_values(['imo', 'dates'])
+    departure_dates = departure_dates[['imo', 'dates']].explode('dates').drop_duplicates().sort_values(['imo', 'dates'])
 
     # Get information on calls already made to MT
     queried_df = pd.read_sql(queried.statement, session.bind)

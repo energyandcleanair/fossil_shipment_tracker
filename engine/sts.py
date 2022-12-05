@@ -66,7 +66,7 @@ def fill_portcalls_around_sts(go_backward=True,
                                        go_backward=go_backward)
 
 
-def update():
+def update_sts_locations():
     """
     Update departure and arrival STS locations
 

@@ -154,6 +154,9 @@ class Marinetraffic:
                                      "NAME": None
                                      }]
 
+            if not response_data:
+                raise ValueError('Empty response')
+
             response_data = response_data[0]
             if mt_id:
                 response_data['SHIPID'] = mt_id
@@ -227,7 +230,7 @@ class Marinetraffic:
                                               api_key=api_key,
                                               params=params,
                                               credits_per_record=4,
-                                              save_empty_record=use_call_based)
+                                              save_empty_record=True)
 
         if response_datas is None:
             if not imo or not '_v2' in imo:

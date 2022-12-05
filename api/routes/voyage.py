@@ -474,6 +474,7 @@ class VoyageResource(Resource):
 
                 # Looks like StS only
                 (ArrivalPort.name.ilike('Lakonikos Gulf%'), sa.null()),
+                (ArrivalPort.iso2 == 'GI', sa.null()),
 
                 # Removal of dardaneles discharges + bosphorus strait
                 (ArrivalPort.name.ilike('DARDANELES WAIT AREA'), sa.null()),
@@ -951,7 +952,8 @@ class VoyageResource(Resource):
                 result = result \
                     .groupby([x for x in result.columns if x not in [date_column, 'ship_dwt',
                                                                      'value_tonne', 'value_m3',
-                                                                     'value_eur', 'value_currency', 'count']]) \
+                                                                     'value_eur', 'value_currency', 'count']],
+                             dropna=False) \
                     .apply(lambda x: x.set_index(date_column) \
                            .resample("D").sum() \
                            .reindex(daterange) \
@@ -987,6 +989,7 @@ class VoyageResource(Resource):
                      and x not in to_list(pivot_by)
                      and x not in pivot_by_dependencies]
 
+            result[to_list(pivot_by)] = result[to_list(pivot_by)].fillna(base.UNKNOWN)
             result = result.pivot_table(index=index,
                                         columns=to_list(pivot_by),
                                         values=pivot_value,

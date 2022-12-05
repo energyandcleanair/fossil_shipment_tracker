@@ -56,6 +56,16 @@ deleted_trajectory_sts AS (
     )
 ),
 
+ship_draught AS (
+    SELECT
+        ship_imo,
+        -- min(draught) can yield very low values.
+        max(draught * (load_status='in_ballast')::integer) as draught_min,
+        max(draught) as draught_max
+    FROM portcall
+    GROUP BY 1
+),
+
 portcall_w_prev AS (
     SELECT *,
     lead(portcall.load_status, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_load_status,
@@ -275,7 +285,10 @@ next_departure AS (
                     AND nextd.load_status = 'partially_laden')
              -- When a ship is discharging and loading at the same port (e.g. UST-Luga ANCH)
             OR (nextd.port_operation = 'load'
-                AND nextd.previous_load_status = 'in_ballast' -- this one is an arrival
+                AND (
+                    nextd.previous_load_status = 'in_ballast' -- this one is an arrival
+                    OR (nextd.previous_load_status = 'partially_laden'
+                        AND nextd.previous_draught <= nextd.draught_min + 0.1 * (nextd.draught_max - nextd.draught_min)))
                 AND nextd.load_status = 'fully_laden'
             ))
         ORDER BY
@@ -383,6 +396,7 @@ sts_departures_with_arrival AS (
         nextd.departure_event_id,
         nextd.ship_imo AS ship_imo,
         nextd.departure_date_utc,
+        nextd.nextdeparture_portcall_id,
         preva.id AS arrival_portcall_id,
         preva.date_utc AS arrival_date_utc,
         preva.port_id AS arrival_port_id
@@ -407,7 +421,8 @@ completed_shipments_with_sts_arrival AS (
         departure_date_utc,
         NULL::bigint AS arrival_portcall_id,
         NULL::bigint AS arrival_port_id,
-        event_date_utc as arrival_date_utc,
+        event_date_utc AS arrival_date_utc,
+        NULL::bigint AS nextdeparture_portcall_id,
         NEXTVAL('arrival_id_seq') arrival_id,
         'completed' status,
         event_id AS arrival_event_id,
@@ -426,6 +441,7 @@ completed_shipments_with_sts_departure AS (
         arrival_portcall_id,
         arrival_port_id,
         arrival_date_utc,
+        nextdeparture_portcall_id,
         NEXTVAL('arrival_id_seq') arrival_id,
         'completed' status,
         departure_event_id,
@@ -439,6 +455,7 @@ uncompleted_shipments_with_sts_departure AS (
         NULL::bigint AS arrival_event_id,
         nd.departure_date_utc,
         nd.ship_imo,
+        NULL::bigint nextdeparture_portcall_id,
         NULL::bigint arrival_id,
         NULL::bigint arrival_port_id,
         NULL::bigint arrival_portcall_id,
@@ -460,6 +477,7 @@ uncompleted_shipments_with_sts_departure AS (
 shipments_sts AS (
     SELECT
         departure_portcall_id,
+        nextdeparture_portcall_id,
         departure_port_id,
         ship_imo,
         departure_date_utc,
@@ -473,6 +491,7 @@ shipments_sts AS (
     UNION ALL
     SELECT
         departure_portcall_id,
+        nextdeparture_portcall_id,
         departure_port_id,
         ship_imo,
         departure_date_utc,
@@ -486,6 +505,7 @@ shipments_sts AS (
     UNION ALL
     SELECT
         departure_portcall_id,
+        nextdeparture_portcall_id,
         departure_port_id,
         ship_imo,
         departure_date_utc,
@@ -543,7 +563,8 @@ completed_shipments_all AS (
         arrival_portcall_id,
         departure_event_id,
         arrival_event_id,
-        departure_portcall_id
+        departure_portcall_id,
+        nextdeparture_portcall_id
     FROM
         completed_shipments_with_sts_arrival
     UNION ALL
@@ -555,12 +576,13 @@ completed_shipments_all AS (
         arrival_portcall_id,
         departure_event_id,
         arrival_event_id,
-        departure_portcall_id
+        departure_portcall_id,
+        nextdeparture_portcall_id
     FROM
         completed_shipments_with_sts_departure
 ),
 inserted_arrivals AS (
-INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id, event_id)
+INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id, event_id, nextdeparture_portcall_id)
     SELECT
         arrival_id,
         inserted_departures.id,
@@ -568,7 +590,8 @@ INSERT INTO arrival (id, departure_id, date_utc, method_id, port_id, portcall_id
         'postgres',
         arrival_port_id,
         arrival_portcall_id,
-        arrival_event_id
+        arrival_event_id,
+        nextdeparture_portcall_id
     FROM
         completed_shipments_all
         LEFT JOIN inserted_departures ON

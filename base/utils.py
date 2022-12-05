@@ -267,6 +267,9 @@ def df_to_json(df, nest_in_data=False):
     # To be parsable by JS
     df = df.where(pd.notnull(df), None)
 
+    # Sometimes keys are dates (when pivoting)
+    df.columns = [str(x) for x in df.columns]
+
     if nest_in_data:
         return json.dumps({"data": df.to_dict(orient="records")}, cls=JsonEncoder)
     else:

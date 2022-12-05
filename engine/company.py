@@ -230,8 +230,10 @@ def fill_country():
             'US': ['USA[\.]?$'],
             'SG': ['Singapore [0-9]*$'],
             'TW': ['\(Taiwan\)[\.]?'],
+            'PT': ['Madeira[\.]?$'],
             'HK': ['Hong Kong, China[\.]?[\w]*[0-9]*'],
-            'PT': ['Madeira[\.]?$']
+            'IM': ['Isle of Man'],
+            'JE': ['Jersey']
         }
 
         for key, regexps in address_regexps.items():
