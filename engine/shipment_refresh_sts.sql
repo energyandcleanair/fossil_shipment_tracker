@@ -56,6 +56,16 @@ deleted_trajectory_sts AS (
     )
 ),
 
+ship_draught AS (
+    SELECT
+        ship_imo,
+        -- min(draught) can yield very low values.
+        max(draught * (load_status='in_ballast')::integer) as draught_min,
+        max(draught) as draught_max
+    FROM portcall
+    GROUP BY 1
+),
+
 portcall_w_prev AS (
     SELECT *,
     lead(portcall.load_status, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_load_status,
@@ -275,7 +285,10 @@ next_departure AS (
                     AND nextd.load_status = 'partially_laden')
              -- When a ship is discharging and loading at the same port (e.g. UST-Luga ANCH)
             OR (nextd.port_operation = 'load'
-                AND nextd.previous_load_status = 'in_ballast' -- this one is an arrival
+                AND (
+                    nextd.previous_load_status = 'in_ballast' -- this one is an arrival
+                    OR (nextd.previous_load_status = 'partially_laden'
+                        AND nextd.previous_draught <= nextd.draught_min + 0.1 * (nextd.draught_max - nextd.draught_min)))
                 AND nextd.load_status = 'fully_laden'
             ))
         ORDER BY
