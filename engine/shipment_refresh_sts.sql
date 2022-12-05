@@ -76,7 +76,8 @@ portcall_w_prev AS (
     lead(portcall.move_type, 1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS next_move_type,
     lead(portcall.date_utc, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_date_utc,
     lead(portcall.port_id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_port_id,
-    lead(portcall.id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_portcall_id
+    lead(portcall.id, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_portcall_id,
+    lead(portcall.draught, -1) OVER (PARTITION BY portcall.ship_imo ORDER BY portcall.date_utc) AS previous_draught
     FROM portcall
     WHERE date_utc >= '2021-01-01'
 ),
