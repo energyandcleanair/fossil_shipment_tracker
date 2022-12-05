@@ -99,6 +99,9 @@ departure_portcalls AS (
         port.name,
         port.check_departure,
         pc.ship_imo,
+        pc.draught,
+        ship_draught.draught_min,
+        ship_draught.draught_max,
 
         pc.previous_load_status,
         pc.previous_move_type,
@@ -113,6 +116,7 @@ FROM
     portcall_w_prev pc
     LEFT JOIN port ON pc.port_id = port.id
     LEFT JOIN ship ON ship.imo = pc.ship_imo
+    LEFT JOIN ship_draught ON ship_draught.ship_imo = pc.ship_imo
     WHERE
         pc.date_utc >= '2021-01-01'
         AND ship.commodity != 'unknown'
