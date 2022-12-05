@@ -124,6 +124,8 @@ def update_info_from_equasis():
                 equasis_infos = equasis.get_ship_infos(imo=imo)
             except requests.exceptions.HTTPError as e:
                 logger.warning("Failed to get equasis ship info, trying again.")
+            except requests.exceptions.ConnectionError as e:
+                logger.warning("Connection failed, trying again.")
 
         if equasis_infos is not None:
 
