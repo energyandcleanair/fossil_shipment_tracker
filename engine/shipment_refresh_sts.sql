@@ -105,6 +105,7 @@ departure_portcalls AS (
         pc.previous_portcall_id,
         pc.previous_date_utc,
         pc.previous_port_id,
+        pc.previous_draught,
 
         -- We need both previous arrival status AND previous departure status
         lead(pc.load_status, -1) OVER (PARTITION BY pc.ship_imo ORDER BY pc.date_utc) AS previous_departure_load_status
