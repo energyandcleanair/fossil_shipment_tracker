@@ -319,7 +319,7 @@ class Marinetraffic:
         :param use_call_based: weither to use the normal (credit-based) key or the call-based key
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
-        delta_time = dt.timedelta(hours=12) if not use_call_based else dt.timedelta(days=190)
+        delta_time = dt.timedelta(hours=6) if not use_call_based else dt.timedelta(days=190)
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
         if date_to is None:
