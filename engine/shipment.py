@@ -96,8 +96,8 @@ def send_diagnostic_chart():
 
     params = {'aggregate_by': ['departure_date', 'status', 'commodity'],
               'commodity': ['crude_oil', 'oil_products', 'lng', 'coal'],
-              # 'commodity_origin_iso2': 'RU',
-              'departure_date_from': '2021-01-01',
+              'departure_iso2': 'RU',
+              'departure_date_from': '2022-01-01',
               'rolling_days': 14,
               'currency': 'EUR',
               'pricing_scenario' : [PRICING_DEFAULT],
