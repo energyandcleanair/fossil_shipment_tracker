@@ -5,7 +5,10 @@ from engine.datalastic import Datalastic
 
 
 def test_query_ship():
-    ship = Datalastic.get_ship(mmsi="538008212")
+    ship = Datalastic.get_ship(mmsi="538008212", use_cache=False)
+    ship_cached = Datalastic.get_ship(mmsi="538008212", use_cache=True)
+
+    assert ship.mmsi == ship_cached.mmsi and ship.imo == ship_cached.imo
 
 def test_find_position():
     date_str = "2022-05-23T08:49:00"
