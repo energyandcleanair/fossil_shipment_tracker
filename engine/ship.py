@@ -4,7 +4,7 @@ import base
 
 from base.db import session
 from base.logger import logger
-from base.models import Ship, PortCall, Departure, Shipment, ShipmentDepartureBerth, Trajectory
+from base.models import Ship, PortCall, Departure, Shipment, ShipmentDepartureBerth, Trajectory, MTVoyageInfo
 from base.utils import to_datetime, to_list
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
@@ -33,7 +33,8 @@ def collect_mt_for_large_oil_products():
 
     for ship in tqdm(ships):
         if ship.type != ship.others.get('marinetraffic', {}).get('VESSEL_TYPE'):
-            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi)
+            # If there are multiple mmsis take latest one
+            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi[-1])
             if ship_mt is not None and ship.imo == ship_mt.imo:
                 ship_mt.others.update(ship.others)
                 (commodity, quantity, unit) = ship_to_commodity(ship_mt)
@@ -283,9 +284,9 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
 
         return sources
 
-    def update_ship_imo(old_imo, new_imo):
+    def update_ship_imo(old_imo, new_imo, mmsis):
         """
-        Correct any existing deparutres/portcalls with new imo
+        Correct any existing departures/portcalls with new imo
 
         Parameters
         ----------
@@ -297,8 +298,22 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
 
         """
         ship_portcalls = PortCall.query.filter(PortCall.ship_imo == old_imo).all()
+        ship_mtvoyages = MTVoyageInfo.query.filter(MTVoyageInfo.ship_imo == old_imo).all()
+
+        # First let's try and clean up mtvoyage which should not have issues with changes - it is just to make sure
+        # mmsi arrays are consistent everywhere
+        for ship_mtvoyage in ship_mtvoyages:
+            ship_mtvoyage.ship_imo = new_imo
+            ship_mtvoyage.ship_mmsi = mmsis
+            try:
+                session.commit()
+            except sa.exc.IntegrityError as e:
+                session.rollback()
+                logger.info("Duplicate voyageinfo {} - failed to delete. Please check.".format(ship_mtvoyage.id))
+
         for ship_portcall in ship_portcalls:
             ship_portcall.ship_imo = new_imo
+            ship_portcall.ship_mmsi = mmsis
             try:
                 session.commit()
             except sa.exc.IntegrityError as e:
@@ -394,7 +409,7 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
             for sv in ship_versions[1:]:
 
                 # fix departures/portcalls if necessary
-                update_ship_imo(sv.imo, old_imo)
+                update_ship_imo(sv.imo, old_imo, mmsis)
 
                 # remove ship
                 session.delete(sv)
@@ -492,7 +507,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
     # For each ship, ask datalastic
     for portcall_ship in tqdm(portcall_ships):
         imo = portcall_ship.ship_imo
-        mmsi = portcall_ship.ship_mmsi
+        mmsi = portcall_ship.ship_mmsi[-1]
         # others = portcall_ship.others
         found_ship = Datalastic.get_ship(mmsi=mmsi, use_cache=True)
         if not found_ship or not found_ship.imo or found_ship.imo == '0':
