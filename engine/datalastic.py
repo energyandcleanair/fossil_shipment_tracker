@@ -31,7 +31,7 @@ class Datalastic:
     @classmethod
     def get_ship_cached(cls, imo=None, mmsi=None):
         try:
-            filter = lambda x : (imo is not None and str(x["imo"]) == str(imo)) or (mmsi is not None and str(x["mmsi"]) == str(mmsi))
+            filter = lambda x : (imo is not None and str(x["imo"]) == str(imo)) or (mmsi is not None and x["mmsi"].contains(str(mmsi)))
             return next(x for x in cls.cache_ships if filter(x))
         except StopIteration:
             return None
@@ -176,7 +176,7 @@ class Datalastic:
     @classmethod
     def parse_ship_data(cls, response_data):
         data = {
-            "mmsi": response_data["mmsi"],
+            "mmsi": [response_data["mmsi"]],
             "name": response_data["name"],
             "imo": response_data["imo"],
             "type": response_data["type"],
