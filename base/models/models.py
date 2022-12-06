@@ -338,7 +338,7 @@ class Trajectory(Base):
 
 class PortCall(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    ship_mmsi = Column(String) #, ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
+    ship_mmsi = Column(ARRAY(String)) #, ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
     date_utc = Column(DateTime(timezone=False)) # Departure time for departure, Arrival time for arrival
     date_lt = Column(DateTime(timezone=False))  # local time
@@ -432,7 +432,7 @@ class MTVoyageInfo(Base):
     }"""
 
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    ship_mmsi = Column(String)  # , ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
+    ship_mmsi = Column(ARRAY(String))  # , ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + '.imo', onupdate="CASCADE"))
     queried_date_utc = Column(DateTime(timezone=False))  # Departure time for departure, Arrival time for arrival
     destination_name = Column(String)
