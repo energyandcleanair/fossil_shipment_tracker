@@ -159,7 +159,7 @@ class Marinetraffic:
                 cls.do_cache_object(response_data, cls.cache_ship, cls.cache_file_ship)
 
         data = {
-            "mmsi": response_data["MMSI"],
+            "mmsi": [response_data["MMSI"]],
             "imo": response_data["IMO"],
             "name": response_data.get("NAME"),
             "type": response_data.get("VESSEL_TYPE"),
