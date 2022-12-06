@@ -76,7 +76,7 @@ def collect_mt_for_large_oil_products():
 def fill_missing_commodity():
 
     ships = Ship.query.filter(Ship.commodity == sa.null()).all()
-    for ship in ships:
+    for ship in tqdm(ships):
         (commodity, quantity, unit) = ship_to_commodity(ship)
         ship.commodity = commodity
         ship.quantity = quantity
