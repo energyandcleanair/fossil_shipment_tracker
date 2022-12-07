@@ -49,6 +49,7 @@ def collect_mt_for_large_oil_products():
         else:
             logger.info("Was already using MT")
 
+
 #
 # def collect_mt_for_insurers(date_from='2022-02-24',
 #                          commodity=[base.CRUDE_OIL, base.LNG]):
@@ -75,7 +76,6 @@ def collect_mt_for_large_oil_products():
 #                 logger.info("IMOs don't match or ship not found")
 
 def fill_missing_commodity():
-
     ships = Ship.query.filter(Ship.commodity == sa.null()).all()
     for ship in ships:
         (commodity, quantity, unit) = ship_to_commodity(ship)
@@ -83,7 +83,6 @@ def fill_missing_commodity():
         ship.quantity = quantity
         ship.unit = unit
         session.commit()
-
 
 
 def fill(imos=[], mmsis=[]):
@@ -109,7 +108,7 @@ def fill(imos=[], mmsis=[]):
         # Ship already in db
         return True
 
-    logger.info("Adding %d missing ships"%(len(imos) + len(mmsis)))
+    logger.info("Adding %d missing ships" % (len(imos) + len(mmsis)))
 
     # First with Datalastic
     ships = [Datalastic.get_ship(imo=x, query_if_not_in_cache=False) for x in get_missing_ships_imos(imos)]
@@ -155,7 +154,7 @@ def upload_ships(ships):
                     imo_ships[0].mmsi.append(ship.mmsi)
                     session.commit()
             else:
-                raise ValueError("Problem inserting ship: %s"%(str(e),))
+                raise ValueError("Problem inserting ship: %s" % (str(e),))
 
 
 def ship_to_commodity(ship):
@@ -178,15 +177,15 @@ def ship_to_commodity(ship):
                 or re.match('Oil products', subtype, re.IGNORECASE):
             commodity = base.OIL_PRODUCTS
         elif re.match('LNG', type, re.IGNORECASE) \
-             or re.match('LNG', subtype, re.IGNORECASE):
+                or re.match('LNG', subtype, re.IGNORECASE):
             commodity = base.LNG
         elif re.match('LPG', type, re.IGNORECASE) \
-             or re.match('LPG', subtype, re.IGNORECASE):
+                or re.match('LPG', subtype, re.IGNORECASE):
             commodity = base.LPG
         elif re.match('Ore or Oil', subtype, re.IGNORECASE):
             commodity = base.OIL_OR_ORE
         elif re.match('Bulk', type, re.IGNORECASE) \
-             or re.match('Bulk', subtype, re.IGNORECASE):
+                or re.match('Bulk', subtype, re.IGNORECASE):
             commodity = base.BULK
         elif re.match('cargo', type, re.IGNORECASE):
             commodity = base.GENERAL_CARGO
@@ -196,19 +195,17 @@ def ship_to_commodity(ship):
     except TypeError:
         commodity = base.UNKNOWN_COMMODITY
 
-    if ship.liquid_gas is not None and commodity==base.LNG:
+    if ship.liquid_gas is not None and commodity == base.LNG:
         unit = "m3"
         quantity = ship.liquid_gas
-    #TODO Should we consider the m3 information for oil?
+    # TODO Should we consider the m3 information for oil?
     else:
         unit = "tonne"
         quantity = ship.dwt
 
-
     # # Heuristic1: if oil_products but dwt > 90,000t, then assume crude_oil
     if ship.dwt and float(ship.dwt) > 90e3 and commodity in [base.OIL_PRODUCTS]:
         commodity = base.CRUDE_OIL
-
 
     return [commodity, quantity, unit]
 
@@ -230,7 +227,8 @@ def set_commodity(ship):
     ship.unit = unit
     return ship
 
-def fix_duplicate_imo(ships=None, handle_not_found=True):
+
+def fix_duplicate_imo(imo=None, handle_not_found=True):
     """
     Verify the ship table - check if there are any identical rows - this could happen with the historic version
     of using '_v*' to iterate ships
@@ -284,7 +282,7 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
 
         return sources
 
-    def update_ship_imo(old_imo, new_imo, mmsis):
+    def update_ship_imo(old_imo, new_imo):
         """
         Correct any existing departures/portcalls with new imo
 
@@ -304,7 +302,6 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
         # mmsi arrays are consistent everywhere
         for ship_mtvoyage in ship_mtvoyages:
             ship_mtvoyage.ship_imo = new_imo
-            ship_mtvoyage.ship_mmsi = mmsis
             try:
                 session.commit()
             except sa.exc.IntegrityError as e:
@@ -313,19 +310,19 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
 
         for ship_portcall in ship_portcalls:
             ship_portcall.ship_imo = new_imo
-            ship_portcall.ship_mmsi = mmsis
             try:
                 session.commit()
             except sa.exc.IntegrityError as e:
                 session.rollback()
-                logger.info("Duplicate portcall_id {} - deleting portcall, departure and associated shipments.".format(ship_portcall.id))
+                logger.info("Duplicate portcall_id {} - deleting portcall, departure and associated shipments.".format(
+                    ship_portcall.id))
 
                 # find associated shipments to delete
                 shipments_to_delete = session.query(
                     Shipment
                 ) \
-                .join(Departure, Departure.id == Shipment.departure_id) \
-                .filter(Departure.portcall_id == ship_portcall.id)
+                    .join(Departure, Departure.id == Shipment.departure_id) \
+                    .filter(Departure.portcall_id == ship_portcall.id)
 
                 shipments_to_delete_list = [s.id for s in shipments_to_delete.all()]
 
@@ -333,7 +330,8 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
                 session.query(Shipment).filter(Shipment.id.in_(shipments_to_delete_list)).delete()
                 session.query(Departure).filter(Departure.portcall_id == ship_portcall.id).delete()
 
-                session.query(ShipmentDepartureBerth).filter(ShipmentDepartureBerth.shipment_id.in_(shipments_to_delete_list)).delete()
+                session.query(ShipmentDepartureBerth).filter(
+                    ShipmentDepartureBerth.shipment_id.in_(shipments_to_delete_list)).delete()
                 session.query(Trajectory).filter(Trajectory.shipment_id.in_(shipments_to_delete_list)).delete()
 
                 session.delete(ship_portcall)
@@ -356,25 +354,28 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
             logger.error(e)
             session.rollback()
 
-    if ships is None:
-        ships = session.query(
-            sa.case(
-                [
-                    (Ship.imo.like('%_v%'), sa.func.split_part(Ship.imo, '_', 1))
-                ], else_ = sa.null()
-                ).label('imo'),
-            sa.case(
-                [
-                    (Ship.imo.like('%NOTFOUND%'), sa.func.split_part(Ship.imo, '_', 2))
-                ], else_=sa.null()
-            ).label('mmsi'),
-            Ship.imo.label('old_imo')
-        )\
+    ships = session.query(
+        sa.case(
+            [
+                (Ship.imo.like('%_v%'), sa.func.split_part(Ship.imo, '_', 1))
+            ], else_=sa.null()
+        ).label('imo'),
+        sa.case(
+            [
+                (Ship.imo.like('%NOTFOUND%'), sa.func.split_part(Ship.imo, '_', 2))
+            ], else_=sa.null()
+        ).label('mmsi'),
+        Ship.imo.label('old_imo')
+    ) \
         .filter(sa.or_(
-            Ship.imo.op('~')('[_v]'),
-            Ship.imo.op('~')('[NOTFOUND]')
-        )) \
-        .all()
+        Ship.imo.op('~')('[_v]'),
+        Ship.imo.op('~')('[NOTFOUND]')
+    )).subquery()
+
+    if imo:
+        ships = session.query(ships).filter(ships.c.imo.in_(to_list(imo)))
+
+    ships = ships.all()
 
     for ship in tqdm(ships):
         logger.info("Checking vessel imo: {}, mmsi: {}.".format(ship.imo, ship.mmsi))
@@ -388,8 +389,8 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
         ship_versions = session.query(
             Ship
         ) \
-        .filter(Ship.imo.op('~')(base_imo)) \
-        .all()
+            .filter(Ship.imo.op('~')(base_imo)) \
+            .all()
 
         # combine other data column to store for the future
         other_data = return_coalesced_data(ship_versions)
@@ -398,16 +399,16 @@ def fix_duplicate_imo(ships=None, handle_not_found=True):
         # check if existing versions of ships have the same dwt - in which case we can simplify
         if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1:
             # delete all duplicates except 1 - we keep records in priority of datalastic > mt
-            data_priority = {'datalastic':4, 'marinetraffic':2, 'equasis':1}
+            data_priority = {'datalastic': 4, 'marinetraffic': 2, 'equasis': 1}
 
-            ship_versions = sorted(ship_versions, key=lambda item: sum([data_priority[d] for d in item.others]), reverse=True)
+            ship_versions = sorted(ship_versions, key=lambda item: sum([data_priority[d] for d in item.others]),
+                                   reverse=True)
 
             ship_to_keep = ship_versions[0]
             old_imo = ship_to_keep.imo
 
             # fix the rest of the ship versions by changing departures/portcalls and deleting them after
             for sv in ship_versions[1:]:
-
                 # fix departures/portcalls if necessary
                 update_ship_imo(sv.imo, old_imo, mmsis)
 
@@ -648,4 +649,3 @@ def fix_not_found():
                     # What to do?
                     logger.info("%s \n vs. \n %s " % (str(new_ship.others),
                                                       str(ship.others)))
-
