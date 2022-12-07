@@ -26,7 +26,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-
+from time import sleep
 import datetime as dt
 import pandas as pd
 import numpy as np
@@ -34,6 +34,7 @@ from collections import defaultdict
 from tqdm import tqdm
 import sqlalchemy as sa
 import requests
+from requests.adapters import HTTPAdapter, Retry
 
 import base
 from base.db import session
@@ -41,6 +42,14 @@ from base.logger import logger, logger_slack
 from base.utils import to_list, to_datetime
 from base.db_utils import upsert
 from base.models import DB_TABLE_ENTSOGFLOW, EntsogFlow
+
+s = requests.Session()
+
+retries = Retry(total=5,
+                backoff_factor=2,
+                status_forcelist=[500, 502, 503, 504])
+
+s.mount('https://', HTTPAdapter(max_retries=retries))
 
 
 def split(x, f):
@@ -52,7 +61,7 @@ def split(x, f):
 
 def api_req(url, params={}, limit=-1):
     params['limit'] = limit
-    api_result = requests.get(url, params=params)
+    api_result = s.get(url, params=params, timeout=60)
 
     if api_result.status_code != 200:
         logger.warning("ENTSOG: Failed to query entsog %s %s" % (url, params))
@@ -276,94 +285,98 @@ def fix_opd_countries(opd):
     return opd
 
 
-
-
-def get_flows_by_pointtype(date_from='2022-01-01',
-                              date_to=dt.date.today(),
-                              country_iso2=None,
-                              remove_pipe_in_pipe=True,
-                              remove_operators=[],
-                              remove_point_labels=[]):
-    """
-    Mainly to debug/understand why germany so low on consumption + distribution
-    :param date_from:
-    :param date_to:
-    :param country_iso2:
-    :param remove_pipe_in_pipe:
-    :param remove_operators:
-    :param remove_point_labels:
-    :return:
-    """
-    opd = get_operator_point_directions()
-    opd = fix_opd_countries(opd)
-
-    if country_iso2:
-        opd = opd.loc[opd.country.isin(to_list(country_iso2))]
-
-    if remove_pipe_in_pipe:
-        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
-                      | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
-
-    if remove_operators:
-        opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
-
-    if remove_point_labels:
-        opd = opd.loc[~opd.pointLabel.isin(to_list(remove_point_labels))]
-
-    def keep_unique(x):
-        return x[['pointKey', 'operatorKey']].drop_duplicates()
-
-    def add_countries(x):
-        if x is None:
-            return None
-
-        return x.merge(
-            opd[['pointKey', 'operatorKey', 'directionKey', 'country', 'partner']] \
-                .drop_duplicates())
-
-
-    flows = get_physical_flows(
-        operator_key=opd.operatorKey.to_list(),
-        point_key=opd.pointKey.to_list(),
-        direction=None,
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows = add_countries(flows)
-    flows['value_m3'] = flows.value / base.GCV_KWH_PER_M3
-
-    flows_sum = flows.groupby(['directionKey','pointType', 'country', 'partner']) \
-        .aggregate({'value_m3': 'sum'}) \
-        .reset_index()
-
-
-    # flows_within_country = flows_sum[flows_sum.country == flows_sum.partner]
-    flows_sum.sort_values(['value_m3'], inplace=True, ascending=False)
-    flows_sum.value_m3.sum() / 1e9
-    return flows_sum
-
-
+# def get_flows_by_pointtype(date_from='2022-01-01',
+#                               date_to=dt.date.today(),
+#                               country_iso2=None,
+#                               remove_pipe_in_pipe=True,
+#                               remove_operators=[],
+#                               remove_point_labels=[]):
+#     """
+#     Mainly to debug/understand why germany so low on consumption + distribution
+#     :param date_from:
+#     :param date_to:
+#     :param country_iso2:
+#     :param remove_pipe_in_pipe:
+#     :param remove_operators:
+#     :param remove_point_labels:
+#     :return:
+#     """
+#     opd = get_operator_point_directions()
+#     opd = fix_opd_countries(opd)
+#
+#     if country_iso2:
+#         opd = opd.loc[opd.country.isin(to_list(country_iso2))]
+#
+#     if remove_pipe_in_pipe:
+#         opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
+#                       | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
+#
+#     if remove_operators:
+#         opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
+#
+#     if remove_point_labels:
+#         opd = opd.loc[~opd.pointLabel.isin(to_list(remove_point_labels))]
+#
+#     def keep_unique(x):
+#         return x[['pointKey', 'operatorKey']].drop_duplicates()
+#
+#     def add_countries(x):
+#         if x is None:
+#             return None
+#
+#         return x.merge(
+#             opd[['pointKey', 'operatorKey', 'directionKey', 'country', 'partner']] \
+#                 .drop_duplicates())
+#
+#     flows = get_physical_flows(
+#         operator_key=opd.operatorKey.to_list(),
+#         point_key=opd.pointKey.to_list(),
+#         direction=None,
+#         date_from=to_datetime(date_from),
+#         date_to=to_datetime(date_to),
+#     )
+#
+#     flows = add_countries(flows)
+#     flows['value_m3'] = flows.value / base.GCV_KWH_PER_M3
+#
+#     flows_sum = flows.groupby(['directionKey', 'pointType', 'country', 'partner']) \
+#         .aggregate({'value_m3': 'sum'}) \
+#         .reset_index()
+#
+#     # flows_within_country = flows_sum[flows_sum.country == flows_sum.partner]
+#     flows_sum.sort_values(['value_m3'], inplace=True, ascending=False)
+#     flows_sum.value_m3.sum() / 1e9
+#     return flows_sum
 
 
 def get_flows_raw(date_from='2022-01-01',
-                              date_to=dt.date.today(),
-                              country_iso2=None,
-                              remove_pipe_in_pipe=True,
-                              remove_operators=[],
-                              remove_point_labels=['Dornum GASPOOL',
-                                                   'VIP Waidhaus NCG',
-                                                   'Haiming 2 7F/bn']
-                              ):
+                  date_to=dt.date.today(),
+                  country_iso2=None,
+                  remove_pipe_in_pipe=True,
+                  remove_operators=[],
+                  remove_point_labels=[],
+                  remove_point_ids=[],
+                  # remove_point_labels=['Dornum GASPOOL',
+                  #                      'VIP Waidhaus NCG',
+                  #                      'Haiming 2 7F/bn'],
+                  # remove_point_ids=['5DE-TSO-0016ITP-00452exitCZ-TSO-0001',
+                  #                   '5DE-TSO-0016ITP-00452entryCZ-TSO-0001'],
+                  use_csv_selection=True):
 
     opd = get_operator_point_directions()
     opd = fix_opd_countries(opd)
 
     if country_iso2:
-        opd = opd.loc[opd.country.isin(to_list(country_iso2))]
+        opd = opd.loc[opd.coujntry.isin(to_list(country_iso2))]
+
+    if use_csv_selection:
+        to_remove = pd.read_csv('assets/entsog/opd_to_remove.csv')
+        # Do an antijoin
+        outer_join = opd.merge(to_remove, how='outer', indicator=True)
+        opd = outer_join[(outer_join._merge == 'left_only')].drop('_merge', axis=1)
 
     if remove_pipe_in_pipe:
-        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
+        opd = opd.loc[opd.isPipeInPipe.isnull() |  ~opd.isPipeInPipe \
          | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
 
     if remove_operators:
@@ -371,6 +384,10 @@ def get_flows_raw(date_from='2022-01-01',
 
     if remove_point_labels:
         opd = opd.loc[~opd.pointLabel.isin(to_list(remove_point_labels))]
+
+    if remove_point_ids:
+        opd = opd.loc[~opd.id.isin(to_list(remove_point_ids))]
+
 
     entry_points = opd.loc[
         opd.pointType.str.contains('Cross-Border') \
@@ -591,6 +608,8 @@ def process_crossborder_flows(flows_import_raw,
                                   flows_import_agg_cols=None,
                                   flows_export_agg_cols=None,
                                   remove_operators=[],
+                                  save_intermediary_to_file=False,
+                                  intermediary_filename=None,
                                   save_to_file=False,
                                   filename=None):
 
@@ -643,7 +662,10 @@ def process_crossborder_flows(flows_import_raw,
         flows = flows.loc[~flows.operatorKey_import.isin(remove_operators)]
 
     def process_pt_op_date(df):
-        df = df.loc[df.value_import > 0]
+
+        df = df.loc[(df.value_import > 0) |
+                    # Or an export point for which we don't have import
+                    (pd.isna(df.value_import) & (df.value_export > 0))]
 
         if auto_confirmed_only and 'Confirmed' in df.flowStatus_import.to_list():
             df = df.loc[df.flowStatus_import == 'Confirmed']
@@ -653,6 +675,7 @@ def process_crossborder_flows(flows_import_raw,
 
         # This function only manages the case were one import
         # is matching several exports
+        # Or when there are only exports
         if not len(df[['pointKey', 'flowStatus_import', 'value_import']].drop_duplicates()) == 1:
 
             # Values have probably been updated later on
@@ -668,7 +691,7 @@ def process_crossborder_flows(flows_import_raw,
                 logger.warning("Flows are mismanaged")
 
         # Further checks
-        if not all(df.country_export.isnull() | (df.country_export == df.partner_import)):
+        if not all(df.country_export.isnull() | df.country_import.isnull() | (df.country_export == df.partner_import)):
             logger.warning("flows aren't matching")
             print(df[['pointKey', 'operatorKey_import', 'date']])
 
@@ -676,28 +699,37 @@ def process_crossborder_flows(flows_import_raw,
         # One import was mathching two exports
         value_import = np.nanmean(df.value_import)
         value_export_sum = np.nansum(df.value_export)
-        if value_export_sum > 0:
+        if value_export_sum > 0 and not pd.isna(value_import):
             df['value'] = df.value_export / value_export_sum * value_import / len(df)
         elif all(df.value_export.isnull()):
             df['value'] = value_import / len(df) # spread equally
+        elif all(df.value_import.isnull()):
+            df['value'] = df.value_export
         else:
             df['value'] = 0
 
         df['partner'] = np.where(df['country_export'].isnull(), df['partner_import'], df['country_export'])
+        df['country'] = np.where(df['country_import'].isnull(), df['partner_export'], df['country_import'])
         return df.reset_index()
 
-    flows_scaled = flows.groupby(['pointKey', 'operatorKey_import', 'date']).apply(process_pt_op_date)
+    flows_scaled = flows.groupby(['pointKey', 'operatorKey_import', 'date'],
+                                 dropna=False).apply(process_pt_op_date)
     flows_scaled = flows_scaled.reset_index(drop=True)
-    flows_agg = flows_scaled.groupby(['country_import', 'partner', 'date']) \
+
+    if save_intermediary_to_file:
+        intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
+        flows_scaled.to_csv(intermediary_filename, index=False)
+
+    flows_agg = flows_scaled.groupby(['country', 'partner', 'date']) \
         .agg(value=('value', np.nansum)) \
         .reset_index() \
-        .rename(columns={'country_import': 'to_country',
+        .rename(columns={'country': 'to_country',
                          'partner': 'from_country'}) \
         .reset_index()
 
     flows_agg.rename(columns={'from_country': 'departure_iso2',
-                                      'to_country': 'destination_iso2',
-                                      'value': 'value_kwh'},
+                              'to_country': 'destination_iso2',
+                              'value': 'value_kwh'},
                      inplace=True)
 
     flows_agg.loc[
@@ -721,13 +753,14 @@ def fix_kipi_flows(flows):
     return flows
 
 
-
 def get_flows(date_from='2022-01-01',
-                          date_to=dt.date.today(),
-                          country_iso2=None,
-                          remove_pipe_in_pipe=True,
-                          save_to_file=False,
-                          filename=None):
+              date_to=dt.date.today(),
+              country_iso2=None,
+              remove_pipe_in_pipe=True,
+              save_intermediary_to_file=False,
+              intermediary_filename=None,
+              save_to_file=False,
+              filename=None):
 
     # Get raw information from ENTSOG
     (flows_import_raw,
@@ -754,6 +787,8 @@ def get_flows(date_from='2022-01-01',
                                               keep_confirmed_only=False,
                                               auto_confirmed_only=True,
                                               remove_operators=[],
+                                              save_intermediary_to_file=save_intermediary_to_file,
+                                              intermediary_filename=intermediary_filename,
                                               save_to_file=save_to_file,
                                               filename=filename)
 
