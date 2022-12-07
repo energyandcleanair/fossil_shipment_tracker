@@ -41,34 +41,44 @@ def test_germany():
 
 def test_get_crossborder_flows():
 
-    flows = get_flows(date_from='2022-01-01',
-                      date_to='2022-01-31',
+    flows = get_flows(date_from='2021-01-01',
+                      date_to='2021-12-31',
                       save_intermediary_to_file=True,
-                      intermediary_filename='entsog_flows_raw_202201_clean_nopip.csv',
+                      intermediary_filename='entsog_flows_raw_2021.csv',
                       save_to_file=True,
                       remove_pipe_in_pipe=True,
-                      filename='entsog_flows_202201_clean_nopip.csv')
+                      filename='entsog_flows_2021.csv')
 
     flows['month'] = pd.to_datetime(flows['date']).dt.strftime('%Y-%m-01')
     total = flows.groupby(['departure_iso2', 'destination_iso2', 'month']) \
         .agg(value_bcm=('value_m3', lambda x: np.nansum(x) / 1e9)) \
         .reset_index()
+    total['departure_iso2'] = total.departure_iso2.replace({'DZ': 'Maghreb'})
+    total['departure_iso2'] = total.departure_iso2.replace({'AZ': 'TR'})
 
     iea = pd.read_csv('engine/tests/assets/iea.csv') \
         .groupby(['departure_iso2', 'destination_iso2', 'month']) \
         .agg(value_bcm=('value_m3', lambda x: np.nansum(x) / 1e9)) \
         .reset_index()
     iea = iea[iea.month == '2022-01-01']
+    iea['departure_iso2'] = iea.departure_iso2.replace({'TN': 'Maghreb'})
 
     comp = total.merge(iea,
                        how='left',
                        on=['departure_iso2', 'destination_iso2', 'month'],
-                       suffixes=['_entsog', '_iea'])
+                       suffixes=['_entsog', '_iea'],
+                       )
+    comp = comp.fillna(0)
     comp['pct'] = (comp.value_bcm_entsog-comp.value_bcm_iea)/comp.value_bcm_iea
     comp['abs'] = (comp.value_bcm_entsog - comp.value_bcm_iea)
-    comp = comp.sort_values(['abs'], ascending=True)
 
-    sum_diff = comp[~np.isnan(comp['abs'])]['abs'].abs().sum()
+    comp = comp.sort_values(['abs'], ascending=True)
+    comp = comp[comp.departure_iso2 != comp.destination_iso2]
+    comp = comp[comp.departure_iso2 != 'lng']
+    comp = comp[(comp.departure_iso2 != 'RU') | (comp.destination_iso2 != 'UA')]
+
+    error = comp[~np.isnan(comp['abs'])]['abs'].abs().sum() / comp.value_bcm_iea.sum()
+    assert error < 0.25
 
     assert abs(np.sum(total.loc[total.departure_iso2 == 'NO'].value_bcm) - 42) < 4
     assert abs(np.sum(total.loc[total.departure_iso2 == 'RU'].value_bcm) - 53) < 3
