@@ -23,8 +23,6 @@ def test_germany():
                                                        date_to=date_to,
                                                        country_iso2='DE')
 
-    a=2
-
     import_de = flows_import_raw.groupby(['pointKey', 'operatorKey', 'pointLabel', 'country', 'partner']) \
         .agg(value_bcm=('value', lambda x: np.nansum(x) / base.GCV_KWH_PER_M3 / 1e9)) \
         .reset_index() \
@@ -40,32 +38,38 @@ def test_germany():
     poi2 = opd.loc[opd.pointLabel.isin(['Dornum / NETRA (OGE)',
                                         'Dornum GASPOOL'])]
 
+
 def test_get_crossborder_flows():
 
-    flows = get_crossborder_flows(date_from='2020-01-01',
-                                  date_to='2020-01-31',
-                                  save_to_file=True,
-                                  filename='entsog_flows_202001.csv')
+    flows = get_flows(date_from='2022-01-01',
+                      date_to='2022-01-31',
+                      save_intermediary_to_file=True,
+                      intermediary_filename='entsog_flows_raw_202201_clean_nopip.csv',
+                      save_to_file=True,
+                      remove_pipe_in_pipe=True,
+                      filename='entsog_flows_202201_clean_nopip.csv')
 
-
-    total = flows.groupby(['to_country', 'from_country']) \
-        .agg(value_bcm=('value', lambda x: np.nansum(x) / base.GCV_KWH_PER_M3 / 1e9)) \
+    flows['month'] = pd.to_datetime(flows['date']).dt.strftime('%Y-%m-01')
+    total = flows.groupby(['departure_iso2', 'destination_iso2', 'month']) \
+        .agg(value_bcm=('value_m3', lambda x: np.nansum(x) / 1e9)) \
         .reset_index()
 
-    # Some numbers taken from IEA
-    iea = [
-        {'from_country': 'RU', 'to_country': 'DE', 'value_bcm': 5.075},
-        {'from_country': 'DE', 'to_country': 'CZ', 'value_bcm': 3.954},
-        {'from_country': 'CZ', 'to_country': 'DE', 'value_bcm': 2.102},
-        {'from_country': 'NO', 'to_country': 'DE', 'value_bcm': 3.574},
-    ]
+    iea = pd.read_csv('engine/tests/assets/iea.csv') \
+        .groupby(['departure_iso2', 'destination_iso2', 'month']) \
+        .agg(value_bcm=('value_m3', lambda x: np.nansum(x) / 1e9)) \
+        .reset_index()
+    iea = iea[iea.month == '2022-01-01']
 
-
-    comp = total.merge(pd.DataFrame(iea),
-                       on=['to_country', 'from_country'],
+    comp = total.merge(iea,
+                       how='left',
+                       on=['departure_iso2', 'destination_iso2', 'month'],
                        suffixes=['_entsog', '_iea'])
+    comp['pct'] = (comp.value_bcm_entsog-comp.value_bcm_iea)/comp.value_bcm_iea
+    comp['abs'] = (comp.value_bcm_entsog - comp.value_bcm_iea)
+    comp = comp.sort_values(['abs'], ascending=True)
 
-    assert abs(np.sum(total.loc[total.from_country == 'Norway'].value)/1e9 - 42) < 4
-    assert abs(np.sum(total.loc[total.from_country == 'RU'].value) / 1e9 - 53) < 3
+    sum_diff = comp[~np.isnan(comp['abs'])]['abs'].abs().sum()
 
-    return
+    assert abs(np.sum(total.loc[total.departure_iso2 == 'NO'].value_bcm) - 42) < 4
+    assert abs(np.sum(total.loc[total.departure_iso2 == 'RU'].value_bcm) - 53) < 3
+
