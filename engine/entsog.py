@@ -31,6 +31,7 @@ import datetime as dt
 import pandas as pd
 import numpy as np
 from collections import defaultdict
+from tqdm import tqdm
 import sqlalchemy as sa
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -299,72 +300,77 @@ def fix_opd_countries(opd):
 
     len_after = len(opd)
     assert len_after == len_before
-
     return opd
 
 
-# def get_flows_by_pointtype(date_from='2022-01-01',
-#                               date_to=dt.date.today(),
-#                               country_iso2=None,
-#                               remove_pipe_in_pipe=True,
-#                               remove_operators=[],
-#                               remove_point_labels=[]):
-#     """
-#     Mainly to debug/understand why germany so low on consumption + distribution
-#     :param date_from:
-#     :param date_to:
-#     :param country_iso2:
-#     :param remove_pipe_in_pipe:
-#     :param remove_operators:
-#     :param remove_point_labels:
-#     :return:
-#     """
-#     opd = get_operator_point_directions()
-#     opd = fix_opd_countries(opd)
-#
-#     if country_iso2:
-#         opd = opd.loc[opd.country.isin(to_list(country_iso2))]
-#
-#     if remove_pipe_in_pipe:
-#         opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
-#                       | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
-#
-#     if remove_operators:
-#         opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
-#
-#     if remove_point_labels:
-#         opd = opd.loc[~opd.pointLabel.isin(to_list(remove_point_labels))]
-#
-#     def keep_unique(x):
-#         return x[['pointKey', 'operatorKey']].drop_duplicates()
-#
-#     def add_countries(x):
-#         if x is None:
-#             return None
-#
-#         return x.merge(
-#             opd[['pointKey', 'operatorKey', 'directionKey', 'country', 'partner']] \
-#                 .drop_duplicates())
-#
-#     flows = get_physical_flows(
-#         operator_key=opd.operatorKey.to_list(),
-#         point_key=opd.pointKey.to_list(),
-#         direction=None,
-#         date_from=to_datetime(date_from),
-#         date_to=to_datetime(date_to),
-#     )
-#
-#     flows = add_countries(flows)
-#     flows['value_m3'] = flows.value / base.GCV_KWH_PER_M3
-#
-#     flows_sum = flows.groupby(['directionKey', 'pointType', 'country', 'partner']) \
-#         .aggregate({'value_m3': 'sum'}) \
-#         .reset_index()
-#
-#     # flows_within_country = flows_sum[flows_sum.country == flows_sum.partner]
-#     flows_sum.sort_values(['value_m3'], inplace=True, ascending=False)
-#     flows_sum.value_m3.sum() / 1e9
-#     return flows_sum
+
+
+def get_flows_by_pointtype(date_from='2022-01-01',
+                              date_to=dt.date.today(),
+                              country_iso2=None,
+                              remove_pipe_in_pipe=True,
+                              remove_operators=[],
+                              remove_point_labels=[]):
+    """
+    Mainly to debug/understand why germany so low on consumption + distribution
+    :param date_from:
+    :param date_to:
+    :param country_iso2:
+    :param remove_pipe_in_pipe:
+    :param remove_operators:
+    :param remove_point_labels:
+    :return:
+    """
+    opd = get_operator_point_directions()
+    opd = fix_opd_countries(opd)
+
+    if country_iso2:
+        opd = opd.loc[opd.country.isin(to_list(country_iso2))]
+
+    if remove_pipe_in_pipe:
+        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
+                      | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
+
+    if remove_operators:
+        opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
+
+    if remove_point_labels:
+        opd = opd.loc[~opd.pointLabel.isin(to_list(remove_point_labels))]
+
+    def keep_unique(x):
+        return x[['pointKey', 'operatorKey']].drop_duplicates()
+
+    def add_countries(x):
+        if x is None:
+            return None
+
+        return x.merge(
+            opd[['pointKey', 'operatorKey', 'directionKey', 'country', 'partner']] \
+                .drop_duplicates())
+
+
+    flows = get_physical_flows(
+        operator_key=opd.operatorKey.to_list(),
+        point_key=opd.pointKey.to_list(),
+        direction=None,
+        date_from=to_datetime(date_from),
+        date_to=to_datetime(date_to),
+    )
+
+    flows = add_countries(flows)
+    flows['value_m3'] = flows.value / base.GCV_KWH_PER_M3
+
+    flows_sum = flows.groupby(['directionKey','pointType', 'country', 'partner']) \
+        .aggregate({'value_m3': 'sum'}) \
+        .reset_index()
+
+
+    # flows_within_country = flows_sum[flows_sum.country == flows_sum.partner]
+    flows_sum.sort_values(['value_m3'], inplace=True, ascending=False)
+    flows_sum.value_m3.sum() / 1e9
+    return flows_sum
+
+
 
 
 def get_flows_raw(date_from='2022-01-01',
@@ -394,7 +400,7 @@ def get_flows_raw(date_from='2022-01-01',
         opd = outer_join[(outer_join._merge == 'left_only')].drop('_merge', axis=1)
 
     if remove_pipe_in_pipe:
-        opd = opd.loc[opd.isPipeInPipe.isnull() |  ~opd.isPipeInPipe \
+        opd = opd.loc[opd.isPipeInPipe.isnull() | ~opd.isPipeInPipe \
          | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
 
     if remove_operators:
@@ -792,6 +798,7 @@ def fix_kipi_flows(flows):
     return flows
 
 
+
 def get_flows(date_from='2022-01-01',
               date_to=dt.date.today(),
               country_iso2=None,
@@ -826,8 +833,6 @@ def get_flows(date_from='2022-01-01',
                                               keep_confirmed_only=False,
                                               auto_confirmed_only=True,
                                               remove_operators=[],
-                                              save_intermediary_to_file=save_intermediary_to_file,
-                                              intermediary_filename=intermediary_filename,
                                               save_to_file=save_to_file,
                                               filename=filename)
 
