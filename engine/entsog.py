@@ -295,7 +295,7 @@ def fix_opd_countries(opd):
 
     # LNG marked as LNG
     # Zeebrugge
-    opd.loc[(opd.pointKey == 'LNG-00017') & (opd.direction_key == 'entry'), 'partner'] = 'lng'
+    opd.loc[(opd.pointKey == 'LNG-00017') & (opd.directionKey == 'entry'), 'partner'] = 'lng'
 
     # BE - LU
     opd.loc[opd.pointKey == 'ITP-00113']
