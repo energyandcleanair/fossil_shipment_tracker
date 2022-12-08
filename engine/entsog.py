@@ -390,7 +390,7 @@ def get_flows_raw(date_from='2022-01-01',
 
 
     entry_points = opd.loc[
-        opd.pointType.str.contains('Cross-Border') \
+        opd.pointType.str.contains('Cross-Border Transmission') \
         & (opd.directionKey == 'entry')]
 
     storage_entry_points = opd.loc[
@@ -422,7 +422,7 @@ def get_flows_raw(date_from='2022-01-01',
         & (opd.directionKey == 'exit')]
 
     exit_points = opd.loc[
-        opd.pointType.str.contains('Cross-Border') \
+        opd.pointType.str.contains('Cross-Border Transmission') \
         & (opd.directionKey == 'exit')]
 
     storage_exit_points = opd.loc[
