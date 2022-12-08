@@ -204,7 +204,7 @@ class RussiaCounterResource(Resource):
                 .reset_index() \
                 .sort_values(intersect(['commodity', 'date'], counter.columns))
 
-            counter['date'] = counter.date.dt.date
+            counter['date'] = pd.to_datetime(counter.date.dt.date)
 
         if cumulate and "date" in counter:
             groupby_cols = [x for x in ['commodity', 'commodity_group', 'commodity_group_name', 'destination_iso2',
