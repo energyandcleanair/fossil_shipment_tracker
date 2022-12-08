@@ -45,7 +45,7 @@ from base.models import DB_TABLE_ENTSOGFLOW, EntsogFlow
 
 s = requests.Session()
 
-retries = Retry(total=5,
+retries = Retry(total=10,
                 backoff_factor=2,
                 status_forcelist=[500, 502, 503, 504])
 
