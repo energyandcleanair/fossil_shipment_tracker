@@ -293,9 +293,17 @@ def fix_opd_countries(opd):
     opd.loc[(opd.pointKey == 'ITP-00008') & (opd.operatorKey == 'IT-TSO-0001'), 'partner'] = 'GR'
 
 
+    # LNG marked as LNG
+    # Zeebrugge
+    opd.loc[(opd.pointKey == 'LNG-00017') & (opd.direction_key == 'entry'), 'partner'] = 'lng'
+
+    # BE - LU
+    opd.loc[opd.pointKey == 'ITP-00113']
+
 
     len_after = len(opd)
     assert len_after == len_before
+
     return opd
 
 
