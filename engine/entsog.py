@@ -159,10 +159,10 @@ def get_physical_flows(operator_key,
     dates = pd.date_range(to_datetime(date_from),
                           to_datetime(date_to),
                           freq='d').to_list()
-    dates_group = [x.year for x in dates]
+    dates_group = [(x.month.astype(int) - 1) // 6 for x in dates]
 
     if len(set(dates_group)) > 1:
-        logger.info("Splitting by dates")
+        # logger.info("Splitting by dates")
         splitted = split(dates, dates_group)
         result = []
         for dates in splitted.values():
