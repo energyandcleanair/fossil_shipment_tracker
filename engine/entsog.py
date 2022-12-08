@@ -297,10 +297,6 @@ def fix_opd_countries(opd):
     # Zeebrugge
     opd.loc[(opd.pointKey == 'LNG-00017') & (opd.directionKey == 'entry'), 'partner'] = 'lng'
 
-    # BE - LU
-    opd.loc[opd.pointKey == 'ITP-00113']
-
-
     len_after = len(opd)
     assert len_after == len_before
 
@@ -411,49 +407,47 @@ def get_flows_raw(date_from='2022-01-01',
         opd = opd.loc[~opd.id.isin(to_list(remove_point_ids))]
 
 
-    entry_points = opd.loc[
-        opd.pointType.str.contains('Cross-Border Transmission') \
-        & (opd.directionKey == 'entry')]
+    is_crossborder = opd.pointType.str.contains('Cross-Border Transmission') \
+                | ( opd.pointType.str.contains('Transmission') \
+                    & opd.crossBorderPointType.str.contains('Cross') \
+                    & ~opd.pointLabel.str.contains('VIP'))
 
-    storage_entry_points = opd.loc[
-        opd.pointType.str.startswith('Storage') \
-        & (opd.directionKey == 'entry')]
+    is_transmission = opd.pointType.str.startswith('Transmission') & ~is_crossborder
+    is_storage = opd.pointType.str.startswith('Storage')
+    is_lng = opd.pointType.str.contains('LNG Entry point')
+    is_production = opd.pointType.str.contains('production')
+    is_consumption = opd.pointType.str.contains('Consumers')
+    is_distribution = opd.pointType.str.contains('Distribution')
 
-    lng_entry_points = opd.loc[
-        opd.pointType.str.contains('LNG Entry point') \
-        & (opd.directionKey == 'entry')]
+    # Check that no point belongs to two categories
+    assert (is_crossborder.astype(int)
+     + is_transmission.astype(int)
+     + is_storage.astype(int)
+     + is_lng.astype(int)
+     + is_production.astype(int)
+     + is_consumption.astype(int)
+     + is_distribution.astype(int)).max() == 1
 
-    transmission_entry_points = opd.loc[
-        opd.pointType.str.startswith('Transmission') \
-        & (opd.directionKey == 'entry')]
 
-    production_points = opd.loc[
-        opd.pointType.str.contains('production') \
-        & (opd.directionKey == 'entry')]
+    is_entry = opd.directionKey == 'entry'
+    is_exit = opd.directionKey == 'exit'
 
-    consumption_points = opd.loc[
-        opd.pointType.str.contains('Consumers') \
-        & (opd.directionKey == 'exit')]
+    entry_points = opd.loc[is_crossborder & is_entry]
+    exit_points = opd.loc[is_crossborder & is_exit]
 
-    transmission_exit_points = opd.loc[
-        opd.pointType.str.startswith('Transmission') \
-        & (opd.directionKey == 'exit')]
+    storage_entry_points = opd.loc[is_storage & is_entry]
+    storage_exit_points = opd.loc[is_storage & is_exit]
 
-    distribution_points = opd.loc[
-        opd.pointType.str.contains('Distribution') \
-        & (opd.directionKey == 'exit')]
+    lng_entry_points = opd.loc[is_lng & is_entry]
+    lng_exit_points = opd.loc[is_lng & is_exit]
 
-    exit_points = opd.loc[
-        opd.pointType.str.contains('Cross-Border Transmission') \
-        & (opd.directionKey == 'exit')]
+    transmission_entry_points = opd.loc[is_transmission & is_entry]
+    transmission_exit_points = opd.loc[is_transmission & is_exit]
 
-    storage_exit_points = opd.loc[
-        opd.pointType.str.startswith('Storage') \
-        & (opd.directionKey == 'exit')]
+    production_points = opd.loc[is_production & is_entry]
+    consumption_points = opd.loc[is_consumption & is_exit]
+    distribution_points = opd.loc[is_distribution & is_exit]
 
-    lng_exit_points = opd.loc[
-        opd.pointType.str.contains('LNG Entry point') \
-        & (opd.directionKey == 'exit')]
 
     # Check all are uniques
     all = pd.concat([entry_points,
@@ -746,7 +740,7 @@ def process_crossborder_flows(flows_import_raw,
 
         if value_export_sum > 0 and not pd.isna(value_import):
             df['value'] = df.value_export / value_export_sum * value_import / len(df)
-        elif all(df.value_export.isnull()):
+        elif all(df.value_export.isnull()) or (value_export_sum == 0):
             df['value'] = value_import / len(df) # spread equally
         elif all(df.value_import.isnull()):
             df['value'] = df.value_export
