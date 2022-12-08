@@ -31,10 +31,11 @@ import datetime as dt
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-from tqdm import tqdm
 import sqlalchemy as sa
 import requests
 from requests.adapters import HTTPAdapter, Retry
+from tqdm import tqdm
+tqdm.pandas()
 
 import base
 from base.db import session
@@ -367,7 +368,7 @@ def get_flows_raw(date_from='2022-01-01',
     opd = fix_opd_countries(opd)
 
     if country_iso2:
-        opd = opd.loc[opd.coujntry.isin(to_list(country_iso2))]
+        opd = opd.loc[opd.country.isin(to_list(country_iso2))]
 
     if use_csv_selection:
         to_remove = pd.read_csv('assets/entsog/opd_to_remove.csv')
@@ -668,7 +669,16 @@ def process_crossborder_flows(flows_import_raw,
                     (pd.isna(df.value_import) & (df.value_export > 0))]
 
         if auto_confirmed_only and 'Confirmed' in df.flowStatus_import.to_list():
-            df = df.loc[df.flowStatus_import == 'Confirmed']
+            if (np.std(df.value_import) / np.nanmean(df.value_import)) < 0.1:
+                df = df.loc[df.flowStatus_import == 'Confirmed']
+            else:
+                logger.warning("Several unmatching export flows")
+
+        if auto_confirmed_only and 'Confirmed' in df.flowStatus_export.to_list():
+            if (np.std(df.value_export) / np.nanmean(df.value_export)) < 0.1:
+                df = df.loc[df.flowStatus_export == 'Confirmed']
+            else:
+                logger.warning("Several unmatching export flows")
 
         if len(df) == 0:
             return df
@@ -697,8 +707,14 @@ def process_crossborder_flows(flows_import_raw,
 
         # Keep only confirmed if it is there
         # One import was mathching two exports
-        value_import = np.nanmean(df.value_import)
+
+        def nanmean(x):
+            #Without warning if empty
+            return np.NaN if np.all(x!=x) else np.nanmean(x)
+
+        value_import = nanmean(df.value_import)
         value_export_sum = np.nansum(df.value_export)
+
         if value_export_sum > 0 and not pd.isna(value_import):
             df['value'] = df.value_export / value_export_sum * value_import / len(df)
         elif all(df.value_export.isnull()):
@@ -713,7 +729,7 @@ def process_crossborder_flows(flows_import_raw,
         return df.reset_index()
 
     flows_scaled = flows.groupby(['pointKey', 'operatorKey_import', 'date'],
-                                 dropna=False).apply(process_pt_op_date)
+                                 dropna=False).progress_apply(process_pt_op_date)
     flows_scaled = flows_scaled.reset_index(drop=True)
 
     if save_intermediary_to_file:
