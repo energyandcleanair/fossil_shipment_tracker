@@ -281,6 +281,19 @@ def fix_opd_countries(opd):
     opd['country'] = opd[['countryFromIc', 'tSOCountry']].bfill(axis=1).iloc[:, 0]
     opd.drop(['adjacentCountryFromIc', 'countryFromIc'], axis=1, inplace=True)
 
+
+    # Manual fixes
+    # Greece to Albania is 77.5 TWh in 2021 according to IEA, but ENTSOG doesn't capture it
+    # We for now bypass Albania, and assume the IT / TAP (which goes from Albania to IT)
+    # is actually from Greece. In 2021 it was 75.9 TWh. Difference is probably Albania consumption
+    # Improvement: account for that
+    # Also, it was attributed to Switzerland because the TSO it Swiss
+    # TODO check if others are wrong
+    opd.loc[(opd.pointKey=='ITP-00008') & (opd.operatorKey=='AL-TSO-0001'), 'country'] = 'GR'
+    opd.loc[(opd.pointKey == 'ITP-00008') & (opd.operatorKey == 'IT-TSO-0001'), 'partner'] = 'GR'
+
+
+
     len_after = len(opd)
     assert len_after == len_before
     return opd
@@ -670,17 +683,23 @@ def process_crossborder_flows(flows_import_raw,
 
         if auto_confirmed_only and 'Confirmed' in df.flowStatus_import.to_list():
             if (np.nansum(df.value_import) == 0) \
-                        or (np.std(df.value_import) / np.nanmean(df.value_import)) < 0.1:
+                        or (np.std(df.value_import) / np.nanmean(df.value_import)) < 0.2:
                 df = df.loc[df.flowStatus_import == 'Confirmed']
             else:
                 logger.warning("Several unmatching import flows")
+                df = df.loc[df.flowStatus_import == 'Confirmed']
 
         if auto_confirmed_only and 'Confirmed' in df.flowStatus_export.to_list():
             if (np.nansum(df.value_export) == 0) \
-                    or (np.std(df.value_export) / np.nanmean(df.value_export)) < 0.1:
+                    or (np.std(df.value_export) / np.nanmean(df.value_export)) < 0.2:
                 df = df.loc[df.flowStatus_export == 'Confirmed']
             else:
-                logger.warning("Several unmatching export flows")
+                if np.nansum(df.value_import) > 0:
+                    # Take the one closest to import
+                    df['diff'] = abs(df.value_export-df.value_import)
+                    df = df.sort_values('diff', ascending=True).head(1).drop('diff', axis=1)
+                else:
+                    logger.warning("Several unmatching export flows")
 
         if len(df) == 0:
             return df
