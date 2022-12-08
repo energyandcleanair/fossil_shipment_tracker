@@ -669,13 +669,15 @@ def process_crossborder_flows(flows_import_raw,
                     (pd.isna(df.value_import) & (df.value_export > 0))]
 
         if auto_confirmed_only and 'Confirmed' in df.flowStatus_import.to_list():
-            if (np.std(df.value_import) / np.nanmean(df.value_import)) < 0.1:
+            if (np.nansum(df.value_import) == 0) \
+                        or (np.std(df.value_import) / np.nanmean(df.value_import)) < 0.1:
                 df = df.loc[df.flowStatus_import == 'Confirmed']
             else:
-                logger.warning("Several unmatching export flows")
+                logger.warning("Several unmatching import flows")
 
         if auto_confirmed_only and 'Confirmed' in df.flowStatus_export.to_list():
-            if (np.std(df.value_export) / np.nanmean(df.value_export)) < 0.1:
+            if (np.nansum(df.value_export) == 0) \
+                    or (np.std(df.value_export) / np.nanmean(df.value_export)) < 0.1:
                 df = df.loc[df.flowStatus_export == 'Confirmed']
             else:
                 logger.warning("Several unmatching export flows")
