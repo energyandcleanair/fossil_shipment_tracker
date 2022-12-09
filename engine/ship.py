@@ -340,7 +340,7 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
                 try:
                     session.commit()
                 except sa.exc.IntegrityError:
-                    logger.error("Failed to delete portcall_id {} and associated objects.".format(ship_portcall.id))
+                    logger.info("Failed to delete portcall_id {} and associated objects.".format(ship_portcall.id))
                     session.rollback()
                     continue
 
@@ -351,7 +351,7 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
         try:
             session.commit()
         except sa.exc.IntegrityError as e:
-            logger.error(e)
+            logger.info(e)
             session.rollback()
 
     ships = session.query(
@@ -372,8 +372,16 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
         Ship.imo.op('~')('[NOTFOUND]')
     )).subquery()
 
+    ships = session.query(
+        ships
+    ) \
+        .distinct(ships.c.imo, ships.c.mmsi).subquery()
+
     if imo:
-        ships = session.query(ships).filter(ships.c.imo.in_(to_list(imo)))
+        ships = session.query(ships).filter(ships.c.imo.in_(to_list(imo))).subquery()
+
+    if not handle_not_found:
+        ships = session.query(ships).filter(~ships.c.imo.op('~')('[NOTFOUND]'))
 
     ships = ships.all()
 
@@ -399,18 +407,32 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
         # check if existing versions of ships have the same dwt - in which case we can simplify
         if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1:
             # delete all duplicates except 1 - we keep records in priority of datalastic > mt
-            data_priority = {'datalastic': 4, 'marinetraffic': 2, 'equasis': 1}
+            #data_priority = {'datalastic': 4, 'marinetraffic': 2, 'equasis': 1}
 
-            ship_versions = sorted(ship_versions, key=lambda item: sum([data_priority[d] for d in item.others]),
-                                   reverse=True)
+            # We can keep by pripritising the ship object which was requested through DL
+            #ship_versions = sorted(ship_versions, key=lambda item: sum([data_priority[d] for d in item.others]),
+            #                       reverse=True)
+
+            # However, it is easier to keep the non-version ship object so we do not have to change events/portcalls
+            ship_versions = sorted(ship_versions, key=lambda item: len(str(item.imo)),
+                                   reverse=False)
+
+            # Check if we only have 1 version - this should not happen as we select distinct
+            if len(ship_versions) == 1:
+                continue
 
             ship_to_keep = ship_versions[0]
             old_imo = ship_to_keep.imo
 
+            # If we only have ships with _v versioning and no base ship, let's skip and check manually
+            if '_v' in ship_to_keep.imo:
+                logger.info("Found a ship with no non-version object, ship imo: {}. Please check.".format(ship_to_keep.imo))
+                continue
+
             # fix the rest of the ship versions by changing departures/portcalls and deleting them after
             for sv in ship_versions[1:]:
                 # fix departures/portcalls if necessary
-                update_ship_imo(sv.imo, old_imo, mmsis)
+                update_ship_imo(sv.imo, old_imo)
 
                 # remove ship
                 session.delete(sv)
@@ -436,7 +458,7 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
                 session.commit()
             except sa.exc.IntegrityError:
                 session.rollback()
-                logger.error("Failed to fix ship imo {}.".format(base_imo))
+                logger.info("Failed to fix ship imo {}.".format(base_imo))
 
         else:
             # first let's try and deal with NOTFOUND cases
@@ -477,7 +499,7 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
 
 
                 else:
-                    logger.error("Failed to update ship_imo {}, we will use existing ship object.".format(base_imo))
+                    logger.info("Failed to update ship_imo {}, we will use existing ship object.".format(base_imo))
                     for sv in ship_versions:
                         if '_v' in sv.imo:
                             update_ship_imo(sv.imo, base_imo)
@@ -485,7 +507,7 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
                     try:
                         session.commit()
                     except sa.exc.IntegrityError:
-                        logger.error("Failed update existing portcalls/departures for ship imo {}.".format(base_imo))
+                        logger.info("Failed update existing portcalls/departures for ship imo {}.".format(base_imo))
                         session.rollback()
 
 
@@ -545,7 +567,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                 try:
                     session.commit()
                 except sa.exc.IntegrityError as e:
-                    logger.error(e)
+                    logger.info(e)
                     session.rollback()
 
             if len(existing_ship) == 1:
@@ -563,7 +585,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                     try:
                         session.commit()
                     except sa.exc.IntegrityError as e:
-                        logger.error(e)
+                        logger.info(e)
                         session.rollback()
 
                 else:
@@ -584,7 +606,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                     try:
                         session.commit()
                     except sa.exc.IntegrityError as e:
-                        logger.error(e)
+                        logger.info(e)
                         session.rollback()
 
             wrong.append(mmsi)
