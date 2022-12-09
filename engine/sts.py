@@ -34,16 +34,20 @@ def update():
     update_sts_locations()
 
 
-def fill_portcalls_around_sts(collapse_events=False,
-                              go_backward=True,
-                              for_departing=True,
-                              for_arriving=False):
+def fill_portcalls_around_sts(
+        date_from='2022-01-01',
+        collapse_events=False,
+        go_backward=True,
+        for_departing=True,
+        for_arriving=True):
     """
     The purpose of this function is to find the first preceeding and proceeding portcall for sts events
 
-    :param collapse_events:
-    :param go_backward:
-    :param for_departing:
+    :param date_from: Date from which to check events
+    :param for_arriving: Whether to fill portcalls around arriving ship
+    :param collapse_events: whether to collapse events between existing portcalls
+    :param go_backward: whether to check portcall backwards as well
+    :param for_departing: whether to fill portcalls around departing [interacting] ship
     :return:
     """
 
@@ -59,12 +63,13 @@ def fill_portcalls_around_sts(collapse_events=False,
         .join(MainShip, MainShip.imo == Event.ship_imo) \
         .join(IntShip, IntShip.imo == Event.interacting_ship_imo) \
         .filter(
-            Event.interacting_ship_details['distance_meters'] != sa.null(),
-            sa.or_(
-                MainShip.commodity == IntShip.commodity,
-                sa.and_(MainShip.commodity.in_([base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS]),
-                IntShip.commodity.in_([base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS]))
-    )).all()
+        Event.date_utc >= date_from,
+        Event.interacting_ship_details['distance_meters'] != sa.null(),
+        sa.or_(
+            MainShip.commodity == IntShip.commodity,
+            sa.and_(MainShip.commodity.in_([base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS]),
+                    IntShip.commodity.in_([base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS]))
+        )).all()
 
     if collapse_events:
         unique_events = session.query(
@@ -74,31 +79,44 @@ def fill_portcalls_around_sts(collapse_events=False,
             Event.date_utc,
             PortCall.date_utc.label('next_portcall_date_utc')
         ) \
-        .outerjoin(PortCall, PortCall.ship_imo == Event.ship_imo) \
-        .filter(PortCall.date_utc > Event.date_utc) \
-        .filter(Event.id.in_([e.id for e in unique_events])) \
-        .order_by(
+            .outerjoin(PortCall, PortCall.ship_imo == Event.ship_imo) \
+            .filter(PortCall.date_utc > Event.date_utc) \
+            .filter(Event.id.in_([e.id for e in unique_events])) \
+            .order_by(
             Event.ship_imo,
             Event.interacting_ship_imo,
             Event.date_utc,
             PortCall.date_utc.asc()
         ) \
-        .distinct(
+            .distinct(
             Event.ship_imo,
             Event.interacting_ship_imo,
             Event.date_utc
         ).all()
 
     for event in tqdm.tqdm(unique_events):
-        portcall.get_next_portcall(imo=event.ship_imo,
-                                   date_from=event.date_utc,
-                                   arrival_or_departure=None)
 
-        if go_backward:
+        if for_arriving:
+            portcall.get_next_portcall(imo=event.ship_imo,
+                                       date_from=event.date_utc,
+                                       arrival_or_departure=None)
+
+            if go_backward:
+                portcall.get_next_portcall(imo=event.ship_imo,
+                                           date_from=event.date_utc,
+                                           arrival_or_departure=None,
+                                           go_backward=True)
+
+        if for_departing:
             portcall.get_next_portcall(imo=event.interacting_ship_imo,
                                        date_from=event.date_utc,
-                                       arrival_or_departure=None,
-                                       go_backward=go_backward)
+                                       arrival_or_departure=None)
+
+            if go_backward:
+                portcall.get_next_portcall(imo=event.interacting_ship_imo,
+                                           date_from=event.date_utc,
+                                           arrival_or_departure=None,
+                                           go_backward=go_backward)
 
 
 def update_sts_locations():
