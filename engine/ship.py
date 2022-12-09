@@ -111,10 +111,10 @@ def fill(imos=[], mmsis=[]):
     logger.info("Adding %d missing ships" % (len(imos) + len(mmsis)))
 
     # First with Datalastic
-    ships = [Datalastic.get_ship(imo=x, query_if_not_in_cache=False) for x in get_missing_ships_imos(imos)]
+    ships = [Datalastic.get_ship(imo=x, query_if_not_in_cache=True) for x in get_missing_ships_imos(imos)]
     upload_ships(ships)
 
-    ships = [Datalastic.get_ship(mmsi=x, query_if_not_in_cache=False) for x in get_missing_ships_mmsis(mmsis)]
+    ships = [Datalastic.get_ship(mmsi=x, query_if_not_in_cache=True) for x in get_missing_ships_mmsis(mmsis)]
     upload_ships(ships)
 
     # Then with Marinetraffic for those still missing
