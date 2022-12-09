@@ -242,7 +242,7 @@ class Marinetraffic:
             mmsis = [x['MMSI'] for x in response_datas]
             found = ship.fill(mmsis=mmsis)
 
-            mmsi_imo = session.query(Ship.mmsi, Ship.imo).filter(Ship.mmsi.overlap(mmsis)).all()
+            mmsi_imo = session.query(Ship.mmsi, Ship.imo).filter(Ship.mmsi.in_(mmsis)).all()
             # Make a dict with IMO:MMSIS
             mmsi_imo_dict = dict(zip([x[1] for x in mmsi_imo],
                                     [x[0] for x in mmsi_imo]))
@@ -275,6 +275,7 @@ class Marinetraffic:
                                 session.add(unknown_ship)
                                 session.commit()
 
+                # else we take the IMO we found
                 r["IMO"] = r_imo[0]
 
             if imo is not None:
@@ -287,7 +288,7 @@ class Marinetraffic:
     @classmethod
     def parse_portcall(cls, response_data):
         data = {
-            "ship_mmsi": [response_data["MMSI"]],
+            "ship_mmsi": response_data["MMSI"],
             "ship_imo": response_data["IMO"],
             "date_utc": response_data["TIMESTAMP_UTC"],
             "date_lt": response_data["TIMESTAMP_LT"],
