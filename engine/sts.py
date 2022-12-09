@@ -7,61 +7,96 @@ import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 from fiona.drvsupport import supported_drivers
 
-from base.logger import logger, logger_slack
-from base.db import session, engine
-from base.models import Berth, Port, Shipment, ShipmentWithSTS, ShipmentArrivalBerth, ShipmentDepartureBerth, \
-    Departure, ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, Event, STSLocation, Arrival
+import base
+from base.logger import logger
+from base.db import session
+from base.models import ShipmentWithSTS, PortCall, Departure, ShipmentDepartureLocationSTS, \
+    ShipmentArrivalLocationSTS, Event, STSLocation, Arrival, Ship
 
 from base.utils import update_geometry_from_wkb, to_list
 from base.db_utils import upsert
 
-from base.models import DB_TABLE_BERTH, DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, \
+from base.models import DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, \
     DB_TABLE_STSARRIVALLOCATION
 
 from engine import portcall
 
 
-def fill_portcalls_around_sts(go_backward=True,
+def update():
+    """
+    This function collects the before/after portcall for STS events so we can verify draught change
+
+    :return:
+    """
+
+    fill_portcalls_around_sts()
+
+    update_sts_locations()
+
+
+def fill_portcalls_around_sts(collapse_events=False,
+                              go_backward=True,
                               for_departing=True,
                               for_arriving=False):
     """
     The purpose of this function is to find the first preceeding and proceeding portcall for sts events
 
+    :param collapse_events:
     :param go_backward:
     :param for_departing:
     :return:
     """
 
-    DepartureEvent = aliased(Event)
-    ArrivalEvent = aliased(Event)
+    MainShip = aliased(Ship)
+    IntShip = aliased(Ship)
 
-    sts_shipments = session.query(
-        ShipmentWithSTS.id,
-        Departure.ship_imo,
-        ArrivalEvent.date_utc,
-        DepartureEvent.date_utc,
-        Departure.event_id) \
-        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
-        .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
-        .outerjoin(ArrivalEvent, ArrivalEvent.id == Arrival.event_id) \
-        .outerjoin(DepartureEvent, DepartureEvent.id == Departure.event_id)
+    unique_events = session.query(
+        Event.id,
+        Event.ship_imo,
+        Event.interacting_ship_imo,
+        Event.date_utc
+    ) \
+        .join(MainShip, MainShip.imo == Event.ship_imo) \
+        .join(IntShip, IntShip.imo == Event.interacting_ship_imo) \
+        .filter(
+            Event.interacting_ship_details['distance_meters'] != sa.null(),
+            sa.or_(
+                MainShip.commodity == IntShip.commodity,
+                sa.and_(MainShip.commodity.in_([base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS]),
+                IntShip.commodity.in_([base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS]))
+    )).all()
 
-    if not for_departing:
-        sts_shipments = sts_shipments.filter(Departure.event_id == sa.null())
+    if collapse_events:
+        unique_events = session.query(
+            Event.id,
+            Event.ship_imo,
+            Event.interacting_ship_imo,
+            Event.date_utc,
+            PortCall.date_utc.label('next_portcall_date_utc')
+        ) \
+        .outerjoin(PortCall, PortCall.ship_imo == Event.ship_imo) \
+        .filter(PortCall.date_utc > Event.date_utc) \
+        .filter(Event.id.in_([e.id for e in unique_events])) \
+        .order_by(
+            Event.ship_imo,
+            Event.interacting_ship_imo,
+            Event.date_utc,
+            PortCall.date_utc.asc()
+        ) \
+        .distinct(
+            Event.ship_imo,
+            Event.interacting_ship_imo,
+            Event.date_utc
+        ).all()
 
-    if not for_arriving:
-        sts_shipments = sts_shipments.filter(Arrival.event_id == sa.null())
-
-    sts_shipments = sts_shipments.all()
-
-    for shipment in tqdm.tqdm(sts_shipments):
-        portcall.get_next_portcall(imo=shipment.ship_imo,
-                                   date_from=shipment.date_utc,
+    for event in tqdm.tqdm(unique_events):
+        portcall.get_next_portcall(imo=event.ship_imo,
+                                   date_from=event.date_utc,
                                    arrival_or_departure=None)
 
         if go_backward:
-            portcall.get_next_portcall(imo=shipment.ship_imo,
-                                       date_from=shipment.date_utc,
+            portcall.get_next_portcall(imo=event.interacting_ship_imo,
+                                       date_from=event.date_utc,
                                        arrival_or_departure=None,
                                        go_backward=go_backward)
 
