@@ -287,7 +287,7 @@ class Marinetraffic:
     @classmethod
     def parse_portcall(cls, response_data):
         data = {
-            "ship_mmsi": response_data["MMSI"],
+            "ship_mmsi": [response_data["MMSI"]],
             "ship_imo": response_data["IMO"],
             "date_utc": response_data["TIMESTAMP_UTC"],
             "date_lt": response_data["TIMESTAMP_LT"],
