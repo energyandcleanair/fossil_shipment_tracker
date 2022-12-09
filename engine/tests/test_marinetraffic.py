@@ -36,3 +36,7 @@ def test_query_portcall():
     assert portcalls3[0].port_id is not None
     assert dt.datetime.strptime(portcalls3[0].date_utc, "%Y-%m-%dT%H:%M:%S") < date_from
 
+    # Verify ship fill and unlocode filtering works
+    filtered_portcalls, portcalls = Marinetraffic.get_portcalls_between_dates(date_from=dt.date.today() - dt.timedelta(days=1),
+                                                                              date_to=dt.date.today() + dt.timedelta(days=1),
+                                                                              unlocode='RUULU')
