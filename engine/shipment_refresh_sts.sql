@@ -231,8 +231,7 @@ FROM
       AND pprev_intship.draught < pprev_intship.next_draught
       AND (
         (mainship.commodity = intship.commodity) OR
-        (mainship.commodity = 'oil_products' AND intship.commodity = 'oil_or_chemical') OR
-        (intship.commodity = 'oil_products' AND mainship.commodity = 'oil_or_chemical')
+        (mainship.commodity IN ('oil_products', 'oil_or_chemical') AND intship.commodity IN ('oil_products', 'oil_or_chemical'))
       )
   ) AS next_departure_events
 ORDER BY

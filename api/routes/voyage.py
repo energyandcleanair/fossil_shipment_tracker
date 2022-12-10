@@ -301,7 +301,6 @@ class VoyageResource(Resource):
         commodity_field = case(
             [
                 (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
-                         Ship.subtype.notin_([base.SUBTYPE_REEFER]),
                          DepartureBerth.commodity.ilike('%coal%'),
                          # Lauri: For Taiwan, please exclude coal shipments without identified berth.
                          # I've done that for data I've provided to Taiwan because too much of the rest is iron ore, scrap etc
