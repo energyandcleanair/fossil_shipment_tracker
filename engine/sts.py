@@ -91,7 +91,7 @@ def fill_portcalls_around_sts(
             .distinct(
             Event.ship_imo,
             Event.interacting_ship_imo,
-            Event.date_utc
+            PortCall.date_utc
         ).all()
 
     for event in tqdm.tqdm(unique_events):
