@@ -385,6 +385,7 @@ def update_departures(
     """
     logger_slack.info("=== Update departures (Portcall) ===")
     ports = session.query(Port)
+    date_from = to_datetime(date_from)
 
     if not ignore_check_departure:
         ports = ports.filter(Port.check_departure)
