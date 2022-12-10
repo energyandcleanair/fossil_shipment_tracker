@@ -690,3 +690,92 @@ def fill_gaps_within_shipments(ship_imo=None,
                 use_cache=False,
                 filter=filter_departure)
             i=i+1
+
+
+
+def fill_gaps_within_shipments_using_mtcall(ship_imo=None,
+                                            date_from=None,
+                                            commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS,
+                                                         base.LNG, base.OIL_OR_CHEMICAL],
+                                            min_dwt=base.DWT_MIN,
+                                            max_time_delta=dt.timedelta(days=7)):
+    """
+    For all completed shipments, look at all calls made to MT
+    and identify potential gaps
+    """
+
+    # sa.cast(MarineTrafficCall.params['imo'], sa.String)) \
+
+    ship_imo = sa.func.regexp_replace(
+            sa.func.regexp_replace(
+                sa.cast(MarineTrafficCall.params['imo'], sa.String),"\"",''),"\"",'').label('ship_imo')
+
+    # Get hours for which
+    calls = session.query(
+        sa.sql.expression.literal_column("0").label('dummy'), # Necessary for the anti-join
+        MarineTrafficCall.id,
+        ship_imo,
+        func.generate_series(
+            func.date_trunc('hour', sa.cast(sa.cast(MarineTrafficCall.params['fromdate'], sa.String), sa.DateTime)),
+            func.date_trunc('hour', sa.cast(sa.cast(MarineTrafficCall.params['todate'], sa.String), sa.DateTime)),
+            '1 hour'
+        ).label('date_utc')) \
+        .join(Ship, Ship.imo ==  ship_imo) \
+        .filter(MarineTrafficCall.method == 'portcalls/',
+                sa.or_(
+                    MarineTrafficCall.params['movetype'] == sa.null(),
+                    sa.cast(MarineTrafficCall.params['movetype'], sa.String) == 'departure'
+                ),
+                MarineTrafficCall.status == base.HTTP_OK
+                ) \
+        .distinct()
+
+    if ship_imo is not None:
+        calls = calls.filter(ship_imo.in_(to_list(ship_imo)))
+
+    if date_from is not None:
+        calls = calls.filter(sa.cast(sa.cast(MarineTrafficCall.params['todate'], sa.String), sa.DateTime) >= to_datetime(date_from))
+
+    if commodities is not None:
+        calls = calls.filter(Ship.commodity.in_(to_list(commodities)))
+
+    shipment_date_from = func.date_trunc('hour', Departure.date_utc).label('date_from')
+    # The end of a shipment we consider is either its arrival (if completed),
+    # its next departure (if undetected) or today (if ongoing)...
+    shipment_date_to = func.date_trunc('hour', func.coalesce(
+        Arrival.date_utc,
+        sa.func.lag(Departure.date_utc) \
+            .over(Departure.ship_imo, order_by=Departure.date_utc.desc()),
+        dt.datetime.now())).label('date_to')
+
+
+    shipments = session.query(Departure.id.label('departure_id'),
+                              Departure.ship_imo,
+                              func.generate_series(
+                                  shipment_date_from,
+                                  shipment_date_to,
+                                  '1 hour').label('date_utc')) \
+        .outerjoin(Arrival, Arrival.departure_id == Departure.id) \
+        .join(Ship, Ship.imo == Departure.ship_imo) \
+        .distinct()
+
+    if ship_imo is not None:
+        shipments = shipments.filter(Departure.ship_imo.in_(to_list(ship_imo)))
+
+    if date_from is not None:
+        shipments = shipments.filter(Departure.date_utc >= to_datetime(date_from))
+
+    if commodities is not None:
+        shipments = shipments.filter(Ship.commodity.in_(to_list(commodities)))
+
+    calls = calls.subquery()
+    shipments = shipments.subquery()
+
+    missing_parts = session.query(shipments) \
+                        .outerjoin(calls, sa.and_(calls.c.ship_imo == shipments.c.ship_imo,
+                                                  calls.c.date_utc == shipments.c.date_utc)) \
+                        .filter(calls.c.dummy == sa.null())
+
+    missing_parts_df = pd.read_sql(missing_parts.statement, session.bind)
+    print(missing_parts_df)
+
