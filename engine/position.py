@@ -81,7 +81,7 @@ def update_shipment_last_position():
 def update(commodities=None,
            ship_imo=None,
            shipment_id=None,
-           date_from=None,
+           date_from='2022-01-01',
            date_to=None,
            shipment_status=None,
            force_for_those_without_destination=False,
