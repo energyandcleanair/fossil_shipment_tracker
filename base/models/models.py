@@ -31,7 +31,6 @@ from . import DB_TABLE_SHIPMENTARRIVALBERTH
 from . import DB_TABLE_SHIPMENTDEPARTUREBERTH
 from . import DB_TABLE_MTVOYAGEINFO
 from . import DB_TABLE_PRICE
-from . import DB_TABLE_PORTPRICE
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
 from . import DB_TABLE_COUNTER100BN
@@ -147,6 +146,7 @@ class STSLocation(Base):
 
     __tablename__ = DB_TABLE_STS_LOCATIONS
 
+
 class ShipmentArrivalLocationSTS(Base):
     """
     For each shipment, lists the berth detected as well as the method used to find it
@@ -163,6 +163,7 @@ class ShipmentArrivalLocationSTS(Base):
     __table_args__ = (UniqueConstraint('shipment_id', 'sts_location_id', name='unique_shipmentstsarrivallocation'),
                       )
 
+
 class ShipmentDepartureLocationSTS(Base):
     """
     For each shipment, lists the berth detected as well as the method used to find it
@@ -178,6 +179,7 @@ class ShipmentDepartureLocationSTS(Base):
     __tablename__ = DB_TABLE_STSDEPARTURELOCATION
     __table_args__ = (UniqueConstraint('shipment_id', 'sts_location_id', name='unique_shipmentstsdeparturelocation'),
                       )
+
 
 class Country(Base):
     iso2 = Column(String, unique=True, primary_key=True)
@@ -498,43 +500,27 @@ class MTVoyageInfo(Base):
 
 class Price(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
+
     commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
     date = Column(DateTime(timezone=False))
     eur_per_tonne = Column(Numeric)
     scenario = Column(String, nullable=False)
+
+    destination_iso2s = Column(ARRAY(String))
+    departure_port_ids = Column(ARRAY(BigInteger))
+    ship_owner_iso2s = Column(ARRAY(String))
+    ship_insurer_iso2s = Column(ARRAY(String))
+
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_PRICE
-    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', 'scenario', name='unique_price'),
-                      CheckConstraint("eur_per_tonne >= 0", name="price_positive"),
-                      # We add a unique index to be sure because the constraint above doesn't work if country_iso2 is null
-                      Index(
-                          "unique_price_additional_constraint",
-                          "date",
-                          "commodity",
-                          "scenario",
-                          unique=True,
-                          postgresql_where=country_iso2.is_(None)
-                      ),
-                      Index("idx_price_commodity", "commodity")
+    __table_args__ = (UniqueConstraint('destination_iso2s', 'departure_port_ids',
+                                       'ship_owner_iso2s',  'ship_insurer_iso2s',
+                                       'date', 'commodity', 'scenario', name='unique_price_new'),
+                      CheckConstraint("eur_per_tonne >= 0", name="price_new_positive"),
+                      Index("idx_price_new_commodity", "commodity"),
+                      Index("idx_price_new_date", "date")
                       )
-
-
-class PortPrice(Base):
-    id = Column(BigInteger, autoincrement=True, primary_key=True)
-    port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'), nullable=False)
-    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
-    date = Column(DateTime(timezone=False))
-    eur_per_tonne = Column(Numeric)
-    scenario = Column(String, nullable=False)
-    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
-
-    __tablename__ = DB_TABLE_PORTPRICE
-    __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', 'scenario', name='unique_portprice'),
-                      CheckConstraint("eur_per_tonne >= 0", name="portprice_positive"),
-                      Index("idx_portprice_commodity", "commodity"))
-
 
 # Entsog flows: before processing
 # Mainly used to communicate between Python and R

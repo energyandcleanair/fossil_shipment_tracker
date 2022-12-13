@@ -13,7 +13,7 @@ from sqlalchemy import func, case, any_
 from . import routes_api
 from flask_restx import inputs
 
-from base.models import PipelineFlow, Country, Commodity, Currency, PriceNew
+from base.models import PipelineFlow, Country, Commodity, Currency, Price
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
@@ -117,7 +117,7 @@ class PipelineFlowResource(Resource):
             aggregate_by.remove('')
 
         value_eur_field = (
-            PipelineFlow.value_tonne * PriceNew.eur_per_tonne
+            PipelineFlow.value_tonne * Price.eur_per_tonne
         ).label('value_eur')
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
@@ -167,20 +167,20 @@ class PipelineFlowResource(Resource):
                                     value_eur_field,
                                     Currency.currency,
                                     value_currency_field,
-                                    PriceNew.scenario.label('pricing_scenario'))
+                                    Price.scenario.label('pricing_scenario'))
              .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
              .outerjoin(DestinationCountry, PipelineFlow.destination_iso2 == DestinationCountry.iso2)
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
              .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(commodity_subquery, PipelineFlow.commodity == commodity_subquery.c.id)
-             .outerjoin(PriceNew,
+             .outerjoin(Price,
                          sa.and_(
-                             PriceNew.date == PipelineFlow.date,
-                             PriceNew.commodity == commodity_subquery.c.pricing_commodity,
+                             Price.date == PipelineFlow.date,
+                             Price.commodity == commodity_subquery.c.pricing_commodity,
                              sa.or_(
-                                 commodity_destination_iso2_field == any_(PriceNew.destination_iso2s),
-                                 PriceNew.destination_iso2s == sa.null()
+                                 commodity_destination_iso2_field == any_(Price.destination_iso2s),
+                                 Price.destination_iso2s == sa.null()
                              )
                          )
                         )
@@ -188,10 +188,10 @@ class PipelineFlowResource(Resource):
              .filter(PipelineFlow.destination_iso2 != "RU")
               # Very important for pricing to have a distinct statement! And to be sorted prior that
               # so that we pick those with port ids matching, then destination iso2s, then ship etc.
-              .order_by(PipelineFlow.id, PriceNew.scenario,
+              .order_by(PipelineFlow.id, Price.scenario,
                         Currency.currency,
-                        PriceNew.destination_iso2s)
-              .distinct(PipelineFlow.id, PriceNew.scenario, Currency.currency)
+                        Price.destination_iso2s)
+              .distinct(PipelineFlow.id, Price.scenario, Currency.currency)
             )
 
 
@@ -226,7 +226,7 @@ class PipelineFlowResource(Resource):
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
 
         if pricing_scenario is not None:
-            flows_rich = flows_rich.filter(PriceNew.scenario.in_(to_list(pricing_scenario)))
+            flows_rich = flows_rich.filter(Price.scenario.in_(to_list(pricing_scenario)))
 
         if not keep_zeros:
             flows_rich = flows_rich.filter(sa.or_(

@@ -18,7 +18,7 @@ from . import routes_api
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     ShipOwner, ShipInsurer, ShipManager, Company, \
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
-    Destination, Country, PriceNew, Currency, ShipmentWithSTS, Event, \
+    Destination, Country, Price, Currency, ShipmentWithSTS, Event, \
     ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, STSLocation, PortCall
 from base.db import session
 from base.encoder import JsonEncoder
@@ -417,7 +417,7 @@ class VoyageResource(Resource):
         shipments_combined = shipments_non_sts.union(shipments_sts_with_arrival).subquery()
 
         value_eur_field = (
-                Ship.dwt * PriceNew.eur_per_tonne
+                Ship.dwt * Price.eur_per_tonne
         ).label('value_eur')
 
         # Technically, we could pivot long -> wide
@@ -578,7 +578,7 @@ class VoyageResource(Resource):
                                     sa.sql.label('value_eur', value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
                                     Currency.currency,
                                     (value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight * Currency.per_eur).label('value_currency'),
-                                    PriceNew.scenario.label('pricing_scenario'),
+                                    Price.scenario.label('pricing_scenario'),
 
                                     DepartureBerth.id.label("departure_berth_id"),
                                     DepartureBerth.name.label("departure_berth_name"),
@@ -608,17 +608,17 @@ class VoyageResource(Resource):
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
              .outerjoin(commodity_subquery, commodity_subquery.c.id == commodity_field)
 
-             .outerjoin(PriceNew,
+             .outerjoin(Price,
                         sa.and_(
-                            PriceNew.date == func.date_trunc('day', Departure.date_utc),
-                            PriceNew.commodity == commodity_subquery.c.pricing_commodity,
+                            Price.date == func.date_trunc('day', Departure.date_utc),
+                            Price.commodity == commodity_subquery.c.pricing_commodity,
                             sa.or_(
-                                destination_iso2_field == any_(PriceNew.destination_iso2s),
-                                PriceNew.destination_iso2s == sa.null()
+                                destination_iso2_field == any_(Price.destination_iso2s),
+                                Price.destination_iso2s == sa.null()
                             ),
                             sa.or_(
-                                DeparturePort.id == any_(PriceNew.departure_port_ids),
-                                PriceNew.departure_port_ids == sa.null()
+                                DeparturePort.id == any_(Price.departure_port_ids),
+                                Price.departure_port_ids == sa.null()
                             )
                         ))
 
@@ -654,10 +654,10 @@ class VoyageResource(Resource):
 
              # Very important for pricing to have a distinct statement! And to be sorted prior that
              # so that we pick those with port ids matching, then destination iso2s, then ship etc.
-             .order_by(shipments_combined.c.shipment_id, shipments_combined.c.ship_imo, PriceNew.scenario, Currency.currency,
-                       PriceNew.departure_port_ids, PriceNew.destination_iso2s, PriceNew.ship_insurer_iso2s, PriceNew.ship_owner_iso2s)
+             .order_by(shipments_combined.c.shipment_id, shipments_combined.c.ship_imo, Price.scenario, Currency.currency,
+                       Price.departure_port_ids, Price.destination_iso2s, Price.ship_insurer_iso2s, Price.ship_owner_iso2s)
              #TODO confirm with Jan these are good columns to do so
-             .distinct(shipments_combined.c.shipment_id, shipments_combined.c.ship_imo, PriceNew.scenario, Currency.currency)
+             .distinct(shipments_combined.c.shipment_id, shipments_combined.c.ship_imo, Price.scenario, Currency.currency)
         )
 
         if id is not None:
@@ -676,7 +676,7 @@ class VoyageResource(Resource):
             shipments_rich = shipments_rich.filter(shipments_combined.c.is_sts == is_sts)
 
         if pricing_scenario is not None:
-            shipments_rich = shipments_rich.filter(PriceNew.scenario.in_(to_list(pricing_scenario)))
+            shipments_rich = shipments_rich.filter(Price.scenario.in_(to_list(pricing_scenario)))
 
         if date_from is not None:
             shipments_rich = shipments_rich.filter(

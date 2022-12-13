@@ -15,7 +15,7 @@ from sqlalchemy import func, case, any_
 
 
 import base
-from base.models import EntsogFlow, PriceNew, Country, Commodity, Currency
+from base.models import EntsogFlow, Price, Country, Commodity, Currency
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
@@ -108,11 +108,11 @@ class EntsogFlowResource(Resource):
             aggregate_by.remove('')
 
         value_eur_field = (
-            EntsogFlow.value_tonne * PriceNew.eur_per_tonne
+            EntsogFlow.value_tonne * Price.eur_per_tonne
         ).label('value_eur')
 
         pricing_scenario_field = (
-                PriceNew.scenario
+                Price.scenario
         ).label('pricing_scenario')
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
@@ -171,13 +171,13 @@ class EntsogFlowResource(Resource):
              .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(commodity_subquery, EntsogFlow.commodity == commodity_subquery.c.id)
-             .outerjoin(PriceNew,
+             .outerjoin(Price,
                          sa.and_(
-                             PriceNew.date == EntsogFlow.date,
-                             PriceNew.commodity == commodity_subquery.c.pricing_commodity,
+                             Price.date == EntsogFlow.date,
+                             Price.commodity == commodity_subquery.c.pricing_commodity,
                              sa.or_(
-                                 commodity_destination_iso2_field == any_(PriceNew.destination_iso2s),
-                                 PriceNew.destination_iso2s == sa.null()
+                                 commodity_destination_iso2_field == any_(Price.destination_iso2s),
+                                 Price.destination_iso2s == sa.null()
                              )
                          )
                          )
@@ -185,8 +185,8 @@ class EntsogFlowResource(Resource):
              .filter(EntsogFlow.destination_iso2 != "RU")
               # Very important for pricing to have a distinct statement! And to be sorted prior that
               # so that we pick those with port ids matching, then destination iso2s, then ship etc.
-             .order_by(EntsogFlow.id, PriceNew.scenario, Currency.currency, PriceNew.destination_iso2s)
-             .distinct(EntsogFlow.id, PriceNew.scenario, Currency.currency)
+             .order_by(EntsogFlow.id, Price.scenario, Currency.currency, Price.destination_iso2s)
+             .distinct(EntsogFlow.id, Price.scenario, Currency.currency)
         )
 
         # Return only >0 values. Otherwise we hit response size limit

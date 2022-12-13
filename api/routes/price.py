@@ -6,7 +6,7 @@ from flask import Response
 from flask_restx import Resource, reqparse, inputs
 from sqlalchemy import func
 
-from base.models import PriceNew, Port, Currency
+from base.models import Price, Port, Currency
 from base.encoder import JsonEncoder
 from base.db import session
 from base.utils import to_list, to_datetime
@@ -46,16 +46,16 @@ class PriceResource(Resource):
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
 
-        query = PriceNew.query.filter(PriceNew.scenario==scenario)
+        query = Price.query.filter(Price.scenario==scenario)
 
         if commodity is not None:
-            query = query.filter(PriceNew.commodity.in_(to_list(commodity)))
+            query = query.filter(Price.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
-            query = query.filter(PriceNew.date >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
+            query = query.filter(Price.date >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
 
         if date_to is not None:
-            query = query.filter(PriceNew.date <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
+            query = query.filter(Price.date <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
 
         price_df = pd.read_sql(query.statement, session.bind)
         price_df.replace({np.nan: None}, inplace=True)
@@ -112,17 +112,17 @@ class PortPriceResource(Resource):
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
 
-        unnested_query = session.query(PriceNew.date,
-                                       PriceNew.commodity,
-                                       PriceNew.date,
-                                       PriceNew.scenario,
-                                       PriceNew.destination_iso2s,
-                                       func.unnest(PriceNew.departure_port_ids).label('port_id'),
-                                       (Currency.per_eur * PriceNew.eur_per_tonne).label('usd_per_tonne'),
-                                       (Currency.per_eur * PriceNew.eur_per_tonne * 0.138).label('usd_per_barrel')
+        unnested_query = session.query(Price.date,
+                                       Price.commodity,
+                                       Price.date,
+                                       Price.scenario,
+                                       Price.destination_iso2s,
+                                       func.unnest(Price.departure_port_ids).label('port_id'),
+                                       (Currency.per_eur * Price.eur_per_tonne).label('usd_per_tonne'),
+                                       (Currency.per_eur * Price.eur_per_tonne * 0.138).label('usd_per_barrel')
                               ) \
-            .join(Currency, Currency.date == PriceNew.date) \
-            .filter(PriceNew.scenario.in_(to_list(scenario)),
+            .join(Currency, Currency.date == Price.date) \
+            .filter(Price.scenario.in_(to_list(scenario)),
                     Currency.currency == 'USD') \
             .subquery()
 
@@ -133,13 +133,13 @@ class PortPriceResource(Resource):
             query = query.filter(Port.unlocode.in_(to_list(unlocode)))
 
         if commodity is not None:
-            query = query.filter(PriceNew.commodity.in_(to_list(commodity)))
+            query = query.filter(Price.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
-            query = query.filter(PriceNew.date >= to_datetime(date_from))
+            query = query.filter(Price.date >= to_datetime(date_from))
 
         if date_to is not None:
-            query = query.filter(PriceNew.date <= to_datetime(date_to))
+            query = query.filter(Price.date <= to_datetime(date_to))
 
         price_df = pd.read_sql(query.statement, session.bind)
         price_df.replace({np.nan: None}, inplace=True)

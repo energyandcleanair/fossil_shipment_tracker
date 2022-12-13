@@ -7,7 +7,7 @@ import pandas as pd
 import base
 import json
 import sqlalchemy as sa
-from base.models import Position, ShipmentArrivalBerth, PriceNew
+from base.models import Position, ShipmentArrivalBerth, Price
 from base.db import session
 from base import PRICING_DEFAULT, PRICING_PRICECAP
 
@@ -37,9 +37,9 @@ def test_voyage_pricing(app):
         assert len(data) > 0
 
         # Check that the match is done properlyz
-        query_price = PriceNew.query.filter(PriceNew.date >= date_from,
-                                            PriceNew.commodity.in_(commodities),
-                                            PriceNew.scenario == PRICING_PRICECAP)
+        query_price = Price.query.filter(Price.date >= date_from,
+                                            Price.commodity.in_(commodities),
+                                            Price.scenario == PRICING_PRICECAP)
 
         price_given = pd.read_sql(query_price.statement, session.bind)
         price_given = price_given.explode('departure_port_ids')
@@ -145,9 +145,9 @@ def test_price_cap(app):
         assert len(data) > 0
 
         # Check that the match is done properly
-        query_price = PriceNew.query.filter(PriceNew.date >= '2022-11-01',
-                                            PriceNew.commodity.in_(commodities),
-                                            PriceNew.scenario == PRICING_PRICECAP)
+        query_price = Price.query.filter(Price.date >= '2022-11-01',
+                                            Price.commodity.in_(commodities),
+                                            Price.scenario == PRICING_PRICECAP)
 
         price_given = pd.read_sql(query_price.statement, session.bind)
         price_given = price_given.explode('departure_port_ids')
