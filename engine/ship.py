@@ -4,10 +4,11 @@ import base
 
 from base.db import session
 from base.logger import logger
-from base.models import Ship, PortCall, Departure, Shipment
+from base.models import Ship, PortCall, Departure, Shipment, Arrival
 from base.utils import to_datetime, to_list
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
+import numpy as np
 
 import sqlalchemy as sa
 
@@ -48,6 +49,7 @@ def collect_mt_for_large_oil_products():
         else:
             logger.info("Was already using MT")
 
+
 #
 # def collect_mt_for_insurers(date_from='2022-02-24',
 #                          commodity=[base.CRUDE_OIL, base.LNG]):
@@ -74,7 +76,6 @@ def collect_mt_for_large_oil_products():
 #                 logger.info("IMOs don't match or ship not found")
 
 def fill_missing_commodity():
-
     ships = Ship.query.filter(Ship.commodity == sa.null()).all()
     for ship in tqdm(ships):
         (commodity, quantity, unit) = ship_to_commodity(ship)
@@ -82,7 +83,6 @@ def fill_missing_commodity():
         ship.quantity = quantity
         ship.unit = unit
         session.commit()
-
 
 
 def fill(imos=[], mmsis=[]):
@@ -108,7 +108,7 @@ def fill(imos=[], mmsis=[]):
         # Ship already in db
         return True
 
-    logger.info("Adding %d missing ships"%(len(imos) + len(mmsis)))
+    logger.info("Adding %d missing ships" % (len(imos) + len(mmsis)))
 
     # First with Datalastic
     ships = [Datalastic.get_ship(imo=x, query_if_not_in_cache=False) for x in get_missing_ships_imos(imos)]
@@ -146,11 +146,11 @@ def upload_ships(ships):
             # Ship with this IMO probably already exists.
             n_imo_ships = Ship.query.filter(Ship.imo.op('~')(ship.imo)).count()
             if n_imo_ships > 0:
-                ship.imo = "%s_v%d"%(ship.imo, n_imo_ships+1)
+                ship.imo = "%s_v%d" % (ship.imo, n_imo_ships + 1)
                 session.add(ship)
                 session.commit()
             else:
-                raise ValueError("Problem inserting ship: %s"%(str(e),))
+                raise ValueError("Problem inserting ship: %s" % (str(e),))
 
 
 def ship_to_commodity(ship):
@@ -173,15 +173,15 @@ def ship_to_commodity(ship):
                 or re.match('Oil products', subtype, re.IGNORECASE):
             commodity = base.OIL_PRODUCTS
         elif re.match('LNG', type, re.IGNORECASE) \
-             or re.match('LNG', subtype, re.IGNORECASE):
+                or re.match('LNG', subtype, re.IGNORECASE):
             commodity = base.LNG
         elif re.match('LPG', type, re.IGNORECASE) \
-             or re.match('LPG', subtype, re.IGNORECASE):
+                or re.match('LPG', subtype, re.IGNORECASE):
             commodity = base.LPG
         elif re.match('Ore or Oil', subtype, re.IGNORECASE):
             commodity = base.OIL_OR_ORE
         elif re.match('Bulk', type, re.IGNORECASE) \
-             or re.match('Bulk', subtype, re.IGNORECASE):
+                or re.match('Bulk', subtype, re.IGNORECASE):
             commodity = base.BULK
         elif re.search('cargo', type, re.IGNORECASE):
             commodity = base.GENERAL_CARGO
@@ -191,19 +191,17 @@ def ship_to_commodity(ship):
     except TypeError:
         commodity = base.UNKNOWN_COMMODITY
 
-    if ship.liquid_gas is not None and commodity==base.LNG:
+    if ship.liquid_gas is not None and commodity == base.LNG:
         unit = "m3"
         quantity = ship.liquid_gas
-    #TODO Should we consider the m3 information for oil?
+    # TODO Should we consider the m3 information for oil?
     else:
         unit = "tonne"
         quantity = ship.dwt
 
-
     # # Heuristic1: if oil_products but dwt > 90,000t, then assume crude_oil
     if ship.dwt and float(ship.dwt) > 90e3 and commodity in [base.OIL_PRODUCTS]:
         commodity = base.CRUDE_OIL
-
 
     return [commodity, quantity, unit]
 
@@ -214,6 +212,7 @@ def set_commodity(ship):
     ship.quantity = quantity
     ship.unit = unit
     return ship
+
 
 def fix_mmsi_imo_discrepancy(date_from=None):
     query = session.query(PortCall.ship_imo, PortCall.ship_mmsi)
@@ -370,3 +369,69 @@ def fix_not_found():
                     logger.info("%s \n vs. \n %s " % (str(new_ship.others),
                                                       str(ship.others)))
 
+
+def compare_ship_sources(dwt_min=None,
+                         sample=None,
+                         limit=None,
+                         reload_marinetraffic=False,
+                         commodity=[base.CRUDE_OIL]):
+    """
+
+    :return:
+    """
+
+    # Let's use a simplified estimate to find out what our biggest transporters of commodities are
+    largest_transporters = session.query(
+        Ship,
+        sa.func.avg(Ship.dwt).label('dwt'),
+        sa.func.sum(Ship.dwt).label('total_dwt'),
+        sa.func.count(Shipment.id.label('shipment_id')).label('n_shipments')
+    ) \
+        .join(Departure, Departure.id == Shipment.departure_id) \
+        .join(Arrival, Arrival.id == Shipment.arrival_id) \
+        .join(Ship, Ship.imo == Departure.ship_imo) \
+        .filter(Ship.others.has_key('marinetraffic'),
+                ~Ship.others.has_key('datalastic')) \
+        .group_by(Ship.imo) \
+        .order_by(sa.func.sum(Ship.dwt).label('total_dwt').desc())
+
+    if dwt_min:
+        largest_transporters = largest_transporters.filter(Ship.dwt > dwt_min)
+
+    if commodity:
+        largest_transporters = largest_transporters.filter(Ship.commodity.in_(to_list(commodity)))
+
+    largest_transporters = largest_transporters.all()
+
+    if limit:
+        largest_transporters = largest_transporters[0:limit]
+
+    if sample:
+        largest_transporters = [largest_transporters[i] for i in
+                                np.random.choice(len(largest_transporters), sample, replace=True)]
+
+    matching = []
+
+    for ship in tqdm(largest_transporters):
+        ship_mt = ship[0]
+        if reload_marinetraffic:
+            ship_mt = Marinetraffic.get_ship(imo = ship_mt.imo)
+
+        ship_dt = set_commodity(Datalastic.get_ship(imo=ship_mt.imo))
+
+        if (ship_mt.dwt == ship_dt.dwt) & (ship_mt.commodity == ship_dt.commodity):
+            if ship_mt.name != ship_dt.name:
+                logger.info('Ship imo {}, names do not match, but dwt and commodity do.'.format(ship_mt.imo))
+            matching.append(ship_dt)
+        else:
+            logger.info('Ship imo {}, dwt/commodity did not match. DWT: {}/{}, Name: {}/{}, Commodity: {}/{}'.format(
+                ship_mt.imo,
+                ship_mt.dwt,
+                ship_dt.dwt,
+                ship_mt.name,
+                ship_dt.name,
+                ship_mt.commodity,
+                ship_dt.commodity
+            ))
+
+    logger.info('Ships are identical for {}% of cases.'.format(100*len(matching) / float(sample)))
