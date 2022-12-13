@@ -607,26 +607,9 @@ class VoyageResource(Resource):
              .outerjoin(Destination, shipments_combined.c.shipment_last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
              .outerjoin(commodity_subquery, commodity_subquery.c.id == commodity_field)
-
-             .outerjoin(Price,
-                        sa.and_(
-                            Price.date == func.date_trunc('day', Departure.date_utc),
-                            Price.commodity == commodity_subquery.c.pricing_commodity,
-                            sa.or_(
-                                destination_iso2_field == any_(Price.destination_iso2s),
-                                Price.destination_iso2s == sa.null()
-                            ),
-                            sa.or_(
-                                DeparturePort.id == any_(Price.departure_port_ids),
-                                Price.departure_port_ids == sa.null()
-                            )
-                        ))
-
-             .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
              .outerjoin(CommodityDestinationCountry, CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
-
              .outerjoin(ShipOwnerDistinct, sa.and_(
                             ShipOwnerDistinct.c.ship_imo == Departure.ship_imo,
                             sa.or_(
@@ -641,7 +624,6 @@ class VoyageResource(Resource):
                         ShipManagerDistinct.c.date_from == sa.null())))
              .outerjoin(ShipManagerCompany, ShipManagerDistinct.c.company_id == ShipManagerCompany.id)
              .outerjoin(ShipManagerCountry, ShipManagerCompany.country_iso2 == ShipManagerCountry.iso2)
-
              .outerjoin(ShipInsurerDistinct, sa.and_(
                     ShipInsurerDistinct.c.ship_imo == Departure.ship_imo,
                     sa.or_(
@@ -649,6 +631,29 @@ class VoyageResource(Resource):
                         ShipInsurerDistinct.c.date_from == sa.null())))
              .outerjoin(ShipInsurerCompany, ShipInsurerDistinct.c.company_id == ShipInsurerCompany.id)
              .outerjoin(ShipInsurerCountry, ShipInsurerCompany.country_iso2 == ShipInsurerCountry.iso2)
+                          .outerjoin(Price,
+                                     sa.and_(
+                                         Price.date == func.date_trunc('day', Departure.date_utc),
+                                         Price.commodity == commodity_subquery.c.pricing_commodity,
+                                         sa.or_(
+                                             destination_iso2_field == any_(Price.destination_iso2s),
+                                             Price.destination_iso2s == sa.null()
+                                         ),
+                                         sa.or_(
+                                             DeparturePort.id == any_(Price.departure_port_ids),
+                                             Price.departure_port_ids == sa.null()
+                                         ),
+                                         sa.or_(
+                                             ShipOwnerCountry.iso2 == any_(Price.ship_owner_iso2s),
+                                             Price.ship_owner_iso2s == sa.null()
+                                         ),
+                                         sa.or_(
+                                             ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
+                                             Price.ship_insurer_iso2s == sa.null()
+                                         )
+                                     ))
+
+             .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
 
