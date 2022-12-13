@@ -117,9 +117,25 @@ class ChartProductOnWater(Resource):
             (data['commodity'] != 'unknown')
             & (data['commodity'] != 'Others')
             & (data['commodity'].notnull())
+            & ~((data['commodity'] == 'Coal')
+                & (data['commodity_destination_region'] == 'EU')
+                & (data['arrival_detected_date_utc'] > pd.to_datetime('2022-08-11'))
+                & (data['status'] == 'completed'))
             ]
 
         data['commodity_destination_region'] = np.where(data['commodity_destination_country'] == 'United Kingdom', 'EU',
+                                                        data['commodity_destination_region'])
+
+        # Fix coal
+        data['commodity_destination_region'] = np.where((data['status'] == 'ongoing')
+                                                        & (data['commodity'] == 'Coal')
+                                                        & (data['commodity_destination_region'] == 'EU'), 'Unknown',
+                                                        data['commodity_destination_region'])
+
+        # Fix crude oil
+        data['commodity_destination_region'] = np.where((data['status'] == 'ongoing')
+                                                        & (data['commodity'] == 'Crude oil')
+                                                        & (data['commodity_destination_region'] == 'EU'), 'Unknown',
                                                         data['commodity_destination_region'])
 
         date_range = pd.date_range('2022-01-01', data['departure_date_utc'].max(), freq='D')
