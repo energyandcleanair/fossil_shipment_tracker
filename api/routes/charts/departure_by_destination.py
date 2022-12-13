@@ -42,7 +42,7 @@ class ChartDepartureDestination(Resource):
                         default=['crude_oil', 'oil_products', 'oil_or_chemical'])
 
     parser.add_argument('aggregate_by', type=str, action='split',
-                        default=['destination_country', 'commodity_group', 'departure_date'],
+                        default=['destination_country', 'commodity_group', 'departure_date', 'status'],
                         help='which variables to aggregate by. Could be any of commodity, type, destination_region, date')
 
     parser.add_argument('language', type=str, help='en or ua',
@@ -152,10 +152,20 @@ class ChartDepartureDestination(Resource):
 
 
         response = VoyageResource().get_from_params(params)
+
         data = pd.DataFrame(response.json['data'])
         data = data[data.destination_iso2 != 'RU']
         data['departure_date'] = pd.to_datetime(data.departure_date)
         data.replace({base.UNKNOWN: 'Unknown'}, inplace=True)
+
+        # Fix crude oil
+        data['destination_region'] = np.where((data['status'] == 'ongoing')
+                                                        & (data['commodity_group_name'] == 'Crude oil')
+                                                        & (data['destination_region'] == 'EU'), 'Unknown',
+                                                        data['destination_region'])
+
+        data = data.drop('status', axis=1)
+
         data = group_countries(data, country_grouping)
         data = pivot_data(data)
         data = translate(data=data, language=language)

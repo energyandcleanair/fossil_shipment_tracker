@@ -48,9 +48,9 @@ def test_departure_destination(app):
 
         # Order matters for Flourish
         # If this changes, please update column selection in Flourish
-        assert data_df.columns[1] == 'commodity_group_name'
-        assert data_df.columns[4] == 'departure_date'
-        assert len(data_df.columns) == 14
+        assert data_df.columns[0] == 'commodity_group_name'
+        assert data_df.columns[1] == 'departure_date'
+        assert len(data_df.columns) == 15
 
 
 def test_departure_ownership(app):
