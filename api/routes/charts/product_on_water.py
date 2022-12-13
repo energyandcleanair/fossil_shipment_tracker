@@ -33,6 +33,10 @@ class ChartProductOnWater(Resource):
                         required=False,
                         default=None)
 
+    parser.add_argument('aggregate_by', type=str, action='split',
+                        default=['commodity_destination_region', 'commodity_destination_country', 'commodity', 'arrival_detected_date', 'departure_date', 'status'],
+                        help='which variables to aggregate by. Could be any of commodity, type, destination_region, date')
+
     parser.add_argument('rolling_days', type=int,
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=None)
@@ -105,10 +109,10 @@ class ChartProductOnWater(Resource):
         response = VoyageResource().get_from_params(params)
         data = pd.DataFrame(response.json['data'])
 
-        data['arrival_detected_date_utc'] = pd.to_datetime(data['arrival_detected_date_utc'])
-        data['arrival_detected_date_utc'].fillna(pd.to_datetime('now') + pd.Timedelta(days=7), inplace=True)
+        data['arrival_detected_date'] = pd.to_datetime(data['arrival_detected_date'])
+        data['arrival_detected_date'].fillna(pd.to_datetime('now') + pd.Timedelta(days=7), inplace=True)
 
-        data['departure_date_utc'] = pd.to_datetime(data['departure_date_utc'])
+        data['departure_date'] = pd.to_datetime(data['departure_date'])
 
         data.replace({'commodity': recode_commodity}, inplace=True)
         data['commodity'].fillna('Others', inplace=True)
@@ -119,7 +123,7 @@ class ChartProductOnWater(Resource):
             & (data['commodity'].notnull())
             & ~((data['commodity'] == 'Coal')
                 & (data['commodity_destination_region'] == 'EU')
-                & (data['arrival_detected_date_utc'] > pd.to_datetime('2022-08-11'))
+                & (data['arrival_detected_date'] > pd.to_datetime('2022-08-11'))
                 & (data['status'] == 'completed'))
             ]
 
@@ -138,11 +142,11 @@ class ChartProductOnWater(Resource):
                                                         & (data['commodity_destination_region'] == 'EU'), 'Unknown',
                                                         data['commodity_destination_region'])
 
-        date_range = pd.date_range('2022-01-01', data['departure_date_utc'].max(), freq='D')
+        date_range = pd.date_range('2022-01-01', data['departure_date'].max(), freq='D')
         result = []
 
         for d in date_range:
-            _data = data[(data['departure_date_utc'] <= d) & (data['arrival_detected_date_utc'] >= d)] \
+            _data = data[(data['departure_date'] <= d) & (data['arrival_detected_date'] >= d)] \
                           .groupby(['commodity', 'commodity_destination_region']).agg(
                 {'value_tonne': 'sum'}).reset_index()
             _data['date'] = d
