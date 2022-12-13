@@ -67,7 +67,7 @@ class ChartProductOnWater(Resource):
             'keep_zeros': True,
             'format': 'json',
             'nest_in_data': True,
-            'status': ['completed', 'ongoing']
+            #'status': ['completed', 'ongoing']
         })
 
         recode_commodity = {
