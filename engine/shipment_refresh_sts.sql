@@ -154,102 +154,45 @@ departures_russia_full AS (
 -- take unique events by collapsing all of them between discharge calls and taking distinct ship name/int ship name
 unique_events AS (
     SELECT
-  DISTINCT ON (
-    next_departure_events.ship_imo,
-    next_departure_events.next_departure_date_utc,
-    next_departure_events.interacting_ship_name
+	  DISTINCT ON (
+    events.ship_imo,
+    events.next_portcall_date_utc,
+    events.interacting_ship_imo
   )
-    next_departure_events.*
+    events.*
 FROM
   (
-    SELECT
-      dr.ship_imo,
-      dr.date_utc,
-      next_departures.next_departure_date_utc,
-      ev.id AS event_id,
-      ev.ship_name,
-      ev.interacting_ship_name,
-      ev.date_utc AS event_date_utc,
-      ev.interacting_ship_imo,
-      cast(
-        ev.interacting_ship_details ->> 'distance_meters' AS bigint
-      ) AS distance_meters
-    FROM departures_russia_full dr
-    LEFT JOIN
-      (
-        SELECT DISTINCT ON (d.ship_imo, d.id)
-          d.ship_imo,
-          d.id as departure_portcall_id,
-          d.date_utc,
-          p.date_utc AS next_departure_date_utc
-        FROM
-          departures_russia_full d
-        LEFT JOIN departure_portcalls p
-            ON p.ship_imo = d.ship_imo
-        WHERE
-            p.move_type = 'departure'
-            AND p.date_utc > d.date_utc
-            AND (d.next_russia_departure_date_utc IS NULL
-                OR p.date_utc <= d.next_russia_departure_date_utc)
-            AND (p.port_operation = 'discharge'
-                OR (p.previous_load_status = 'fully_laden'
-                    AND p.load_status = 'in_ballast')
-                OR p.port_operation = 'load'
-                )
-        ORDER BY
-            d.ship_imo,
-            d.id,
-            next_departure_date_utc DESC
-      ) AS next_departures
-      ON dr.id = next_departures.departure_portcall_id
-      LEFT JOIN event ev ON (
-        ev.ship_imo = dr.ship_imo
-        AND (
-          (
-            next_departures.next_departure_date_utc IS NOT NULL
-            AND ev.date_utc BETWEEN dr.date_utc
-            AND next_departures.next_departure_date_utc
-          )
-          OR (
-            next_departures.next_departure_date_utc IS NULL
-            AND ev.date_utc BETWEEN dr.date_utc
-            AND CURRENT_DATE
-          )
-        )
-      )
-    LEFT JOIN portcall_w_prev pprev_ship ON
+  	SELECT
+	  ev.ship_imo,
+	  ev.date_utc as event_date_utc,
+	  ev.id as event_id,
+	  ev.interacting_ship_imo,
+	  ev.interacting_ship_name,
+	  pprev_ship.next_date_utc as next_portcall_date_utc
+	  FROM
+	    event ev
+	  JOIN ship mainship ON mainship.imo = ev.ship_imo
+      JOIN ship intship ON intship.imo = ev.interacting_ship_imo
+	  LEFT JOIN portcall_w_prev pprev_ship ON
         (pprev_ship.ship_imo = ev.ship_imo AND ev.date_utc BETWEEN pprev_ship.date_utc AND pprev_ship.next_date_utc)
-    LEFT JOIN portcall_w_prev pprev_intship ON
+      LEFT JOIN portcall_w_prev pprev_intship ON
         (pprev_intship.ship_imo = ev.interacting_ship_imo AND ev.date_utc BETWEEN pprev_intship.date_utc AND pprev_intship.next_date_utc)
-    JOIN ship mainship ON mainship.imo = dr.ship_imo
-    JOIN ship intship ON intship.imo = ev.interacting_ship_imo
     WHERE
       ev.type_id = '21'
       AND ev.interacting_ship_imo IS NOT NULL
       AND ev.interacting_ship_details ->> 'distance_meters' IS NOT NULL
-      AND pprev_ship.draught > pprev_ship.next_draught
-      AND pprev_intship.draught < pprev_intship.next_draught
       AND (
         (mainship.commodity = intship.commodity) OR
         (mainship.commodity IN ('oil_products', 'oil_or_chemical') AND intship.commodity IN ('oil_products', 'oil_or_chemical'))
       )
-  ) AS next_departure_events
-ORDER BY
-  next_departure_events.ship_imo,
-  next_departure_events.next_departure_date_utc,
-  next_departure_events.interacting_ship_name,
-  next_departure_events.event_date_utc DESC
-),
-departures_sts AS (
-    SELECT
-        e.interacting_ship_imo AS ship_imo,
-        e.event_id,
-        e.event_date_utc as departure_date_utc
-    FROM
-        unique_events e
-    WHERE
-        e.interacting_ship_imo IS NOT NULL
-        AND e.event_id IS NOT NULL
+      AND pprev_ship.draught > pprev_ship.next_draught
+      AND pprev_intship.draught < pprev_intship.next_draught
+    ) AS events
+    ORDER BY
+  events.ship_imo,
+  events.next_portcall_date_utc,
+  events.interacting_ship_imo,
+  events.event_date_utc DESC
 ),
 next_departure AS (
     SELECT DISTINCT ON (departure_portcall_id)
@@ -336,16 +279,28 @@ sts_arrival AS (
         LEFT JOIN unique_events ev
             ON ev.ship_imo = nextd.ship_imo
     WHERE
-        ev.event_date_utc > nextd.departure_date_utc AND
         (
-            (nextd.next_russia_departure_date_utc IS NOT NULL AND ev.event_date_utc <= nextd.next_russia_departure_date_utc)
+            (nextd.next_russia_departure_date_utc IS NOT NULL AND ev.event_date_utc BETWEEN nextd.departure_date_utc AND nextd.next_russia_departure_date_utc)
             OR
-            (nextd.next_russia_departure_date_utc IS NULL AND ev.event_date_utc <= CURRENT_DATE)
+            (nextd.next_russia_departure_date_utc IS NULL AND ev.event_date_utc BETWEEN nextd.departure_date_utc AND CURRENT_DATE)
         )
         ORDER BY
             departure_portcall_id,
             event_id,
             ev.event_date_utc DESC
+),
+departures_sts AS (
+    SELECT
+        e.interacting_ship_imo AS ship_imo,
+        e.event_id,
+        e.event_date_utc as departure_date_utc
+    FROM
+        unique_events e
+    WHERE
+        e.event_id IN (
+			SELECT event_id
+			FROM sts_arrival
+		)
 ),
 -- now look at departures from sts and check if we have any matching arrivals
 sts_departures_with_next AS (
