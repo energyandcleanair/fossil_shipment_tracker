@@ -19,7 +19,7 @@ def update():
                 # To ensure latest version is being used
                 "if('russiacounter' %in% (.packages())){detach('package:russiacounter', unload=T)}",
                 "library(russiacounter)",
-                "russiacounter::update_counter_new()"
+                "russiacounter::update_counter()"
             ]
         },
         "environment_variables": [
