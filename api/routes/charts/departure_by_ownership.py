@@ -61,9 +61,12 @@ class ChartDepartureOwnership(Resource):
         params = VoyageResource.parser.parse_args()
         params_chart = ChartDepartureOwnership.parser.parse_args()
         format = params_chart.get('format')
+        aggregate_by = params_chart.get('aggregate_by').copy()
         nest_in_data = params_chart.get('nest_in_data')
         language = params_chart.get('language')
         group_eug7_insurernorwary = params_chart.get('group_eug7_insurernorwary')
+
+        default_aggregate_by = ['ship_owner_country', 'ship_insurer_country', 'departure_date', 'commodity_group']
 
         params.update(**params_chart)
         params.update(**{
@@ -119,13 +122,19 @@ class ChartDepartureOwnership(Resource):
             # Do in two steps in case voyage returned base.UNKNOWN
             data.replace({base.UNKNOWN: 'Unknown'}, inplace=True)
 
-        result = data.groupby(['region', 'departure_date', 'commodity_group_name']) \
+
+
+        group_by_cols = ['region', 'departure_date', 'commodity_group_name'] \
+                        + [x for x in aggregate_by if x not in default_aggregate_by]
+        pivot_cols = ['region']
+        index_cols = [x for x in group_by_cols if x not in pivot_cols]
+        result = data.groupby(group_by_cols) \
                         .value_tonne.sum() \
                         .reset_index() \
-            .pivot_table(index=['commodity_group_name', 'departure_date'],
-                           columns=['region'],
-                           values='value_tonne',
-                           sort=False,
+            .pivot_table(index=index_cols,
+                         columns=pivot_cols,
+                         values='value_tonne',
+                         sort=False,
                            fill_value=0) \
             .reset_index()
 
