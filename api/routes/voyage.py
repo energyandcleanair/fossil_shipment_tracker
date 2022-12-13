@@ -18,7 +18,7 @@ from . import routes_api
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     ShipOwner, ShipInsurer, ShipManager, Company, \
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
-    Destination, Price, Country, PortPrice, PriceNew, Currency, ShipmentWithSTS, Event, \
+    Destination, Country, PriceNew, Currency, ShipmentWithSTS, Event, \
     ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, STSLocation, PortCall
 from base.db import session
 from base.encoder import JsonEncoder
@@ -416,22 +416,6 @@ class VoyageResource(Resource):
 
         shipments_combined = shipments_non_sts.union(shipments_sts_with_arrival).subquery()
 
-        # generate value fields based on arrivalship dwt
-
-        # Price for all countries without country-specific price
-        # SelectedPrice = Price.query.filter(Price.scenario.in_(to_list(pricing_scenario))).subquery()
-        # SelectedPortPrice = PortPrice.query.filter(PortPrice.scenario.in_(to_list(pricing_scenario))).subquery()
-        #
-        # default_price = session.query(SelectedPrice).filter(SelectedPrice.c.country_iso2 == sa.null()).subquery()
-
-        # price_eur_per_tonne_field = (
-        #     func.coalesce(SelectedPortPrice.c.eur_per_tonne, SelectedPrice.c.eur_per_tonne, default_price.c.eur_per_tonne)
-        # ).label('price_eur_per_tonne')
-
-        # pricing_scenario_field = (
-        #     func.coalesce(SelectedPortPrice.c.scenario, SelectedPrice.c.scenario, default_price.c.scenario)
-        # ).label('pricing_scenario')
-
         value_eur_field = (
                 Ship.dwt * PriceNew.eur_per_tonne
         ).label('value_eur')
@@ -669,6 +653,7 @@ class VoyageResource(Resource):
              .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
 
              # Very important for pricing to have a distinct statement! And to be sorted prior that
+             # so that we pick those with port ids matching, then destination iso2s, then ship etc.
              .order_by(shipments_combined.c.shipment_id, shipments_combined.c.ship_imo, PriceNew.scenario, Currency.currency,
                        PriceNew.departure_port_ids, PriceNew.destination_iso2s, PriceNew.ship_insurer_iso2s, PriceNew.ship_owner_iso2s)
              #TODO confirm with Jan these are good columns to do so

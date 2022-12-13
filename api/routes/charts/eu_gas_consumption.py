@@ -9,11 +9,6 @@ import sqlalchemy.sql.expression
 from .. import routes_api
 from flask_restx import inputs
 
-from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
-    ShipOwner, ShipInsurer, ShipManager, Company, \
-    ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
-    Destination, Price, Country, PortPrice, Currency, ShipmentWithSTS, Event
-from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from base.logger import logger

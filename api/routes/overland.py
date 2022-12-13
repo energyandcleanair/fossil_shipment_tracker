@@ -8,12 +8,12 @@ from flask import Response
 from flask_restx import Resource, reqparse
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
-from sqlalchemy import func, case
+from sqlalchemy import func, case, any_
 
 from . import routes_api
 from flask_restx import inputs
 
-from base.models import PipelineFlow, Price, Country, Commodity, Currency
+from base.models import PipelineFlow, Country, Commodity, Currency, PriceNew
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
@@ -116,17 +116,9 @@ class PipelineFlowResource(Resource):
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
 
-        # Price for all countries without country-specific price
-        SelectedPrice = Price.query.filter(Price.scenario.in_(to_list(pricing_scenario))).subquery()
-        default_price = session.query(SelectedPrice).filter(SelectedPrice.c.country_iso2 == sa.null()).subquery()
-
         value_eur_field = (
-            PipelineFlow.value_tonne * func.coalesce(SelectedPrice.c.eur_per_tonne, default_price.c.eur_per_tonne)
+            PipelineFlow.value_tonne * PriceNew.eur_per_tonne
         ).label('value_eur')
-
-        pricing_scenario_field = (
-                func.coalesce(SelectedPrice.c.scenario, default_price.c.scenario)
-        ).label('pricing_scenario')
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
@@ -175,29 +167,32 @@ class PipelineFlowResource(Resource):
                                     value_eur_field,
                                     Currency.currency,
                                     value_currency_field,
-                                    pricing_scenario_field)
+                                    PriceNew.scenario.label('pricing_scenario'))
              .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
              .outerjoin(DestinationCountry, PipelineFlow.destination_iso2 == DestinationCountry.iso2)
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
              .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(commodity_subquery, PipelineFlow.commodity == commodity_subquery.c.id)
-             .outerjoin(default_price,
-                         sa.and_(default_price.c.date == PipelineFlow.date,
-                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
-                                 )
+             .outerjoin(PriceNew,
+                         sa.and_(
+                             PriceNew.date == PipelineFlow.date,
+                             PriceNew.commodity == commodity_subquery.c.pricing_commodity,
+                             sa.or_(
+                                 commodity_destination_iso2_field == any_(PriceNew.destination_iso2s),
+                                 PriceNew.destination_iso2s == sa.null()
+                             )
                          )
-             .outerjoin(SelectedPrice,
-                        sa.and_(SelectedPrice.c.date == PipelineFlow.date,
-                                SelectedPrice.c.commodity == commodity_subquery.c.pricing_commodity,
-                                sa.or_(
-                                    sa.and_(SelectedPrice.c.country_iso2 == sa.null(), PipelineFlow.destination_iso2 == sa.null()),
-                                    SelectedPrice.c.country_iso2 == PipelineFlow.destination_iso2),
-                                SelectedPrice.c.scenario == default_price.c.scenario
-                                ),
                         )
              .outerjoin(Currency, Currency.date == PipelineFlow.date)
-             .filter(PipelineFlow.destination_iso2 != "RU"))
+             .filter(PipelineFlow.destination_iso2 != "RU")
+              # Very important for pricing to have a distinct statement! And to be sorted prior that
+              # so that we pick those with port ids matching, then destination iso2s, then ship etc.
+              .order_by(PipelineFlow.id, PriceNew.scenario,
+                        Currency.currency,
+                        PriceNew.destination_iso2s)
+              .distinct(PipelineFlow.id, PriceNew.scenario, Currency.currency)
+            )
 
 
         # Return only >0 values. Otherwise we hit response size limit
@@ -229,6 +224,9 @@ class PipelineFlowResource(Resource):
 
         if currency is not None:
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
+
+        if pricing_scenario is not None:
+            flows_rich = flows_rich.filter(PriceNew.scenario.in_(to_list(pricing_scenario)))
 
         if not keep_zeros:
             flows_rich = flows_rich.filter(sa.or_(

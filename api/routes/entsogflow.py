@@ -11,11 +11,11 @@ from flask import Response
 from flask_restx import Resource, reqparse
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
-from sqlalchemy import func, case
+from sqlalchemy import func, case, any_
 
 
 import base
-from base.models import EntsogFlow, Price, Country, Commodity, Currency
+from base.models import EntsogFlow, PriceNew, Country, Commodity, Currency
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
@@ -107,17 +107,12 @@ class EntsogFlowResource(Resource):
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
 
-        # Price for all countries without country-specific price
-        SelectedPrice = Price.query.filter(Price.scenario.in_(to_list(pricing_scenario))).subquery()
-        default_price = session.query(SelectedPrice).filter(SelectedPrice.c.country_iso2 == sa.null()).subquery()
-
-
         value_eur_field = (
-            EntsogFlow.value_tonne * func.coalesce(SelectedPrice.c.eur_per_tonne, default_price.c.eur_per_tonne)
+            EntsogFlow.value_tonne * PriceNew.eur_per_tonne
         ).label('value_eur')
 
         pricing_scenario_field = (
-                func.coalesce(SelectedPrice.c.scenario, default_price.c.scenario)
+                PriceNew.scenario
         ).label('pricing_scenario')
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
@@ -176,21 +171,23 @@ class EntsogFlowResource(Resource):
              .outerjoin(CommodityDestinationCountry,
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(commodity_subquery, EntsogFlow.commodity == commodity_subquery.c.id)
-             .outerjoin(SelectedPrice,
-                        sa.and_(SelectedPrice.c.date == EntsogFlow.date,
-                                SelectedPrice.c.commodity == commodity_subquery.c.pricing_commodity,
-                                sa.or_(
-                                    sa.and_(SelectedPrice.c.country_iso2 == sa.null(), EntsogFlow.destination_iso2 == sa.null()),
-                                    SelectedPrice.c.country_iso2 == EntsogFlow.destination_iso2)
-                                )
-                        )
-             .outerjoin(default_price,
-                         sa.and_(default_price.c.date == EntsogFlow.date,
-                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
-                                 )
-                        )
+             .outerjoin(PriceNew,
+                         sa.and_(
+                             PriceNew.date == EntsogFlow.date,
+                             PriceNew.commodity == commodity_subquery.c.pricing_commodity,
+                             sa.or_(
+                                 commodity_destination_iso2_field == any_(PriceNew.destination_iso2s),
+                                 PriceNew.destination_iso2s == sa.null()
+                             )
+                         )
+                         )
              .outerjoin(Currency, Currency.date == EntsogFlow.date)
-             .filter(EntsogFlow.destination_iso2 != "RU"))
+             .filter(EntsogFlow.destination_iso2 != "RU")
+              # Very important for pricing to have a distinct statement! And to be sorted prior that
+              # so that we pick those with port ids matching, then destination iso2s, then ship etc.
+             .order_by(EntsogFlow.id, PriceNew.scenario, Currency.currency, PriceNew.destination_iso2s)
+             .distinct(EntsogFlow.id, PriceNew.scenario, Currency.currency)
+        )
 
         # Return only >0 values. Otherwise we hit response size limit
         flows_rich = flows_rich.filter(EntsogFlow.value_tonne > 0)
