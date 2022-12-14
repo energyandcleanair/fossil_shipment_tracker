@@ -161,7 +161,7 @@ class Marinetraffic:
         data = {
             "mmsi": [response_data["MMSI"]],
             "imo": response_data["IMO"],
-            "name": response_data.get("NAME"),
+            "name": [response_data.get("NAME")],
             "type": response_data.get("VESSEL_TYPE"),
             # "subtype": None,
             "dwt": response_data.get("SUMMER_DWT"),

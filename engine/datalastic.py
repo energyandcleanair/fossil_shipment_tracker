@@ -177,7 +177,7 @@ class Datalastic:
     def parse_ship_data(cls, response_data):
         data = {
             "mmsi": [response_data["mmsi"]],
-            "name": response_data["name"],
+            "name": [response_data["name"]],
             "imo": response_data["imo"],
             "type": response_data["type"],
             "subtype": response_data["type_specific"],
