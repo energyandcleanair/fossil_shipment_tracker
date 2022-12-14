@@ -837,6 +837,9 @@ def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=Tr
     flows = flows[['commodity', 'departure_iso2', 'destination_iso2', 'date',
                    'value_tonne', 'value_mwh', 'value_m3', 'type']]
 
+    # For flows update for debug or manual cleaning
+    flows['updated_on'] = dt.datetime.now()
+
     upsert(df=flows, table=DB_TABLE_ENTSOGFLOW, constraint_name="unique_entsogflow")
 
     # Raise alert if no recent data was found
