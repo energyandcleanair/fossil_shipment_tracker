@@ -137,6 +137,7 @@ def update(
 
             if not events:
                 print("No vessel events found for ship_imo: {}.".format(ship_imo))
+                continue
 
             event_process_state = [add_interacting_ship_details_to_event(e) for e in events]
 
@@ -190,9 +191,10 @@ def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time):
 def find_ships_in_db(interacting_ship_name):
 
     ships = session.query(Ship) \
-            .filter(func.lower(Ship.name).ilike(func.lower(interacting_ship_name)),
+            .filter(sa.or_(Ship.name.any(interacting_ship_name),
+                           Ship.name.any(func.lower(interacting_ship_name))),
                     Ship.dwt > base.DWT_MIN,
-                    sqlalchemy.not_(Ship.name.contains('NOTFOUND'))).all()
+                    ~Ship.imo.contains('NOTFOUND')).all()
 
     return ships
 
@@ -273,14 +275,14 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
 
                 if not mt_intship_check:
                     # add unknown ship to db, so we don't repeatedly query MT
-                    unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi, mmsi=intship.mmsi, type=intship.type,
+                    unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi[-1], mmsi=intship.mmsi[-1], type=intship.type,
                                         name=intship.name)
                     session.add(unknown_ship)
                     session.commit()
 
                     continue
 
-                mt_ship = session.query(Ship).filter(Ship.mmsi == intship.mmsi).all()
+                mt_ship = session.query(Ship).filter(Ship.mmsi.any(intship.mmsi[0])).all()
 
                 # check if we find more than 1 ship
                 if len(mt_ship) > 1:
@@ -293,7 +295,7 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
 
                 mt_ship = mt_ship[0]
 
-                if intship.name == mt_ship.name:
+                if intship.name[0] in mt_ship.name:
                     intship.imo = mt_ship.imo
                 else:
                     print("Found match for ship with mmsi, but names do not match for event {}".format(event_content))
