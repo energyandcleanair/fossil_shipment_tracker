@@ -53,7 +53,7 @@ from . import DB_TABLE_ALERT_CRITERIA_ASSOC
 class Ship(Base):
     imo = Column(String, primary_key=True)
     mmsi = Column(ARRAY(String))
-    name = Column(String)
+    name = Column(ARRAY(String))
     type = Column(String)
     subtype = Column(String)
     dwt = Column(Numeric) # in tonnes
