@@ -403,6 +403,7 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
         # combine other data column to store for the future
         other_data = return_coalesced_data(ship_versions)
         mmsis = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
+        names = list(set([name for s in ship_versions for name in s.name]))
 
         # check if existing versions of ships have the same dwt - in which case we can simplify
         if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1:
@@ -449,6 +450,7 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
             ship_to_keep.imo = base_imo
             ship_to_keep.others = other_data
             ship_to_keep.mmsi = mmsis
+            ship_to_keep.name = names
 
             # fix portcalls/departures to base imo if original had _v naming
             if '_v' in ship_to_keep.imo:
@@ -487,6 +489,7 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
 
                     found_ship.others = other_data
                     found_ship.mmsi = mmsis
+                    found_ship.name = names
 
                     for sv in ship_versions:
                         update_ship_imo(sv.imo, base_imo)
