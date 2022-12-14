@@ -290,13 +290,22 @@ def fix_opd_countries(opd):
     # Improvement: account for that
     # Also, it was attributed to Switzerland because the TSO it Swiss
     # TODO check if others are wrong
-    opd.loc[(opd.pointKey=='ITP-00008') & (opd.operatorKey=='AL-TSO-0001'), 'country'] = 'GR'
+    opd.loc[(opd.pointKey == 'ITP-00008') & (opd.operatorKey=='AL-TSO-0001'), 'country'] = 'GR'
     opd.loc[(opd.pointKey == 'ITP-00008') & (opd.operatorKey == 'IT-TSO-0001'), 'partner'] = 'GR'
-
 
     # LNG marked as LNG
     # Zeebrugge
     opd.loc[(opd.pointKey == 'LNG-00017') & (opd.directionKey == 'entry'), 'partner'] = 'lng'
+
+    # Nea Mesimvria is from GR to GR, not from CH to GR
+    opd.loc[opd.pointLabel == 'Nea Mesimvria', 'partner'] = 'GR'
+    opd.loc[opd.pointLabel == 'Nea Mesimvria', 'country'] = 'GR'
+
+    # EELV - Russia (Luhammar | Korneti)
+    # TO Russia
+    opd.loc[opd.id == '5LV-TSO-0001ITP-00493exit', 'partner'] = 'RU'
+    # From Russia
+    opd.loc[opd.id == '5LV-TSO-0001ITP-00493entry', 'partner'] = 'RU'
 
     len_after = len(opd)
     assert len_after == len_before
@@ -380,11 +389,6 @@ def get_flows_raw(date_from='2022-01-01',
                   remove_operators=[],
                   remove_point_labels=[],
                   remove_point_ids=[],
-                  # remove_point_labels=['Dornum GASPOOL',
-                  #                      'VIP Waidhaus NCG',
-                  #                      'Haiming 2 7F/bn'],
-                  # remove_point_ids=['5DE-TSO-0016ITP-00452exitCZ-TSO-0001',
-                  #                   '5DE-TSO-0016ITP-00452entryCZ-TSO-0001'],
                   use_csv_selection=True):
 
     opd = get_operator_point_directions()
@@ -414,9 +418,8 @@ def get_flows_raw(date_from='2022-01-01',
 
 
     is_crossborder = opd.pointType.str.contains('Cross-Border Transmission') \
-                | ( opd.pointType.str.contains('Transmission') \
-                    & opd.crossBorderPointType.str.contains('Cross') \
-                    & ~opd.pointLabel.str.contains('VIP'))
+                | (opd.pointType.str.contains('Transmission') \
+                    & opd.crossBorderPointType.str.contains('Cross'))
 
     is_transmission = opd.pointType.str.startswith('Transmission') & ~is_crossborder
     is_storage = opd.pointType.str.startswith('Storage')
@@ -803,6 +806,7 @@ def get_flows(date_from='2022-01-01',
               date_to=dt.date.today(),
               country_iso2=None,
               remove_pipe_in_pipe=True,
+              use_csv_selection=True,
               save_intermediary_to_file=False,
               intermediary_filename=None,
               save_to_file=False,
@@ -820,9 +824,10 @@ def get_flows(date_from='2022-01-01',
      flows_storage_exit_raw,
      flows_transmission_entry_raw,
      flows_transmission_exit_raw) = get_flows_raw(date_from=date_from,
-                                                       date_to=date_to,
-                                                       country_iso2=country_iso2,
-                                                       remove_pipe_in_pipe=remove_pipe_in_pipe)
+                                                  date_to=date_to,
+                                                  country_iso2=country_iso2,
+                                                  use_csv_selection=use_csv_selection,
+                                                  remove_pipe_in_pipe=remove_pipe_in_pipe)
 
     # Process cross border & production
     flows_crossborder = process_crossborder_flows(flows_import_raw=flows_import_raw,
