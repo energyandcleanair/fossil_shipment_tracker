@@ -43,7 +43,7 @@ def get_upsert_method(constraint_name, show_progress=True):
     return upsert
 
 
-def upsert(df, table, constraint_name, dtype={}, show_progress=True, chunksize=100):
+def upsert(df, table, constraint_name, dtype={}, show_progress=True, chunksize=10000):
     """
     This function upserts data into a specific table using chunks determined by chunksize
 
