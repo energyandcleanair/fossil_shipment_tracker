@@ -400,35 +400,30 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
             .filter(Ship.imo.op('~')(base_imo)) \
             .all()
 
+        # Check if we only have 1 version - this should not happen as we select distinct
+        if len(ship_versions) == 1:
+            continue
+
+        # However, it is easier to keep the non-version ship object so we do not have to change events/portcalls
+        ship_versions = sorted(ship_versions, key=lambda item: len(str(item.imo)),
+                               reverse=False)
+
+        ship_to_keep = ship_versions[0]
+
+        # If we only have ships with _v versioning and no base ship, let's skip and check manually
+        if '_v' in ship_to_keep.imo:
+            logger.info("Found a ship with no non-version object, ship imo: {}. Please check.".format(ship_to_keep.imo))
+            continue
+
         # combine other data column to store for the future
         other_data = return_coalesced_data(ship_versions)
         mmsis = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
         names = list(set([name for s in ship_versions for name in s.name]))
 
-        # check if existing versions of ships have the same dwt - in which case we can simplify
-        if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1:
-            # delete all duplicates except 1 - we keep records in priority of datalastic > mt
-            #data_priority = {'datalastic': 4, 'marinetraffic': 2, 'equasis': 1}
+        # check if existing versions of ships have the same dwt/name/mmsi - in which case we can simplify
+        if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1 and len(names) == 1 and len(mmsis) == 1:
 
-            # We can keep by pripritising the ship object which was requested through DL
-            #ship_versions = sorted(ship_versions, key=lambda item: sum([data_priority[d] for d in item.others]),
-            #                       reverse=True)
-
-            # However, it is easier to keep the non-version ship object so we do not have to change events/portcalls
-            ship_versions = sorted(ship_versions, key=lambda item: len(str(item.imo)),
-                                   reverse=False)
-
-            # Check if we only have 1 version - this should not happen as we select distinct
-            if len(ship_versions) == 1:
-                continue
-
-            ship_to_keep = ship_versions[0]
             old_imo = ship_to_keep.imo
-
-            # If we only have ships with _v versioning and no base ship, let's skip and check manually
-            if '_v' in ship_to_keep.imo:
-                logger.info("Found a ship with no non-version object, ship imo: {}. Please check.".format(ship_to_keep.imo))
-                continue
 
             # fix the rest of the ship versions by changing departures/portcalls and deleting them after
             for sv in ship_versions[1:]:
@@ -451,10 +446,6 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
             ship_to_keep.others = other_data
             ship_to_keep.mmsi = mmsis
             ship_to_keep.name = names
-
-            # fix portcalls/departures to base imo if original had _v naming
-            if '_v' in ship_to_keep.imo:
-                update_ship_imo(old_imo, base_imo)
 
             try:
                 session.commit()
@@ -479,19 +470,35 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
                 # we have conflicting information for a minotiry of cases -
                 # we fill ship using imo to get the latest data and make sure dwt is correct
                 found_ship = Datalastic.get_ship(imo=base_imo)
-                if found_ship is None: found_ship = Marinetraffic.get_ship(imo=base_imo)
+                if found_ship is None or found_ship.dwt is None:
+                    found_ship = Marinetraffic.get_ship(imo=base_imo)
 
                 if found_ship is not None:
 
+                    found_mmsi, found_name = found_ship.mmsi[0], found_ship.name[0]
                     # add or over ride existing others data with newest
                     for source, data in found_ship.others.items():
                         other_data[source] = data
+                    if found_mmsi not in mmsis:
+                        mmsis.append(found_mmsi)
+                    if found_name not in names:
+                        names.append(found_name)
 
-                    found_ship.others = other_data
-                    found_ship.mmsi = mmsis
-                    found_ship.name = names
+                    # Ugly, but we enforce the latest mmsi/name is now at the end of the list
+                    names.append(names.pop(names.index(found_name)))
+                    mmsis.append(mmsis.pop(mmsis.index(found_mmsi)))
 
-                    for sv in ship_versions:
+                    # Update existing ship with new data
+                    ship_to_keep.others = other_data
+                    ship_to_keep.mmsi = mmsis
+                    ship_to_keep.name = names
+                    ship_to_keep.dwt = found_ship.dwt
+                    ship_to_keep.type = found_ship.type
+                    ship_to_keep.subtype = found_ship.subtype
+
+                    ship_to_keep = set_commodity(ship_to_keep)
+
+                    for sv in ship_versions[1:]:
                         update_ship_imo(sv.imo, base_imo)
                         session.delete(sv)
 
