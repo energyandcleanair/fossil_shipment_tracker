@@ -152,8 +152,7 @@ def upload_ships(ships):
                 # add new shop mmsi to existing ship imo
                 imo_ship, mmsis = imo_ships[0], imo_ships[0].mmsi
                 if ship.mmsi[-1] not in mmsis:
-                    mmsis.append(ship.mmsi[-1])
-                    imo_ship.mmsi = list(mmsis)
+                    imo_ship.mmsi = imo_ship.mmsi + ship.mmsi
                     session.commit()
             else:
                 raise ValueError("Problem inserting ship: %s" % (str(e),))
