@@ -271,7 +271,7 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
         # fill imo where necessary from MT
         if intship.imo is None:
             if intship.mmsi is not None:
-                mt_intship_check = fill(mmsis=[intship.mmsi])
+                mt_intship_check = fill(mmsis=[intship.mmsi[-1]])
 
                 if not mt_intship_check:
                     # add unknown ship to db, so we don't repeatedly query MT
@@ -282,7 +282,7 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
 
                     continue
 
-                mt_ship = session.query(Ship).filter(Ship.mmsi.any(intship.mmsi[0])).all()
+                mt_ship = session.query(Ship).filter(Ship.mmsi.any(intship.mmsi[-1])).all()
 
                 # check if we find more than 1 ship
                 if len(mt_ship) > 1:
@@ -295,7 +295,7 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
 
                 mt_ship = mt_ship[0]
 
-                if intship.name[0] in mt_ship.name:
+                if intship.name[-1] in mt_ship.name:
                     intship.imo = mt_ship.imo
                 else:
                     print("Found match for ship with mmsi, but names do not match for event {}".format(event_content))
@@ -304,7 +304,7 @@ def add_interacting_ship_details_to_event(event, distance_check = 30000):
                 print("No ship imo found and we do not have an mmsi for event: {}".format(event_content))
                 continue
 
-            # check if interacting ship is in db
+        # check if interacting ship is in db
         found = fill(imos=[intship.imo])
         if not found:
             print("Failed to upload missing ships")
