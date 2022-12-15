@@ -144,14 +144,16 @@ def upload_ships(ships):
         except sa.exc.IntegrityError as e:
             session.rollback()
             # Ship with this IMO probably already exists.
-            imo_ships = Ship.query.filter(Ship.imo.op('~')(ship.imo)).all()
+            imo_ships = session.query(Ship).filter(Ship.imo.op('~')(ship.imo)).all()
 
             if len(imo_ships) > 1:
                 logger.warning("Please check ship imo {}, we have more than one ship in db.".format(ship.imo))
             if len(imo_ships) == 1:
                 # add new shop mmsi to existing ship imo
-                if ship.mmsi not in imo_ships[0].mmsi:
-                    imo_ships[0].mmsi.append(ship.mmsi)
+                imo_ship, mmsis = imo_ships[0], imo_ships[0].mmsi
+                if ship.mmsi[-1] not in mmsis:
+                    mmsis.append(ship.mmsi[-1])
+                    imo_ship.mmsi = list(mmsis)
                     session.commit()
             else:
                 raise ValueError("Problem inserting ship: %s" % (str(e),))
