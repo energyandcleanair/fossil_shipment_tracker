@@ -133,13 +133,13 @@ class PortPriceResource(Resource):
             query = query.filter(Port.unlocode.in_(to_list(unlocode)))
 
         if commodity is not None:
-            query = query.filter(Price.commodity.in_(to_list(commodity)))
+            query = query.filter(unnested_query.c.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
-            query = query.filter(Price.date >= to_datetime(date_from))
+            query = query.filter(unnested_query.c.date >= to_datetime(date_from))
 
         if date_to is not None:
-            query = query.filter(Price.date <= to_datetime(date_to))
+            query = query.filter(unnested_query.c.date <= to_datetime(date_to))
 
         price_df = pd.read_sql(query.statement, session.bind)
         price_df.replace({np.nan: None}, inplace=True)
