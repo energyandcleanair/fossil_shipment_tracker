@@ -182,7 +182,7 @@ class EntsogFlowResource(Resource):
                          )
                          )
              .outerjoin(Currency, Currency.date == EntsogFlow.date)
-             .filter(EntsogFlow.destination_iso2 != "RU")
+             # .filter(EntsogFlow.destination_iso2 != "RU")
               # Very important for pricing to have a distinct statement! And to be sorted prior that
               # so that we pick those with port ids matching, then destination iso2s, then ship etc.
              .order_by(EntsogFlow.id, Price.scenario, Currency.currency, Price.destination_iso2s)
