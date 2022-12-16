@@ -263,7 +263,7 @@ class Marinetraffic:
                     except IntegrityError:
                         session.rollback()
                         # Check if they are the same imo and name - if so, we assume its the same
-                        is_same = bool(Ship.query.filter(Ship.imo==r_imo, Ship.name == r['SHIPNAME']).count())
+                        is_same = bool(Ship.query.filter(Ship.imo==r_imo, Ship.name.any(r['SHIPNAME'])).count())
                         if is_same:
                             continue
                         else:
