@@ -678,7 +678,7 @@ def process_crossborder_flows(flows_import_raw,
         value_export_sum = np.nansum(df.value_export)
 
         if value_export_sum > 0 and not pd.isna(value_import):
-            df['value'] = df.value_export / value_export_sum * value_import / len(df)
+            df['value'] = df.value_export / value_export_sum * value_import
         elif all(df.value_export.isnull()) or (value_export_sum == 0):
             df['value'] = value_import / len(df) # spread equally
         elif all(df.value_import.isnull()):
@@ -800,7 +800,11 @@ def get_flows(date_from='2022-01-01',
     return flows
 
 
-def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=True, nodata_error_date_from=None):
+def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
+           filename=None, save_to_file=True,
+           save_intermediary_to_file=False,
+           intermediary_filename=None,
+           nodata_error_date_from=None):
     """
 
     :param date_from:
@@ -824,6 +828,9 @@ def update(date_from=-7, date_to=dt.date.today(), filename=None, save_to_file=Tr
         try:
             flows = get_flows(date_from=date_from,
                               date_to=date_to,
+                              country_iso2=country_iso2,
+                              save_intermediary_to_file=save_intermediary_to_file,
+                              intermediary_filename=intermediary_filename,
                               save_to_file=save_to_file,
                               filename=filename)
         except TypeError:
