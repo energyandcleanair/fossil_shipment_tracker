@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, Date, DateTime, Integer, Numeric, BigInteger, Boolean, Time
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import validates
 from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
