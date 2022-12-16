@@ -152,7 +152,7 @@ def get_new_alerts():
         Commodity.name.label('commodity_name'),
         Ship.dwt,
         Ship.imo,
-        Ship.name.label('ship_name')
+        Ship.name[func.array_length(Ship.name, 1)].label('ship_name'),
        ) \
         .join(Departure, Departure.id == query_shipment1.c.departure_id) \
         .join(Ship, Ship.imo == Departure.ship_imo) \
