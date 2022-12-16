@@ -22,14 +22,14 @@ from base.models import DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, \
 from engine import portcall
 
 
-def update():
+def update(date_from = '2021-01-01'):
     """
     This function collects the before/after portcall for STS events so we can verify draught change
 
     :return:
     """
 
-    fill_portcalls_around_sts()
+    fill_portcalls_around_sts(date_from=date_from)
 
     update_sts_locations()
 

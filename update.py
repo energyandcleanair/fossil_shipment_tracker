@@ -39,7 +39,7 @@ def update():
     position.update()
     destination.update()
     berth.update()
-    sts.update_sts_locations()
+    sts.update(date_from=dt.date.today() - dt.timedelta(days=90))
     entsog.update(date_from=-21, nodata_error_date_from=-4)
     rscript.update()
     trajectory.update()
