@@ -473,9 +473,11 @@ class VoyageResource(Resource):
                                     shipments_combined.c.shipment_destination_dates.label("destination_dates"),
                                     shipments_combined.c.shipment_destination_iso2s.label("destination_iso2s"),
 
-                                    Ship.name.label("ship_name"),
+                                    Ship.name.label("ship_names"),
+                                    Ship.name[func.array_length(Ship.name, 1)].label("ship_name"),
                                     Ship.imo.label("ship_imo"),
-                                    Ship.mmsi.label("ship_mmsi"),
+                                    Ship.mmsi.label("ship_mmsis"),
+                                    Ship.mmsi[func.array_length(Ship.mmsi, 1)].label("ship_mmsi"),
                                     Ship.type.label("ship_type"),
                                     Ship.subtype.label("ship_subtype"),
                                     Ship.dwt.label("ship_dwt"),
