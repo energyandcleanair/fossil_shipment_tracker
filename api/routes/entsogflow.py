@@ -274,6 +274,8 @@ class EntsogFlowResource(Resource):
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
             'date': [subquery.c.date],
+            'month': [func.date_trunc('month', subquery.c.date).label("month")],
+            'year': [func.date_trunc('year', subquery.c.date).label("year")],
             'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
                                       subquery.c.commodity_origin_region],
             'commodity_origin_region': [subquery.c.commodity_origin_region],
@@ -306,16 +308,17 @@ class EntsogFlowResource(Resource):
     def roll_average(self, result, aggregate_by, rolling_days):
 
         if rolling_days is not None:
-            date_column = "date"
-            min_date = result[date_column].min()
-            max_date = result[date_column].max() # change your date here
-            daterange = pd.date_range(min_date, max_date).rename(date_column)
+            date_col = "date"
+            date_cols = ['date', 'month', 'year']
+            min_date = result[date_col].min()
+            max_date = result[date_col].max() # change your date here
+            daterange = pd.date_range(min_date, max_date).rename(date_col)
 
-            result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
+            result[date_col] = result[date_col].dt.floor('D')  # Should have been done already
             result = result \
-                .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "value_tonne", "value_m3",
+                .groupby([x for x in result.columns if x not in [date_cols, "ship_dwt", "value_tonne", "value_m3",
                                                                  "value_eur", 'value_currency']]) \
-                .apply(lambda x: x.set_index(date_column) \
+                .apply(lambda x: x.set_index(date_col) \
                        .resample("D").sum() \
                        .reindex(daterange) \
                        .fillna(0) \
