@@ -131,6 +131,7 @@ def get_physical_flows(operator_key,
                        date_from="2019-01-01",
                        date_to=dt.date.today(),
                        limit=-1):
+
     url = "https://transparency.entsog.eu/api/v1/operationalData"
 
     if point_key is not None and operator_key is None:
@@ -606,6 +607,7 @@ def process_crossborder_flows(flows_import_raw,
         flows_export = flows_export.groupby(flows_export_agg_cols, dropna=False) \
             .agg(value=('value', np.nanmean)).reset_index()
 
+
     flows = flows_import.merge(flows_export,
                                left_on=['pointKey', 'date', 'country', 'partner'],
                                right_on=['pointKey', 'date', 'partner', 'country'],
@@ -616,11 +618,15 @@ def process_crossborder_flows(flows_import_raw,
     if remove_operators:
         flows = flows.loc[~flows.operatorKey_import.isin(remove_operators)]
 
+    if save_intermediary_to_file:
+        intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
+        flows.to_csv(intermediary_filename, index=False)
+
     def process_pt_op_date(df):
 
         df = df.loc[(df.value_import > 0) |
                     # Or an export point for which we don't have import
-                    (pd.isna(df.value_import) & (df.value_export > 0))]
+                    (all(pd.isna(df.value_import)) & (df.value_export > 0))]
 
         if auto_confirmed_only and 'Confirmed' in df.flowStatus_import.to_list():
             if (np.nansum(df.value_import) == 0) \
@@ -667,36 +673,32 @@ def process_crossborder_flows(flows_import_raw,
             logger.warning("flows aren't matching")
             print(df[['pointKey', 'operatorKey_import', 'date']])
 
-        # Keep only confirmed if it is there
-        # One import was mathching two exports
-
         def nanmean(x):
-            #Without warning if empty
-            return np.NaN if np.all(x!=x) else np.nanmean(x)
+            # Without warning if empty
+            return np.NaN if np.all(x != x) else np.nanmean(x)
 
-        value_import = nanmean(df.value_import)
+        value_import_mean = nanmean(df.value_import)
         value_export_sum = np.nansum(df.value_export)
 
-        if value_export_sum > 0 and not pd.isna(value_import):
-            df['value'] = df.value_export / value_export_sum * value_import
-        elif all(df.value_export.isnull()) or (value_export_sum == 0):
-            df['value'] = value_import / len(df) # spread equally
+        if not pd.isna(value_import_mean):
+            value = value_import_mean
         elif all(df.value_import.isnull()):
-            df['value'] = df.value_export
+            value = value_export_sum
         else:
-            df['value'] = 0
+            value = 0
 
-        df['partner'] = np.where(df['country_export'].isnull(), df['partner_import'], df['country_export'])
-        df['country'] = np.where(df['country_import'].isnull(), df['partner_export'], df['country_import'])
-        return df.reset_index()
+        countries = df[['country_export', 'country_import', 'partner_import', 'partner_export']].drop_duplicates()
+        if len(countries) > 1:
+            logger.warning("Uncertain countries")
 
-    flows_scaled = flows.groupby(['pointKey', 'operatorKey_import', 'date'],
-                                 dropna=False).progress_apply(process_pt_op_date)
-    flows_scaled = flows_scaled.reset_index(drop=True)
+        partner = np.where(countries['country_export'].isnull(), countries['partner_import'], countries['country_export'])[0]
+        country = np.where(countries['country_import'].isnull(), countries['partner_export'], countries['country_import'])[0]
+        return pd.DataFrame({'partner': partner, 'country': country, 'value': value}, index=[0])
 
-    if save_intermediary_to_file:
-        intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
-        flows_scaled.to_csv(intermediary_filename, index=False)
+
+    flows_scaled = flows.groupby(['pointKey', 'operatorKey_import', 'date'], dropna=False) \
+        .progress_apply(process_pt_op_date) \
+        .reset_index(drop=True)
 
     flows_agg = flows_scaled.groupby(['country', 'partner', 'date']) \
         .agg(value=('value', np.nansum)) \
