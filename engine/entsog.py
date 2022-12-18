@@ -310,6 +310,9 @@ def fix_opd_countries(opd):
     len_after = len(opd)
     assert len_after == len_before
 
+    # Brandov
+    # Remove transit DE-DE
+    opd = opd[opd.id != '5DE-TSO-0016ITP-00452exitDE-TSO-0020']
     return opd
 
 
@@ -693,24 +696,21 @@ def process_crossborder_flows(flows_import_raw,
 
         partner = np.where(countries['country_export'].isnull(), countries['partner_import'], countries['country_export'])[0]
         country = np.where(countries['country_import'].isnull(), countries['partner_export'], countries['country_import'])[0]
-        return pd.DataFrame({'partner': partner, 'country': country, 'value': value}, index=[0])
+        result = {'partner': partner, 'country': country, 'value': value}
+        return pd.Series(result)
 
+    flows_scaled = flows \
+        .groupby(['pointKey', 'operatorKey_import', 'date'], dropna=False, as_index=False) \
+        .progress_apply(process_pt_op_date)
 
-    flows_scaled = flows.groupby(['pointKey', 'operatorKey_import', 'date'], dropna=False) \
-        .progress_apply(process_pt_op_date) \
-        .reset_index(drop=True)
-
-    flows_agg = flows_scaled.groupby(['country', 'partner', 'date']) \
+    flows_agg = flows_scaled.groupby(['country', 'partner', 'date'], dropna=False) \
         .agg(value=('value', np.nansum)) \
         .reset_index() \
-        .rename(columns={'country': 'to_country',
-                         'partner': 'from_country'}) \
+        .rename(columns={'country': 'destination_iso2',
+                         'partner': 'departure_iso2',
+                         'value': 'value_kwh'
+                         }) \
         .reset_index()
-
-    flows_agg.rename(columns={'from_country': 'departure_iso2',
-                              'to_country': 'destination_iso2',
-                              'value': 'value_kwh'},
-                     inplace=True)
 
     flows_agg.loc[
         flows_agg.departure_iso2 != flows_agg.destination_iso2, 'type'] = base.ENTSOG_CROSSBORDER
