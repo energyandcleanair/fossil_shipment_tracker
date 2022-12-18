@@ -697,13 +697,15 @@ def process_crossborder_flows(flows_import_raw,
         partner = np.where(countries['country_export'].isnull(), countries['partner_import'], countries['country_export'])[0]
         country = np.where(countries['country_import'].isnull(), countries['partner_export'], countries['country_import'])[0]
         result = {'partner': partner, 'country': country, 'value': value}
-        return pd.Series(result)
+        return pd.DataFrame(result, index=[0])
 
-    flows_scaled = flows \
-        .groupby(['pointKey', 'operatorKey_import', 'date'], dropna=False, as_index=False) \
-        .progress_apply(process_pt_op_date)
+    flows_scaled = flows.head(1000) \
+        .groupby(['pointKey', 'operatorKey_import', 'date'], group_keys=True, dropna=False) \
+        .apply(process_pt_op_date)[['value', 'country', 'partner']] \
+        .reset_index()
 
-    flows_agg = flows_scaled.groupby(['country', 'partner', 'date'], dropna=False) \
+    flows_agg = flows_scaled \
+        .groupby(['country', 'partner', 'date'], dropna=False) \
         .agg(value=('value', np.nansum)) \
         .reset_index() \
         .rename(columns={'country': 'destination_iso2',
