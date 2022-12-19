@@ -808,7 +808,8 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
            filename=None, save_to_file=True,
            save_intermediary_to_file=False,
            intermediary_filename=None,
-           nodata_error_date_from=None):
+           nodata_error_date_from=None,
+           delete_before_upload=False):
     """
 
     :param date_from:
@@ -850,6 +851,14 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
 
     # For flows update for debug or manual cleaning
     flows['updated_on'] = dt.datetime.now()
+
+    if delete_before_upload:
+        session.query(EntsogFlow) \
+            .filter(EntsogFlow.date >= min(flows.date),
+                    EntsogFlow.date <= max(flows.date),
+                    ) \
+            .delete()
+        session.commit()
 
     upsert(df=flows, table=DB_TABLE_ENTSOGFLOW, constraint_name="unique_entsogflow")
 
