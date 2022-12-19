@@ -699,7 +699,7 @@ def process_crossborder_flows(flows_import_raw,
         result = {'partner': partner, 'country': country, 'value': value}
         return pd.DataFrame(result, index=[0])
 
-    flows_scaled = flows.head(1000) \
+    flows_scaled = flows \
         .groupby(['pointKey', 'operatorKey_import', 'date'], group_keys=True, dropna=False) \
         .apply(process_pt_op_date)[['value', 'country', 'partner']] \
         .reset_index()
