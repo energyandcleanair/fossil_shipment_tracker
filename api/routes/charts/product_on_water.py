@@ -144,7 +144,7 @@ class ChartProductOnWater(Resource):
                                               |
                                               (
                                                       (data['commodity_destination_region'] == 'EU')
-                                                      & (data['commodity'] == 'Crude ol')
+                                                      & (data['commodity'] == 'Crude oil')
                                                       & (data['departure_date'] > '2022-12-05')
                                               ), 'Unknown',
                                               data['commodity_destination_region'])

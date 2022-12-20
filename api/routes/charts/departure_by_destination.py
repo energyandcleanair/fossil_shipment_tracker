@@ -166,7 +166,7 @@ class ChartDepartureDestination(Resource):
                                                         |
                                                         (
                                                        (data['destination_region'] == 'EU')
-                                                       & (data['commodity_group_name'] == 'Crude ol')
+                                                       & (data['commodity_group_name'] == 'Crude oil')
                                                        & (data['departure_date'] > '2022-12-05')
                                               ), 'Unknown',
                                                         data['destination_region'])
