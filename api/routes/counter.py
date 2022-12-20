@@ -84,6 +84,9 @@ class RussiaCounterResource(Resource):
     parser.add_argument('limit_by', action='split',
                         help='in which group do you want to limit to n records',
                         required=False, default=None)
+    parser.add_argument('columns_order', action='split',
+                        help='order of columns. Don\'t need to specify all of them. Mainly useful for charts.',
+                        required=False, default=None)
     parser.add_argument('keep_zeros',  type=inputs.boolean,
                         help='keep lines with zeros',
                         required=False,
@@ -117,6 +120,7 @@ class RussiaCounterResource(Resource):
         limit = params.get("limit")
         limit_by = params.get("limit_by")
         keep_zeros = params.get("keep_zeros")
+        columns_order = params.get("columns_order")
 
 
         if aggregate_by and '' in aggregate_by:
@@ -247,6 +251,9 @@ class RussiaCounterResource(Resource):
         # Pivot
         counter = self.pivot_result(result=counter, pivot_by=pivot_by, pivot_value=pivot_value)
 
+        # Pivot
+        counter = self.sort_columns(result=counter, columns_order=columns_order)
+
         if format == "csv":
             return Response(
                 response=counter.to_csv(index=False),
@@ -328,7 +335,6 @@ class RussiaCounterResource(Resource):
         result.replace({np.nan: None}, inplace=True)
 
         return result
-
 
     def sort_result(self, result, sort_by, aggregate_by):
         by = []
@@ -440,5 +446,14 @@ class RussiaCounterResource(Resource):
             .drop(sort_by, axis=1)
 
         result = pd.merge(result, top, how='inner')
+
+        return result
+
+    def sort_columns(self, result, columns_order):
+
+        if columns_order:
+            # We keep all other columns
+            cols = columns_order + [x for x in result.columns if x not in columns_order]
+            result = result[cols]
 
         return result
