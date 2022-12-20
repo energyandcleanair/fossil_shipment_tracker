@@ -659,6 +659,10 @@ def process_crossborder_flows(flows_import_raw,
         # Or when there are only exports
         if not len(df[['pointKey', 'flowStatus_import', 'value_import']].drop_duplicates()) == 1:
 
+            # Take the longest duration
+            df['duration'] = df['periodTo_import'] - df['periodFrom_import']
+            df = df[df.duration == df.duration.max()]
+
             # Values have probably been updated later on
             # and both are confirmed
             if (np.std(df.value_import) / np.nanmean(df.value_import)) < 0.1 \
