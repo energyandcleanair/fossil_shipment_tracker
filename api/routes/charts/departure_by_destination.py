@@ -158,10 +158,17 @@ class ChartDepartureDestination(Resource):
         data['departure_date'] = pd.to_datetime(data.departure_date)
         data.replace({base.UNKNOWN: 'Unknown'}, inplace=True)
 
-        # Fix crude oil
-        data['destination_region'] = np.where((data['status'] == 'ongoing')
+        # Also remove shipments to EU since 2022-12-05 until we can verify these are correct/breaking sanctions
+        # Any ongoing shipments do not show as to EU - this can look misleading so set them as unknown
+        data['destination_region'] = np.where(((data['status'] == 'ongoing')
                                                         & (data['commodity_group_name'] == 'Crude oil')
-                                                        & (data['destination_region'] == 'EU'), 'Unknown',
+                                                        & (data['destination_region'] == 'EU'))
+                                                        |
+                                                        (
+                                                       (data['destination_region'] == 'EU')
+                                                       & (data['commodity_group_name'] == 'Crude ol')
+                                                       & (data['departure_date'] > '2022-12-05')
+                                              ), 'Unknown',
                                                         data['destination_region'])
 
         data = data.drop('status', axis=1)
