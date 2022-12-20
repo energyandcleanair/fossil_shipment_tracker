@@ -16,8 +16,7 @@ DB_TABLE_TRAJECTORY = "trajectory"
 DB_TABLE_SHIPMENT = "shipment"
 DB_TABLE_SHIPMENTARRIVALBERTH = "shipmentarrivalberth"
 DB_TABLE_SHIPMENTDEPARTUREBERTH = "shipmentdepartureberth"
-DB_TABLE_PRICE = "price"
-DB_TABLE_PORTPRICE = "portprice"
+DB_TABLE_PRICE = "price_new"
 DB_TABLE_COMMODITY = "commodity"
 DB_TABLE_ENTSOGFLOW = "entsogflow"
 DB_TABLE_MARINETRAFFICCALL = "mtcall"
@@ -25,9 +24,13 @@ DB_TABLE_CURRENCY = "currency"
 DB_TABLE_MTEVENT_TYPE = "mtevent_type"
 DB_TABLE_EVENT = "event"
 DB_TABLE_SHIPMENT_WITH_STS = "shipment_with_sts"
+DB_TABLE_STS_LOCATIONS = "sts_locations"
+DB_TABLE_STSDEPARTURELOCATION = "shipmentdeparturelocationsts"
+DB_TABLE_STSARRIVALLOCATION = "shipmentarrivallocationsts"
 
 DB_TABLE_PIPELINEFLOW = "pipelineflow"
 DB_TABLE_COUNTER = "counter"
+DB_TABLE_COUNTER100BN = "counter_100bn"
 
 # Marine Traffic cache
 DB_TABLE_MTVOYAGEINFO = "voyageinfo"
@@ -38,6 +41,13 @@ DB_TABLE_ALERT_RECIPIENT = "alert_recipient"
 DB_TABLE_ALERT_RECIPIENT_ASSOC = "alert_recipient_assoc"
 DB_TABLE_ALERT_CRITERIA = "alert_criteria"
 DB_TABLE_ALERT_CRITERIA_ASSOC = "alert_criteria_assoc"
+
+
+# Flaring related tables
+DB_TABLE_FLARING_FACILITY = "flaring_facility"
+DB_TABLE_FLARING = "flaring"
+DB_TABLE_FLARING_ANOMALY = "flaring_anomaly"
+DB_TABLE_FLARING_ANOMALY_ALGORITHM = "flaring_anomaly_algorithm"
 
 
 from .models import *

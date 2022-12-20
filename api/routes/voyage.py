@@ -3,31 +3,29 @@ import pandas as pd
 import geopandas as gpd
 import re
 import numpy as np
-import sqlalchemy.sql.expression
-
-from . import routes_api
+from http import HTTPStatus
+from flask import Response
+from flask_restx import Resource, reqparse
 from flask_restx import inputs
 
+import sqlalchemy as sa
+from sqlalchemy.orm import aliased
+from sqlalchemy import or_
+from sqlalchemy import any_
+from sqlalchemy import func
 
+from . import routes_api
 from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     ShipOwner, ShipInsurer, ShipManager, Company, \
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
-    Destination, Price, Country, PortPrice, Currency, ShipmentWithSTS, Event
+    Destination, Country, Price, Currency, ShipmentWithSTS, Event, \
+    ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, STSLocation, PortCall
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from base.logger import logger
-
-
-from http import HTTPStatus
-from flask import Response
-from flask_restx import Resource, reqparse
-import sqlalchemy as sa
-from sqlalchemy.orm import aliased
-from sqlalchemy import or_
-from sqlalchemy import func
+from base import PRICING_DEFAULT
 from base.utils import update_geometry_from_wkb
-import country_converter as coco
 import base
 from engine.commodity import get_subquery as get_commodity_subquery
 from sqlalchemy.sql import extract
@@ -58,7 +56,7 @@ class VoyageResource(Resource):
 
 
     parser.add_argument('date_to', type=str, help='end date for departure or arrival (format 2020-01-15 or -7 for seven days before today)', required=False,
-                        default=dt.datetime.today().strftime("%Y-%m-%d"))
+                        default=None)
     parser.add_argument('departure_date_to', type=str,
                         help='end date for departure (format 2020-01-15 or -7 for seven days before today)',
                         required=False,
@@ -66,7 +64,7 @@ class VoyageResource(Resource):
     parser.add_argument('arrival_date_to', type=str,
                         help='end date for arrival (format 2020-01-15 or -7 for seven days before today)',
                         required=False,
-                        default=dt.datetime.today().strftime("%Y-%m-%d"))
+                        default=None)
 
     parser.add_argument('year', help='year(s) of departure or arrival e.g. 2021,2022', type=int,
                         default=None, required=False, action='split')
@@ -74,6 +72,11 @@ class VoyageResource(Resource):
                         default=None, required=False, action='split')
     parser.add_argument('arrival_year', help='year(s) of arrival e.g. 2021,2022', type=int,
                         default=None, required=False, action='split')
+
+    parser.add_argument('pricing_scenario', help='Pricing scenario (standard or pricecap)',
+                        action='split',
+                        default=[PRICING_DEFAULT],
+                        required=False)
 
     parser.add_argument('ship_imo', action='split', help='IMO identifier(s) of the ship(s)',
                         required=False,
@@ -96,6 +99,10 @@ class VoyageResource(Resource):
                         help='unlocode of departure ports to consider',
                         required=False,
                         default=None)
+    parser.add_argument('departure_port_area', action='split',
+                        help='area of departure ports to consider e.g. Baltic,Arctic,Pacific,Black Sea,Caspian Sea',
+                        required=False,
+                        default=None)
     parser.add_argument('destination_iso2', action='split', help='iso2(s) of destination',
                         required=False,
                         default=None)
@@ -103,6 +110,8 @@ class VoyageResource(Resource):
                         required=False,
                         default=None)
     parser.add_argument('commodity_destination_iso2', action='split', help='ISO2(s) of commodity destination country',
+                        required=False, default=None)
+    parser.add_argument('commodity_destination_iso2_not', action='split', help='ISO2(s) of commodity destination country TO EXCLUDE',
                         required=False, default=None)
     parser.add_argument('commodity_destination_region', action='split',
                         help='region(s) of commodity destination e.g. EU28,Turkey',
@@ -195,9 +204,11 @@ class VoyageResource(Resource):
         departure_port_id = params.get("departure_port_id")
         departure_berth_id = params.get("departure_berth_id")
         departure_port_unlocode = params.get("departure_port_unlocode")
+        departure_port_area = params.get("departure_port_area")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
+        commodity_destination_iso2_not = params.get("commodity_destination_iso2_not")
         commodity_destination_region = params.get("commodity_destination_region")
         commodity_grouping = params.get("commodity_grouping")
 
@@ -218,6 +229,7 @@ class VoyageResource(Resource):
         departure_year = params.get('departure_year')
         arrival_year = params.get('arrival_year')
 
+        pricing_scenario = params.get("pricing_scenario")
 
         ship_imo = params.get("ship_imo")
         aggregate_by = params.get("aggregate_by")
@@ -247,6 +259,11 @@ class VoyageResource(Resource):
         CommodityOriginCountry = aliased(Country)
         CommodityDestinationCountry = aliased(Country)
 
+        #TODO Find a better way, so that we can also keep information for older shipments
+        ShipOwnerDistinct = ShipOwner.query.distinct(ShipOwner.ship_imo).subquery()
+        ShipManagerDistinct = ShipManager.query.distinct(ShipManager.ship_imo).subquery()
+        ShipInsurerDistinct = ShipInsurer.query.distinct(ShipInsurer.ship_imo).subquery()
+
         ShipOwnerCompany = aliased(Company)
         ShipManagerCompany = aliased(Company)
         ShipInsurerCompany = aliased(Company)
@@ -261,8 +278,16 @@ class VoyageResource(Resource):
         DepartureBerth= aliased(Berth)
         ArrivalBerth = aliased(Berth)
 
+        DepartureSTSLocation = aliased(STSLocation)
+        ArrivalSTSLocation = aliased(STSLocation)
+
         DestinationPort = aliased(Port)
         DestinationCountry = aliased(Country)
+
+        DepartureShip = aliased(Ship)
+        ArrivalShip = aliased(Ship)
+
+        NextDeparturePortcall = aliased(PortCall)
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -276,7 +301,10 @@ class VoyageResource(Resource):
                          DepartureBerth.commodity.ilike('%coal%'),
                          # Lauri: For Taiwan, please exclude coal shipments without identified berth.
                          # I've done that for data I've provided to Taiwan because too much of the rest is iron ore, scrap etc
-                         ArrivalPort.iso2 != 'TW'), 'coal'),
+                         sa.or_(
+                             ArrivalPort.iso2 == sa.null(),
+                             ArrivalPort.iso2 != 'TW')
+                         ), 'coal'),
 
                 (sa.and_(Ship.commodity.in_([base.BULK, base.GENERAL_CARGO]),
                          ArrivalPort.iso2 == 'TW',
@@ -291,15 +319,105 @@ class VoyageResource(Resource):
             else_ = Ship.commodity
         ).label('commodity')
 
-        # Price for all countries without country-specific price
-        default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
+        # Commodity origin and destination field
+        commodity_origin_iso2_field = case(
+            [(DepartureBerth.name == 'Novorossiysk CPC', 'KZ')],
+            else_=DeparturePort.iso2
+        ).label('commodity_origin_iso2')
 
-        price_eur_per_tonne_field = (
-            func.coalesce(PortPrice.eur_per_tonne, Price.eur_per_tonne, default_price.c.eur_per_tonne)
-        ).label('price_eur_per_tonne')
+        # To remove Kazak oil
+        departure_iso2_field = case(
+            [(DepartureBerth.name.ilike('Novorossiysk CPC%'), 'KZ')],
+            else_=DeparturePort.iso2
+        ).label('departure_iso2')
+
+
+        # combine sts shipment table with normal (non-sts) shipments
+
+        shipment_sts_departures = session.query(
+                    ShipmentWithSTS,
+                    Departure.event_id.label('departure_event_id')
+                ) \
+                .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+                .filter(Departure.event_id != sa.null()) \
+                .subquery()
+
+        shipment_sts_weights = session.query(
+            ShipmentWithSTS.id,
+                Arrival.event_id.label('arrival_event_id'),
+                func.coalesce(ArrivalShip.dwt, func.avg(ArrivalShip.dwt).over(partition_by=ShipmentWithSTS.departure_id)).label('dwt_average'),
+                func.sum(ArrivalShip.dwt).over(partition_by=ShipmentWithSTS.departure_id).label('dwt_total'),
+                Departure.ship_imo.label('departure_ship_imo'),
+                ArrivalShip.imo
+        ) \
+        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+        .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
+        .join(DepartureShip, DepartureShip.imo == Departure.ship_imo) \
+        .join(Event, Event.id == Arrival.event_id) \
+        .outerjoin(ArrivalShip, ArrivalShip.imo == Event.interacting_ship_imo) \
+        .filter(Arrival.event_id != sa.null()) \
+        .subquery()
+
+        shipment_sts_arrival_weights = session.query(
+            ShipmentWithSTS.id,
+            func.least(1.0, ArrivalShip.dwt / func.sum(
+                DepartureShip.dwt * (shipment_sts_weights.c.dwt_average / shipment_sts_weights.c.dwt_total)).over(
+                partition_by=Arrival.portcall_id)).label('arrival_weight')
+        ) \
+        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+        .join(ArrivalShip, ArrivalShip.imo == Departure.ship_imo) \
+        .join(shipment_sts_weights, shipment_sts_weights.c.arrival_event_id == Departure.event_id) \
+        .join(DepartureShip, DepartureShip.imo == shipment_sts_weights.c.departure_ship_imo) \
+        .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
+        .filter(Arrival.event_id == sa.null()) \
+        .subquery()
+
+        shipments_sts_with_arrival = session.query(
+            ShipmentWithSTS.id,
+            ShipmentWithSTS.departure_id,
+            shipment_sts_departures.c.arrival_id.label('arrival_id'),
+            shipment_sts_departures.c.last_position_id,
+            shipment_sts_departures.c.last_destination_name,
+            shipment_sts_departures.c.status,
+            shipment_sts_departures.c.destination_names,
+            shipment_sts_departures.c.destination_dates,
+            shipment_sts_departures.c.destination_iso2s,
+            case(
+                [(shipment_sts_weights.c.dwt_average != sa.null(), shipment_sts_weights.c.dwt_average / shipment_sts_weights.c.dwt_total)],
+                else_=1.0
+            ).label('weight'),
+            shipment_sts_arrival_weights.c.arrival_weight,
+            sa.sql.expression.literal_column('True').label('is_sts'),
+            ArrivalShip,
+            Event.date_utc.label('event_date_utc'),
+            Event.ship_closest_position.label('sts_position')
+        ) \
+        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+        .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
+        .outerjoin(Event, Event.id == Arrival.event_id) \
+        .outerjoin(shipment_sts_departures, shipment_sts_departures.c.departure_event_id == Arrival.event_id) \
+        .outerjoin(shipment_sts_weights, shipment_sts_weights.c.id == ShipmentWithSTS.id) \
+        .outerjoin(shipment_sts_arrival_weights, shipment_sts_arrival_weights.c.id == shipment_sts_departures.c.id) \
+        .outerjoin(ArrivalShip, ArrivalShip.imo == shipment_sts_weights.c.imo) \
+        .filter(Departure.event_id == sa.null())
+
+        shipments_non_sts = session.query(
+            Shipment,
+            sa.sql.expression.literal_column('1.0').label('weight'),
+            sa.sql.expression.literal_column('1.0').label('arrival_weight'),
+            sa.sql.expression.literal_column('False').label('is_sts'),
+            # Arrival ship is the same as departure ship for non sts shipments, so we just add this in so we can union
+            Ship,
+            sa.null().label('event_date_utc'),
+            sa.null().label('sts_position')
+        ) \
+        .join(Departure, Departure.id == Shipment.departure_id) \
+        .join(Ship, Ship.imo == Departure.ship_imo)
+
+        shipments_combined = shipments_non_sts.union(shipments_sts_with_arrival).subquery()
 
         value_eur_field = (
-            Ship.dwt * price_eur_per_tonne_field
+                Ship.dwt * Price.eur_per_tonne
         ).label('value_eur')
 
         # Technically, we could pivot long -> wide
@@ -319,85 +437,8 @@ class VoyageResource(Resource):
             else_=sa.null()
         ).label('value_m3')
 
-        # Commodity origin and destination field
-        commodity_origin_iso2_field = case(
-            [(DepartureBerth.name == 'Novorossiysk CPC', 'KZ')],
-            else_=DeparturePort.iso2
-        ).label('commodity_origin_iso2')
-
-        # To remove Kazak oil
-        departure_iso2_field = case(
-            [(DepartureBerth.name.ilike('Novorossiysk CPC%'), 'KZ')],
-            else_=DeparturePort.iso2
-        ).label('departure_iso2')
-
-        value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
-
-        # combine sts shipment table with normal (non-sts) shipments
-
-        DepartureShip = aliased(Ship)
-        ArrivalShip = aliased(Ship)
-
-        shipment_sts_departures = session.query(
-                    ShipmentWithSTS,
-                    Departure.event_id.label('departure_event_id')
-                ) \
-                .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
-                .filter(Departure.event_id != sa.null()) \
-                .subquery()
-
-        shipment_sts_weights = session.query(
-            ShipmentWithSTS.id,
-                func.coalesce(ArrivalShip.dwt, func.avg(ArrivalShip.dwt).over(partition_by=ShipmentWithSTS.departure_id)).label('dwt_average'),
-                func.sum(ArrivalShip.dwt).over(partition_by=ShipmentWithSTS.departure_id).label('dwt_total'),
-                ArrivalShip.imo
-        ) \
-        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
-        .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
-        .join(DepartureShip, DepartureShip.imo == Departure.ship_imo) \
-        .join(Event, Event.id == Arrival.event_id) \
-        .outerjoin(ArrivalShip, ArrivalShip.imo == Event.interacting_ship_imo) \
-        .filter(Arrival.event_id != sa.null()) \
-        .subquery()
-
-        shipments_sts_with_arrival = session.query(
-            ShipmentWithSTS.id,
-            ShipmentWithSTS.departure_id,
-            shipment_sts_departures.c.arrival_id.label('arrival_id'),
-            shipment_sts_departures.c.last_position_id,
-            shipment_sts_departures.c.last_destination_name,
-            shipment_sts_departures.c.status,
-            shipment_sts_departures.c.destination_names,
-            shipment_sts_departures.c.destination_dates,
-            shipment_sts_departures.c.destination_iso2s,
-            case(
-                [(shipment_sts_weights.c.dwt_average != sa.null(), shipment_sts_weights.c.dwt_average / shipment_sts_weights.c.dwt_total)],
-                else_=1.0
-            ).label('weight'),
-            sa.sql.expression.literal_column('True').label('is_sts'),
-            ArrivalShip,
-            Event.date_utc.label("event_date_utc")
-        ) \
-        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
-        .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id) \
-        .outerjoin(Event, Event.id == Arrival.event_id) \
-        .outerjoin(shipment_sts_departures, shipment_sts_departures.c.departure_event_id == Arrival.event_id) \
-        .outerjoin(shipment_sts_weights, shipment_sts_weights.c.id == ShipmentWithSTS.id) \
-        .outerjoin(ArrivalShip, ArrivalShip.imo == shipment_sts_weights.c.imo) \
-        .filter(Departure.event_id == sa.null())
-
-        shipments_non_sts = session.query(
-            Shipment,
-            sa.sql.expression.literal_column('1.0').label('weight'),
-            sa.sql.expression.literal_column('False').label('is_sts'),
-            # Arrival ship is the same as departure ship for non sts shipments, so we just add this in so we can union
-            Ship,
-            sa.null().label('event_date_utc')
-        ) \
-        .join(Departure, Departure.id == Shipment.departure_id) \
-        .join(Ship, Ship.imo == Departure.ship_imo)
-
-        shipments_combined = shipments_non_sts.union(shipments_sts_with_arrival).subquery()
+        # for now we will clauclate this in the main query so we can apply weights - we can clean this up all into one
+        #value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
         # generate commodity destination field now, after combining shipment tables
         commodity_destination_iso2_field = case(
@@ -415,6 +456,11 @@ class VoyageResource(Resource):
 
                 # Looks like StS only
                 (ArrivalPort.name.ilike('Lakonikos Gulf%'), sa.null()),
+                (ArrivalPort.iso2 == 'GI', sa.null()),
+
+                # Removal of dardaneles discharges + bosphorus strait
+                (ArrivalPort.name.ilike('DARDANELES WAIT AREA'), sa.null()),
+                (ArrivalPort.name.ilike('BOSPHORUS N ANCH'), sa.null()),
 
                 # For completed shipments, we don't use declared destination
                 # but only actual one
@@ -431,12 +477,18 @@ class VoyageResource(Resource):
         commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
 
         # Query with joined information
-        shipments_rich = (session.query(shipments_combined.c.shipment_id.distinct().label('id'), # Potential introducers of duplicates: ShipinOwner, Insurer etc.
+        shipments_rich = (session.query(shipments_combined.c.shipment_id.label('id'),
                                         shipments_combined.c.shipment_status.label('status'),
 
                                     # STS related columns
                                     shipments_combined.c.is_sts,
                                     shipments_combined.c.event_date_utc,
+                                    shipments_combined.c.sts_position.label('sts_position_geometry'),
+                                    func.ST_Y(shipments_combined.c.sts_position).label('sts_position_lat'),
+                                    func.ST_X(shipments_combined.c.sts_position).label('sts_position_lon'),
+                                    # for now departure sts location == arrival sts location as we cant have departures
+                                    # from sts locations, this can be modified once we do
+                                    ArrivalSTSLocation.name.label('sts_location_name'),
 
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
@@ -454,9 +506,11 @@ class VoyageResource(Resource):
                                     DepartureCountry.region.label("departure_region"),
                                     DeparturePort.name.label("departure_port_name"),
                                     DeparturePort.id.label("departure_port_id"),
+                                    DeparturePort.area.label("departure_port_area"),
 
                                     # Arrival
                                     Arrival.date_utc.label("arrival_date_utc"),
+                                    NextDeparturePortcall.date_utc.label('arrival_detected_date_utc'),
                                     ArrivalPort.unlocode.label("arrival_unlocode"),
                                     ArrivalPort.iso2.label("arrival_iso2"),
                                     ArrivalCountry.name.label("arrival_country"),
@@ -491,7 +545,8 @@ class VoyageResource(Resource):
 
                                     commodity_field,
                                     commodity_subquery.c.group.label("commodity_group"),
-                                    # commodity_subquery.c.group_name.label("commodity_group_name"),
+                                    commodity_subquery.c.name.label("commodity_name"),
+                                    commodity_subquery.c.group_name.label("commodity_group_name"),
 
                                     # Companies
                                     ShipManagerCompany.name.label("ship_manager"),
@@ -518,11 +573,14 @@ class VoyageResource(Resource):
 
                                     shipments_combined.c.weight.label('weight'),
 
-                                    sa.sql.label('value_tonne', value_tonne_field*shipments_combined.c.weight),
-                                    sa.sql.label('value_m3', value_m3_field*shipments_combined.c.weight),
-                                    sa.sql.label('value_eur', value_eur_field*shipments_combined.c.weight),
+                                    # we apply heuristic to decide what % of dwt gets transferred on STS, and also make sure
+                                    # if we have multiple arrivals at same portcall, we divide the value also
+                                    sa.sql.label('value_tonne', value_tonne_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
+                                    sa.sql.label('value_m3', value_m3_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
+                                    sa.sql.label('value_eur', value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight),
                                     Currency.currency,
-                                    value_currency_field,
+                                    (value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight * Currency.per_eur).label('value_currency'),
+                                    Price.scenario.label('pricing_scenario'),
 
                                     DepartureBerth.id.label("departure_berth_id"),
                                     DepartureBerth.name.label("departure_berth_name"),
@@ -543,60 +601,71 @@ class VoyageResource(Resource):
              .outerjoin(ShipmentArrivalBerth, shipments_combined.c.shipment_id == ShipmentArrivalBerth.shipment_id)
              .outerjoin(DepartureBerth, DepartureBerth.id == ShipmentDepartureBerth.berth_id)
              .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
+             .outerjoin(NextDeparturePortcall, NextDeparturePortcall.id == Arrival.nextdeparture_portcall_id)
+             .outerjoin(ShipmentArrivalLocationSTS, shipments_combined.c.shipment_id == ShipmentArrivalLocationSTS.shipment_id)
+             .outerjoin(ArrivalSTSLocation, ArrivalSTSLocation.id == ShipmentArrivalLocationSTS.sts_location_id)
+             .outerjoin(ShipmentDepartureLocationSTS, shipments_combined.c.shipment_id == ShipmentDepartureLocationSTS.shipment_id)
+             .outerjoin(DepartureSTSLocation, DepartureSTSLocation.id == ShipmentDepartureLocationSTS.sts_location_id)
              .outerjoin(Destination, shipments_combined.c.shipment_last_destination_name == Destination.name)
              .outerjoin(DestinationPort, Destination.port_id == DestinationPort.id)
              .outerjoin(commodity_subquery, commodity_subquery.c.id == commodity_field)
-             .outerjoin(Price,
-                        sa.and_(Price.date == func.date_trunc('day', Departure.date_utc),
-                                Price.commodity == commodity_subquery.c.pricing_commodity,
-                                sa.or_(
-                                    sa.and_(Price.country_iso2 == sa.null(), destination_iso2_field == sa.null()),
-                                    Price.country_iso2 == destination_iso2_field)
-                                )
-                        )
-             .outerjoin(default_price,
-                         sa.and_(default_price.c.date == func.date_trunc('day', Departure.date_utc),
-                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
-                                 )
-                        )
-             .outerjoin(PortPrice,
-                        sa.and_(
-                            PortPrice.port_id == DeparturePort.id,
-                            PortPrice.commodity == commodity_subquery.c.pricing_commodity,
-                            PortPrice.date == func.date_trunc('day', Departure.date_utc)
-                        ))
-             .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
              .outerjoin(CommodityDestinationCountry, CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
-
-             .outerjoin(ShipOwner, sa.and_(
-                            ShipOwner.ship_imo == Departure.ship_imo,
+             .outerjoin(ShipOwnerDistinct, sa.and_(
+                            ShipOwnerDistinct.c.ship_imo == Departure.ship_imo,
                             sa.or_(
-                                    Departure.date_utc >= ShipOwner.date_from,
-                                    ShipOwner.date_from == sa.null())))
-             .outerjoin(ShipOwnerCompany, ShipOwner.company_id == ShipOwnerCompany.id)
+                                    Departure.date_utc >= ShipOwnerDistinct.c.date_from,
+                                    ShipOwnerDistinct.c.date_from == sa.null())))
+             .outerjoin(ShipOwnerCompany, ShipOwnerDistinct.c.company_id == ShipOwnerCompany.id)
              .outerjoin(ShipOwnerCountry, ShipOwnerCompany.country_iso2 == ShipOwnerCountry.iso2)
-
-             .outerjoin(ShipManager, sa.and_(
-                    ShipManager.ship_imo == Departure.ship_imo,
+             .outerjoin(ShipManagerDistinct, sa.and_(
+                    ShipManagerDistinct.c.ship_imo == Departure.ship_imo,
                     sa.or_(
-                        Departure.date_utc >= ShipManager.date_from,
-                        ShipManager.date_from == sa.null())))
-             .outerjoin(ShipManagerCompany, ShipManager.company_id == ShipManagerCompany.id)
+                        Departure.date_utc >= ShipManagerDistinct.c.date_from,
+                        ShipManagerDistinct.c.date_from == sa.null())))
+             .outerjoin(ShipManagerCompany, ShipManagerDistinct.c.company_id == ShipManagerCompany.id)
              .outerjoin(ShipManagerCountry, ShipManagerCompany.country_iso2 == ShipManagerCountry.iso2)
-
-             .outerjoin(ShipInsurer, sa.and_(
-                    ShipInsurer.ship_imo == Departure.ship_imo,
+             .outerjoin(ShipInsurerDistinct, sa.and_(
+                    ShipInsurerDistinct.c.ship_imo == Departure.ship_imo,
                     sa.or_(
-                        Departure.date_utc >= ShipInsurer.date_from,
-                        ShipInsurer.date_from == sa.null())))
-             .outerjoin(ShipInsurerCompany, ShipInsurer.company_id == ShipInsurerCompany.id)
+                        Departure.date_utc >= ShipInsurerDistinct.c.date_from,
+                        ShipInsurerDistinct.c.date_from == sa.null())))
+             .outerjoin(ShipInsurerCompany, ShipInsurerDistinct.c.company_id == ShipInsurerCompany.id)
              .outerjoin(ShipInsurerCountry, ShipInsurerCompany.country_iso2 == ShipInsurerCountry.iso2)
+                          .outerjoin(Price,
+                                     sa.and_(
+                                         Price.date == func.date_trunc('day', Departure.date_utc),
+                                         Price.commodity == commodity_subquery.c.pricing_commodity,
+                                         sa.or_(
+                                             destination_iso2_field == any_(Price.destination_iso2s),
+                                             Price.destination_iso2s == sa.null()
+                                         ),
+                                         sa.or_(
+                                             DeparturePort.id == any_(Price.departure_port_ids),
+                                             Price.departure_port_ids == sa.null()
+                                         ),
+                                         sa.or_(
+                                             ShipOwnerCountry.iso2 == any_(Price.ship_owner_iso2s),
+                                             Price.ship_owner_iso2s == sa.null()
+                                         ),
+                                         sa.or_(
+                                             ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
+                                             Price.ship_insurer_iso2s == sa.null()
+                                         )
+                                     ))
 
+             .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
-             .filter(destination_iso2_field != "RU"))
+
+             # Very important for pricing to have a distinct statement! And to be sorted prior that
+             # so that we pick those with port ids matching, then destination iso2s, then ship etc.
+             .order_by(shipments_combined.c.shipment_id, shipments_combined.c.ship_imo, Price.scenario, Currency.currency,
+                       Price.departure_port_ids, Price.destination_iso2s, Price.ship_insurer_iso2s, Price.ship_owner_iso2s)
+             #TODO confirm with Jan these are good columns to do so
+             .distinct(shipments_combined.c.shipment_id, shipments_combined.c.ship_imo, Price.scenario, Currency.currency)
+        )
 
         if id is not None:
             shipments_rich = shipments_rich.filter(shipments_combined.c.shipment_id.in_(id))
@@ -608,10 +677,13 @@ class VoyageResource(Resource):
             shipments_rich = shipments_rich.filter(commodity_field.in_(to_list(commodity)))
 
         if status is not None:
-            shipments_rich = shipments_rich.filter(shipments_combined.c.shipment_status.in_(status))
+            shipments_rich = shipments_rich.filter(shipments_combined.c.shipment_status.in_(to_list(status)))
 
         if is_sts is not None:
             shipments_rich = shipments_rich.filter(shipments_combined.c.is_sts == is_sts)
+
+        if pricing_scenario is not None:
+            shipments_rich = shipments_rich.filter(Price.scenario.in_(to_list(pricing_scenario)))
 
         if date_from is not None:
             shipments_rich = shipments_rich.filter(
@@ -629,7 +701,7 @@ class VoyageResource(Resource):
         if date_to is not None:
             shipments_rich = shipments_rich.filter(
                 sa.or_(
-                    Arrival.date_utc <= dt.datetime.strptime(date_to, "%Y-%m-%d"),
+                    Arrival.date_utc <= to_datetime(date_to),
                     Departure.date_utc <= to_datetime(date_to)
                 ))
 
@@ -638,6 +710,9 @@ class VoyageResource(Resource):
 
         if arrival_date_to is not None:
             shipments_rich = shipments_rich.filter(Arrival.date_utc <= to_datetime(arrival_date_to))
+
+        if departure_port_area is not None:
+            shipments_rich = shipments_rich.filter(func.lower(DeparturePort.area).in_([x.lower() for x  in to_list(departure_port_area)]))
 
         if year is not None:
             shipments_rich = shipments_rich.filter(sa.or_(
@@ -675,6 +750,9 @@ class VoyageResource(Resource):
         if commodity_destination_iso2 is not None:
             shipments_rich = shipments_rich.filter(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2)))
 
+        if commodity_destination_iso2_not is not None:
+            shipments_rich = shipments_rich.filter(sa.not_(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2_not))))
+
         if commodity_destination_region is not None:
             shipments_rich = shipments_rich.filter(CommodityDestinationCountry.region.in_(to_list(commodity_destination_region)))
 
@@ -710,7 +788,6 @@ class VoyageResource(Resource):
 
         # Query
         result = pd.read_sql(query.statement, session.bind)
-
         if len(result) == 0:
             return Response(
                 status=HTTPStatus.NO_CONTENT,
@@ -762,15 +839,17 @@ class VoyageResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['currency']
+        must_group_by = ['currency', 'pricing_scenario']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
+            'pricing_scenario': [subquery.c.pricing_scenario],
             'currency': [subquery.c.currency],
-            'commodity': [subquery.c.commodity, subquery.c.commodity_group],
-            'commodity_group': [subquery.c.commodity_group],
+            'commodity': [subquery.c.commodity, subquery.c.commodity_name,
+                          subquery.c.commodity_group, subquery.c.commodity_group_name],
+            'commodity_group': [subquery.c.commodity_group, subquery.c.commodity_group_name],
 
             'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country, subquery.c.commodity_origin_region],
             'commodity_origin_country': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
@@ -798,11 +877,13 @@ class VoyageResource(Resource):
             'departure_year': [func.date_trunc('year', subquery.c.departure_date_utc).label("departure_year")],
 
             'arrival_date': [func.date_trunc('day', subquery.c.arrival_date_utc).label('arrival_date')],
+            'arrival_detected_date': [func.date_trunc('day', subquery.c.arrival_detected_date_utc).label('arrival_detected_date')],
             'arrival_month': [func.date_trunc('month', subquery.c.arrival_date_utc).label('arrival_month')],
             'arrival_year': [func.date_trunc('year', subquery.c.arrival_date_utc).label('arrival_year')],
 
-            'departure_port': [subquery.c.departure_port_name, subquery.c.departure_unlocode,
+            'departure_port': [subquery.c.departure_port_name, subquery.c.departure_port_area, subquery.c.departure_unlocode,
                                subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
+            'departure_port_area': [subquery.c.departure_port_area],
             'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
             'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country, subquery.c.departure_region],
 
@@ -863,7 +944,8 @@ class VoyageResource(Resource):
                 result = result \
                     .groupby([x for x in result.columns if x not in [date_column, 'ship_dwt',
                                                                      'value_tonne', 'value_m3',
-                                                                     'value_eur', 'value_currency', 'count']]) \
+                                                                     'value_eur', 'value_currency', 'count']],
+                             dropna=False) \
                     .apply(lambda x: x.set_index(date_column) \
                            .resample("D").sum() \
                            .reindex(daterange) \
@@ -878,9 +960,13 @@ class VoyageResource(Resource):
     def pivot_result(self, result, pivot_by, pivot_value):
 
         dependencies = {
-            'commodity': ['commodity_group', 'commodity_group_name'],
-            'commodity_group': ['commodity', 'commodity_group_name'],
-            'commodity_group_name': ['commodity', 'commodity_group'],
+            'commodity': ['commodity_name', 'commodity_group', 'commodity_group_name'],
+            'commodity_name': ['commodity', 'commodity_group', 'commodity_group_name'],
+            'commodity_group': ['commodity', 'commodity_name', 'commodity_group_name'],
+            'commodity_group_name': ['commodity', 'commodity_name', 'commodity_group'],
+
+            'commodity_destination_country': ['commodity_destination_iso2', 'commodity_destination_region'],
+            'commodity_origin_country': ['commodity_origin_iso2', 'commodity_origin_region'],
 
             'ship_insurer_country': ['ship_insurer_region', 'ship_insurer_iso2'],
             'ship_owner_country': ['ship_owner_region', 'ship_owner_iso2'],
@@ -895,6 +981,7 @@ class VoyageResource(Resource):
                      and x not in to_list(pivot_by)
                      and x not in pivot_by_dependencies]
 
+            result[to_list(pivot_by)] = result[to_list(pivot_by)].fillna(base.UNKNOWN)
             result = result.pivot_table(index=index,
                                         columns=to_list(pivot_by),
                                         values=pivot_value,
@@ -1002,7 +1089,8 @@ class VoyageResource(Resource):
 
         if aggregate_by:
             group_by = [x for x in aggregate_by \
-                        if not x.startswith('commodity') \
+                        if not x in ['commodity', 'commodity_group',
+                                     'commodity_name', 'commodity_group_name'] \
                         and not x in ['arrival_date', 'arrival_month', 'arrival_year',
                                       'departure_date', 'departure_month', 'departure_year',
                                       'date', 'month', 'year'] \
@@ -1106,7 +1194,6 @@ class VoyageResource(Resource):
                     status=200,
                     mimetype='application/kml',
                     headers=headers)
-
 
         return Response(response="Unknown format. Should be either csv, json, geojson or kml",
                         status=HTTPStatus.BAD_REQUEST,

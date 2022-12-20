@@ -1,0 +1,25 @@
+{
+  "China": "Китай",
+  "EU": "ЄС", 
+  "For orders": "На замовлення", 
+  "India": "Індія", 
+  "South Korea": "Південна Корея",
+  "Turkey": "Туреччина",
+  "United States": "Сполучені Штати",
+  "Egypt": "Єгипет",
+  "For orders": "На замовлення",
+  "Russia": "Росія",
+  "United Arab Emirates": "Об’єднані Арабські Емірати",
+
+
+  "Coal": "Вугілля",
+  "Crude oil": "Сира нафта",
+  "Oil products and chemicals" :"Нафтопродукти та хімікати",
+  "Oil products" :"Нафтопродукти",
+  "LNG": "ЗПГ",
+  "Others": "Інше",
+  "Unknown" : "Невідомо",
+
+  "Owned and / or insured in EU & G7": "У власності та/або застраховані в ЄС і G7",
+  "Insured in Norway": "Застраховані в Норвегії"
+}

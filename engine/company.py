@@ -6,7 +6,7 @@ from sqlalchemy import func
 import sqlalchemy as sa
 from base.db_utils import execute_statement
 from difflib import SequenceMatcher
-
+import re
 import base
 from base.db import session
 from base.env import get_env
@@ -108,11 +108,15 @@ def update_info_from_equasis():
         .all()
 
     imos = [x[0] for x in imos]
-    itry = 0
     ntries = 3
-    equasis_infos = None
+
+    # Remove thos we know can't be found
+    imos = [x for x in imos if x is not None and not re.search('_v|NOTFOUND_', x, re.IGNORECASE)]
 
     for imo in tqdm(imos):
+
+        itry = 0
+        equasis_infos = None
 
         while equasis_infos is None and itry <= ntries:
             itry += 1
@@ -120,8 +124,12 @@ def update_info_from_equasis():
                 equasis_infos = equasis.get_ship_infos(imo=imo)
             except requests.exceptions.HTTPError as e:
                 logger.warning("Failed to get equasis ship info, trying again.")
+            except requests.exceptions.ConnectionError as e:
+                logger.warning("Connection failed, trying again.")
 
         if equasis_infos is not None:
+
+
 
             # Insurer
             if equasis_infos.get('insurer'):
@@ -224,8 +232,10 @@ def fill_country():
             'US': ['USA[\.]?$'],
             'SG': ['Singapore [0-9]*$'],
             'TW': ['\(Taiwan\)[\.]?'],
+            'PT': ['Madeira[\.]?$'],
             'HK': ['Hong Kong, China[\.]?[\w]*[0-9]*'],
-            'PT': ['Madeira[\.]?$']
+            'IM': ['Isle of Man'],
+            'JE': ['Jersey']
         }
 
         for key, regexps in address_regexps.items():
@@ -365,7 +375,7 @@ def fill_using_imo_website():
         'St Vincent & The Grenadines':'VC'
     }
 
-    country_dict = db_countries | additional_countries
+    country_dict = {**db_countries, **additional_countries}
 
     companies = session.query(
         Company
@@ -389,7 +399,6 @@ def fill_using_imo_website():
         # add reg iso2 to record and commit
         try:
             company.registration_country_iso2 = country_dict[company_info[0]]
-            session.add(company)
             session.commit()
         except KeyError:
             logger.warning("We did not find the ISO2 for imo {}, country {}. Considering adding manually.".format(company.imo, company_info[0]))
@@ -536,6 +545,8 @@ class CompanyImoScraper:
         if not options:
             options = webdriver.ChromeOptions()
             options.add_argument('ignore-certificate-errors')
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
             if headless:
                 options.add_argument("--headless")
 

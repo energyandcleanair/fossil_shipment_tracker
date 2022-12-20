@@ -11,7 +11,7 @@ import datetime as dt
 from base.models import Position, ShipmentArrivalBerth
 from base.db import session
 from base.utils import to_datetime
-
+from base import PRICING_DEFAULT, PRICING_PRICECAP
 
 def test_counter_last(app):
 
@@ -257,7 +257,7 @@ def test_counter_matches_shipments(app):
         assert all(comparison.value_eur_x == comparison.value_eur_y)
 
 
-
+#TODO agree on sorting specification
 def test_counter_sorting(app):
 
     # We take a country without overland, or a commodity that is only traded through shipments
@@ -320,11 +320,28 @@ def test_pricing_gt0(app):
         data = response.json["data"]
         pipeline_df = pd.DataFrame(data).sort_values(['date'], ascending=False)
 
-
         pipeline_notgas = pipeline_df.loc[pipeline_df.commodity != 'natural_gas']
 
-        assert pd.to_datetime(pipeline_df.date).max() > dt.date.today() - dt.timedelta(days=3)
+        assert pd.to_datetime(pipeline_df.date).max().date() > dt.date.today() - dt.timedelta(days=3)
         assert all(pipeline_df.value_eur > 0)
 
-        assert pd.to_datetime(pipeline_notgas.date).max() > dt.date.today() - dt.timedelta(days=3)
+        assert pd.to_datetime(pipeline_notgas.date).max().date() > dt.date.today() - dt.timedelta(days=3)
         assert all(pipeline_notgas.value_eur > 0)
+
+
+def test_pricing_scenario(app):
+    with app.test_client() as test_client:
+        response = test_client.get('/v0/counter')
+        assert response.status_code == 200
+        data = response.json["data"]
+        counter_df = pd.DataFrame(data)
+        assert list(counter_df.pricing_scenario.unique()) == [PRICING_DEFAULT]
+        default_sum = counter_df.value_eur.sum()
+
+        params =  {'pricing_scenario': PRICING_PRICECAP}
+        response = test_client.get('/v0/counter' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        counter_df = pd.DataFrame(data)
+        assert list(counter_df.pricing_scenario.unique()) == [PRICING_DEFAULT]
+        default_sum = counter_df.value_eur.sum()

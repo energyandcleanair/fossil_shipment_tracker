@@ -4,12 +4,13 @@ import datetime as dt
 import numpy as np
 from flask import Response
 from flask_restx import Resource, reqparse, inputs
+from sqlalchemy import func
 
-
-from base.models import Price, PortPrice
+from base.models import Price, Port, Currency
 from base.encoder import JsonEncoder
 from base.db import session
 from base.utils import to_list, to_datetime
+from base import PRICING_DEFAULT
 from . import routes_api
 
 
@@ -24,6 +25,11 @@ class PriceResource(Resource):
 
     parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+
+    parser.add_argument('scenario', help='Pricing scenario (standard or pricecap)',
+                        default=PRICING_DEFAULT,
+                        required=False)
+
     parser.add_argument('nest_in_data', help='Whether to nest the json content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
@@ -35,11 +41,13 @@ class PriceResource(Resource):
         params = PriceResource.parser.parse_args()
         commodity = params.get("commodity")
         date_from = params.get("date_from")
+        scenario = params.get("scenario")
         date_to = params.get("date_to")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
 
-        query = Price.query
+        query = Price.query.filter(Price.scenario==scenario)
+
         if commodity is not None:
             query = query.filter(Price.commodity.in_(to_list(commodity)))
 
@@ -76,12 +84,17 @@ class PriceResource(Resource):
 class PortPriceResource(Resource):
 
     parser = reqparse.RequestParser()
+    parser.add_argument('unlocode', help='UNLOCODE',
+                        default=None, action='split', required=False)
     parser.add_argument('commodity', help='commodity(ies) of interest. Default: returns all of them',
                         default=None, action='split', required=False)
     parser.add_argument('date_from', help='start date (format 2020-01-15)',
                         default="2022-01-01", required=False)
     parser.add_argument('date_to', type=str, help='end date (format 2020-01-15)', required=False,
                         default=dt.datetime.today().strftime("%Y-%m-%d"))
+    parser.add_argument('scenario', help='Pricing scenario (standard or pricecap)',
+                        default=PRICING_DEFAULT,
+                        required=False)
     parser.add_argument('nest_in_data', help='Whether to nest the json content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
@@ -91,24 +104,46 @@ class PortPriceResource(Resource):
     def get(self):
 
         params = PortPriceResource.parser.parse_args()
+        unlocode = params.get("unlocode")
         commodity = params.get("commodity")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
+        scenario = params.get("scenario")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
 
-        query = PortPrice.query
+        unnested_query = session.query(Price.date,
+                                       Price.commodity,
+                                       Price.date,
+                                       Price.scenario,
+                                       Price.destination_iso2s,
+                                       func.unnest(Price.departure_port_ids).label('port_id'),
+                                       (Currency.per_eur * Price.eur_per_tonne).label('usd_per_tonne'),
+                                       (Currency.per_eur * Price.eur_per_tonne * 0.138).label('usd_per_barrel')
+                              ) \
+            .join(Currency, Currency.date == Price.date) \
+            .filter(Price.scenario.in_(to_list(scenario)),
+                    Currency.currency == 'USD') \
+            .subquery()
+
+        query = session.query(unnested_query) \
+            .join(Port, Port.id == unnested_query.c.port_id)
+
+        if unlocode is not None:
+            query = query.filter(Port.unlocode.in_(to_list(unlocode)))
+
         if commodity is not None:
-            query = query.filter(PortPrice.commodity.in_(to_list(commodity)))
+            query = query.filter(unnested_query.c.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
-            query = query.filter(PortPrice.date >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
+            query = query.filter(unnested_query.c.date >= to_datetime(date_from))
 
         if date_to is not None:
-            query = query.filter(PortPrice.date <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
+            query = query.filter(unnested_query.c.date <= to_datetime(date_to))
 
         price_df = pd.read_sql(query.statement, session.bind)
         price_df.replace({np.nan: None}, inplace=True)
+        price_df.sort_values(['date'], inplace=True)
 
         if format == "csv":
             return Response(

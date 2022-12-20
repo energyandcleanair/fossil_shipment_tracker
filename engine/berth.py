@@ -68,7 +68,8 @@ def detect_departure_berths(shipment_id=None, min_hours_at_berth=4, max_distance
     # Look for shipments to update
     shipments_all = return_combined_shipments(session)
 
-    shipments_to_update = session.query(shipments_all.c.shipment_id).filter(shipments_all.c.shipment_id.notin_(session.query(ShipmentDepartureBerth.shipment_id)))
+    shipments_to_update = session.query(shipments_all.c.shipment_id) \
+        .filter(shipments_all.c.shipment_id.notin_(session.query(ShipmentDepartureBerth.shipment_id)))
 
     if shipment_id is not None:
         shipment_id = to_list(shipment_id)

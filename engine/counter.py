@@ -8,6 +8,8 @@ from base.models import Counter, Port, Country, Berth, Commodity
 from base.models import DB_TABLE_COUNTER
 from base.utils import to_datetime
 from base.logger import logger_slack
+from base import PRICING_DEFAULT, PRICING_PRICECAP
+from base.db_utils import upsert
 
 try:
     from api.routes.voyage import VoyageResource
@@ -19,7 +21,7 @@ except ImportError:
 import base
 
 
-def update(date_from='2021-11-01'):
+def update(date_from='2021-01-01'):
     """
     Fill counter
     :return:
@@ -35,7 +37,8 @@ def update(date_from='2021-11-01'):
         "commodity_origin_iso2": ["RU"],
         "aggregate_by": ["commodity_origin_iso2", "commodity_destination_iso2", "commodity", "date"],
         "nest_in_data": False,
-        "currency": "EUR"
+        "currency": "EUR",
+        "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
     }
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
@@ -56,13 +59,16 @@ def update(date_from='2021-11-01'):
         "commodity_origin_iso2": ['RU'],
         "aggregate_by": ['commodity_origin_iso2', "commodity_destination_iso2", "commodity", "arrival_date", "status"],
         "nest_in_data": False,
-        "currency": 'EUR'
+        "currency": 'EUR',
+        "status": 'completed',
+        "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
     }
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
     voyages = pd.DataFrame(voyages)
-    voyages = voyages.loc[voyages.commodity_origin_iso2 == 'RU'] # Just to confirm
-    voyages = voyages.loc[voyages.status == base.COMPLETED]
+    voyages = voyages.loc[voyages.commodity_origin_iso2 == 'RU']
+    voyages = voyages.loc[voyages.commodity_destination_iso2 != 'RU']
+    voyages = voyages.loc[voyages.status == base.COMPLETED] # just to confirm
     voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
 
     # Aggregate
@@ -71,22 +77,33 @@ def update(date_from='2021-11-01'):
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
     result = pd.concat([pipelineflows, voyages]) \
         .sort_values(['date', 'commodity']) \
-        [["commodity", 'commodity_group', 'commodity_destination_region', "commodity_destination_iso2", "date", "value_tonne", "value_eur"]]
+        [["commodity", 'commodity_group', 'commodity_destination_region', "commodity_destination_iso2", "date", "value_tonne", "value_eur",
+          "pricing_scenario"]]
     result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
     result = result \
-        .groupby(["commodity", 'commodity_group', "commodity_destination_iso2", 'commodity_destination_region']) \
+        .groupby(["commodity", 'commodity_group', "commodity_destination_iso2", 'commodity_destination_region', 'pricing_scenario'],
+                 dropna=False) \
         .apply(lambda x: x.set_index("date") \
                .resample("D").sum() \
                .fillna(0)) \
         .reset_index()
 
-    result["type"] = base.COUNTER_OBSERVED
+    result = result[~pd.isna(result.pricing_scenario)]
 
     # Progressively phase out pipeline_lng in n days
     result = remove_pipeline_lng(result)
 
+    # Remove EU coal shipments following coal ban
+    result = remove_coal_to_eu(result)
+
+    # Progressively restore new EU oil pipeline that we missed before
+    # result = resume_pipeline_oil_eu(result, n_days=3)
+
+    # # Progressively resume EU shipments that have been paused to reached 100bn
+    # result = resume_eu_shipments(result, n_days=3)
+
     # Sanity check before updating counter
-    ok, global_new, global_old, eu_new, eu_old = sanity_check(result)
+    ok, global_new, global_old, eu_new, eu_old = sanity_check(result.loc[result.pricing_scenario == PRICING_DEFAULT])
 
     if not ok:
         logger_slack.error("[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (global_new / 1e9, global_old / 1e9))
@@ -94,19 +111,23 @@ def update(date_from='2021-11-01'):
         logger_slack.info("[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)" %
                           (global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9))
 
-        # Erase and replace everything
         result.drop(['commodity_destination_region', 'commodity_group'], axis=1, inplace=True)
         result.rename(columns={'commodity_destination_iso2': 'destination_iso2'}, inplace=True)
-        Counter.query.delete()
-        session.commit()
-        result.to_sql(DB_TABLE_COUNTER,
-                  con=engine,
-                  if_exists="append",
-                  index=False)
-        session.commit()
 
-    # Add estimates
-    # add_estimates(result)
+        if True:
+            # Erase and replace everything
+            Counter.query.delete()
+            session.commit()
+            result.to_sql(DB_TABLE_COUNTER,
+                      con=engine,
+                      if_exists="append",
+                      index=False)
+            session.commit()
+        else:
+            # For manual purposes
+            upsert(df=result[result.pricing_scenario == PRICING_PRICECAP],
+                   table=DB_TABLE_COUNTER,
+                   constraint_name="unique_counter")
 
 
 def sanity_check(result):
@@ -129,6 +150,10 @@ def sanity_check(result):
         logger_slack.error("Counter has for_orders")
         ok = ok and False
 
+    if len(result[pd.isna(result.pricing_scenario)]) > 0:
+        logger_slack.error("Missing pricing scenario")
+        ok = ok and False
+
     coal_ban = result[(result.commodity_destination_region == 'EU') & \
         (result.commodity.isin(['coal_rail_road', 'coke_rail_road']) &
          (result.date >= '2022-08-11'))].value_tonne.sum()
@@ -142,22 +167,22 @@ def sanity_check(result):
                                              Counter.destination_iso2.label('commodity_destination_iso2'),
                                              Country.region.label('commodity_destination_region'),
                                              Commodity.group.label('commodity_group')) \
-                               .join(Country, Country.iso2 == Counter.destination_iso2) \
-                               .join(Commodity, Commodity.id == Counter.commodity).statement,
+                               .outerjoin(Country, Country.iso2 == Counter.destination_iso2) \
+                               .join(Commodity, Commodity.id == Counter.commodity) \
+                               .filter(Counter.pricing_scenario == PRICING_DEFAULT).statement,
                                session.bind)
         old = old_data \
             .loc[old_data.date >= '2022-02-24'] \
             .loc[old_data.date <= pd.to_datetime(dt.date.today())] \
-            .groupby(compared_cols) \
+            .groupby(compared_cols, dropna=False) \
             .agg(old_eur=('value_eur', np.nansum)) \
             .replace(np.nan, 0)
 
         new = result \
             .loc[result.date >= '2022-02-24'] \
             .loc[result.date <= pd.to_datetime(dt.date.today())] \
-            .groupby(compared_cols) \
+            .groupby(compared_cols, dropna=False) \
             .agg(new_eur=('value_eur', np.nansum))
-
 
         comparison = pd.merge(old, new,
                  how='outer',
@@ -206,36 +231,48 @@ def remove_pipeline_lng(result, n_days=10,
     return result
 
 
-# def remove_kipi_flows(pipelineflows,
-#                       date_stop=dt.datetime(2022, 6, 16),
-#                       n_days=10):
-#     """
-#         Assuming gas transiting from Turkey through Kipi point
-#         is originating in Azerbaidjan.
-#
-#         n_days: number of days to phase it out to avoid jumps in counter
-#         date_stop: date of immediate cut (everything before will be progressively removed,
-#                                           everything after will be removed immediately)
-#         :return:
-#         """
-#
-#     idx = (pipelineflows.departure_iso2 == 'TR') & (pipelineflows.destination_iso2 == 'GR')
-#
-#     idx_after = idx & (pd.to_datetime(pipelineflows.date) >= date_stop)
-#     idx_before = idx & (pd.to_datetime(pipelineflows.date) <= date_stop)
-#
-#     factor_after = 0
-#     factor_before = max(0, 1 - (1 / n_days * (dt.date.today() - date_stop.date()).days))
-#
-#     pipelineflows.loc[idx_after, 'value_tonne'] = pipelineflows.loc[idx_after, 'value_tonne'] * factor_after
-#     pipelineflows.loc[idx_after, 'value_m3'] = pipelineflows.loc[idx_after, 'value_m3'] * factor_after
-#     pipelineflows.loc[idx_after, 'value_eur'] = pipelineflows.loc[idx_after, 'value_eur'] * factor_after
-#
-#     pipelineflows.loc[idx_before, 'value_tonne'] = pipelineflows.loc[idx_before, 'value_tonne'] * factor_before
-#     pipelineflows.loc[idx_before, 'value_m3'] = pipelineflows.loc[idx_before, 'value_m3'] * factor_before
-#     pipelineflows.loc[idx_before, 'value_eur'] = pipelineflows.loc[idx_before, 'value_eur'] * factor_before
-#
-#     return pipelineflows
+def remove_coal_to_eu(result, date_stop=dt.date(2022,8,11)):
+    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'coal')
+               & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
+               ["value_eur", "value_tonne"]] = 0
+
+    return result
+
+
+def resume_pipeline_oil_eu(result, n_days=14,
+                           date_start_resuming = dt.date(2022, 10, 4),
+                           date_break = dt.date(2022, 9, 1)):
+    """
+    We missed EU pipeline oil for a couple weeks but didn't want to restore it
+    in one go just before the 100 bn counter. We're adding a slow catchup
+    :param result:
+    :param n_days:
+    :param date_stop:
+    :return:
+    """
+    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'pipeline_oil')
+               & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
+               ["value_eur", "value_tonne"]] *= min(1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days))
+
+    return result
+
+
+def resume_eu_shipments(result, n_days=10,
+                        date_start_resuming = dt.date(2022, 10, 4),
+                        date_break = dt.date(2022, 9, 26)):
+    """
+    We missed EU pipeline oil for a couple weeks but didn't want to restore it
+    in one go just before the 100 bn counter. We're adding a slow catchup
+    :param result:
+    :param n_days:
+    :param date_stop:
+    :return:
+    """
+    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity.isin(['lng', 'crude_oil', 'oil_products']))
+               & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
+               ["value_eur", "value_tonne"]] *= min(1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600  / 24 / n_days))
+
+    return result
 
 
 

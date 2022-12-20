@@ -31,9 +31,9 @@ from . import DB_TABLE_SHIPMENTARRIVALBERTH
 from . import DB_TABLE_SHIPMENTDEPARTUREBERTH
 from . import DB_TABLE_MTVOYAGEINFO
 from . import DB_TABLE_PRICE
-from . import DB_TABLE_PORTPRICE
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
+from . import DB_TABLE_COUNTER100BN
 from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_MARINETRAFFICCALL
@@ -41,6 +41,9 @@ from . import DB_TABLE_CURRENCY
 from . import DB_TABLE_MTEVENT_TYPE
 from . import DB_TABLE_EVENT
 from . import DB_TABLE_SHIPMENT_WITH_STS
+from . import DB_TABLE_STS_LOCATIONS
+from . import DB_TABLE_STSARRIVALLOCATION
+from . import DB_TABLE_STSDEPARTURELOCATION
 
 from . import DB_TABLE_ALERT_INSTANCE
 from . import DB_TABLE_ALERT_CONFIG
@@ -48,6 +51,11 @@ from . import DB_TABLE_ALERT_RECIPIENT
 from . import DB_TABLE_ALERT_RECIPIENT_ASSOC
 from . import DB_TABLE_ALERT_CRITERIA
 from . import DB_TABLE_ALERT_CRITERIA_ASSOC
+
+from . import DB_TABLE_FLARING
+from . import DB_TABLE_FLARING_FACILITY
+from . import DB_TABLE_FLARING_ANOMALY
+from . import DB_TABLE_FLARING_ANOMALY_ALGORITHM
 
 
 class Ship(Base):
@@ -103,6 +111,7 @@ class Port(Base):
     check_arrival = Column(Boolean)
     geometry = Column(Geometry('POINT', srid=4326))
     others = Column(JSONB)
+    area = Column(String)
 
     __tablename__ = DB_TABLE_PORT
     __table_args__ = (Index('idx_port_unlocode', "unlocode"),
@@ -129,6 +138,47 @@ class Berth(Base):
     geometry = Column(Geometry('GEOMETRY', srid=4326))
 
     __tablename__ = DB_TABLE_BERTH
+
+class STSLocation(Base):
+    id = Column(String, unique=True, primary_key=True)
+    name = Column(String)
+    geometry = Column(Geometry('GEOMETRY', srid=4326))
+
+    __tablename__ = DB_TABLE_STS_LOCATIONS
+
+
+class ShipmentArrivalLocationSTS(Base):
+    """
+    For each shipment, lists the berth detected as well as the method used to find it
+    """
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    shipment_id = Column(BigInteger, unique=True)
+    sts_location_id = Column(String, ForeignKey(DB_TABLE_STS_LOCATIONS + '.id', onupdate="CASCADE", ondelete="CASCADE"))
+
+    # Optional
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"))
+    method_id = Column(String)
+
+    __tablename__ = DB_TABLE_STSARRIVALLOCATION
+    __table_args__ = (UniqueConstraint('shipment_id', 'sts_location_id', name='unique_shipmentstsarrivallocation'),
+                      )
+
+
+class ShipmentDepartureLocationSTS(Base):
+    """
+    For each shipment, lists the berth detected as well as the method used to find it
+    """
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    shipment_id = Column(BigInteger, unique=True)
+    sts_location_id = Column(String, ForeignKey(DB_TABLE_STS_LOCATIONS + '.id', onupdate="CASCADE", ondelete="CASCADE"))
+
+    # Optional
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"))
+    method_id = Column(String)
+
+    __tablename__ = DB_TABLE_STSDEPARTURELOCATION
+    __table_args__ = (UniqueConstraint('shipment_id', 'sts_location_id', name='unique_shipmentstsdeparturelocation'),
+                      )
 
 
 class Country(Base):
@@ -201,8 +251,11 @@ class Arrival(Base):
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'))
     event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + '.id', onupdate="CASCADE"), nullable=True, unique=True)
 
-    # Optional
     portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=False)
+
+    # We add next departure to have a detected date
+    nextdeparture_portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + '.id'), unique=False)
+
     __tablename__ = DB_TABLE_ARRIVAL
 
 
@@ -348,6 +401,7 @@ class PortCall(Base):
     load_status = Column(String)  # (0 : N/A, 1 : In Ballast, 2 : Partially Laden, 3 : Fully Laden)
     move_type = Column(String)  # "1": "departure", "0":"arrival"
     port_operation = Column(String) # (0: N / A, 1: load, 2: discharge, 3: both, 4: none)
+    draught = Column(Numeric)
 
     # Optional
     terminal_id = Column(String, ForeignKey(DB_TABLE_TERMINAL + '.id', onupdate="CASCADE"))
@@ -359,7 +413,8 @@ class PortCall(Base):
     created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
 
     __tablename__ = DB_TABLE_PORTCALL
-    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'date_utc', 'move_type', name='unique_portcall'),
+                      Index('idx_portcall_ship_imo', "ship_imo"),)
 
 
     @validates('port_unlocode')
@@ -445,38 +500,27 @@ class MTVoyageInfo(Base):
 
 class Price(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    country_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
+
     commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
     date = Column(DateTime(timezone=False))
     eur_per_tonne = Column(Numeric)
+    scenario = Column(String, nullable=False)
+
+    destination_iso2s = Column(ARRAY(String))
+    departure_port_ids = Column(ARRAY(BigInteger))
+    ship_owner_iso2s = Column(ARRAY(String))
+    ship_insurer_iso2s = Column(ARRAY(String))
+
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_PRICE
-    __table_args__ = (UniqueConstraint('country_iso2', 'date', 'commodity', name='unique_price'),
-                      CheckConstraint("eur_per_tonne >= 0", name="price_positive"),
-                      # We add a unique index to be sure because the constraint above doesn't work if country_iso2 is null
-                      Index(
-                          "unique_price_additional_constraint",
-                          "date",
-                          "commodity",
-                          unique=True,
-                          postgresql_where=country_iso2.is_(None)
-                      ),
-                      Index("idx_price_commodity", "commodity")
+    __table_args__ = (UniqueConstraint('destination_iso2s', 'departure_port_ids',
+                                       'ship_owner_iso2s',  'ship_insurer_iso2s',
+                                       'date', 'commodity', 'scenario', name='unique_price_new'),
+                      CheckConstraint("eur_per_tonne >= 0", name="price_new_positive"),
+                      Index("idx_price_new_commodity", "commodity"),
+                      Index("idx_price_new_date", "date")
                       )
-
-
-class PortPrice(Base):
-    id = Column(BigInteger, autoincrement=True, primary_key=True)
-    port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + '.id'), nullable=False)
-    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
-    date = Column(DateTime(timezone=False))
-    eur_per_tonne = Column(Numeric)
-
-    __tablename__ = DB_TABLE_PORTPRICE
-    __table_args__ = (UniqueConstraint('port_id', 'date', 'commodity', name='unique_portprice'),
-                      CheckConstraint("eur_per_tonne >= 0", name="portprice_positive"),
-                      Index("idx_portprice_commodity", "commodity"))
-
 
 # Entsog flows: before processing
 # Mainly used to communicate between Python and R
@@ -528,10 +572,25 @@ class Counter(Base):
     date = Column(DateTime(timezone=False))
     value_tonne = Column(Numeric)
     value_eur = Column(Numeric)
-    type = Column(String) # observed or estimated
+    pricing_scenario = Column(String)
 
     __tablename__ = DB_TABLE_COUNTER
-    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_iso2', name='unique_counter_tmp'),)
+    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_iso2', 'pricing_scenario', name='unique_counter'),)
+
+
+class Counter100bn(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + '.id'), nullable=False)
+
+    destination_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + '.iso2'))
+
+    date = Column(DateTime(timezone=False))
+    value_tonne = Column(Numeric)
+    value_eur = Column(Numeric)
+    pricing_scenario = Column(String)
+
+    __tablename__ = DB_TABLE_COUNTER100BN
+    __table_args__ = (UniqueConstraint('date', 'commodity', 'destination_iso2', 'pricing_scenario', name='unique_counter_100bn'),)
 
 
 class Commodity(Base):
@@ -567,6 +626,7 @@ class Currency(Base):
     date = Column(Date)
     currency = Column(String)
     per_eur = Column(Numeric) # All currencies
+    estimated = Column(Boolean) # Whether it is actual value or estimated (useful when API is down)
 
     __table_args__ = (UniqueConstraint('date', 'currency', name='unique_currency'),)
     __tablename__ = DB_TABLE_CURRENCY
@@ -640,6 +700,8 @@ class AlertCriteria(Base):
     new_destination_iso2 = Column(ARRAY(String))
     new_destination_name_pattern = Column(ARRAY(String))
 
+    departure_port_ids = Column(ARRAY(BigInteger)) # If null, all ports considered
+
     __tablename__ = DB_TABLE_ALERT_CRITERIA
 
 
@@ -663,3 +725,46 @@ class AlertInstance(Base):
     sent_date_utc = Column(DateTime(timezone=False))
 
     __tablename__ = DB_TABLE_ALERT_INSTANCE
+
+
+class FlaringFacility(Base):
+    """Geometries of Oil/Gas related installations"""
+    id = Column(BigInteger, unique=True, primary_key=True)
+    type = Column(String)
+    name = Column(String)
+    name_en = Column(String)
+    url = Column(String)
+    commodity = Column(String)
+    geometry = Column(Geometry('GEOMETRY', srid=4326))
+
+    __tablename__ = DB_TABLE_FLARING_FACILITY
+
+
+class Flaring(Base):
+    """Geometries of Oil/Gas related installations"""
+    id = Column(BigInteger, unique=True, primary_key=True)
+    facility_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING_FACILITY + '.id', ondelete="CASCADE"), nullable=False)
+    date = Column(Date)
+    unit = Column(String, nullable=False)
+    value = Column(Numeric)
+    buffer_km = Column(Numeric)
+
+    __table_args__ = (UniqueConstraint('facility_id', 'date', 'buffer_km', 'unit', name='unique_flaring'),)
+    __tablename__ = DB_TABLE_FLARING
+
+
+# class FlaringAnomaly(Base):
+#     """Geometries of Oil/Gas related installations"""
+#     id = Column(String, unique=True, primary_key=True)
+#     flaring_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING + '.id', ondelete="CASCADE"), nullable=False)
+#     algorithm = Column(Numeric)
+#
+#     __tablename__ = DB_TABLE_FLARING_ANOMALY
+#
+# class FlaringAnomalyAlgorithm(Base):
+#     """Geometries of Oil/Gas related installations"""
+#     id = Column(String, unique=True, primary_key=True)
+#     flaring_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING + '.id', ondelete="CASCADE"), nullable=False)
+#     algorithm = Column(Numeric)
+#
+#     __tablename__ = DB_TABLE_FLARING_ANOMALY_ALGORITHM

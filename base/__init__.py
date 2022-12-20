@@ -8,6 +8,7 @@ BULK = "bulk"
 COAL = "coal"
 GENERAL_CARGO = "general_cargo"
 BULK_NOT_COAL = "bulk_not_coal"
+SUBTYPE_REEFER = "reefer"
 UNKNOWN_COMMODITY = "unknown"
 PIPELINE_GAS = "natural_gas"
 PIPELINE_OIL = "pipeline_oil"
@@ -15,6 +16,8 @@ PIPELINE_OIL = "pipeline_oil"
 # MARINE TRAFFIC METHODS
 VESSEL_DATA = "vesselmasterdata/"
 VESSEL_EVENTS = "vesselevents/"
+VESSEL_POSITION = "exportvesseltrack/"
+VESSEL_PORTCALLS = "portcalls/"
 HTTP_OK = "200"
 
 
@@ -62,3 +65,8 @@ COMMODITY_GROUPING_DEFAULT = "default"
 
 # IMO WEBSITE SCRAPING
 IMO_BASE_URL = "https://gisis.imo.org/public/ships/default.aspx"
+
+
+# PRICING SCENARIO
+PRICING_DEFAULT = "default"
+PRICING_PRICECAP = "pricecap"

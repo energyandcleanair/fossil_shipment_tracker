@@ -15,7 +15,7 @@ from sqlalchemy import case
 
 import base
 from . import routes_api
-
+from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session
 from base.models import Counter, Commodity, Country, Currency
@@ -28,9 +28,6 @@ class RussiaCounterResource(Resource):
 
     parser = reqparse.RequestParser()
     parser.add_argument('cumulate', type=inputs.boolean, help='whether or not to cumulate (i.e. sum) data over time',
-                        required=False,
-                        default=False)
-    parser.add_argument('fill_with_estimates', type=inputs.boolean, help='whether or not to fill late days with estimates',
                         required=False,
                         default=False)
     parser.add_argument('use_eu', type=inputs.boolean,
@@ -70,6 +67,10 @@ class RussiaCounterResource(Resource):
     parser.add_argument('currency', action='split', help='currency(ies) of returned results e.g. EUR,USD,GBP',
                         required=False,
                         default=['EUR', 'USD'])
+    parser.add_argument('pricing_scenario', help='Pricing scenario (standard or pricecap)',
+                        action='split',
+                        default=[PRICING_DEFAULT],
+                        required=False)
     parser.add_argument('nest_in_data', help='Whether to nest the json content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('sort_by', type=str, help='sorting results e.g. asc(commodity),desc(value_eur)',
@@ -83,6 +84,9 @@ class RussiaCounterResource(Resource):
     parser.add_argument('limit_by', action='split',
                         help='in which group do you want to limit to n records',
                         required=False, default=None)
+    parser.add_argument('columns_order', action='split',
+                        help='order of columns. Don\'t need to specify all of them. Mainly useful for charts.',
+                        required=False, default=None)
     parser.add_argument('keep_zeros',  type=inputs.boolean,
                         help='keep lines with zeros',
                         required=False,
@@ -90,8 +94,10 @@ class RussiaCounterResource(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-
         params = RussiaCounterResource.parser.parse_args()
+        return self.get_from_params(params)
+
+    def get_from_params(self, params):
         format = params.get("format")
         cumulate = params.get("cumulate")
         rolling_days = params.get("rolling_days")
@@ -104,16 +110,18 @@ class RussiaCounterResource(Resource):
         commodity = params.get("commodity")
         commodity_group = params.get("commodity_group")
         commodity_grouping = params.get("commodity_grouping")
-        fill_with_estimates = params.get("fill_with_estimates")
         nest_in_data = params.get("nest_in_data")
         use_eu = params.get("use_eu")
         currency = params.get("currency")
+        pricing_scenario = params.get("pricing_scenario")
         sort_by = params.get("sort_by")
         pivot_by = params.get("pivot_by")
         pivot_value = params.get("pivot_value")
         limit = params.get("limit")
         limit_by = params.get("limit_by")
         keep_zeros = params.get("keep_zeros")
+        columns_order = params.get("columns_order")
+
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
@@ -123,7 +131,8 @@ class RussiaCounterResource(Resource):
                 (sa.and_(use_eu, Counter.destination_iso2 == 'GB'), 'United Kingdom'),
                 (sa.and_(use_eu, Country.region == 'EU28', Counter.destination_iso2 != 'GB'), 'EU'),
                 (sa.and_(not use_eu, Counter.destination_iso2 == 'GB'), 'EU28'),
-                (sa.and_(not use_eu, Country.region == 'EU'), 'EU28')
+                (sa.and_(not use_eu, Country.region == 'EU'), 'EU28'),
+                (Country.iso2 == sa.null(), 'Others')
             ],
             else_=Country.region
         ).label('destination_region')
@@ -143,13 +152,14 @@ class RussiaCounterResource(Resource):
                 Counter.value_tonne,
                 Counter.value_eur,
                 Currency.currency,
-                value_currency_field
+                value_currency_field,
+                Counter.pricing_scenario
             ) \
             .outerjoin(commodity_subquery, Counter.commodity == commodity_subquery.c.id) \
-            .join(Country, Counter.destination_iso2 == Country.iso2) \
+            .outerjoin(Country, Counter.destination_iso2 == Country.iso2) \
             .outerjoin(Currency, Counter.date == Currency.date) \
             .filter(Counter.date >= to_datetime(date_from)) \
-            .filter(sa.or_(fill_with_estimates, Counter.type != base.COUNTER_ESTIMATED))
+            .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
         if destination_iso2:
             query = query.filter(Counter.destination_iso2.in_(to_list(destination_iso2)))
@@ -183,33 +193,38 @@ class RussiaCounterResource(Resource):
         if "date" in counter:
             daterange = pd.date_range(min(counter.date), max(counter.date)).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor('D')  # Should have been done already
-            cols = intersect(["commodity", "commodity_group", 'commodity_group_name', 'destination_iso2',
-                                    'destination_country', "destination_region",'price_type', 'currency'], counter.columns)
+            cols = intersect(["commodity", "commodity_group", 'commodity_group_name',
+                              'destination_iso2', 'destination_country', "destination_region",
+                              'currency', 'pricing_scenario'], counter.columns)
 
             counter = counter \
-                .groupby(cols) \
+                .groupby(cols, dropna=False) \
                 .apply(lambda x: x.set_index("date") \
-                       .resample("D").sum() \
+                       .resample("D") \
+                       .sum() \
                        .reindex(daterange) \
                        # .drop(cols, axis=1) \
                        .fillna(0)) \
                 .reset_index() \
                 .sort_values(intersect(['commodity', 'date'], counter.columns))
 
+            counter['date'] = pd.to_datetime(counter.date.dt.date)
 
         if cumulate and "date" in counter:
-            groupby_cols = [x for x in ['commodity', 'commodity_group', 'commodity_group_name', 'destination_iso2', 'destination_country', 'destination_region', 'currency'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
-            counter['value_eur'] = counter.groupby(groupby_cols)['value_eur'].transform(pd.Series.cumsum)
-            counter['value_tonne'] = counter.groupby(groupby_cols)['value_tonne'].transform(pd.Series.cumsum)
-            counter['value_currency'] = counter.groupby(groupby_cols)['value_currency'].transform(pd.Series.cumsum)
+            groupby_cols = [x for x in ['commodity', 'commodity_group', 'commodity_group_name', 'destination_iso2',
+                                        'destination_country', 'destination_region', 'currency', 'pricing_scenario'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
+            counter['value_eur'] = counter.groupby(groupby_cols, dropna=False)['value_eur'].transform(pd.Series.cumsum)
+            counter['value_tonne'] = counter.groupby(groupby_cols, dropna=False)['value_tonne'].transform(pd.Series.cumsum)
+            counter['value_currency'] = counter.groupby(groupby_cols, dropna=False)['value_currency'].transform(pd.Series.cumsum)
 
 
         if rolling_days is not None and rolling_days > 1:
             counter = counter \
-                .groupby(intersect(["commodity", "commodity_group", 'commodity_group_name',
+                .groupby(intersect(["commodity", "commodity_name", "commodity_group", 'commodity_group_name',
                                     'destination_iso2',
                                     'destination_country',
-                                    "destination_region", 'currency'], counter.columns)) \
+                                    "destination_region", 'currency', 'pricing_scenario'], counter.columns),
+                         dropna=False) \
                 .apply(lambda x: x.set_index('date') \
                        .resample("D").sum() \
                        .reindex(daterange) \
@@ -235,6 +250,9 @@ class RussiaCounterResource(Resource):
 
         # Pivot
         counter = self.pivot_result(result=counter, pivot_by=pivot_by, pivot_value=pivot_value)
+
+        # Pivot
+        counter = self.sort_columns(result=counter, columns_order=columns_order)
 
         if format == "csv":
             return Response(
@@ -266,7 +284,7 @@ class RussiaCounterResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['currency']
+        must_group_by = ['currency', 'pricing_scenario']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
@@ -274,6 +292,7 @@ class RussiaCounterResource(Resource):
         # Aggregating
         aggregateby_cols_dict = {
             'currency': [subquery.c.currency],
+            'pricing_scenario': [subquery.c.pricing_scenario],
             'date': [subquery.c.date],
             'month': [func.date_trunc('month', subquery.c.date).label("month")],
             'year': [func.date_trunc('year', subquery.c.date).label("year")],
@@ -317,7 +336,6 @@ class RussiaCounterResource(Resource):
 
         return result
 
-
     def sort_result(self, result, sort_by, aggregate_by):
         by = []
         ascending = []
@@ -350,9 +368,10 @@ class RussiaCounterResource(Resource):
                 sorting_groupers = [x for x in aggregate_by \
                                     if not x in aggregate_by_dependencies \
                                     and not x in ['date', 'month', 'year', 'currency'] \
+                                    and not x in by
                                     and x in result.columns]
 
-            sorted = result.groupby(sorting_groupers)[sort_by].sum() \
+            sorted = result.groupby(sorting_groupers, dropna=False)[by].sum() \
                 .reset_index() \
                 .sort_values(by=by, ascending=ascending) \
                 .drop(sort_by, axis=1)
@@ -360,17 +379,16 @@ class RussiaCounterResource(Resource):
             result = pd.merge(sorted, result, how='left')
 
 
-            # Sort commodity group manually
-
-
         return result
 
     def pivot_result(self, result, pivot_by, pivot_value):
 
         dependencies = {
-            'commodity': ['commodity_group','commodity_group_name'],
+            'commodity': ['commodity_group', 'commodity_group_name'],
             'commodity_group': ['commodity', 'commodity_group_name'],
-            'commodity_group_name': ['commodity', 'commodity_group']
+            'commodity_group_name': ['commodity', 'commodity_group'],
+            'destination_country': ['destination_iso2', 'destination_region'],
+            'destination_iso2': ['destination_country', 'destination_region'],
         }
 
         if pivot_by:
@@ -381,12 +399,13 @@ class RussiaCounterResource(Resource):
                         and x not in to_list(pivot_by)
                         and x not in pivot_by_dependencies]
 
-            result = result.pivot_table(index=index,
+            result['variable'] = pivot_value
+            result = result.pivot_table(index=index + ['variable'],
                                         columns=to_list(pivot_by),
                                         values=pivot_value,
                                         sort=False,
                                         fill_value=0).reset_index()
-            result['variable'] = pivot_value
+
 
         return result
 
@@ -406,7 +425,7 @@ class RussiaCounterResource(Resource):
         if aggregate_by:
             group_by = [x for x in aggregate_by \
                               if not x.startswith('commodity') \
-                              and not x in ['date','month','year'] \
+                              and not x in ['date', 'month', 'year'] \
                               and x in result.columns]
 
         sort_by = sort_by or 'value_eur'
@@ -414,18 +433,27 @@ class RussiaCounterResource(Resource):
 
         # Can only take one
         sort_by = to_list(sort_by)[0]
-        top = result.groupby(group_by) \
+        top = result.groupby(group_by, dropna=False) \
             .agg({sort_by: 'sum'}) \
             .reset_index() \
             .sort_values(limit_by + to_list(sort_by), ascending=False)
 
         if limit_by:
-            top = top.groupby(limit_by, as_index=False)
+            top = top.groupby(limit_by, as_index=False, dropna=False)
 
         top = top \
             .head(limit) \
             .drop(sort_by, axis=1)
 
         result = pd.merge(result, top, how='inner')
+
+        return result
+
+    def sort_columns(self, result, columns_order):
+
+        if columns_order:
+            # We keep all other columns
+            cols = columns_order + [x for x in result.columns if x not in columns_order]
+            result = result[cols]
 
         return result

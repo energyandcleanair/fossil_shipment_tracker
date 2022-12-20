@@ -1,32 +1,31 @@
 from geoalchemy2.functions import ST_MakeLine, ST_Multi, ST_Union, ST_Distance, ST_ClusterDBSCAN, ST_Centroid, ST_Transform
-from sqlalchemy import func
-import sqlalchemy as sa
 import geopandas as gpd
 import os
-
-
-from engine.datalastic import Datalastic
-from base.db import session
 import datetime as dt
-import base
-from base.logger import logger_slack
-from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, ShipmentWithSTS, Event
 import sqlalchemy as sa
 from sqlalchemy import func, or_
-from base.utils import to_list, to_datetime, update_geometry_from_wkb
-from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, Berth, ShipmentArrivalBerth
+from sqlalchemy.orm import aliased
 from tqdm import tqdm
 import pandas as pd
-from engine.shipment import return_combined_shipments
 
+
+import base
+from base.db import session
+from base.logger import logger_slack
+from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, ShipmentWithSTS, Event
+from base.utils import to_list, to_datetime, update_geometry_from_wkb
+from base.models import Ship, Departure, Shipment, Position, Arrival, Port, Destination, Berth, ShipmentArrivalBerth
 from base.db_utils import execute_statement, upsert
 from base.models import DB_TABLE_POSITION
+from engine.datalastic import Datalastic
+from engine.shipment import return_combined_shipments
+
+ArrivalPort = aliased(Port)
 
 
 def get(imo, date_from, date_to):
     positions = Datalastic.get_positions(imo=imo, date_from=date_from, date_to=date_to)
     return positions
-
 
 def update_shipment_last_position():
 
@@ -82,10 +81,11 @@ def update_shipment_last_position():
 def update(commodities=None,
            ship_imo=None,
            shipment_id=None,
-           date_from=None,
+           date_from='2022-01-01',
            date_to=None,
            shipment_status=None,
-           force_for_those_without_destination=False):
+           force_for_those_without_destination=False,
+           force_rebuild=False):
     
     logger_slack.info("=== Position update ===")
     buffer = dt.timedelta(hours=24)
@@ -137,7 +137,8 @@ def update(commodities=None,
         )
     )
     ) \
-        .filter(shipments_all.c.shipment_status != base.UNDETECTED_ARRIVAL)
+        .filter(sa.not_(Departure.ship_imo.contains('NOTFOUND')),
+                sa.not_(Departure.ship_imo.contains('_v')))
 
     if shipment_id is not None:
         shipments_to_update = shipments_to_update.filter(shipments_all.c.shipment_id.in_(to_list(shipment_id)))
@@ -171,7 +172,7 @@ def update(commodities=None,
         date_to = arrival_date + dt.timedelta(hours=base.QUERY_POSITION_HOURS_AFTER_ARRIVAL)
 
         dates = []
-        if first_date is None:
+        if first_date is None or force_rebuild:
             # No position found, we query the whole voyage
             dates.append({"date_from": date_from - buffer, "date_to": date_to + buffer})
         else:
@@ -204,6 +205,7 @@ def get_shipment_positions():
                                       ) \
         .join(Departure, Departure.id == Shipment.departure_id) \
         .join(Arrival, Arrival.id == Shipment.arrival_id) \
+        .join(ArrivalPort, Arrival.port_id == ArrivalPort.id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .join(Ship, Ship.imo == Position.ship_imo) \
         .filter(
@@ -229,6 +231,7 @@ def get_missing_berths(max_speed=0.5,
                        distance_to_coast_m=None,
                        cluster_m=100,
                        hours_from_arrival=24*7,
+                       arrival_iso2=None,
                        format='kml',
                        export_file='missing_berths.kml'):
     """
@@ -254,6 +257,9 @@ def get_missing_berths(max_speed=0.5,
         positions = positions.filter(sa.or_(
             Position.speed <= max_speed,
             Position.speed == sa.null()))
+
+    if arrival_iso2:
+        positions = positions.filter(ArrivalPort.iso2.in_(to_list(arrival_iso2)))
 
     if date_from:
         positions = positions.filter(Position.date_utc >= to_datetime(date_from))
@@ -293,7 +299,6 @@ def get_missing_berths(max_speed=0.5,
         coastline['geometry'] = coastline['geometry'].buffer(distance_to_coast_m)
         coastline = coastline.to_crs(4326)
         result_gdf = result_gdf.sjoin(coastline, how="inner")[list(result_gdf.columns)]
-
 
     if format == "kml":
         import fiona

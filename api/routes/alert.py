@@ -51,6 +51,7 @@ class AlertTestResource(Resource):
         params = AlertTestResource.parser.parse_args()
         destination_iso2 = params.get('destination_iso2')
         destination_name_pattern = params.get('destination_name_pattern')
+        departure_port_id = params.get('departure_port_id')
         commodity = params.get('commodity')
         min_dwt = params.get('min_dwt')
         date_from = params.get('date_from')
@@ -64,16 +65,19 @@ class AlertTestResource(Resource):
         if destination_name_pattern and '' in destination_name_pattern:
             destination_name_pattern.remove('')
 
+        if departure_port_id and '' in departure_port_id:
+            departure_port_id.remove('')
+
         if commodity and '' in commodity:
             commodity.remove('')
 
 
         alerts_df = manual_alert(destination_name_pattern=destination_name_pattern,
-                              destination_iso2=destination_iso2,
-                              date_from=to_datetime(date_from),
-                              commodity=commodity,
-                              min_dwt=min_dwt)
-
+                                 destination_iso2=destination_iso2,
+                                 date_from=to_datetime(date_from),
+                                 commodity=commodity,
+                                 min_dwt=min_dwt,
+                                 departure_port_id=departure_port_id)
 
         if format == "csv":
             return Response(

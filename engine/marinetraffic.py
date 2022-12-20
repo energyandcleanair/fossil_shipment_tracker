@@ -1,14 +1,17 @@
 import requests
 import json
 import datetime as dt
+
+import tqdm
+
 import base
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from base.db import session
 from base.logger import logger
 from base.env import get_env
-from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall, Event
-from base.utils import to_datetime
+from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall, Event, Position
+from base.utils import to_datetime, latlon_to_point
 from requests.adapters import HTTPAdapter, Retry
 import urllib.parse
 
@@ -59,7 +62,7 @@ class Marinetraffic:
             call_log['credits'] = len(api_result.json()) * credits_per_record
             call_log['status'] = str(api_result.status_code)
 
-        if  (call_log['records'] > 0) or save_empty_record:
+        if (call_log['records'] > 0) or save_empty_record:
             session.add(MarineTrafficCall(**call_log))
             session.commit()
 
@@ -151,6 +154,9 @@ class Marinetraffic:
                                      "NAME": None
                                      }]
 
+            if not response_data:
+                raise ValueError('Empty response')
+
             response_data = response_data[0]
             if mt_id:
                 response_data['SHIPID'] = mt_id
@@ -224,7 +230,7 @@ class Marinetraffic:
                                               api_key=api_key,
                                               params=params,
                                               credits_per_record=4,
-                                              save_empty_record=False)
+                                              save_empty_record=True)
 
         if response_datas is None:
             if not imo or not '_v2' in imo:
@@ -296,13 +302,14 @@ class Marinetraffic:
             "load_status": response_data.get("LOAD_STATUS"),
             "move_type": response_data["MOVE_TYPE"],
             "port_operation": response_data.get("PORT_OPERATION"),
+            "draught": response_data.get("DRAUGHT"),
             "others": {"marinetraffic": response_data}
         }
         return PortCall(**data)
 
 
     @classmethod
-    def get_next_portcall(cls, date_from, arrival_or_departure, date_to=None, imo=None, unlocode=None,
+    def get_next_portcall(cls, date_from, arrival_or_departure=None, date_to=None, imo=None, unlocode=None,
                           filter=None, go_backward=False, use_call_based=False):
         """
         The function returns collects arrival portcalls until it finds one matching
@@ -316,7 +323,7 @@ class Marinetraffic:
         :param use_call_based: weither to use the normal (credit-based) key or the call-based key
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
-        delta_time = dt.timedelta(hours=12) if not use_call_based else dt.timedelta(days=190)
+        delta_time = dt.timedelta(hours=6) if not use_call_based else dt.timedelta(days=190)
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
         if date_to is None:
@@ -434,6 +441,118 @@ class Marinetraffic:
         }
         return MTVoyageInfo(**data)
 
+    @classmethod
+    def get_positions(cls, imo, date_from, date_to, period=None):
+        """
+        This function returns positions for imo in a date range
+
+        Parameters
+        ----------
+        period : hourly or daily - this allows MT to only return 1 position per hour/day - useful for limiting credits
+        imo : ship imo
+        date_from : date from
+        date_to : date to
+
+        Returns
+        -------
+
+        Returns all positions (Position objects) for ship imo which satisfy the conditions
+
+        """
+
+        api_key = get_env("KEY_MARINETRAFFIC_PS01")
+
+        date_from = to_datetime(date_from)
+        date_to = to_datetime(date_to)
+
+        params = {
+            'protocol': 'jsono',
+            'imo': imo,
+            'fromdate': date_from.strftime("%Y-%m-%d %H:%M"),
+            'todate': date_to.strftime("%Y-%m-%d %H:%M")
+        }
+
+        if period:
+            params['period'] = period
+
+
+        (response_datas, response) = cls.call(method='exportvesseltrack/',
+                                              api_key=api_key,
+                                              params=params,
+                                              credits_per_record=1,
+                                              save_empty_record=True)
+
+        if response_datas is None:
+            logger.warning("Marinetraffic: Failed to query position for ship %s: %s" % (imo, response))
+            return []
+
+        if response_datas == []:
+            logger.info("Didn't find any vessel positions for imo %s" % (imo,))
+            return []
+
+        positions = cls.parse_position_response_data(response_data=response_datas, imo=imo)
+
+        for p in positions:
+            try:
+                session.add(p)
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+
+        return positions
+
+    @classmethod
+    def parse_position_response_data(cls, response_data, imo):
+
+        positions = [Position(**{
+            "geometry": latlon_to_point(lat=float(x["LAT"]), lon=float(x["LON"])),
+            "ship_imo": imo,
+            "navigation_status": x["STATUS"],
+            "speed": float(x["SPEED"]),
+            "date_utc": dt.datetime.strptime(x["TIMESTAMP"], "%Y-%m-%dT%H:%M:%S"),
+            "destination_name": None
+        }) for x in response_data if abs(float(x["LAT"])) > 1e-4]
+
+        return positions
+
+    @classmethod
+    def get_closest_position(cls, imo, date, window_hours = 24, interval_mins = 30):
+        """
+        Returns the closest position to a given date within the time window, using certain intervals to minimise number
+        of queried/returned positions
+
+        Parameters
+        ----------
+        imo : ship imo
+        date : date to find the closest position to
+        window_hours : time window around date to look for positions
+        interval_mins : what size interval to look between
+
+        Returns
+        -------
+        Returns Position object
+
+        """
+        date = to_datetime(date)
+
+        intervals = [[date-dt.timedelta(minutes=d*interval_mins/2.),
+                      date+dt.timedelta(minutes=d*interval_mins/2.)]
+                        for d in range(1, int((window_hours*60.0)/interval_mins))]
+
+        logger.info("Querying intervals for ship imo: {}.".format(imo))
+        for interval in tqdm.tqdm(intervals):
+            date_from = interval[0]
+            date_to = interval[1]
+
+            interval_positions = cls.get_positions(imo=imo, date_from=date_from, date_to=date_to)
+
+            if interval_positions is not None and interval_positions:
+                # Sort in case we have more than one
+                interval_positions.sort(key=lambda x: x.date_utc)
+                return interval_positions[0]
+
+        # Otherwise return None
+        return None
     @classmethod
     def get_ship_events_between_dates(cls, imo,
                                       date_from,

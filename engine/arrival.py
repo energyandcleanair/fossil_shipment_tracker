@@ -5,9 +5,9 @@ from tqdm import tqdm
 import base
 from engine import departure
 from engine import portcall
-from base.logger import logger, logger_slack
+from base.logger import logger_slack
 from base.db import session
-from base.models import Arrival, Shipment, Port, PortCall, Departure, ShipmentArrivalBerth, Trajectory, ShipmentWithSTS
+from base.models import Arrival, Shipment, ShipmentWithSTS
 
 
 def get_dangling_arrivals():
@@ -23,9 +23,28 @@ def update(min_dwt=base.DWT_MIN,
            ship_imo=None,
            unlocode=None,
            port_id=None,
-           force_for_arrival_to_departure_greater_than=None,
+           departure_port_iso2=None,
+           shipment_id=None,
+           force_for_arrival_to_next_portcall_greater_than=None,
+           force_for_arrival_to_prev_portcall_greater_than=None,
            include_undetected_arrival_shipments=True,
-           cache_only=False):
+           cache_only=False,
+           exclude_sts=False):
+    """
+
+    :param min_dwt:
+    :param limit:
+    :param date_from:
+    :param date_to:
+    :param commodities:
+    :param ship_imo:
+    :param unlocode:
+    :param port_id:
+    :param force_for_arrival_to_departure_greater_than:
+    :param include_undetected_arrival_shipments:
+    :param cache_only:
+    :return:
+    """
 
     logger_slack.info("=== Arrival update ===")
 
@@ -37,7 +56,9 @@ def update(min_dwt=base.DWT_MIN,
                                                                    date_to=date_to,
                                                                    ship_imo=ship_imo,
                                                                    unlocode=unlocode,
-                                                                   port_id=port_id)
+                                                                   port_id=port_id,
+                                                                   departure_port_iso2=departure_port_iso2,
+                                                                   shipment_id=shipment_id)
 
     if not include_undetected_arrival_shipments:
         undetected_arrival_departures = session.query(Shipment.departure_id) \
@@ -48,15 +69,29 @@ def update(min_dwt=base.DWT_MIN,
                                [y[0] for y in undetected_arrival_departures]]
 
 
-    if force_for_arrival_to_departure_greater_than is not None:
-        dangling_departures.extend(departure.get_departures_with_arrival_too_remote_from_next_departure(
-            min_timedelta=force_for_arrival_to_departure_greater_than,
+    if force_for_arrival_to_next_portcall_greater_than is not None:
+        dangling_departures.extend(
+            departure.get_departures_with_gap_around_arrival(
+            min_gap_after=force_for_arrival_to_next_portcall_greater_than,
             min_dwt=min_dwt,
             commodities=commodities,
             date_from=date_from,
             date_to=date_to,
             ship_imo=ship_imo,
-            unlocode=unlocode))
+            unlocode=unlocode)
+        )
+
+    if force_for_arrival_to_prev_portcall_greater_than is not None:
+        dangling_departures.extend(
+            departure.get_departures_with_gap_around_arrival(
+            min_gap_before=force_for_arrival_to_prev_portcall_greater_than,
+            min_dwt=min_dwt,
+            commodities=commodities,
+            date_from=date_from,
+            date_to=date_to,
+            ship_imo=ship_imo,
+            unlocode=unlocode)
+        )
 
 
     if limit is not None:
@@ -73,6 +108,9 @@ def update(min_dwt=base.DWT_MIN,
     # Until we fix arrival detection, the first hundreds of dangling departures
     # will take lot of time for not much
     # dangling_departures.sort(key=lambda x: x.date_utc, reverse=True)
+
+    if exclude_sts:
+        dangling_departures = [x for x in dangling_departures if x.event_id is None]
 
     for d in tqdm(dangling_departures):
         arrival_portcall = portcall.find_arrival(departure=d,

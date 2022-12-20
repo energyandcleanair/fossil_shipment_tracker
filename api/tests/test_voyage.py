@@ -239,3 +239,13 @@ def test_voyage_companies(app):
                                                 'ship_%s_iso2' % (company_type)])
 
 
+def test_ongoing_coal(app):
+
+    with app.test_client() as test_client:
+
+        params = {"commodity": "coal",
+                  "status": 'ongoing'}
+        response = test_client.get('/v0/voyage?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0

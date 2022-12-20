@@ -1,6 +1,7 @@
 import logging
 from slack_logger import SlackHandler, SlackFormatter
 from base.env import get_env
+from slack_sdk import WebClient
 import requests
 
 
@@ -34,6 +35,7 @@ def slack_webhook_ok(url):
 logger_slack = logging.getLogger('FOSSIL_SHIPMENT_TRACKER_SLACK')
 logger_slack.setLevel(logging.INFO)
 
+sh = None
 if slack_webhook_ok(get_env('SLACK_WEBHOOK')):
     sh = SlackHandler(get_env('SLACK_WEBHOOK'))
     sh.setFormatter(SlackFormatter())
@@ -45,7 +47,7 @@ if slack_webhook_ok(get_env('SLACK_WEBHOOK')):
     sh2.setLevel(level=logging.INFO)
     logger_slack.addHandler(sh2)
 
-
+slacker = WebClient(token=get_env('SLACK_API_TOKEN'))
 # Adding an error logging in file
 # logger_fh = logging.FileHandler('error.log')
 # logger_fh.setLevel(logging.ERROR)

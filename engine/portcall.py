@@ -2,19 +2,21 @@ import pandas as pd
 import datetime as dt
 import sqlalchemy as sa
 from tqdm import tqdm
+from sqlalchemy import func
+
 
 import base
 from base.logger import logger, logger_slack
 from base.db import session
 from base.db_utils import upsert
 from base.models import DB_TABLE_PORTCALL
-from base.utils import to_datetime, to_list
+from base.utils import to_datetime, to_list, collapse_dates, remove_dates
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
 from engine.datalastic import Datalastic
 
-from base.models import PortCall, Port, Ship, Event
+from base.models import PortCall, Port, Ship, Event, MarineTrafficCall, Shipment, Departure, Arrival
 
 
 def initial_fill(limit=None):
@@ -198,19 +200,24 @@ def upload_portcalls(portcalls):
 
 
 def get_next_portcall(date_from,
-                      arrival_or_departure,
+                      arrival_or_departure=None,
                       date_to=None,
                       imo=None,
                       unlocode=None,
                       filter=None,
                       use_cache=True,
+                      force_rebuild=True,
                       cache_only=False,
                       go_backward=False,
                       use_call_based=False):
 
+    date_from, date_to = to_datetime(date_from), to_datetime(date_to)
+
     # First look in DB
     if use_cache:
-        cached_portcalls = PortCall.query.filter(PortCall.move_type == arrival_or_departure)
+        cached_portcalls = PortCall.query
+        if arrival_or_departure:
+            cached_portcalls = cached_portcalls.filter(PortCall.move_type == arrival_or_departure)
         if go_backward:
             direction = -1
             cached_portcalls = cached_portcalls.filter(PortCall.date_utc <= date_from)
@@ -239,15 +246,51 @@ def get_next_portcall(date_from,
 
     if filtered_cached_portcalls:
         # We found a matching portcall in db
-        if go_backward:
-            filtered_cached_portcalls.sort(key=lambda x: x.date_utc, reverse=True)
-        else:
-            filtered_cached_portcalls.sort(key=lambda x: x.date_utc)
+        filtered_cached_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
+
         if cache_only:
             return filtered_cached_portcalls[0]
 
     if cache_only:
         return None
+
+    if not force_rebuild:
+
+        date_from_query, date_to_query = date_from, date_to
+        if go_backward:
+            date_from_query, date_to_query = date_to, date_from
+
+        # check whether we called this ship imo in the MTCall table and get latest date
+        portcall_queries = session.query(
+            MarineTrafficCall.params['fromdate'].astext.label('datefrom'),
+            MarineTrafficCall.params['todate'].astext.label('dateto')
+        ) \
+            .filter(MarineTrafficCall.method == base.VESSEL_PORTCALLS,
+                    MarineTrafficCall.status == base.HTTP_OK,
+                    sa.or_(
+                        MarineTrafficCall.params.op('?')('imo'),
+                        MarineTrafficCall.params.op('?')('unlocode')
+                           ),
+                    sa.or_(
+                        sa.and_(
+                            (MarineTrafficCall.params['fromdate'].astext).cast(sa.TIMESTAMP) >= date_from_query,
+                            (MarineTrafficCall.params['fromdate'].astext).cast(sa.TIMESTAMP) <= date_to_query
+                    ),
+                        sa.and_(
+                            (MarineTrafficCall.params['todate'].astext).cast(sa.TIMESTAMP) >= date_from_query,
+                            (MarineTrafficCall.params['todate'].astext).cast(sa.TIMESTAMP) <= date_to_query
+                        )
+                )
+            ) \
+        .order_by(MarineTrafficCall.params['todate'].astext.cast(sa.TIMESTAMP).asc())
+
+        if imo is not None:
+            portcall_queries = portcall_queries.filter(MarineTrafficCall.params['imo'].astext == imo)
+
+        if unlocode is not None:
+            portcall_queries = portcall_queries.filter(Marinetraffic.params['unlocode'].astext == unlocode)
+
+        portcall_query_dates = collapse_dates([(to_datetime(p.datefrom), to_datetime(p.dateto)) for p in portcall_queries.all()])
 
     # If not, query MarineTraffic
     flush = True
@@ -256,54 +299,85 @@ def get_next_portcall(date_from,
         portcalls = []
         direction = -1 if go_backward else 1
         cached_portcalls.sort(key=lambda x: x.date_utc, reverse=go_backward)
+
+        # Only keep required intervals if we already have found matching ones in db
+        if filtered_cached_portcalls:
+            cached_portcalls = [x for x in cached_portcalls if (go_backward != (x.date_utc < filtered_cached_portcalls[0].date_utc) and
+                                                                x.date_utc != date_from)]
+            date_to = filtered_cached_portcalls[0].date_utc
+
         #IMPORTANT marinetraffic uses UTC for filtering
         date_froms = [to_datetime(date_from)] + [x.date_utc for x in cached_portcalls]
         date_tos = [x.date_utc for x in cached_portcalls] + [to_datetime(date_to)]
+
         for dates in list(zip(date_froms, date_tos)):
             date_from = dates[0] + direction * dt.timedelta(minutes=1)
             date_to = dates[1] - direction * dt.timedelta(minutes=1) if dates[1] else dt.datetime.utcnow()
 
-            filtered_portcall, portcalls_interval = Marinetraffic.get_next_portcall(imo=imo,
-                                                   unlocode=unlocode,
-                                                   date_from=date_from,
-                                                   date_to=date_to,
-                                                   filter=filter,
-                                                   arrival_or_departure=arrival_or_departure,
-                                                   go_backward=go_backward,
-                                                   use_call_based=use_call_based
-                                                   )
+            intervals = [(date_from, date_to)]
+            if not force_rebuild:
+                intervals = remove_dates((date_from, date_to), portcall_query_dates, go_backward=go_backward)
 
-            if flush:
-                upload_portcalls(portcalls_interval)
-            else:
-                portcalls.extend(portcalls_interval)
-            if filtered_portcall:
-                break
+            for i in intervals:
+                filtered_portcall, portcalls_interval = Marinetraffic.get_next_portcall(imo=imo,
+                                                       unlocode=unlocode,
+                                                       date_from=i[0],
+                                                       date_to=i[1],
+                                                       filter=filter,
+                                                       arrival_or_departure=arrival_or_departure,
+                                                       go_backward=go_backward,
+                                                       use_call_based=use_call_based
+                                                       )
+
+                if flush:
+                    upload_portcalls(portcalls_interval)
+                else:
+                    portcalls.extend(portcalls_interval)
+                if filtered_portcall:
+                    return filtered_portcall
+
+        # If we haven't found any new portcall,
+        # we return the portcall that was already existing
+        if filtered_cached_portcalls:
+            return filtered_cached_portcalls[0]
+        else:
+            return None
 
     else:
-        filtered_portcall, portcalls = Marinetraffic.get_next_portcall(imo=imo,
-                                                                       unlocode=unlocode,
-                                                                       date_from=date_from,
-                                                                       date_to=date_to,
-                                                                       filter=filter,
-                                                                       arrival_or_departure=arrival_or_departure,
-                                                                       go_backward=go_backward,
-                                                                       use_call_based=use_call_based)
+        intervals = [(date_from, date_to)]
+        if not force_rebuild:
+            intervals = remove_dates((date_from, date_to), portcall_query_dates, go_backward=go_backward)
 
-        upload_portcalls(portcalls)
+        for i in intervals:
+            filtered_portcall, portcalls = Marinetraffic.get_next_portcall(imo=imo,
+                                                                           unlocode=unlocode,
+                                                                           date_from=i[0],
+                                                                           date_to=i[1],
+                                                                           filter=filter,
+                                                                           arrival_or_departure=arrival_or_departure,
+                                                                           go_backward=go_backward,
+                                                                           use_call_based=use_call_based)
 
-    return filtered_portcall
+            upload_portcalls(portcalls)
+            if filtered_portcall:
+                return filtered_portcall
+
+    return None
 
 
-def update_departures_from_russia(
+def update_departures(
         date_from="2022-01-01",
         date_to=dt.date.today() + dt.timedelta(days=1),
         unlocode=None,
         marinetraffic_port_id=None,
         port_id=None,
+        departure_port_iso2=None,
         force_rebuild=False,
-        between_existing_only=False):
+        between_existing_only=False,
+        ignore_check_departure=False):
     """
+    This function collects departure portcalls for ports which we have selected
+
     If force rebuild, we ignore cache port calls. Should only be used if we suspect
     we missed some port calls (e.g. in the initial fill using manually downloaded data)
     :param date_from:
@@ -311,7 +385,11 @@ def update_departures_from_russia(
     :return:
     """
     logger_slack.info("=== Update departures (Portcall) ===")
-    ports = Port.query.filter(Port.check_departure)\
+    ports = session.query(Port)
+    date_from = to_datetime(date_from)
+
+    if not ignore_check_departure:
+        ports = ports.filter(Port.check_departure)
 
     if unlocode is not None:
         ports = ports.filter(Port.unlocode.in_(to_list(unlocode)))
@@ -321,6 +399,9 @@ def update_departures_from_russia(
 
     if port_id is not None:
         ports = ports.filter(Port.id.in_(to_list(port_id)))
+
+    if departure_port_iso2 is not None:
+        ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
 
     ports = ports.all()
     for port in tqdm(ports):
@@ -416,7 +497,7 @@ def find_arrival(departure,
                                  or x.port_operation in ["discharge", "both"]
     filter_arrival = lambda x: x.port_id is not None
 
-    # We query new departures only if there is none between current portcall and next departure from russia
+    # We query new departures if there is none between current portcall and next departure from Russia
     next_departure = get_next_portcall(date_from=date_utc + dt.timedelta(minutes=1),
                                        arrival_or_departure="departure",
                                        imo=ship_imo,
@@ -430,10 +511,8 @@ def find_arrival(departure,
                                               filter=filter_departure_russia)
 
     if not next_departure \
-            or not next_departure_russia \
             or next_departure.port_id in [originally_checked_port_ids] \
-            or to_datetime(next_departure.date_utc) > to_datetime(
-        next_departure_russia.date_utc):  # to_datetime(p.date_utc) + dt.timedelta(hours=24):
+            or (next_departure_russia and to_datetime(next_departure.date_utc) > to_datetime(next_departure_russia.date_utc)):
 
         next_departure_date_to = next_departure_russia.date_utc - dt.timedelta(
             minutes=1) if next_departure_russia else to_datetime(date_to)
@@ -552,40 +631,152 @@ def fill_departure_gaps(imo=None,
     #     find_arrival(departure_portcall=p, date_to=date_to)
 
 
-def fill_arrival_gaps(imo=None, date_from=None, min_dwt=base.DWT_MIN):
+def fill_gaps_within_shipments(ship_imo=None,
+                               date_from=None,
+                               min_dwt=base.DWT_MIN,
+                               max_time_delta=dt.timedelta(days=7)):
     """
-    We missed quite a lot of arrival data in the original filling. Since by default,
-     the program is looking at arrivals after last departure, it will never look again
-     at arrivals for previous departures.
-     To solve this, we query again first arrival after problematic departures.
-    :param imo:
-    :param date_from:
-    :param filter:
-    :return:
+    For all completed shipments, look at departure portcalls.
+    If gap between two departures is too wide, we query portcalls inbetween.
     """
 
-    query = PortCall.query
-    if imo is not None:
-        query = query.filter(PortCall.ship_imo == imo)
+    portcalls = session.query(PortCall,
+                              func.lead(PortCall.date_utc).over(
+                              partition_by=PortCall.ship_imo,
+                              order_by=PortCall.date_utc).label('next_date_utc')
+                              ) \
+        .filter(PortCall.move_type=='departure') \
+        .subquery()
+
+    query = session.query(Shipment.id,
+                          Departure.ship_imo,
+                          portcalls.c.date_utc,
+                          portcalls.c.next_date_utc) \
+    .join(Departure, Departure.id == Shipment.departure_id) \
+    .join(Arrival, Arrival.id == Shipment.arrival_id) \
+    .join(portcalls, sa.and_(portcalls.c.ship_imo == Departure.ship_imo,
+                             portcalls.c.date_utc >= Departure.date_utc,
+                             portcalls.c.date_utc <= Arrival.date_utc)) \
+    .join(Ship, Departure.ship_imo == Ship.imo) \
+    .filter((portcalls.c.next_date_utc - portcalls.c.date_utc) >= max_time_delta)
+
+    if ship_imo is not None:
+        query = query.filter(Departure.ship_imo.in_(to_list(ship_imo)))
 
     if min_dwt is not None:
-        query = query.join(Ship).filter(Ship.dwt >= min_dwt)
+        query = query.filter(Ship.dwt >= min_dwt)
 
     if date_from is not None:
-        query = query.filter(PortCall.date_utc >= to_datetime(date_from))
+        query = query.filter(portcalls.c.date_utc >= to_datetime(date_from))
 
-    portcall_df = pd.read_sql(query.statement, session.bind)
+    gaps = pd.read_sql(query.statement, session.bind)
 
-    # Isolate problematic ones: departure portcalls that are followed by another departure portcall
-    portcall_df = portcall_df[~pd.isnull(portcall_df.port_unlocode)].copy()
-    portcall_df['next_move_type'] = portcall_df.sort_values(['ship_imo', 'date_utc']) \
-        .groupby("ship_imo")['move_type'].shift(-1)
+    filter_departure = lambda x: x.port_operation in ["discharge", "both"]
 
-    portcall_df = portcall_df.sort_values(['ship_imo', 'date_utc'])
-    problematic_df = portcall_df[(portcall_df.move_type=="departure") \
-                                 & (portcall_df.next_move_type=="departure") \
-                                 & (portcall_df.load_status == base.FULLY_LADEN) #TOOD this is just to start with most important ones
-        ]
+    # For each shipment, we only fill gaps progressively,
+    # until we find a matching departure portcall to save credits
+    shipment_ids = gaps.id.unique()
+    for shipment_id in tqdm(shipment_ids):
 
-    for index, row in tqdm(problematic_df.iterrows(), total=problematic_df.shape[0]):
-        new_portcall = get_next_portcall(arrival_or_departure="arrival", imo=row.ship_imo, date_from=to_datetime(row.date_utc), use_cache=False)
+        shipment_gaps = gaps[gaps.id == shipment_id].sort_values(['date_utc'])
+        next_portcall = None
+        i = 0
+        while not next_portcall and (i < len(shipment_gaps)):
+            gap = shipment_gaps.iloc[i,]
+            new_portcall = get_next_portcall(
+                arrival_or_departure="departure",
+                imo=gap.ship_imo,
+                date_from=to_datetime(gap.date_utc) + dt.timedelta(minutes=1),
+                date_to=to_datetime(gap.next_date_utc)  - dt.timedelta(minutes=1),
+                use_cache=False,
+                filter=filter_departure)
+            i=i+1
+
+
+
+def fill_gaps_within_shipments_using_mtcall(ship_imo=None,
+                                            date_from=None,
+                                            commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS,
+                                                         base.LNG, base.OIL_OR_CHEMICAL],
+                                            min_dwt=base.DWT_MIN,
+                                            max_time_delta=dt.timedelta(days=7)):
+    """
+    For all completed shipments, look at all calls made to MT
+    and identify potential gaps
+    """
+
+    # sa.cast(MarineTrafficCall.params['imo'], sa.String)) \
+
+    ship_imo = sa.func.regexp_replace(
+            sa.func.regexp_replace(
+                sa.cast(MarineTrafficCall.params['imo'], sa.String),"\"",''),"\"",'').label('ship_imo')
+
+    # Get hours for which
+    calls = session.query(
+        sa.sql.expression.literal_column("0").label('dummy'), # Necessary for the anti-join
+        MarineTrafficCall.id,
+        ship_imo,
+        func.generate_series(
+            func.date_trunc('hour', sa.cast(sa.cast(MarineTrafficCall.params['fromdate'], sa.String), sa.DateTime)),
+            func.date_trunc('hour', sa.cast(sa.cast(MarineTrafficCall.params['todate'], sa.String), sa.DateTime)),
+            '1 hour'
+        ).label('date_utc')) \
+        .join(Ship, Ship.imo ==  ship_imo) \
+        .filter(MarineTrafficCall.method == 'portcalls/',
+                sa.or_(
+                    MarineTrafficCall.params['movetype'] == sa.null(),
+                    sa.cast(MarineTrafficCall.params['movetype'], sa.String) == 'departure'
+                ),
+                MarineTrafficCall.status == base.HTTP_OK
+                ) \
+        .distinct()
+
+    if ship_imo is not None:
+        calls = calls.filter(ship_imo.in_(to_list(ship_imo)))
+
+    if date_from is not None:
+        calls = calls.filter(sa.cast(sa.cast(MarineTrafficCall.params['todate'], sa.String), sa.DateTime) >= to_datetime(date_from))
+
+    if commodities is not None:
+        calls = calls.filter(Ship.commodity.in_(to_list(commodities)))
+
+    shipment_date_from = func.date_trunc('hour', Departure.date_utc).label('date_from')
+    # The end of a shipment we consider is either its arrival (if completed),
+    # its next departure (if undetected) or today (if ongoing)...
+    shipment_date_to = func.date_trunc('hour', func.coalesce(
+        Arrival.date_utc,
+        sa.func.lag(Departure.date_utc) \
+            .over(Departure.ship_imo, order_by=Departure.date_utc.desc()),
+        dt.datetime.now())).label('date_to')
+
+
+    shipments = session.query(Departure.id.label('departure_id'),
+                              Departure.ship_imo,
+                              func.generate_series(
+                                  shipment_date_from,
+                                  shipment_date_to,
+                                  '1 hour').label('date_utc')) \
+        .outerjoin(Arrival, Arrival.departure_id == Departure.id) \
+        .join(Ship, Ship.imo == Departure.ship_imo) \
+        .distinct()
+
+    if ship_imo is not None:
+        shipments = shipments.filter(Departure.ship_imo.in_(to_list(ship_imo)))
+
+    if date_from is not None:
+        shipments = shipments.filter(Departure.date_utc >= to_datetime(date_from))
+
+    if commodities is not None:
+        shipments = shipments.filter(Ship.commodity.in_(to_list(commodities)))
+
+    calls = calls.subquery()
+    shipments = shipments.subquery()
+
+    missing_parts = session.query(shipments) \
+                        .outerjoin(calls, sa.and_(calls.c.ship_imo == shipments.c.ship_imo,
+                                                  calls.c.date_utc == shipments.c.date_utc)) \
+                        .filter(calls.c.dummy == sa.null())
+
+    missing_parts_df = pd.read_sql(missing_parts.statement, session.bind)
+    print(missing_parts_df)
+

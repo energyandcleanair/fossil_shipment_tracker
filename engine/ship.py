@@ -4,10 +4,11 @@ import base
 
 from base.db import session
 from base.logger import logger
-from base.models import Ship, PortCall, Departure, Shipment, ShipmentDepartureBerth, Trajectory, MTVoyageInfo
+from base.models import Ship, PortCall, Departure, Shipment, ShipmentDepartureBerth, Trajectory, MTVoyageInfo, Arrival
 from base.utils import to_datetime, to_list
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
+import numpy as np
 
 import sqlalchemy as sa
 
@@ -50,6 +51,8 @@ def collect_mt_for_large_oil_products():
             logger.info("Was already using MT")
 
 
+
+
 #
 # def collect_mt_for_insurers(date_from='2022-02-24',
 #                          commodity=[base.CRUDE_OIL, base.LNG]):
@@ -77,7 +80,7 @@ def collect_mt_for_large_oil_products():
 
 def fill_missing_commodity():
     ships = Ship.query.filter(Ship.commodity == sa.null()).all()
-    for ship in ships:
+    for ship in tqdm(ships):
         (commodity, quantity, unit) = ship_to_commodity(ship)
         ship.commodity = commodity
         ship.quantity = quantity
@@ -110,12 +113,13 @@ def fill(imos=[], mmsis=[]):
 
     logger.info("Adding %d missing ships" % (len(imos) + len(mmsis)))
 
-    # First with Datalastic
+    # First with Datalastic - we do check if Datalastic found the ship properly by checking dwt, and refer to
+    # MT to retry if it did not
     ships = [Datalastic.get_ship(imo=x, query_if_not_in_cache=True) for x in get_missing_ships_imos(imos)]
-    upload_ships(ships)
+    upload_ships([s for s in ships if (s and s.dwt is not None and s.type is not None)])
 
     ships = [Datalastic.get_ship(mmsi=x, query_if_not_in_cache=True) for x in get_missing_ships_mmsis(mmsis)]
-    upload_ships(ships)
+    upload_ships([s for s in ships if (s and s.dwt is not None and s.type is not None)])
 
     # Then with Marinetraffic for those still missing
     from engine.marinetraffic import Marinetraffic
@@ -188,7 +192,7 @@ def ship_to_commodity(ship):
         elif re.match('Bulk', type, re.IGNORECASE) \
                 or re.match('Bulk', subtype, re.IGNORECASE):
             commodity = base.BULK
-        elif re.match('cargo', type, re.IGNORECASE):
+        elif re.search('cargo', type, re.IGNORECASE):
             commodity = base.GENERAL_CARGO
         else:
             commodity = base.UNKNOWN_COMMODITY
@@ -227,6 +231,7 @@ def set_commodity(ship):
     ship.quantity = quantity
     ship.unit = unit
     return ship
+
 
 
 def fix_duplicate_imo(imo=None, handle_not_found=True):
@@ -682,3 +687,70 @@ def fix_not_found():
                     # What to do?
                     logger.info("%s \n vs. \n %s " % (str(new_ship.others),
                                                       str(ship.others)))
+
+
+def compare_ship_sources(dwt_min=None,
+                         sample=None,
+                         limit=None,
+                         reload_marinetraffic=False,
+                         commodity=[base.CRUDE_OIL]):
+    """
+
+    :return:
+    """
+
+    # Let's use a simplified estimate to find out what our biggest transporters of commodities are
+    largest_transporters = session.query(
+        Ship,
+        sa.func.avg(Ship.dwt).label('dwt'),
+        sa.func.sum(Ship.dwt).label('total_dwt'),
+        sa.func.count(Shipment.id.label('shipment_id')).label('n_shipments')
+    ) \
+        .join(Departure, Departure.id == Shipment.departure_id) \
+        .join(Arrival, Arrival.id == Shipment.arrival_id) \
+        .join(Ship, Ship.imo == Departure.ship_imo) \
+        .filter(Ship.others.has_key('marinetraffic'),
+                ~Ship.others.has_key('datalastic')) \
+        .group_by(Ship.imo) \
+        .order_by(sa.func.sum(Ship.dwt).label('total_dwt').desc())
+
+    if dwt_min:
+        largest_transporters = largest_transporters.filter(Ship.dwt > dwt_min)
+
+    if commodity:
+        largest_transporters = largest_transporters.filter(Ship.commodity.in_(to_list(commodity)))
+
+    largest_transporters = largest_transporters.all()
+
+    if limit:
+        largest_transporters = largest_transporters[0:limit]
+
+    if sample:
+        largest_transporters = [largest_transporters[i] for i in
+                                np.random.choice(len(largest_transporters), sample, replace=True)]
+
+    matching = []
+
+    for ship in tqdm(largest_transporters):
+        ship_mt = ship[0]
+        if reload_marinetraffic:
+            ship_mt = Marinetraffic.get_ship(imo = ship_mt.imo)
+
+        ship_dt = set_commodity(Datalastic.get_ship(imo=ship_mt.imo))
+
+        if (ship_mt.dwt == ship_dt.dwt) & (ship_mt.commodity == ship_dt.commodity):
+            if ship_mt.name != ship_dt.name:
+                logger.info('Ship imo {}, names do not match, but dwt and commodity do.'.format(ship_mt.imo))
+            matching.append(ship_dt)
+        else:
+            logger.info('Ship imo {}, dwt/commodity did not match. DWT: {}/{}, Name: {}/{}, Commodity: {}/{}'.format(
+                ship_mt.imo,
+                ship_mt.dwt,
+                ship_dt.dwt,
+                ship_mt.name,
+                ship_dt.name,
+                ship_mt.commodity,
+                ship_dt.commodity
+            ))
+
+    logger.info('Ships are identical for {}% of cases.'.format(100*len(matching) / float(sample)))

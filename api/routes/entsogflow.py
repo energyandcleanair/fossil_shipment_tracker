@@ -11,7 +11,7 @@ from flask import Response
 from flask_restx import Resource, reqparse
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
-from sqlalchemy import func, case
+from sqlalchemy import func, case, any_
 
 
 import base
@@ -20,10 +20,11 @@ from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
 from base.logger import logger
+from base import PRICING_DEFAULT
 from engine.commodity import get_subquery as get_commodity_subquery
 
 
-@routes_api.route('/v0/entsogflow', strict_slashes=False, doc=False)
+@routes_api.route('/v0/entsogflow', strict_slashes=False)
 class EntsogFlowResource(Resource):
 
     parser = reqparse.RequestParser()
@@ -59,6 +60,10 @@ class EntsogFlowResource(Resource):
     parser.add_argument('commodity_grouping', type=str,
                         help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
                         default='default')
+    parser.add_argument('pricing_scenario', help='Pricing scenario (standard or pricecap)',
+                        action='split',
+                        default=[PRICING_DEFAULT],
+                        required=False)
     # Query processing
     parser.add_argument('aggregate_by', type=str, action='split',
                         default=None,
@@ -97,17 +102,18 @@ class EntsogFlowResource(Resource):
         download = params.get("download")
         rolling_days = params.get("rolling_days")
         currency = params.get("currency")
-
+        pricing_scenario = params.get("pricing_scenario")
 
         if aggregate_by and '' in aggregate_by:
             aggregate_by.remove('')
 
-        # Price for all countries without country-specific price
-        default_price = session.query(Price).filter(Price.country_iso2 == sa.null()).subquery()
-
         value_eur_field = (
-            EntsogFlow.value_tonne * func.coalesce(Price.eur_per_tonne, default_price.c.eur_per_tonne)
+            EntsogFlow.value_tonne * Price.eur_per_tonne
         ).label('value_eur')
+
+        pricing_scenario_field = (
+                Price.scenario
+        ).label('pricing_scenario')
 
         value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
@@ -120,9 +126,10 @@ class EntsogFlowResource(Resource):
         DestinationCountry = aliased(Country)
 
         commodity_origin_iso2_field = case(
-            [(DepartureCountry.iso2.in_(['BY', 'TR']), 'RU'),
-             (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 == 'GR'), 'AZ'), # Kipoi
+            [
+             (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 == 'GR'), 'AZ'), #Already done in entsog.py # Kipoi
              (sa.and_(DepartureCountry.iso2 == 'TR', DestinationCountry.iso2 != 'GR'), 'RU'),
+             (DepartureCountry.iso2.in_(['BY', 'MD', 'UA']), 'RU'),
              ],
             else_=DepartureCountry.iso2
         ).label('commodity_origin_iso2')
@@ -155,7 +162,8 @@ class EntsogFlowResource(Resource):
                                     EntsogFlow.value_m3,
                                     value_eur_field,
                                     Currency.currency,
-                                    value_currency_field
+                                    value_currency_field,
+                                    pricing_scenario_field
                                     )
              .join(DepartureCountry, DepartureCountry.iso2 == EntsogFlow.departure_iso2)
              .outerjoin(DestinationCountry, EntsogFlow.destination_iso2 == DestinationCountry.iso2)
@@ -164,20 +172,22 @@ class EntsogFlowResource(Resource):
                          CommodityDestinationCountry.iso2 == commodity_destination_iso2_field)
              .outerjoin(commodity_subquery, EntsogFlow.commodity == commodity_subquery.c.id)
              .outerjoin(Price,
-                        sa.and_(Price.date == EntsogFlow.date,
-                                Price.commodity == commodity_subquery.c.pricing_commodity,
-                                sa.or_(
-                                    sa.and_(Price.country_iso2 == sa.null(), EntsogFlow.destination_iso2 == sa.null()),
-                                    Price.country_iso2 == EntsogFlow.destination_iso2)
-                                )
-                        )
-             .outerjoin(default_price,
-                         sa.and_(default_price.c.date == EntsogFlow.date,
-                                 default_price.c.commodity == commodity_subquery.c.pricing_commodity
-                                 )
-                        )
+                         sa.and_(
+                             Price.date == EntsogFlow.date,
+                             Price.commodity == commodity_subquery.c.pricing_commodity,
+                             sa.or_(
+                                 commodity_destination_iso2_field == any_(Price.destination_iso2s),
+                                 Price.destination_iso2s == sa.null()
+                             )
+                         )
+                         )
              .outerjoin(Currency, Currency.date == EntsogFlow.date)
-             .filter(EntsogFlow.destination_iso2 != "RU"))
+             # .filter(EntsogFlow.destination_iso2 != "RU")
+              # Very important for pricing to have a distinct statement! And to be sorted prior that
+              # so that we pick those with port ids matching, then destination iso2s, then ship etc.
+             .order_by(EntsogFlow.id, Price.scenario, Currency.currency, Price.destination_iso2s)
+             .distinct(EntsogFlow.id, Price.scenario, Currency.currency)
+        )
 
         # Return only >0 values. Otherwise we hit response size limit
         flows_rich = flows_rich.filter(EntsogFlow.value_tonne > 0)
@@ -252,7 +262,7 @@ class EntsogFlowResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['currency']
+        must_group_by = ['currency', 'pricing_scenario']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
@@ -260,14 +270,19 @@ class EntsogFlowResource(Resource):
         aggregateby_cols_dict = {
             'type': [subquery.c.type],
             'currency': [subquery.c.currency],
+            'pricing_scenario': [subquery.c.pricing_scenario],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
             'commodity_group': [subquery.c.commodity_group],
             'date': [subquery.c.date],
+            'month': [func.date_trunc('month', subquery.c.date).label("month")],
+            'year': [func.date_trunc('year', subquery.c.date).label("year")],
             'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
                                       subquery.c.commodity_origin_region],
+            'commodity_origin_region': [subquery.c.commodity_origin_region],
             'commodity_destination_iso2': [subquery.c.commodity_destination_iso2,
                                            subquery.c.commodity_destination_country,
                                            subquery.c.commodity_destination_region],
+            'commodity_destination_region': [subquery.c.commodity_destination_region],
             'departure_country': [subquery.c.departure_iso2, subquery.c.departure_country,
                                     subquery.c.departure_region],
             'departure_iso2': [subquery.c.departure_iso2, subquery.c.departure_country,
@@ -293,16 +308,17 @@ class EntsogFlowResource(Resource):
     def roll_average(self, result, aggregate_by, rolling_days):
 
         if rolling_days is not None:
-            date_column = "date"
-            min_date = result[date_column].min()
-            max_date = result[date_column].max() # change your date here
-            daterange = pd.date_range(min_date, max_date).rename(date_column)
+            date_col = "date"
+            date_cols = ['date', 'month', 'year']
+            min_date = result[date_col].min()
+            max_date = result[date_col].max() # change your date here
+            daterange = pd.date_range(min_date, max_date).rename(date_col)
 
-            result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
+            result[date_col] = result[date_col].dt.floor('D')  # Should have been done already
             result = result \
-                .groupby([x for x in result.columns if x not in [date_column, "ship_dwt", "value_tonne", "value_m3",
+                .groupby([x for x in result.columns if x not in [date_cols, "ship_dwt", "value_tonne", "value_m3",
                                                                  "value_eur", 'value_currency']]) \
-                .apply(lambda x: x.set_index(date_column) \
+                .apply(lambda x: x.set_index(date_col) \
                        .resample("D").sum() \
                        .reindex(daterange) \
                        .fillna(0) \

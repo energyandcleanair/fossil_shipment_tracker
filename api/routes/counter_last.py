@@ -13,11 +13,13 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import case
 
 import base
+from base import PRICING_DEFAULT
 from . import routes_api
 from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
-from base.models import Counter, Commodity, Country, Currency
+from base.models import Country
+from base.models import Counter
 from base.utils import to_datetime, to_list, intersect
 from engine.commodity import get_subquery as get_commodity_subquery
 
@@ -45,6 +47,10 @@ class RussiaCounterLastResource(Resource):
     parser.add_argument('commodity_grouping', type=str,
                         help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
                         default='default')
+    parser.add_argument('pricing_scenario', help='Pricing scenario (standard or pricecap)',
+                        action='split',
+                        default=[PRICING_DEFAULT],
+                        required=False)
     parser.add_argument('aggregate_by', help='aggregation e.g. commodity_group,destination_region',
                         required=False, default=['commodity','destination_region'], action='split')
     parser.add_argument('format', type=str, help='format of returned results (json or csv)',
@@ -60,7 +66,7 @@ class RussiaCounterLastResource(Resource):
         date_to = params.get("date_to")
         commodity_grouping = params.get("commodity_grouping")
         aggregate_by = params.get("aggregate_by")
-        fill_with_estimates = params.get("fill_with_estimates")
+        pricing_scenario = params.get("pricing_scenario")
         use_eu = params.get("use_eu")
         format = params.get("format")
 
@@ -76,7 +82,6 @@ class RussiaCounterLastResource(Resource):
 
         commodity_subquery = get_commodity_subquery(session=session, grouping_name=commodity_grouping)
 
-
         query = session.query(
             Counter.commodity,
             commodity_subquery.c.group.label("commodity_group"),
@@ -85,12 +90,14 @@ class RussiaCounterLastResource(Resource):
             destination_region_field,
             Counter.date,
             func.sum(Counter.value_tonne).label("value_tonne"),
-            func.sum(Counter.value_eur).label("value_eur")
+            func.sum(Counter.value_eur).label("value_eur"),
+            Counter.pricing_scenario
         ) \
             .join(commodity_subquery, Counter.commodity == commodity_subquery.c.id) \
             .join(Country, Country.iso2 == Counter.destination_iso2) \
             .group_by(Counter.commodity, Counter.destination_iso2, Country.name, destination_region_field,
-                      Counter.date, commodity_subquery.c.group)
+                      Counter.date, commodity_subquery.c.group, Counter.pricing_scenario) \
+            .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
         if destination_region:
             query = query.filter(destination_region_field.in_(to_list(destination_region)))
@@ -104,8 +111,6 @@ class RussiaCounterLastResource(Resource):
         if date_to:
             query = query.filter(Counter.date <= to_datetime(date_to))
 
-        if not fill_with_estimates:
-            query = query.filter(Counter.type != base.COUNTER_ESTIMATED)
 
         # Important to force this
         # so that future flows (e.g. fixed pipeline) aren't included
@@ -118,11 +123,13 @@ class RussiaCounterLastResource(Resource):
         counter.replace({np.nan: None}, inplace=True)
 
         groupby_cols = set([x for x in ['destination_iso2', 'destination_country',
-                                        'destination_region', 'commodity', 'commodity_group'] if
+                                        'destination_region', 'commodity', 'commodity_group',
+                                        'pricing_scenario'] if
                         aggregate_by is None or not aggregate_by or x in aggregate_by])
 
         if 'commodity' in groupby_cols:
             groupby_cols.add('commodity_group')
+
         if 'destination_iso2' in groupby_cols or 'destination_country' in groupby_cols:
             groupby_cols.update(['destination_iso2', 'destination_country'])
 
@@ -136,6 +143,7 @@ class RussiaCounterLastResource(Resource):
 
         if "commodity_group" in counter_last.columns:
             counter_last = counter_last.loc[~counter_last.commodity_group.isna()]
+
 
         counter_last = counter_last.groupby(groupby_cols).sum()
 
@@ -188,8 +196,8 @@ class RussiaCounterLastResource(Resource):
                 .fillna(0)
             # cut 2 last days and take the 7-day mean
             # but only on last ten days to avoid old shipments (like US)
-            means = x.loc[x.index >= dt.datetime.today() - dt.timedelta(days=10)] \
-                          [["value_tonne", "value_eur"]].shift(shift_days).tail(7) \
+            means = x.loc[x.index >= dt.datetime.today() - dt.timedelta(days=shift_days + n_days + 1)] \
+                          [["value_tonne", "value_eur"]].shift(shift_days).tail(n_days) \
                 .mean() \
                 .fillna(0)
 
@@ -227,7 +235,7 @@ class RussiaCounterLastResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ['date']
+        must_group_by = ['date', 'pricing_scenario']
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if '' in aggregate_by:
             aggregate_by.remove('')
@@ -235,6 +243,7 @@ class RussiaCounterLastResource(Resource):
         # Aggregating
         aggregateby_cols_dict = {
             'date': [subquery.c.date],
+            'pricing_scenario': [subquery.c.pricing_scenario],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region],
@@ -252,3 +261,65 @@ class RussiaCounterLastResource(Resource):
 
         query = session.query(*groupby_cols, *value_cols).group_by(*groupby_cols)
         return query
+
+
+    def fix_post100bn(self,
+                      counter_last,
+                      datetime_100bn_utc=dt.datetime(2022, 10, 4, 5, 52),
+                      start_slope_utc=dt.datetime(2022, 10, 3, 21, 0)):
+        """
+        TEMPORARILY set the time at which 100bn will be reached,
+        and ensure cathing up afterwards
+        :param counter_last:
+        :param datetime_100bn_utc: date at which we want the counter to reach 100bn
+        :param n_days: number of days to catch up
+        :return:
+        """
+
+        if not 'destination_region' in counter_last.columns:
+            counter_last['eur_per_day'] *= (counter_last.eur_per_day.sum() + 1139818113) / counter_last.eur_per_day.sum()
+            return counter_last
+
+        if counter_last[counter_last.destination_region == 'EU'].total_eur.sum() > 100E9:
+            idx_eu = (counter_last.destination_region == 'EU')
+            if counter_last[idx_eu].eur_per_day.sum() == 0:
+                counter_last[idx_eu & (counter_last.commodity == 'crude_oil')]['eur_per_day'] = 13000 * 24 * 3600
+            return counter_last
+
+        # TODO REMOVE
+        df = counter_last.reset_index().copy()
+        idx_eu = (df.destination_region == 'EU')
+
+        if df[idx_eu].eur_per_day.sum() == 0:
+            if 'commodity' in df.columns:
+                df.loc[idx_eu & (df.commodity == 'crude_oil'), 'eur_per_day'] = 1
+            if 'commodity_group' in df.columns:
+                df.loc[idx_eu & (df.commodity_group == 'oil'), 'eur_per_day'] = 1
+
+        df['old_total_eur'] = df.total_eur - (df.now - df.date).dt.days * df.eur_per_day
+
+        df['new_eur_per_day'] = df.eur_per_day
+        df.loc[idx_eu, 'new_eur_per_day'] = df[idx_eu]['eur_per_day'] * \
+                                            (100e9 - df[idx_eu].total_eur.sum()) / df[idx_eu].eur_per_day.sum() \
+                                            / ((datetime_100bn_utc - start_slope_utc).seconds / 24 / 3600)
+
+        # assert np.all(counter_last['eur_per_day'] == df['eur_per_day'])
+
+        counter_last['eur_per_day'] = df['new_eur_per_day']
+        counter_last.replace({np.nan: 0}, inplace=True)
+
+        # fix the total
+        counter_last['total_eur'] = np.where(counter_last['destination_region'] != 'EU',
+                                             counter_last['total_eur'],
+                                             counter_last['total_eur'] + (((dt.datetime.utcnow() - start_slope_utc).seconds / (24*3600)) * counter_last['eur_per_day']))
+
+        # Fixed start
+        # from csv: commodity x region
+        #value_now_bn = 99.2
+        #date_now = dt.datetime(2022, 10, 3 ,X,Y,Z)
+
+        # Two goals, one constraint
+        # Reach EU 100bn at datetime_100bn_utc
+        # Tend towards the new counter value generally
+        # Prevent a huge bump
+        return counter_last

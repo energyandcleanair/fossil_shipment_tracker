@@ -1,23 +1,24 @@
 import sqlalchemy
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import insert
-
 import geopandas as gpd
 import pandas as pd
-
-from base.db import engine
-from base.db import meta
 from tqdm import tqdm
 
-def execute_statement(stmt, print_result=False):
+from base.db import engine, meta #KEEP meta, even though it is greyed out by IDE
+from base.logger import logger, logger_slack
+
+
+def execute_statement(stmt, print_result=False, slack_result=False):
     with engine.connect() as con:
         con = con.execution_options(isolation_level="AUTOCOMMIT")
-        if print_result:
+        if print_result or slack_result:
             rs = con.execute(stmt)
-            for row in rs:
-                print(row)
+            rows = [str(x) for x in rs]
+            for row in rows:
+                if print_result:
+                    print(row)
+            if slack_result:
+                logger_slack.info('\n'.join(rows))
         else:
             con.execute(stmt)
 
@@ -42,7 +43,18 @@ def get_upsert_method(constraint_name, show_progress=True):
     return upsert
 
 
-def upsert(df, table, constraint_name, dtype={}, show_progress=True):
+def upsert(df, table, constraint_name, dtype={}, show_progress=True, chunksize=10000):
+    """
+    This function upserts data into a specific table using chunks determined by chunksize
+
+    :param df:
+    :param table:
+    :param constraint_name:
+    :param dtype:
+    :param show_progress:
+    :param chunksize:
+    :return:
+    """
     global meta
     if meta is None:
         meta = sqlalchemy.MetaData()
@@ -64,4 +76,5 @@ def upsert(df, table, constraint_name, dtype={}, show_progress=True):
                   if_exists="append",
                   index=False,
                   method=get_upsert_method(constraint_name, show_progress=show_progress),
+                  chunksize=chunksize,
                   dtype=dtype)
