@@ -136,11 +136,18 @@ class ChartProductOnWater(Resource):
                                                         & (data['commodity_destination_region'] == 'EU'), 'Unknown',
                                                         data['commodity_destination_region'])
 
-        # Fix crude oil
-        data['commodity_destination_region'] = np.where((data['status'] == 'ongoing')
-                                                        & (data['commodity'] == 'Crude oil')
-                                                        & (data['commodity_destination_region'] == 'EU'), 'Unknown',
-                                                        data['commodity_destination_region'])
+        # Also remove shipments to EU since 2022-12-05 until we can verify these are correct/breaking sanctions
+        # Any ongoing shipments do not show as to EU - this can look misleading so set them as unknown
+        data['destination_region'] = np.where(((data['status'] == 'ongoing')
+                                               & (data['commodity'] == 'Crude oil')
+                                               & (data['commodity_destination_region'] == 'EU'))
+                                              |
+                                              (
+                                                      (data['commodity_destination_region'] == 'EU')
+                                                      & (data['commodity'] == 'Crude ol')
+                                                      & (data['departure_date'] > '2022-12-05')
+                                              ), 'Unknown',
+                                              data['commodity_destination_region'])
 
         date_range = pd.date_range('2022-01-01', data['departure_date'].max(), freq='D')
         result = []
