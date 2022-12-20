@@ -629,7 +629,7 @@ def process_crossborder_flows(flows_import_raw,
                          'partner_import', 'partner_export'
                          ],
                         dropna=False) \
-            .apply(lambda x: x.sort_values(by=['duration_import', 'duration_export'], ascending=False) \
+            .progress_apply(lambda x: x.sort_values(by=['duration_import', 'duration_export'], ascending=False) \
                    .head(1)) \
             .reset_index(drop=True)
         return df
@@ -643,7 +643,7 @@ def process_crossborder_flows(flows_import_raw,
                          'partner_import', 'partner_export'
                          ],
                         dropna=False) \
-            .apply(lambda x: x.sort_values(by=['flowStatus_import', 'flowStatus_export'],
+            .progress_apply(lambda x: x.sort_values(by=['flowStatus_import', 'flowStatus_export'],
                                            ascending=True) \
                    .head(1)) \
             .reset_index(drop=True)
@@ -695,35 +695,20 @@ def process_crossborder_flows(flows_import_raw,
             .reset_index()
         return df
 
-    def process_pt_op_date(df):
-
-        df = keep_max_duration(df)
+    def process(df):
+        df = keep_max_duration(flows)
         df = keep_confirmed_over_provisional(df)
-
-        if len(df) == 0:
-            return df
-
         df = average_both_sides(df)
-
-        # Further checks
-        if not all(df.country_export.isnull() | df.country_import.isnull() | (df.country_export == df.partner_import)):
-            logger.warning("flows aren't matching")
-            print(df[['pointKey', 'operatorKey_import', 'date']])
-
         df = coalesce_and_aggregate(df)
         return df
 
-
-    flows_scaled = flows \
-        .groupby(['pointKey', 'operatorKey_import', 'date'], group_keys=True, dropna=False) \
-        .progress_apply(process_pt_op_date) \
-        .reset_index(drop=True)
+    flows_intermediary = process(flows)
 
     if save_intermediary_to_file:
         intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
-        flows_scaled.to_csv(intermediary_filename, index=False)
+        flows_intermediary.to_csv(intermediary_filename, index=False)
 
-    flows_agg = flows_scaled \
+    flows_agg = flows_intermediary \
         .groupby(['country', 'partner', 'date'], dropna=False) \
         .agg(value=('value', np.nansum)) \
         .reset_index() \
