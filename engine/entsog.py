@@ -562,8 +562,6 @@ def process_crossborder_flows(flows_import_raw,
                                   flows_export_raw,
                                   flows_export_lng_raw,
                                   flows_production_raw,
-                                  keep_confirmed_only=False,
-                                  auto_confirmed_only=True,
                                   flows_import_agg_cols=None,
                                   flows_export_agg_cols=None,
                                   remove_operators=[],
@@ -584,9 +582,6 @@ def process_crossborder_flows(flows_import_raw,
     if flows_production_raw is not None:
         flows_production = flows_production_raw
         flows_import = pd.concat([flows_import, flows_production], axis=0)
-
-    if keep_confirmed_only:
-        flows_import = flows_import.loc[flows_import.flowStatus == 'Confirmed']
 
     if flows_export_raw is None:
         flows_export_raw = pd.DataFrame({'pointKey': pd.Series(dtype='str'),
@@ -621,92 +616,112 @@ def process_crossborder_flows(flows_import_raw,
     if remove_operators:
         flows = flows.loc[~flows.operatorKey_import.isin(remove_operators)]
 
-    if save_intermediary_to_file:
-        intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
-        flows.to_csv(intermediary_filename, index=False)
+    def keep_max_duration(df):
+        # Take those with max duration only
+        df['duration_import'] = df['periodTo_import'] - df['periodFrom_import']
+        df['duration_export'] = df['periodTo_export'] - df['periodFrom_export']
+
+        df = df.groupby(['pointKey', 'date',
+                         'operatorKey_import', 'operatorKey_export',
+                         'operatorLabel_import', 'operatorLabel_export',
+                         'flowStatus_import', 'flowStatus_export',
+                         'country_import', 'country_export',
+                         'partner_import', 'partner_export'
+                         ],
+                        dropna=False) \
+            .apply(lambda x: x.sort_values(by=['duration_import', 'duration_export'], ascending=False) \
+                   .head(1)) \
+            .reset_index(drop=True)
+        return df
+
+    def keep_confirmed_over_provisional(df):
+        # Confirmed < Provisional
+        df = df.groupby(['pointKey', 'date',
+                         'operatorKey_import', 'operatorKey_export',
+                         'operatorLabel_import', 'operatorLabel_export',
+                         'country_import', 'country_export',
+                         'partner_import', 'partner_export'
+                         ],
+                        dropna=False) \
+            .apply(lambda x: x.sort_values(by=['flowStatus_import', 'flowStatus_export'],
+                                           ascending=True) \
+                   .head(1)) \
+            .reset_index(drop=True)
+        return df
+
+
+    def average_both_sides(df):
+        def nanmean(x):
+            # If all is nan return nan without warning
+            if np.all(x != x):
+                return np.NaN
+            if all(x == 0):
+                return 0
+            if (np.std(x) / np.nanmean(x)) > 0.1:
+                logger.warning("Flows are dissimilar before averaging")
+            return np.nanmean(x)
+
+
+        # Average on both sides: export and import
+        df = df.groupby(['pointKey', 'date',
+                         'operatorKey_import', 'operatorKey_export',
+                         'operatorLabel_import', 'operatorLabel_export',
+                    'flowStatus_import', 'flowStatus_export',
+                    'country_import', 'country_export',
+                    'partner_import', 'partner_export'],
+                        dropna=False) \
+                [['value_import', 'value_export']] \
+            .agg(nanmean) \
+            .reset_index()
+        return df
+
+    def coalesce_and_aggregate(df):
+
+        df['partner'] = \
+            np.where(df['country_export'].isnull(), df['partner_import'], df['country_export'])
+
+        df['country'] = \
+            np.where(df['country_import'].isnull(), df['partner_export'], df['country_import'])
+
+        df['value'] = \
+            np.where(df['value_import'].isnull(), df['value_export'], df['value_import'])
+
+        df = df.groupby(['pointKey', 'date',
+                          'operatorKey_import', 'operatorKey_export',
+                          'operatorLabel_import', 'operatorLabel_export',
+                          'country', 'partner'],
+                        dropna=False) \
+            ['value'].agg(np.nansum) \
+            .reset_index()
+        return df
 
     def process_pt_op_date(df):
 
-        df = df.loc[(df.value_import > 0) |
-                    # Or an export point for which we don't have import
-                    (all(pd.isna(df.value_import)) & (df.value_export > 0))]
-
-        if auto_confirmed_only and 'Confirmed' in df.flowStatus_import.to_list():
-            if (np.nansum(df.value_import) == 0) \
-                        or (np.std(df.value_import) / np.nanmean(df.value_import)) < 0.2:
-                df = df.loc[df.flowStatus_import == 'Confirmed']
-            else:
-                logger.warning("Several unmatching import flows")
-                df = df.loc[df.flowStatus_import == 'Confirmed']
-
-        if auto_confirmed_only and 'Confirmed' in df.flowStatus_export.to_list():
-            if (np.nansum(df.value_export) == 0) \
-                    or (np.std(df.value_export) / np.nanmean(df.value_export)) < 0.2:
-                df = df.loc[df.flowStatus_export == 'Confirmed']
-            else:
-                if np.nansum(df.value_import) > 0:
-                    # Take the one closest to import
-                    df['diff'] = abs(df.value_export-df.value_import)
-                    df = df.sort_values('diff', ascending=True).head(1).drop('diff', axis=1)
-                else:
-                    logger.warning("Several unmatching export flows")
+        df = keep_max_duration(df)
+        df = keep_confirmed_over_provisional(df)
 
         if len(df) == 0:
             return df
 
-        # This function only manages the case were one import
-        # is matching several exports
-        # Or when there are only exports
-        if not len(df[['pointKey', 'flowStatus_import', 'value_import']].drop_duplicates()) == 1:
-
-            # Take the longest duration
-            df['duration'] = df['periodTo_import'] - df['periodFrom_import']
-            df = df[df.duration == df.duration.max()]
-
-            # Values have probably been updated later on
-            # and both are confirmed
-            if (np.std(df.value_import) / np.nanmean(df.value_import)) < 0.1 \
-                    and all(df.value_export.isnull()):
-                df = df.groupby([x for x in df.columns if x not in ['value_import', 'value_export']],
-                                dropna=False) \
-                    .agg(value_import=('value_import', np.nanmean),
-                         value_export=('value_export', np.nanmean)) \
-                    .reset_index()
-            else:
-                logger.warning("Flows are mismanaged")
+        df = average_both_sides(df)
 
         # Further checks
         if not all(df.country_export.isnull() | df.country_import.isnull() | (df.country_export == df.partner_import)):
             logger.warning("flows aren't matching")
             print(df[['pointKey', 'operatorKey_import', 'date']])
 
-        def nanmean(x):
-            # Without warning if empty
-            return np.NaN if np.all(x != x) else np.nanmean(x)
+        df = coalesce_and_aggregate(df)
+        return df
 
-        value_import_mean = nanmean(df.value_import)
-        value_export_sum = np.nansum(df.value_export)
-
-        if not pd.isna(value_import_mean):
-            value = value_import_mean
-        elif all(df.value_import.isnull()):
-            value = value_export_sum
-        else:
-            value = 0
-
-        countries = df[['country_export', 'country_import', 'partner_import', 'partner_export']].drop_duplicates()
-        if len(countries) > 1:
-            logger.warning("Uncertain countries")
-
-        partner = np.where(countries['country_export'].isnull(), countries['partner_import'], countries['country_export'])[0]
-        country = np.where(countries['country_import'].isnull(), countries['partner_export'], countries['country_import'])[0]
-        result = {'partner': partner, 'country': country, 'value': value}
-        return pd.DataFrame(result, index=[0])
 
     flows_scaled = flows \
         .groupby(['pointKey', 'operatorKey_import', 'date'], group_keys=True, dropna=False) \
-        .progress_apply(process_pt_op_date)[['value', 'country', 'partner']] \
-        .reset_index()
+        .progress_apply(process_pt_op_date) \
+        .reset_index(drop=True)
+
+    if save_intermediary_to_file:
+        intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
+        flows_scaled.to_csv(intermediary_filename, index=False)
 
     flows_agg = flows_scaled \
         .groupby(['country', 'partner', 'date'], dropna=False) \
@@ -772,8 +787,6 @@ def get_flows(date_from='2022-01-01',
                                               flows_import_lng_raw=flows_import_lng_raw,
                                               flows_export_lng_raw=flows_export_lng_raw,
                                               flows_production_raw=flows_production_raw,
-                                              keep_confirmed_only=False,
-                                              auto_confirmed_only=True,
                                               remove_operators=[],
                                               save_intermediary_to_file=save_intermediary_to_file,
                                               intermediary_filename=intermediary_filename,
