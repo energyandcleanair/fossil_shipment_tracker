@@ -50,7 +50,7 @@ def collect_mt_for_large_oil_products():
             logger.info("Was already using MT")
 
 
-#
+
 # def collect_mt_for_insurers(date_from='2022-02-24',
 #                          commodity=[base.CRUDE_OIL, base.LNG]):
 #
@@ -113,10 +113,10 @@ def fill(imos=[], mmsis=[]):
     # First with Datalastic - we do check if Datalastic found the ship properly by checking dwt, and refer to
     # MT to retry if it did not
     ships = [Datalastic.get_ship(imo=x, query_if_not_in_cache=True) for x in get_missing_ships_imos(imos)]
-    upload_ships([s for s in ships if (s.dwt is not None and s.type is not None)])
+    upload_ships([s for s in ships if (s and s.dwt is not None and s.type is not None)])
 
     ships = [Datalastic.get_ship(mmsi=x, query_if_not_in_cache=True) for x in get_missing_ships_mmsis(mmsis)]
-    upload_ships([s for s in ships if (s.dwt is not None and s.type is not None)])
+    upload_ships([s for s in ships if (s and s.dwt is not None and s.type is not None)])
 
     # Then with Marinetraffic for those still missing
     from engine.marinetraffic import Marinetraffic
