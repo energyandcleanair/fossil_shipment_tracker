@@ -689,9 +689,10 @@ def process_crossborder_flows(flows_import_raw,
         df['value'] = \
             np.where(df['value_import'].isnull(), df['value_export'], df['value_import'])
 
-        df = df.groupby(['pointKey', 'pointLabel', 'date',
+        df = df.groupby(['pointKey', 'date',
                           'operatorKey_import', 'operatorKey_export',
                           'operatorLabel_import', 'operatorLabel_export',
+                         'pointLabel_import', 'pointLabel_export',
                           'country', 'partner'],
                         dropna=False) \
             ['value'].agg(np.nansum) \
