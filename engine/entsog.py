@@ -701,7 +701,7 @@ def process_crossborder_flows(flows_import_raw,
 
     flows_scaled = flows \
         .groupby(['pointKey', 'operatorKey_import', 'date'], group_keys=True, dropna=False) \
-        .apply(process_pt_op_date)[['value', 'country', 'partner']] \
+        .progress_apply(process_pt_op_date)[['value', 'country', 'partner']] \
         .reset_index()
 
     flows_agg = flows_scaled \
