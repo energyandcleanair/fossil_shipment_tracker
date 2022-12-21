@@ -250,7 +250,7 @@ class Marinetraffic:
 
             mmsi_imo = session.query(Ship.mmsi, Ship.imo).filter(Ship.mmsi.in_(mmsis)).all()
             # Make a dict with IMO:MMSIS
-            mmsi_imo_dict = dict(zip([x[1] for x in mmsi_imo],
+            imo_mmsi_dict = dict(zip([x[1] for x in mmsi_imo],
                                     [x[0] for x in mmsi_imo]))
 
         for r in response_datas:
@@ -258,7 +258,7 @@ class Marinetraffic:
             if imo is None:
                 # Ship not found, let's add it
                 #Very important: don't overwrite imo variable
-                r_imo = [k for k, v in mmsi_imo_dict.items() if r["MMSI"] in v]
+                r_imo = [k for k, v in imo_mmsi_dict.items() if r["MMSI"] in v]
                 if r_imo is None:
                     r_imo = 'NOTFOUND_' + r['MMSI']
                     unknown_ship = Ship(imo=r_imo, mmsi=r['MMSI'], type=r["TYPE_NAME"],
