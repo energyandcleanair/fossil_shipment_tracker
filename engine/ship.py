@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from sqlalchemy.exc import IntegrityError
 import base
+import json
 
 from base.db import session
 from base.logger import logger
@@ -49,8 +50,6 @@ def collect_mt_for_large_oil_products():
                 logger.info("IMOs don't match or ship not found")
         else:
             logger.info("Was already using MT")
-
-
 
 
 #
@@ -231,7 +230,6 @@ def set_commodity(ship):
     ship.quantity = quantity
     ship.unit = unit
     return ship
-
 
 
 def fix_duplicate_imo(imo=None, handle_not_found=True):
@@ -427,7 +425,8 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
         names = list(set([name for s in ship_versions for name in s.name]))
 
         # check if existing versions of ships have the same dwt/name/mmsi - in which case we can simplify
-        if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1 and len(names) == 1 and len(mmsis) == 1:
+        if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1 and len(names) == 1 and len(
+                mmsis) == 1:
 
             old_imo = ship_to_keep.imo
 
@@ -734,7 +733,7 @@ def compare_ship_sources(dwt_min=None,
     for ship in tqdm(largest_transporters):
         ship_mt = ship[0]
         if reload_marinetraffic:
-            ship_mt = Marinetraffic.get_ship(imo = ship_mt.imo)
+            ship_mt = Marinetraffic.get_ship(imo=ship_mt.imo)
 
         ship_dt = set_commodity(Datalastic.get_ship(imo=ship_mt.imo))
 
@@ -753,4 +752,32 @@ def compare_ship_sources(dwt_min=None,
                 ship_dt.commodity
             ))
 
-    logger.info('Ships are identical for {}% of cases.'.format(100*len(matching) / float(sample)))
+    logger.info('Ships are identical for {}% of cases.'.format(100 * len(matching) / float(sample)))
+
+
+def convert_mminame_cache_to_array(cache_file='cache/datalastic/ships.json'):
+    """
+    Load our previous cache and convert name/mmsi to cache
+
+    :param cache_file:
+    :return:
+    """
+
+    try:
+        with open(cache_file, "r+") as json_file:
+            cached_ships = json.load(json_file)
+
+            for cached_ship in cached_ships:
+                cached_ship["mmsi"] = [cached_ship["mmsi"]]
+                cached_ship["name"] = [cached_ship["name"]]
+
+            # Move cursor to start
+            json_file.seek(0)
+
+            json.dump(cached_ships, json_file)
+
+            # Shouldn't really need it but good practice in case json file sizes don't match
+            json_file.truncate()
+
+    except json.decoder.JSONDecodeError:
+        return []

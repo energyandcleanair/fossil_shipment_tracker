@@ -9,3 +9,7 @@ def test_ship_fill():
 
 def test_convert_mmsis_to_array():
     ship.fix_duplicate_imo(imo='9402249', handle_not_found=False)
+
+
+def test_convert_cache():
+    ship.convert_mminame_cache_to_array()
