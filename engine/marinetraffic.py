@@ -248,7 +248,7 @@ class Marinetraffic:
             mmsis = [x['MMSI'] for x in response_datas]
             found = ship.fill(mmsis=mmsis)
 
-            mmsi_imo = session.query(Ship.mmsi, Ship.imo).filter(Ship.mmsi.in_(mmsis)).all()
+            mmsi_imo = session.query(Ship.mmsi, Ship.imo).filter(Ship.mmsi.op('&&')(sa.cast(mmsis, sa.ARRAY(sa.UnicodeText)))).all()
             # Make a dict with IMO:MMSIS
             imo_mmsi_dict = dict(zip([x[1] for x in mmsi_imo],
                                     [x[0] for x in mmsi_imo]))
