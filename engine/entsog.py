@@ -327,19 +327,22 @@ def get_flows_raw(date_from='2022-01-01',
 
     opd = get_operator_point_directions()
     opd = fix_opd_countries(opd)
+    opd = opd[['id', 'pointKey', 'pointLabel', 'operatorKey', 'operatorLabel', 'directionKey',
+               'country', 'partner', 'pointType', 'crossBorderPointType']] \
+        .drop_duplicates()
 
     if country_iso2:
         opd = opd.loc[opd.country.isin(to_list(country_iso2))]
 
     if use_csv_selection:
-        to_remove = pd.read_csv('assets/entsog/opd_to_remove.csv')
+        to_remove = pd.read_csv('assets/entsog/opd_to_remove.csv').drop_duplicates()
         # Do an antijoin
         outer_join = opd.merge(to_remove, how='outer', indicator=True)
         opd = outer_join[(outer_join._merge == 'left_only')].drop('_merge', axis=1)
 
-    if remove_pipe_in_pipe:
-        opd = opd.loc[opd.isPipeInPipe.isnull() |  ~opd.isPipeInPipe \
-         | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
+    # if remove_pipe_in_pipe:
+    #     opd = opd.loc[opd.isPipeInPipe.isnull() |  ~opd.isPipeInPipe \
+    #      | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
 
     if remove_operators:
         opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
@@ -354,7 +357,6 @@ def get_flows_raw(date_from='2022-01-01',
     is_crossborder = opd.pointType.str.contains('Cross-Border Transmission') \
                 | (opd.pointType.str.contains('Transmission') \
                     & opd.crossBorderPointType.str.contains('Cross'))
-
     is_transmission = opd.pointType.str.startswith('Transmission') & ~is_crossborder
     is_storage = opd.pointType.str.startswith('Storage')
     is_lng = opd.pointType.str.contains('LNG Entry point')
@@ -370,7 +372,6 @@ def get_flows_raw(date_from='2022-01-01',
      + is_production.astype(int)
      + is_consumption.astype(int)
      + is_distribution.astype(int)).max() == 1
-
 
     is_entry = opd.directionKey == 'entry'
     is_exit = opd.directionKey == 'exit'
@@ -391,7 +392,6 @@ def get_flows_raw(date_from='2022-01-01',
     consumption_points = opd.loc[is_consumption & is_exit]
     distribution_points = opd.loc[is_distribution & is_exit]
 
-
     # Check all are uniques
     all = pd.concat([entry_points,
                storage_entry_points,
@@ -405,6 +405,7 @@ def get_flows_raw(date_from='2022-01-01',
                storage_exit_points,
                lng_exit_points
                      ], axis=0)
+
     assert len(all.index) == len(all.index.unique())
 
     def keep_unique(x):
