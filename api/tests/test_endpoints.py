@@ -60,6 +60,17 @@ def test_port(app):
 
 
 
+def test_portprice(app):
+
+    # Create a test client using the Flask application configured for testing
+    with app.test_client() as test_client:
+        params = {}
+        response = test_client.get('/v0/portprice?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+
+
 def test_price(app):
 
     # Create a test client using the Flask application configured for testing
@@ -75,7 +86,6 @@ def test_price(app):
         assert response.status_code == 200
         data2 = response.json["data"]
         assert set([x['commodity'] for x in data2]) == set([base.PIPELINE_GAS])
-
 
 
 
