@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, Date, DateTime, Integer, Numeric, BigInteger, Boolean, Time
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import validates
 from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKey, Index, func
 from geoalchemy2 import Geometry
@@ -60,8 +60,8 @@ from . import DB_TABLE_FLARING_ANOMALY_ALGORITHM
 
 class Ship(Base):
     imo = Column(String, primary_key=True)
-    mmsi = Column(String)
-    name = Column(String)
+    mmsi = Column(ARRAY(String))
+    name = Column(ARRAY(String))
     type = Column(String)
     subtype = Column(String)
     dwt = Column(Numeric) # in tonnes

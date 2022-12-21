@@ -149,7 +149,7 @@ def get_new_alerts():
 
     ArrivalCountry = aliased(Country)
     ArrivalPort = aliased(Port)
-    
+
     min_date = dt.date.today() - dt.timedelta(days=7)
 
     query_shipment1 = session.query(Shipment.id.label('shipment_id'),
@@ -181,7 +181,7 @@ def get_new_alerts():
         Commodity.name.label('commodity_name'),
         Ship.dwt,
         Ship.imo,
-        Ship.name.label('ship_name'),
+        Ship.name[func.array_length(Ship.name, 1)].label('ship_name'),
         Departure.port_id.label('departure_port_id'),
         DeparturePort.name.label('departure_port_name'),
         DepartureCountry.name.label('departure_country'),

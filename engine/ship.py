@@ -4,7 +4,7 @@ import base
 
 from base.db import session
 from base.logger import logger
-from base.models import Ship, PortCall, Departure, Shipment, Arrival
+from base.models import Ship, PortCall, Departure, Shipment, ShipmentDepartureBerth, Trajectory, MTVoyageInfo, Arrival
 from base.utils import to_datetime, to_list
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
@@ -34,7 +34,8 @@ def collect_mt_for_large_oil_products():
 
     for ship in tqdm(ships):
         if ship.type != ship.others.get('marinetraffic', {}).get('VESSEL_TYPE'):
-            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi)
+            # If there are multiple mmsis take latest one
+            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi[-1])
             if ship_mt is not None and ship.imo == ship_mt.imo:
                 ship_mt.others.update(ship.others)
                 (commodity, quantity, unit) = ship_to_commodity(ship_mt)
@@ -51,6 +52,8 @@ def collect_mt_for_large_oil_products():
 
 
 
+
+#
 # def collect_mt_for_insurers(date_from='2022-02-24',
 #                          commodity=[base.CRUDE_OIL, base.LNG]):
 #
@@ -101,7 +104,7 @@ def fill(imos=[], mmsis=[]):
         return [x for x in imos if str(x) not in existing_imos]
 
     def get_missing_ships_mmsis(mmsis):
-        existing_mmsis = [value for value, in session.query(Ship.mmsi).all()]
+        existing_mmsis = [mmsi for s in session.query(Ship).all() for mmsi in s.mmsi]
         return [x for x in mmsis if str(x) not in existing_mmsis]
 
     if not get_missing_ships_imos(imos) and not get_missing_ships_mmsis(mmsis):
@@ -145,11 +148,16 @@ def upload_ships(ships):
         except sa.exc.IntegrityError as e:
             session.rollback()
             # Ship with this IMO probably already exists.
-            n_imo_ships = Ship.query.filter(Ship.imo.op('~')(ship.imo)).count()
-            if n_imo_ships > 0:
-                ship.imo = "%s_v%d" % (ship.imo, n_imo_ships + 1)
-                session.add(ship)
-                session.commit()
+            imo_ships = session.query(Ship).filter(Ship.imo.op('~')(ship.imo)).all()
+
+            if len(imo_ships) > 1:
+                logger.warning("Please check ship imo {}, we have more than one ship in db.".format(ship.imo))
+            if len(imo_ships) == 1:
+                # add new shop mmsi to existing ship imo
+                imo_ship, mmsis = imo_ships[0], imo_ships[0].mmsi
+                if ship.mmsi[-1] not in mmsis:
+                    imo_ship.mmsi = imo_ship.mmsi + ship.mmsi
+                    session.commit()
             else:
                 raise ValueError("Problem inserting ship: %s" % (str(e),))
 
@@ -208,6 +216,16 @@ def ship_to_commodity(ship):
 
 
 def set_commodity(ship):
+    """
+
+    Parameters
+    ----------
+    ship :
+
+    Returns
+    -------
+
+    """
     [commodity, quantity, unit] = ship_to_commodity(ship)
     ship.commodity = commodity
     ship.quantity = quantity
@@ -215,7 +233,307 @@ def set_commodity(ship):
     return ship
 
 
+
+def fix_duplicate_imo(imo=None, handle_not_found=True):
+    """
+    Verify the ship table - check if there are any identical rows - this could happen with the historic version
+    of using '_v*' to iterate ships
+
+    Parameters
+    ----------
+    ships :
+
+    Returns
+    -------
+
+    """
+
+    def return_coalesced_data(ships):
+        """
+        Combine multiple ship object other data columns into one based on content
+
+        Parameters
+        ----------
+        ships :
+
+        Returns
+        -------
+
+        """
+
+        if not ships:
+            return None
+
+        def return_all_values(d):
+            for v in d.values():
+                if isinstance(v, dict):
+                    yield from return_all_values(v)
+                else:
+                    if v is not None and v != '':
+                        yield v
+
+        # collapse all sources into lists, eg equasis, datalastic, marinetraffic
+        sources = {}
+        for ship in ships:
+
+            if not ship.others:
+                continue
+
+            for source, data in ship.others.items():
+                sources[source] = sources.get(source, []) + [data]
+
+        # sort all data
+        for source, data in sources.items():
+            sources[source] = sorted(data, key=lambda item: len(list(return_all_values(item))), reverse=True)[0]
+
+        return sources
+
+    def update_ship_imo(old_imo, new_imo):
+        """
+        Correct any existing departures/portcalls with new imo
+
+        Parameters
+        ----------
+        old_imo :
+        new_imo :
+
+        Returns
+        -------
+
+        """
+        ship_portcalls = PortCall.query.filter(PortCall.ship_imo == old_imo).all()
+        ship_mtvoyages = MTVoyageInfo.query.filter(MTVoyageInfo.ship_imo == old_imo).all()
+
+        # First let's try and clean up mtvoyage which should not have issues with changes - it is just to make sure
+        # mmsi arrays are consistent everywhere
+        for ship_mtvoyage in ship_mtvoyages:
+            ship_mtvoyage.ship_imo = new_imo
+            try:
+                session.commit()
+            except sa.exc.IntegrityError as e:
+                session.rollback()
+                logger.info("Duplicate voyageinfo {} - failed to delete. Please check.".format(ship_mtvoyage.id))
+
+        for ship_portcall in ship_portcalls:
+            ship_portcall.ship_imo = new_imo
+            try:
+                session.commit()
+            except sa.exc.IntegrityError as e:
+                session.rollback()
+                logger.info("Duplicate portcall_id {} - deleting portcall, departure and associated shipments.".format(
+                    ship_portcall.id))
+
+                # find associated shipments to delete
+                shipments_to_delete = session.query(
+                    Shipment
+                ) \
+                    .join(Departure, Departure.id == Shipment.departure_id) \
+                    .filter(Departure.portcall_id == ship_portcall.id)
+
+                shipments_to_delete_list = [s.id for s in shipments_to_delete.all()]
+
+                # delete in correct order to respect foreign keys
+                session.query(Shipment).filter(Shipment.id.in_(shipments_to_delete_list)).delete()
+                session.query(Departure).filter(Departure.portcall_id == ship_portcall.id).delete()
+
+                session.query(ShipmentDepartureBerth).filter(
+                    ShipmentDepartureBerth.shipment_id.in_(shipments_to_delete_list)).delete()
+                session.query(Trajectory).filter(Trajectory.shipment_id.in_(shipments_to_delete_list)).delete()
+
+                session.delete(ship_portcall)
+
+                # try and commit and if it fails undo
+                try:
+                    session.commit()
+                except sa.exc.IntegrityError:
+                    logger.info("Failed to delete portcall_id {} and associated objects.".format(ship_portcall.id))
+                    session.rollback()
+                    continue
+
+        ship_departures = Departure.query.filter(Departure.ship_imo == old_imo).all()
+        for ship_departure in ship_departures:
+            ship_departure.ship_imo = new_imo
+
+        try:
+            session.commit()
+        except sa.exc.IntegrityError as e:
+            logger.info(e)
+            session.rollback()
+
+    ships = session.query(
+        sa.case(
+            [
+                (Ship.imo.like('%_v%'), sa.func.split_part(Ship.imo, '_', 1))
+            ], else_=sa.null()
+        ).label('imo'),
+        sa.case(
+            [
+                (Ship.imo.like('%NOTFOUND%'), sa.func.split_part(Ship.imo, '_', 2))
+            ], else_=sa.null()
+        ).label('mmsi'),
+        Ship.imo.label('old_imo')
+    ) \
+        .filter(sa.or_(
+        Ship.imo.op('~')('[_v]'),
+        Ship.imo.op('~')('[NOTFOUND]')
+    )).subquery()
+
+    ships = session.query(
+        ships
+    ) \
+        .distinct(ships.c.imo, ships.c.mmsi).subquery()
+
+    if imo:
+        ships = session.query(ships).filter(ships.c.imo.in_(to_list(imo))).subquery()
+
+    if not handle_not_found:
+        ships = session.query(ships).filter(~ships.c.imo.op('~')('[NOTFOUND]'))
+
+    ships = ships.all()
+
+    for ship in tqdm(ships):
+        logger.info("Checking vessel imo: {}, mmsi: {}.".format(ship.imo, ship.mmsi))
+
+        if not handle_not_found:
+            if 'NOTFOUND' in ship.old_imo:
+                continue
+
+        base_imo = ship.imo
+
+        ship_versions = session.query(
+            Ship
+        ) \
+            .filter(Ship.imo.op('~')(base_imo)) \
+            .all()
+
+        # Check if we only have 1 version - this should not happen as we select distinct
+        if len(ship_versions) == 1:
+            continue
+
+        # However, it is easier to keep the non-version ship object so we do not have to change events/portcalls
+        ship_versions = sorted(ship_versions, key=lambda item: len(str(item.imo)),
+                               reverse=False)
+
+        ship_to_keep = ship_versions[0]
+
+        # If we only have ships with _v versioning and no base ship, let's skip and check manually
+        if '_v' in ship_to_keep.imo:
+            logger.info("Found a ship with no non-version object, ship imo: {}. Please check.".format(ship_to_keep.imo))
+            continue
+
+        # combine other data column to store for the future
+        other_data = return_coalesced_data(ship_versions)
+        mmsis = list(set([mmsi for s in ship_versions for mmsi in s.mmsi]))
+        names = list(set([name for s in ship_versions for name in s.name]))
+
+        # check if existing versions of ships have the same dwt/name/mmsi - in which case we can simplify
+        if base_imo is not None and len(set([s.dwt for s in ship_versions])) == 1 and len(names) == 1 and len(mmsis) == 1:
+
+            old_imo = ship_to_keep.imo
+
+            # fix the rest of the ship versions by changing departures/portcalls and deleting them after
+            for sv in ship_versions[1:]:
+                # fix departures/portcalls if necessary
+                update_ship_imo(sv.imo, old_imo)
+
+                # remove ship
+                session.delete(sv)
+
+            # we run flush to make sure the change is reflected, as we need to update ship we're keeping to existing
+            # imo
+            try:
+                session.flush()
+            except sa.exc.IntegrityError:
+                session.rollback()
+                continue
+
+            # update the object we're keeping with all info we want to contain and collapse mmsis into list
+            ship_to_keep.imo = base_imo
+            ship_to_keep.others = other_data
+            ship_to_keep.mmsi = mmsis
+            ship_to_keep.name = names
+
+            try:
+                session.commit()
+            except sa.exc.IntegrityError:
+                session.rollback()
+                logger.info("Failed to fix ship imo {}.".format(base_imo))
+
+        else:
+            # first let's try and deal with NOTFOUND cases
+            if base_imo is None:
+                if fill([ship.mmsi]):
+                    logger.info("Found NOTFOUND ship (mmsi: {}).".format(ship.mmsi))
+
+                    found_ship = session.query(Ship).filter(Ship.mmsi == ship.mmsi).first()
+
+                    update_ship_imo(Ship.old_imo, found_ship.imo)
+
+                else:
+                    logger.warning("Could not find NOTFOUND ship (mmsi: {}).".format(ship.mmsi))
+
+            else:
+                # we have conflicting information for a minotiry of cases -
+                # we fill ship using imo to get the latest data and make sure dwt is correct
+                found_ship = Datalastic.get_ship(imo=base_imo)
+                if found_ship is None or found_ship.dwt is None:
+                    found_ship = Marinetraffic.get_ship(imo=base_imo)
+
+                if found_ship is not None:
+
+                    found_mmsi, found_name = found_ship.mmsi[0], found_ship.name[0]
+                    # add or over ride existing others data with newest
+                    for source, data in found_ship.others.items():
+                        other_data[source] = data
+                    if found_mmsi not in mmsis:
+                        mmsis.append(found_mmsi)
+                    if found_name not in names:
+                        names.append(found_name)
+
+                    # Ugly, but we enforce the latest mmsi/name is now at the end of the list
+                    names.append(names.pop(names.index(found_name)))
+                    mmsis.append(mmsis.pop(mmsis.index(found_mmsi)))
+
+                    # Update existing ship with new data
+                    ship_to_keep.others = other_data
+                    ship_to_keep.mmsi = mmsis
+                    ship_to_keep.name = names
+                    ship_to_keep.dwt = found_ship.dwt
+                    ship_to_keep.type = found_ship.type
+                    ship_to_keep.subtype = found_ship.subtype
+
+                    ship_to_keep = set_commodity(ship_to_keep)
+
+                    for sv in ship_versions[1:]:
+                        update_ship_imo(sv.imo, base_imo)
+                        session.delete(sv)
+
+                    try:
+                        session.commit()
+                    except sa.exc.IntegrityError:
+                        session.rollback()
+
+
+                else:
+                    logger.info("Failed to update ship_imo {}, we will use existing ship object.".format(base_imo))
+                    for sv in ship_versions:
+                        if '_v' in sv.imo:
+                            update_ship_imo(sv.imo, base_imo)
+                            session.delete(sv)
+                    try:
+                        session.commit()
+                    except sa.exc.IntegrityError:
+                        logger.info("Failed update existing portcalls/departures for ship imo {}.".format(base_imo))
+                        session.rollback()
+
+
 def fix_mmsi_imo_discrepancy(date_from=None):
+    """
+
+    Parameters
+    ----------
+    date_from :
+    """
     query = session.query(PortCall.ship_imo, PortCall.ship_mmsi)
     if date_from is not None:
         query = query.filter(PortCall.date_utc >= to_datetime(date_from))
@@ -228,7 +546,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
     # For each ship, ask datalastic
     for portcall_ship in tqdm(portcall_ships):
         imo = portcall_ship.ship_imo
-        mmsi = portcall_ship.ship_mmsi
+        mmsi = portcall_ship.ship_mmsi[-1]
         # others = portcall_ship.others
         found_ship = Datalastic.get_ship(mmsi=mmsi, use_cache=True)
         if not found_ship or not found_ship.imo or found_ship.imo == '0':
@@ -265,7 +583,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                 try:
                     session.commit()
                 except sa.exc.IntegrityError as e:
-                    logger.error(e)
+                    logger.info(e)
                     session.rollback()
 
             if len(existing_ship) == 1:
@@ -283,7 +601,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                     try:
                         session.commit()
                     except sa.exc.IntegrityError as e:
-                        logger.error(e)
+                        logger.info(e)
                         session.rollback()
 
                 else:
@@ -304,7 +622,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                     try:
                         session.commit()
                     except sa.exc.IntegrityError as e:
-                        logger.error(e)
+                        logger.info(e)
                         session.rollback()
 
             wrong.append(mmsi)

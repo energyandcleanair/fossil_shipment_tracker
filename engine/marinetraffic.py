@@ -165,9 +165,9 @@ class Marinetraffic:
                 cls.do_cache_object(response_data, cls.cache_ship, cls.cache_file_ship)
 
         data = {
-            "mmsi": response_data["MMSI"],
+            "mmsi": [response_data["MMSI"]],
             "imo": response_data["IMO"],
-            "name": response_data.get("NAME"),
+            "name": [response_data.get("NAME")],
             "type": response_data.get("VESSEL_TYPE"),
             # "subtype": None,
             "dwt": response_data.get("SUMMER_DWT"),
@@ -249,39 +249,40 @@ class Marinetraffic:
             found = ship.fill(mmsis=mmsis)
 
             mmsi_imo = session.query(Ship.mmsi, Ship.imo).filter(Ship.mmsi.in_(mmsis)).all()
-            mmsi_imo_dict = dict(zip([x[0] for x in mmsi_imo],
-                                    [x[1] for x in mmsi_imo]))
-
-
+            # Make a dict with IMO:MMSIS
+            imo_mmsi_dict = dict(zip([x[1] for x in mmsi_imo],
+                                    [x[0] for x in mmsi_imo]))
 
         for r in response_datas:
             # IMO's missing
             if imo is None:
                 # Ship not found, let's add it
                 #Very important: don't overwrite imo variable
-                r_imo = mmsi_imo_dict.get(r["MMSI"])
+                r_imo = [k for k, v in imo_mmsi_dict.items() if r["MMSI"] in v]
                 if r_imo is None:
                     r_imo = 'NOTFOUND_' + r['MMSI']
-                    unknown_ship = Ship(imo=r_imo, mmsi=r['MMSI'], type=r["TYPE_NAME"],
-                                    name=r['SHIPNAME'])
+                    unknown_ship = Ship(imo=r_imo, mmsi=[r['MMSI']], type=r["TYPE_NAME"],
+                                    name=[r['SHIPNAME']])
                     session.add(unknown_ship)
                     try:
                         session.commit()
                     except IntegrityError:
                         session.rollback()
-                        is_same = bool(Ship.query.filter(Ship.imo==r_imo, Ship.name == r['SHIPNAME']).count())
+                        # Check if they are the same imo and name - if so, we assume its the same
+                        is_same = bool(Ship.query.filter(Ship.imo==r_imo, Ship.name.any(r['SHIPNAME'])).count())
                         if is_same:
                             continue
                         else:
                             n_imo_ships = Ship.query.filter(Ship.imo.op('~')(r_imo)).count()
                             if n_imo_ships > 0:
                                 r_imo = "%s_v%d" % (r_imo, n_imo_ships + 1)
-                                unknown_ship = Ship(imo=r_imo, mmsi=r['MMSI'], type=r["TYPE_NAME"],
-                                                    name=r['SHIPNAME'])
+                                unknown_ship = Ship(imo=r_imo, mmsi=[r['MMSI']], type=r["TYPE_NAME"],
+                                                    name=[r['SHIPNAME']])
                                 session.add(unknown_ship)
                                 session.commit()
 
-                r["IMO"] = r_imo
+                # else we take the IMO we found
+                r["IMO"] = r_imo[0]
 
             if imo is not None:
                 r["IMO"] = imo

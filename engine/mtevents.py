@@ -22,9 +22,9 @@ import datetime as dt
 
 import re
 
-from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall, Port, Event, Arrival, \
-    Position
-from sqlalchemy import func, text
+from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall, Port, Event, \
+Arrival, Position
+from sqlalchemy import func
 import sqlalchemy as sa
 
 
@@ -37,7 +37,6 @@ def update(
                      base.OIL_PRODUCTS,
                      base.OIL_OR_CHEMICAL],
         min_dwt=base.DWT_MIN,
-        force_rebuild=False,
         between_existing_only=False,
         between_shipments_only=False,
         use_cache=False,
@@ -209,6 +208,7 @@ def update(
 
             if not events:
                 print("No vessel events found for ship_imo: {}.".format(ship_imo))
+                continue
 
             event_process_state = [add_interacting_ship_details_to_event(e) for e in events]
 
@@ -301,9 +301,10 @@ def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time, window_
 
 def find_ships_in_db(interacting_ship_name):
     ships = session.query(Ship) \
-        .filter(func.lower(Ship.name).ilike(func.lower(interacting_ship_name)),
+        .filter(sa.or_(Ship.name.any(interacting_ship_name),
+                       Ship.name.any(func.lower(interacting_ship_name))),
                 Ship.dwt > base.DWT_MIN,
-                sqlalchemy.not_(Ship.name.contains('NOTFOUND'))).all()
+                ~Ship.imo.contains('NOTFOUND')).all()
 
     return ships
 
@@ -380,18 +381,18 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
         # fill imo where necessary from MT
         if intship.imo is None:
             if intship.mmsi is not None:
-                mt_intship_check = fill(mmsis=[intship.mmsi])
+                mt_intship_check = fill(mmsis=[intship.mmsi[-1]])
 
                 if not mt_intship_check:
                     # add unknown ship to db, so we don't repeatedly query MT
-                    unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi, mmsi=intship.mmsi, type=intship.type,
-                                        name=intship.name)
+                    unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi[-1], mmsi=[intship.mmsi[-1]], type=intship.type,
+                                        name=[intship.name[-1]])
                     session.add(unknown_ship)
                     session.commit()
 
                     continue
 
-                mt_ship = session.query(Ship).filter(Ship.mmsi == intship.mmsi).all()
+                mt_ship = session.query(Ship).filter(Ship.mmsi.any(intship.mmsi[-1])).all()
 
                 # check if we find more than 1 ship
                 if len(mt_ship) > 1:
@@ -404,7 +405,7 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
 
                 mt_ship = mt_ship[0]
 
-                if intship.name == mt_ship.name:
+                if intship.name[-1] in mt_ship.name:
                     intship.imo = mt_ship.imo
                 else:
                     print("Found match for ship with mmsi, but names do not match for event {}".format(event_content))
@@ -413,7 +414,7 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
                 print("No ship imo found and we do not have an mmsi for event: {}".format(event_content))
                 continue
 
-            # check if interacting ship is in db
+        # check if interacting ship is in db
         found = fill(imos=[intship.imo])
         if not found:
             print("Failed to upload missing ships")
