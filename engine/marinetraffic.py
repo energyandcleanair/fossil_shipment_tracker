@@ -261,8 +261,8 @@ class Marinetraffic:
                 r_imo = [k for k, v in imo_mmsi_dict.items() if r["MMSI"] in v]
                 if r_imo is None:
                     r_imo = 'NOTFOUND_' + r['MMSI']
-                    unknown_ship = Ship(imo=r_imo, mmsi=r['MMSI'], type=r["TYPE_NAME"],
-                                    name=r['SHIPNAME'])
+                    unknown_ship = Ship(imo=r_imo, mmsi=[r['MMSI']], type=r["TYPE_NAME"],
+                                    name=[r['SHIPNAME']])
                     session.add(unknown_ship)
                     try:
                         session.commit()
@@ -276,8 +276,8 @@ class Marinetraffic:
                             n_imo_ships = Ship.query.filter(Ship.imo.op('~')(r_imo)).count()
                             if n_imo_ships > 0:
                                 r_imo = "%s_v%d" % (r_imo, n_imo_ships + 1)
-                                unknown_ship = Ship(imo=r_imo, mmsi=r[['MMSI']], type=r["TYPE_NAME"],
-                                                    name=r['SHIPNAME'])
+                                unknown_ship = Ship(imo=r_imo, mmsi=[r['MMSI']], type=r["TYPE_NAME"],
+                                                    name=[r['SHIPNAME']])
                                 session.add(unknown_ship)
                                 session.commit()
 

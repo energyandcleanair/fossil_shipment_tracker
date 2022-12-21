@@ -385,8 +385,8 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
 
                 if not mt_intship_check:
                     # add unknown ship to db, so we don't repeatedly query MT
-                    unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi[-1], mmsi=intship.mmsi[-1], type=intship.type,
-                                        name=intship.name[-1])
+                    unknown_ship = Ship(imo='NOTFOUND_' + intship.mmsi[-1], mmsi=[intship.mmsi[-1]], type=intship.type,
+                                        name=[intship.name[-1]])
                     session.add(unknown_ship)
                     session.commit()
 
