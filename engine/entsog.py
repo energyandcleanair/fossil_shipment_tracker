@@ -745,6 +745,42 @@ def fix_kipi_flows(flows):
     return flows
 
 
+def update_flows_raw(date_from='2022-01-01',
+                     date_to=dt.date.today(),
+                     country_iso2=None,
+                     use_upsert=True):
+
+    # Get raw information from ENTSOG
+    (flows_import_raw,
+     flows_import_lng_raw,
+     flows_export_raw,
+     flows_export_lng_raw,
+     flows_production_raw,
+     flows_consumption_raw,
+     flows_distribution_raw,
+     flows_storage_entry_raw,
+     flows_storage_exit_raw,
+     flows_transmission_entry_raw,
+     flows_transmission_exit_raw) = get_flows_raw(date_from=date_from,
+                                                  date_to=date_to,
+                                                  country_iso2=country_iso2,
+                                                  use_csv_selection=False)
+
+    # Save to DB
+    upsert_flows_raw(pd.concat([flows_import_raw,
+                                flows_import_lng_raw,
+                                flows_export_raw,
+                                flows_export_lng_raw,
+                                flows_production_raw,
+                                flows_consumption_raw,
+                                flows_distribution_raw,
+                                flows_storage_entry_raw,
+                                flows_storage_exit_raw,
+                                flows_transmission_entry_raw,
+                                flows_transmission_exit_raw]),
+                      use_upsert=use_upsert)
+
+
 def get_flows(date_from='2022-01-01',
               date_to=dt.date.today(),
               country_iso2=None,
@@ -753,7 +789,8 @@ def get_flows(date_from='2022-01-01',
               save_intermediary_to_file=False,
               intermediary_filename=None,
               save_to_file=False,
-              filename=None):
+              filename=None,
+              upload_to_db=False):
 
     # Get raw information from ENTSOG
     (flows_import_raw,
@@ -772,18 +809,19 @@ def get_flows(date_from='2022-01-01',
                                                   use_csv_selection=use_csv_selection,
                                                   remove_pipe_in_pipe=remove_pipe_in_pipe)
 
-    # Save to DB
-    upsert_flows_raw(pd.concat([flows_import_raw,
-                                 flows_import_lng_raw,
-                                 flows_export_raw,
-                                 flows_export_lng_raw,
-                                 flows_production_raw,
-                                 flows_consumption_raw,
-                                 flows_distribution_raw,
-                                 flows_storage_entry_raw,
-                                 flows_storage_exit_raw,
-                                 flows_transmission_entry_raw,
-                                 flows_transmission_exit_raw]))
+    if upload_to_db:
+        # Save to DB
+        upsert_flows_raw(pd.concat([flows_import_raw,
+                                     flows_import_lng_raw,
+                                     flows_export_raw,
+                                     flows_export_lng_raw,
+                                     flows_production_raw,
+                                     flows_consumption_raw,
+                                     flows_distribution_raw,
+                                     flows_storage_entry_raw,
+                                     flows_storage_exit_raw,
+                                     flows_transmission_entry_raw,
+                                     flows_transmission_exit_raw]))
 
 
     # Process cross border & production
@@ -826,12 +864,20 @@ def get_flows(date_from='2022-01-01',
     return flows
 
 
-def upsert_flows_raw(flows_raw):
+def upsert_flows_raw(flows_raw, use_upsert=True):
     to_upload = flows_raw[['id', 'date', 'periodFrom', 'periodTo',
     'pointKey', 'operatorKey', 'directionKey', 'flowStatus', 'value']] \
         .rename(columns={'value': 'value_kwh'})
 
-    upsert(df=to_upload, table=DB_TABLE_ENTSOGFLOW_RAW, constraint_name=DB_TABLE_ENTSOGFLOW_RAW+'_pkey')
+    if use_upsert:
+        upsert(df=to_upload, table=DB_TABLE_ENTSOGFLOW_RAW, constraint_name=DB_TABLE_ENTSOGFLOW_RAW+'_pkey')
+    else:
+        from base.db import engine
+        to_upload.to_sql(DB_TABLE_ENTSOGFLOW_RAW,
+                      con=engine,
+                      if_exists="append",
+                      index=False)
+        session.commit()
     return True
 
 
