@@ -36,6 +36,7 @@ from . import DB_TABLE_COUNTER
 from . import DB_TABLE_COUNTER100BN
 from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
+from . import DB_TABLE_ENTSOGFLOW_RAW
 from . import DB_TABLE_MARINETRAFFICCALL
 from . import DB_TABLE_CURRENCY
 from . import DB_TABLE_MTEVENT_TYPE
@@ -521,6 +522,25 @@ class Price(Base):
                       Index("idx_price_new_commodity", "commodity"),
                       Index("idx_price_new_date", "date")
                       )
+
+
+# ENTSOG data after outer join flows
+# But before filtering them
+# Used to prevent querying ENTSOG all the time when
+# selecting OPDs
+class EntsogFlowRaw(Base):
+    id = Column(String, primary_key=True)
+    date = Column(DateTime(timezone=False))
+    periodFrom = Column(DateTime(timezone=False))
+    periodTo = Column(DateTime(timezone=False))
+    pointKey = Column(String)
+    operatorKey = Column(String)
+    directionKey = Column(String)
+    flowStatus = Column(String)
+    value_kwh = Column(Numeric)
+
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+    __tablename__ = DB_TABLE_ENTSOGFLOW_RAW
 
 # Entsog flows: before processing
 # Mainly used to communicate between Python and R

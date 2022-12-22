@@ -42,7 +42,8 @@ from base.db import session
 from base.logger import logger, logger_slack
 from base.utils import to_list, to_datetime
 from base.db_utils import upsert
-from base.models import DB_TABLE_ENTSOGFLOW, EntsogFlow
+from base.models import DB_TABLE_ENTSOGFLOW, DB_TABLE_ENTSOGFLOW_RAW, EntsogFlow
+from base.db_utils import upsert
 
 s = requests.Session()
 
@@ -771,6 +772,20 @@ def get_flows(date_from='2022-01-01',
                                                   use_csv_selection=use_csv_selection,
                                                   remove_pipe_in_pipe=remove_pipe_in_pipe)
 
+    # Save to DB
+    upsert_flows_raw(pd.concat([flows_import_raw,
+                                 flows_import_lng_raw,
+                                 flows_export_raw,
+                                 flows_export_lng_raw,
+                                 flows_production_raw,
+                                 flows_consumption_raw,
+                                 flows_distribution_raw,
+                                 flows_storage_entry_raw,
+                                 flows_storage_exit_raw,
+                                 flows_transmission_entry_raw,
+                                 flows_transmission_exit_raw]))
+
+
     # Process cross border & production
     flows_crossborder = process_crossborder_flows(flows_import_raw=flows_import_raw,
                                               flows_export_raw=flows_export_raw,
@@ -809,6 +824,15 @@ def get_flows(date_from='2022-01-01',
                   inplace=True)
 
     return flows
+
+
+def upsert_flows_raw(flows_raw):
+    to_upload = flows_raw[['id', 'date', 'periodFrom', 'periodTo',
+    'pointKey', 'operatorKey', 'directionKey', 'flowStatus', 'value']] \
+        .rename(columns={'value': 'value_kwh'})
+
+    upsert(df=to_upload, table=DB_TABLE_ENTSOGFLOW_RAW, constraint_name=DB_TABLE_ENTSOGFLOW_RAW+'_pkey')
+    return True
 
 
 def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
