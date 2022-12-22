@@ -314,6 +314,12 @@ def fix_opd_countries(opd):
     # Brandov
     # Remove transit DE-DE
     opd = opd[opd.id != '5DE-TSO-0016ITP-00452exitDE-TSO-0020']
+
+    # Moffatt
+    # Remove transit UK-UK (Northern Ireland)
+    # Assuming everything goes to Ireland
+    opd = opd[(opd.pointKey != 'ITP-00090') | (opd.country != opd.partner)]
+
     return opd
 
 
@@ -765,7 +771,6 @@ def update_flows_raw(date_from='2022-01-01',
                                                   date_to=date_to,
                                                   country_iso2=country_iso2,
                                                   use_csv_selection=False)
-
     # Save to DB
     upsert_flows_raw(pd.concat([flows_import_raw,
                                 flows_import_lng_raw,
@@ -790,7 +795,8 @@ def get_flows(date_from='2022-01-01',
               intermediary_filename=None,
               save_to_file=False,
               filename=None,
-              upload_to_db=False):
+              upload_raw_to_db=False,
+              use_upsert_raw=True):
 
     # Get raw information from ENTSOG
     (flows_import_raw,
@@ -809,7 +815,7 @@ def get_flows(date_from='2022-01-01',
                                                   use_csv_selection=use_csv_selection,
                                                   remove_pipe_in_pipe=remove_pipe_in_pipe)
 
-    if upload_to_db:
+    if upload_raw_to_db:
         # Save to DB
         upsert_flows_raw(pd.concat([flows_import_raw,
                                      flows_import_lng_raw,
@@ -821,7 +827,8 @@ def get_flows(date_from='2022-01-01',
                                      flows_storage_entry_raw,
                                      flows_storage_exit_raw,
                                      flows_transmission_entry_raw,
-                                     flows_transmission_exit_raw]))
+                                     flows_transmission_exit_raw]),
+                         use_upsert=use_upsert_raw)
 
 
     # Process cross border & production
@@ -869,6 +876,8 @@ def upsert_flows_raw(flows_raw, use_upsert=True):
     'pointKey', 'operatorKey', 'directionKey', 'flowStatus', 'value']] \
         .rename(columns={'value': 'value_kwh'})
 
+    to_upload = to_upload[~pd.isna(to_upload.value_kwh)]
+
     if use_upsert:
         upsert(df=to_upload, table=DB_TABLE_ENTSOGFLOW_RAW, constraint_name=DB_TABLE_ENTSOGFLOW_RAW+'_pkey')
     else:
@@ -877,7 +886,6 @@ def upsert_flows_raw(flows_raw, use_upsert=True):
                       con=engine,
                       if_exists="append",
                       index=False)
-        session.commit()
     return True
 
 
