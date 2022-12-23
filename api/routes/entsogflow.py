@@ -222,6 +222,9 @@ class EntsogFlowResource(Resource):
         if currency is not None:
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
 
+        if pricing_scenario is not None:
+            flows_rich = flows_rich.filter(Price.scenario.in_(to_list(pricing_scenario)))
+
         # Aggregate
         query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)
 
