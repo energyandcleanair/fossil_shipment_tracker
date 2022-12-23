@@ -1003,11 +1003,16 @@ class VoyageResource(Resource):
         result['currency'] = 'value_' + result.currency.str.lower()
 
         # Create a hashable version
-        if 'destination_names' in result.columns:
-            result['destination_names'] = result['destination_names'].apply(lambda row: sep.join(row) if row else row)
-            result['destination_iso2s'] = result['destination_iso2s'].apply(lambda row: sep.join([str(x) for x in row]) if row else row)
-            result['destination_dates'] = result['destination_dates'].apply(
-                lambda row: sep.join([x.strftime("%Y-%m-%d %H:%M:%S") for x in row]) if row else row)
+        list_cols = ['destination_names',
+                     'destination_iso2s',
+                     'destination_dates',
+                     'ship_names',
+                     'ship_mmsis',
+                     'arrival_ship_mmsi',
+                     'arrival_ship_name']
+        for col in list_cols:
+            if col in result.columns:
+                result[col] = result[col].apply(lambda x: tuple(x) if x else x)
 
         index_cols = [x for x in result.columns if x not in ['currency', 'value_currency', 'value_eur']]
         # result[index_cols] = result[index_cols].replace({np.nan: na_str})
@@ -1018,15 +1023,9 @@ class VoyageResource(Resource):
             .unstack(-1).reset_index()
 
         # Recreate lists
-        if 'destination_names' in result.columns:
-            result.loc[~result.destination_names.isnull(), 'destination_names'] = \
-                result.loc[~result.destination_names.isnull(), 'destination_names'].apply(lambda row: row.split(sep))
-
-            result.loc[~result.destination_iso2s.isnull(), 'destination_iso2s'] = \
-                result.loc[~result.destination_iso2s.isnull(), 'destination_iso2s'].apply(lambda row: row.split(sep))
-
-            result.loc[~result.destination_dates.isnull(), 'destination_dates'] = \
-                result.loc[~result.destination_dates.isnull(), 'destination_dates'].apply(lambda row: row.split(sep)) # We keep it as string
+        for col in list_cols:
+            if col in result.columns:
+                result[col] = result[col].apply(lambda x: list(x) if x and not pd.isna(x) else x)
 
         # Quick sanity check
         len_after = len(result)
