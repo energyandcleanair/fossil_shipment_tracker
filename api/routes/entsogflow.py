@@ -190,7 +190,7 @@ class EntsogFlowResource(Resource):
         )
 
         # Return only >0 values. Otherwise we hit response size limit
-        flows_rich = flows_rich.filter(EntsogFlow.value_tonne > 0)
+        flows_rich = flows_rich.filter(EntsogFlow.value_tonne != 0)
 
         if id is not None:
             flows_rich = flows_rich.filter(EntsogFlow.id.in_(to_list(id)))
