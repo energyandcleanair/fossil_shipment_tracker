@@ -541,6 +541,9 @@ class EntsogFlowRaw(Base):
 
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
     __tablename__ = DB_TABLE_ENTSOGFLOW_RAW
+    __table_args__ = (Index("idx_entsogflow_raw_pointkey", "pointKey"),
+                      )
+
 
 # Entsog flows: before processing
 # Mainly used to communicate between Python and R
