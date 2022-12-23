@@ -53,12 +53,25 @@ KG_PER_M3 = 0.717
 # ENTSOGFLOW TYPE
 ENTSOG_CROSSBORDER = "crossborder"
 ENTSOG_PRODUCTION = "production"
-ENTSOG_CONSUMPTION = "consumption"
+ENTSOG_TRANSMISSION = "transmission"
 ENTSOG_DISTRIBUTION = "distribution"
+ENTSOG_CONSUMPTION = "consumption"
+ENTSOG_STORAGE = "storage"
+ENTSOG_LNG = "lng"
+
+ENTSOG_PRODUCTION_ENTRY = "production_entry"
+ENTSOG_PRODUCTION_EXIT = "production_exit"
+ENTSOG_CONSUMPTION_ENTRY = "consumption_entry"
+ENTSOG_CONSUMPTION_EXIT = "consumption_exit"
+ENTSOG_DISTRIBUTION_ENTRY = "distribution_entry"
+ENTSOG_DISTRIBUTION_EXIT = "distribution_exit"
+ENTSOG_LNG_ENTRY = "lng_entry"
+ENTSOG_LNG_EXIT = "lng_exit"
 ENTSOG_STORAGE_ENTRY = "storage_entry"
 ENTSOG_STORAGE_EXIT = "storage_exit"
 ENTSOG_TRANSMISSION_ENTRY = "transmission_entry"
 ENTSOG_TRANSMISSION_EXIT = "transmission_exit"
+ENTSOG_TRADING = "trading"
 
 # COMMODITY GROUPING
 COMMODITY_GROUPING_DEFAULT = "default"
