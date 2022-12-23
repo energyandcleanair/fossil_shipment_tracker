@@ -38,12 +38,14 @@ from tqdm import tqdm
 tqdm.pandas()
 
 import base
+from base.db import engine
 from base.db import session
 from base.logger import logger, logger_slack
 from base.utils import to_list, to_datetime
 from base.db_utils import upsert
-from base.models import DB_TABLE_ENTSOGFLOW, DB_TABLE_ENTSOGFLOW_RAW, EntsogFlow
+from base.models import DB_TABLE_ENTSOGFLOW, DB_TABLE_ENTSOGFLOW_RAW, EntsogFlow, EntsogFlowRaw
 from base.db_utils import upsert
+
 
 s = requests.Session()
 
@@ -54,204 +56,264 @@ retries = Retry(total=10,
 s.mount('https://', HTTPAdapter(max_retries=retries))
 
 
-def split(x, f):
-    res = defaultdict(list)
-    for v, k in zip(x, f):
-        res[k].append(v)
-    return res
 
+class EntsogApi:
 
-def api_req(url, params={}, limit=-1):
-    params['limit'] = limit
-    api_result = s.get(url, params=params, timeout=60)
+    def split(x, f):
+        res = defaultdict(list)
+        for v, k in zip(x, f):
+            res[k].append(v)
+        return res
 
-    if api_result.status_code != 200:
-        logger.warning("ENTSOG: Failed to query entsog %s %s" % (url, params))
-        return None
+    @staticmethod
+    def api_req(url, params={}, limit=-1):
+        params['limit'] = limit
+        api_result = s.get(url, params=params, timeout=60)
 
-    res = api_result.json()
-
-    if res == {'message': 'No Data Available'}:
-        return None
-
-    try:
-        if res['meta'] is not None and res["meta"]["total"] > res["meta"]["count"] * 1.2:
-            # *1.X: for some reason, sometimes total is slightly superior to actual count
-            # yet inferior to limit
-            logger.warning("More data available (%d/%d). Increase limit or implement a loop here...",
-                           res["meta"]["total"], res["meta"]["count"])
-    except KeyError as e:
-        logger.warning("May have failed for: %s %s" % (url, params))
-        return None
-
-    return res
-
-
-def get_balancing_zones():
-    url = "https://transparency.entsog.eu/api/v1/balancingZones"
-    d = api_req(url).get("balancingZones")
-    df = pd.DataFrame(d)
-    return df
-
-
-def get_operators():
-    url = "https://transparency.entsog.eu/api/v1/operators"
-    d = api_req(url).get("operators")
-    df = pd.DataFrame(d)
-    return df
-
-
-def get_interconnections(from_operator_key=None, to_operator_key=None):
-    url = "https://transparency.entsog.eu/api/v1/interconnections"
-    params = {}
-
-    if from_operator_key:
-        params['fromOperatorKey'] = ",".join(to_list(from_operator_key))
-
-    if to_operator_key:
-        params['to_operator_key'] = ",".join(to_list(to_operator_key))
-
-    d = api_req(url, params=params)
-    d = d.get("interconnections")
-    df = pd.DataFrame(d)
-    return df
-
-
-def get_operator_point_directions():
-    url = "https://transparency.entsog.eu/api/v1/operatorpointdirections"
-    params = {}
-    d = api_req(url, params=params)
-    d = d.get("operatorpointdirections")
-    df = pd.DataFrame(d)
-    return df
-
-
-def get_physical_flows(operator_key,
-                       point_key,
-                       direction,
-                       date_from="2019-01-01",
-                       date_to=dt.date.today(),
-                       limit=-1):
-
-    url = "https://transparency.entsog.eu/api/v1/operationalData"
-
-    if point_key is not None and operator_key is None:
-        raise ValueError("Needs to specify operator_key when point_key is given.")
-
-    # Can only do one operator at a time
-    if operator_key is not None and len(set(to_list(operator_key))) > 1:
-        logger.info("Splitting by operator")
-        splitted = split(point_key, operator_key)
-        result = []
-        for operator_key, point_keys in tqdm(splitted.items()):
-            r = get_physical_flows(operator_key=operator_key,
-                                   point_key=point_keys,
-                                   direction=direction,
-                                   date_from=date_from,
-                                   date_to=date_to,
-                                   limit=limit)
-            if r is not None:
-                result.append(r)
-
-        if result:
-            return pd.concat(result, axis=0).drop_duplicates()
-        else:
+        if api_result.status_code != 200:
+            logger.warning("ENTSOG: Failed to query entsog %s %s" % (url, params))
             return None
 
-    # Can only do limited days per call. Doing a call per semester
-    dates = pd.date_range(to_datetime(date_from),
-                          to_datetime(date_to),
-                          freq='d').to_list()
-    dates_group = [str(x.year) + str((x.month - 1) // 6) for x in dates]
+        res = api_result.json()
 
-    if len(set(dates_group)) > 1:
-        # logger.info("Splitting by dates")
-        splitted = split(dates, dates_group)
-        result = []
-        for dates in splitted.values():
-            r = get_physical_flows(operator_key=operator_key,
-                                   point_key=point_key,
-                                   direction=direction,
-                                   date_from=min(dates),
-                                   date_to=max(dates),
-                                   limit=limit)
-            if r is not None:
-                result.append(r)
-
-        if result:
-            return pd.concat(result, axis=0).drop_duplicates()
-        else:
+        if res == {'message': 'No Data Available'}:
             return None
 
-    params = {
-        "indicator": "Physical Flow",
-        "periodType": "day",
-        "timezone": "CET"
-    }
+        try:
+            if res['meta'] is not None and res["meta"]["total"] > res["meta"]["count"] * 1.2:
+                # *1.X: for some reason, sometimes total is slightly superior to actual count
+                # yet inferior to limit
+                logger.warning("More data available (%d/%d). Increase limit or implement a loop here...",
+                               res["meta"]["total"], res["meta"]["count"])
+        except KeyError as e:
+            logger.warning("May have failed for: %s %s" % (url, params))
+            return None
 
-    if operator_key is not None:
-        params['operatorKey'] = ','.join(list(set(to_list(operator_key))))
+        return res
 
-    if point_key is not None:
-        params['pointKey'] = ','.join(list(set(to_list(point_key))))
+    @staticmethod
+    def get_balancing_zones():
+        url = "https://transparency.entsog.eu/api/v1/balancingZones"
+        d = EntsogApi.api_req(url).get("balancingZones")
+        df = pd.DataFrame(d)
+        return df
 
-    if date_from is not None:
-        params['from'] = to_datetime(date_from).strftime("%Y-%m-%d")
+    @staticmethod
+    def get_operators():
+        url = "https://transparency.entsog.eu/api/v1/operators"
+        d = EntsogApi.api_req(url).get("operators")
+        df = pd.DataFrame(d)
+        return df
 
-    if date_to is not None:
-        params['to'] = to_datetime(date_to).strftime("%Y-%m-%d")
+    @staticmethod
+    def get_interconnections(from_operator_key=None, to_operator_key=None):
+        url = "https://transparency.entsog.eu/api/v1/interconnections"
+        params = {}
 
-    if direction is not None:
-        params['directionKey'] = direction
+        if from_operator_key:
+            params['fromOperatorKey'] = ",".join(to_list(from_operator_key))
 
-    d = api_req(url, params=params, limit=limit)
+        if to_operator_key:
+            params['to_operator_key'] = ",".join(to_list(to_operator_key))
 
-    if d is None or not d.get("operationalData"):
-        return None
+        d = EntsogApi.api_req(url, params=params)
+        d = d.get("interconnections")
+        df = pd.DataFrame(d)
+        return df
 
-    df = pd.DataFrame(d.get("operationalData"))
-    df["value"] = pd.to_numeric(df.value)
-    df["isCmpRelevant"] = df["isCmpRelevant"].astype('bool')
-    df["isCamRelevant"] = df["isCamRelevant"].astype('bool')
-    df["periodFrom"] = pd.to_datetime(df.periodFrom, errors='coerce')
-    df["periodTo"] = pd.to_datetime(df.periodTo)
-    df["date"] = df.periodFrom.apply(lambda x: x.date())
+    @staticmethod
+    def get_operator_point_directions():
+        url = "https://transparency.entsog.eu/api/v1/operatorpointdirections"
+        params = {}
+        d = EntsogApi.api_req(url, params=params)
+        d = d.get("operatorpointdirections")
+        df = pd.DataFrame(d)
+        return df
 
-    # IMPORTANT
-    # ENTSOG has duplicated records
-    df = df.drop_duplicates()
-    return df
+    @staticmethod
+    def get_physical_flows(points,
+                           date_from="2019-01-01",
+                           date_to=dt.date.today()):
+
+        # Exit points
+        exit_points = points[points.directionKey == 'exit']
+        exit_flows = EntsogApi._get_physical_flows(operator_key=exit_points.operatorKey.to_list(),
+                                                    point_key=exit_points.pointKey.to_list(),
+                                                    direction_key='exit',
+                                                    date_from=date_from,
+                                                    date_to=date_to
+                                                    )
+        # Entry points
+        entry_points = points[points.directionKey == 'entry']
+        entry_flows = EntsogApi._get_physical_flows(operator_key=entry_points.operatorKey.to_list(),
+                                                    point_key=entry_points.pointKey.to_list(),
+                                                    direction_key='entry',
+                                                    date_from=date_from,
+                                                    date_to=date_to
+                                                    )
+
+        return pd.concat([exit_flows, entry_flows], ignore_index=True)
 
 
-def get_aggregated_physical_flows(date_from="2021-01-01",
-                                  date_to=dt.date.today(),
-                                  limit=-1):
-    url = "https://transparency.entsog.eu/api/v1/AggregatedData"
+    @staticmethod
+    def _get_physical_flows(operator_key,
+                           point_key,
+                           direction_key,
+                           date_from="2019-01-01",
+                           date_to=dt.date.today(),
+                           limit=-1):
 
-    params = {
-        "indicator": "Physical Flow",
-        "periodType": "day",
-        "timezone": "CET"
-    }
+        url = "https://transparency.entsog.eu/api/v1/operationalData"
 
-    if date_from:
-        params['from'] = to_datetime(date_from).strftime("%Y-%m-%d")
+        if point_key is not None and operator_key is None:
+            raise ValueError("Needs to specify operator_key when point_key is given.")
 
-    if date_to:
-        params['to'] = to_datetime(date_to).strftime("%Y-%m-%d")
+        # Can only do one operator at a time
+        if operator_key is not None and len(set(to_list(operator_key))) > 1:
+            logger.info("Splitting by operator")
+            splitted = EntsogApi.split(point_key, operator_key)
+            result = []
+            for operator_key, point_keys in tqdm(splitted.items()):
+                r = EntsogApi._get_physical_flows(operator_key=operator_key,
+                                       point_key=point_keys,
+                                       direction_key=direction_key,
+                                       date_from=date_from,
+                                       date_to=date_to,
+                                       limit=limit)
+                if r is not None:
+                    result.append(r)
 
-    d = api_req(url, params=params, limit=limit)
+            if result:
+                return pd.concat(result, axis=0).drop_duplicates()
+            else:
+                return None
 
-    if d is None:
-        return None
+        # Can only do limited days per call. Doing a call per semester
+        dates = pd.date_range(to_datetime(date_from),
+                              to_datetime(date_to),
+                              freq='d').to_list()
+        dates_group = [str(x.year) + str((x.month - 1) // 6) for x in dates]
 
-    df = pd.DataFrame(d.get("AggregatedData"))
-    df["value"] = pd.to_numeric(df.value)
-    df["periodFrom"] = pd.to_datetime(df.periodFrom)
-    df["periodTo"] = pd.to_datetime(df.periodTo)
-    df["date"] = df.periodFrom.dt.date
-    df = df.drop_duplicates()
-    return df
+        if len(set(dates_group)) > 1:
+            # logger.info("Splitting by dates")
+            splitted = EntsogApi.split(dates, dates_group)
+            result = []
+            for dates in splitted.values():
+                r = EntsogApi._get_physical_flows(operator_key=operator_key,
+                                       point_key=point_key,
+                                       direction_key=direction_key,
+                                       date_from=min(dates),
+                                       date_to=max(dates),
+                                       limit=limit)
+                if r is not None:
+                    result.append(r)
+
+            if result:
+                return pd.concat(result, axis=0).drop_duplicates()
+            else:
+                return None
+
+        params = {
+            "indicator": "Physical Flow",
+            "periodType": "day",
+            "timezone": "CET"
+        }
+
+        if operator_key is not None:
+            params['operatorKey'] = ','.join(list(set(to_list(operator_key))))
+
+        if point_key is not None:
+            params['pointKey'] = ','.join(list(set(to_list(point_key))))
+
+        if date_from is not None:
+            params['from'] = to_datetime(date_from).strftime("%Y-%m-%d")
+
+        if date_to is not None:
+            params['to'] = to_datetime(date_to).strftime("%Y-%m-%d")
+
+        if direction_key is not None:
+            params['directionKey'] = direction_key
+
+        d = EntsogApi.api_req(url, params=params, limit=limit)
+
+        if d is None or not d.get("operationalData"):
+            return None
+
+        df = pd.DataFrame(d.get("operationalData"))
+        df["value_kwh"] = pd.to_numeric(df.value)
+        df["isCmpRelevant"] = df["isCmpRelevant"].astype('bool')
+        df["isCamRelevant"] = df["isCamRelevant"].astype('bool')
+        df["periodFrom"] = pd.to_datetime(df.periodFrom, errors='coerce')
+        df["periodTo"] = pd.to_datetime(df.periodTo)
+        df["date"] = df.periodFrom.apply(lambda x: x.date())
+
+        # IMPORTANT
+        # ENTSOG has duplicated records
+        df = df.drop_duplicates()
+        return df
+
+    @staticmethod
+    def get_aggregated_physical_flows(date_from="2021-01-01",
+                                      date_to=dt.date.today(),
+                                      limit=-1):
+        url = "https://transparency.entsog.eu/api/v1/AggregatedData"
+
+        params = {
+            "indicator": "Physical Flow",
+            "periodType": "day",
+            "timezone": "CET"
+        }
+
+        if date_from:
+            params['from'] = to_datetime(date_from).strftime("%Y-%m-%d")
+
+        if date_to:
+            params['to'] = to_datetime(date_to).strftime("%Y-%m-%d")
+
+        d = EntsogApi.api_req(url, params=params, limit=limit)
+
+        if d is None:
+            return None
+
+        df = pd.DataFrame(d.get("AggregatedData"))
+        df["value"] = pd.to_numeric(df.value)
+        df["periodFrom"] = pd.to_datetime(df.periodFrom)
+        df["periodTo"] = pd.to_datetime(df.periodTo)
+        df["date"] = df.periodFrom.dt.date
+        df = df.drop_duplicates()
+        return df
+
+
+class EntsogDb:
+    @staticmethod
+    def get_physical_flows(points, date_from, date_to):
+
+        # Download for all points (probably too much info)
+        # and then inner join
+        query = session.query(EntsogFlowRaw) \
+            .filter(EntsogFlowRaw.pointKey.in_(points.pointKey.to_list()),
+                    EntsogFlowRaw.date >= date_from,
+                    EntsogFlowRaw.date <= date_to
+                    )
+        flows_all = pd.read_sql(query.statement, session.bind)
+        flows_raw = points[['pointKey', 'pointLabel', 'operatorKey', 'operatorLabel', 'directionKey',
+                        'country', 'partner', 'type']] \
+            .merge(flows_all, how='inner').drop(['id', 'updated_on'], axis=1)
+        return flows_raw
+
+    @staticmethod
+    def upload_flows(flows):
+        to_upload = flows[['id', 'date', 'periodFrom', 'periodTo',
+                               'pointKey', 'operatorKey', 'directionKey', 'flowStatus', 'value_kwh']]
+
+        to_upload = to_upload[~pd.isna(to_upload.value_kwh)]
+        try:
+            to_upload.to_sql(DB_TABLE_ENTSOGFLOW_RAW, con=engine, if_exists="append", index=False)
+        except sa.exc.IntegrityError:
+            logger.info('Failed at inserting. Trying upserting instead (much slower).')
+            upsert(df=to_upload, table=DB_TABLE_ENTSOGFLOW_RAW, constraint_name=DB_TABLE_ENTSOGFLOW_RAW + '_pkey')
+
+        return True
 
 
 def fix_opd_countries(opd):
@@ -261,7 +323,7 @@ def fix_opd_countries(opd):
     len_before = len(opd)
 
     # Fixing adjacent country for EU - Non EU using interconnections
-    ic = get_interconnections()
+    ic = EntsogApi.get_interconnections()
     added_adjacent_entries = ic[['toDirectionKey', 'fromCountryKey', 'fromOperatorKey', 'toPointKey', 'toOperatorKey', 'toCountryKey']] \
         .rename(columns={'toDirectionKey': 'directionKey',
                          'fromCountryKey': 'adjacentCountryFromIc',
@@ -320,19 +382,19 @@ def fix_opd_countries(opd):
     # Assuming everything goes to Ireland
     opd = opd[(opd.pointKey != 'ITP-00090') | (opd.country != opd.partner)]
 
+    # Mark LNG partner as lng
+    opd.loc[opd.pointType.str.contains('LNG Entry point'), 'partner'] = 'lng'
+    opd.loc[opd.pointType.str.contains('LNG Exit point'), 'partner'] = 'lng'
     return opd
 
 
-def get_flows_raw(date_from='2022-01-01',
-                  date_to=dt.date.today(),
-                  country_iso2=None,
-                  remove_pipe_in_pipe=True,
-                  remove_operators=[],
-                  remove_point_labels=[],
-                  remove_point_ids=[],
-                  use_csv_selection=True):
+def get_points(country_iso2=None,
+              remove_operators=[],
+              remove_point_labels=[],
+              remove_point_ids=[],
+              use_csv_selection=True):
 
-    opd = get_operator_point_directions()
+    opd = EntsogApi.get_operator_point_directions()
     opd = fix_opd_countries(opd)
     opd = opd[['id', 'pointKey', 'pointLabel', 'operatorKey', 'operatorLabel', 'directionKey',
                'country', 'partner', 'pointType', 'crossBorderPointType']] \
@@ -347,10 +409,6 @@ def get_flows_raw(date_from='2022-01-01',
         outer_join = opd.merge(to_remove, how='outer', indicator=True)
         opd = outer_join[(outer_join._merge == 'left_only')].drop('_merge', axis=1)
 
-    # if remove_pipe_in_pipe:
-    #     opd = opd.loc[opd.isPipeInPipe.isnull() |  ~opd.isPipeInPipe \
-    #      | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
-
     if remove_operators:
         opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
 
@@ -360,276 +418,191 @@ def get_flows_raw(date_from='2022-01-01',
     if remove_point_ids:
         opd = opd.loc[~opd.id.isin(to_list(remove_point_ids))]
 
-
     is_crossborder = opd.pointType.str.contains('Cross-Border Transmission') \
-                | (opd.pointType.str.contains('Transmission') \
-                    & opd.crossBorderPointType.str.contains('Cross'))
+                     | (opd.pointType.str.contains('Transmission') \
+                        & opd.crossBorderPointType.str.contains('Cross'))
     is_transmission = opd.pointType.str.startswith('Transmission') & ~is_crossborder
-    is_storage = opd.pointType.str.startswith('Storage')
-    is_lng = opd.pointType.str.contains('LNG Entry point')
+    is_storage = opd.pointType.str.contains('Storage')
+    is_lng = opd.pointType.str.contains('LNG')
     is_production = opd.pointType.str.contains('production')
     is_consumption = opd.pointType.str.contains('Consumers')
     is_distribution = opd.pointType.str.contains('Distribution')
+    is_trading = opd.pointType.str.contains('Trading')
 
-    # Check that no point belongs to two categories
-    assert (is_crossborder.astype(int)
-     + is_transmission.astype(int)
-     + is_storage.astype(int)
-     + is_lng.astype(int)
-     + is_production.astype(int)
-     + is_consumption.astype(int)
-     + is_distribution.astype(int)).max() == 1
+    # Check that category coverage is complete and not ambiguous
+    union = (is_crossborder.astype(int)
+            + is_transmission.astype(int)
+            + is_storage.astype(int)
+            + is_lng.astype(int)
+            + is_production.astype(int)
+            + is_consumption.astype(int)
+            + is_distribution.astype(int)
+            + is_trading.astype(int))
+
+    assert all(union == 1)
 
     is_entry = opd.directionKey == 'entry'
     is_exit = opd.directionKey == 'exit'
 
-    entry_points = opd.loc[is_crossborder & is_entry]
-    exit_points = opd.loc[is_crossborder & is_exit]
+    opd.loc[is_crossborder, 'type'] = base.ENTSOG_CROSSBORDER
+    opd.loc[is_transmission, 'type'] = base.ENTSOG_TRANSMISSION
+    opd.loc[is_storage, 'type'] = base.ENTSOG_STORAGE
+    opd.loc[is_lng, 'type'] = base.ENTSOG_LNG
+    opd.loc[is_production, 'type'] = base.ENTSOG_PRODUCTION
+    opd.loc[is_consumption, 'type'] = base.ENTSOG_CONSUMPTION
+    opd.loc[is_distribution, 'type'] = base.ENTSOG_DISTRIBUTION
 
-    storage_entry_points = opd.loc[is_storage & is_entry]
-    storage_exit_points = opd.loc[is_storage & is_exit]
-
-    lng_entry_points = opd.loc[is_lng & is_entry]
-    lng_exit_points = opd.loc[is_lng & is_exit]
-
-    transmission_entry_points = opd.loc[is_transmission & is_entry]
-    transmission_exit_points = opd.loc[is_transmission & is_exit]
-
-    production_points = opd.loc[is_production & is_entry]
-    consumption_points = opd.loc[is_consumption & is_exit]
-    distribution_points = opd.loc[is_distribution & is_exit]
-
-    # Check all are uniques
-    all = pd.concat([entry_points,
-               storage_entry_points,
-               lng_entry_points,
-               transmission_entry_points,
-               production_points,
-               consumption_points,
-               transmission_exit_points,
-               distribution_points,
-               exit_points,
-               storage_exit_points,
-               lng_exit_points
-                     ], axis=0)
-
-    assert len(all.index) == len(all.index.unique())
+    # opd.loc[is_storage & is_exit, 'type'] = base.ENTSOG_STORAGE_EXIT
+    # opd.loc[is_storage & is_entry, 'type'] = base.ENTSOG_STORAGE_ENTRY
+    # opd.loc[is_transmission & is_exit, 'type'] = base.ENTSOG_TRANSMISSION_EXIT
+    # opd.loc[is_transmission & is_entry, 'type'] = base.ENTSOG_TRANSMISSION_ENTRY
+    # opd.loc[is_lng & is_entry, 'type'] = base.ENTSOG_LNG_ENTRY
+    # opd.loc[is_lng & is_exit, 'type'] = base.ENTSOG_LNG_EXIT
+    # opd.loc[is_production & is_entry, 'type'] = base.ENTSOG_PRODUCTION_ENTRY
+    # opd.loc[is_production & is_exit, 'type'] = base.ENTSOG_PRODUCTION_EXIT
+    # opd.loc[is_consumption & is_entry, 'type'] = base.ENTSOG_CONSUMPTION_ENTRY
+    # opd.loc[is_consumption & is_exit, 'type'] = base.ENTSOG_CONSUMPTION_EXIT
+    # opd.loc[is_distribution & is_entry, 'type'] = base.ENTSOG_DISTRIBUTION_ENTRY
+    # opd.loc[is_distribution & is_exit, 'type'] = base.ENTSOG_DISTRIBUTION_EXIT
+    opd.loc[is_trading, 'type'] = base.ENTSOG_TRADING
 
     def keep_unique(x):
-        return x[['pointKey', 'operatorKey']].drop_duplicates()
+        return x.drop_duplicates(subset=['pointKey', 'operatorKey', 'directionKey'])
 
+    # We ignore TRADING points
+    opd = opd[opd.type != base.ENTSOG_TRADING]
+    opd = keep_unique(opd)
+    return opd
+
+
+def get_flows_raw(date_from='2022-01-01',
+                  date_to=dt.date.today(),
+                  country_iso2=None,
+                  remove_operators=[],
+                  remove_point_labels=[],
+                  remove_point_ids=[],
+                  use_csv_selection=True,
+                  use_db=False):
+
+    points = get_points(country_iso2=country_iso2,
+                        remove_operators=remove_operators,
+                        remove_point_labels=remove_point_labels,
+                        remove_point_ids=remove_point_ids,
+                        use_csv_selection=use_csv_selection)
+    
+    if use_db:
+        flows_raw = EntsogDb.get_physical_flows(points=points,
+                                                date_from=date_from,
+                                                date_to=date_to)
+
+    else:
+        flows_raw = EntsogApi.get_physical_flows(points=points,
+                                                 date_from=date_from,
+                                                 date_to=date_to)
     def add_countries(x):
         if x is None:
             return None
-
         return x.merge(
-            opd[['pointKey', 'operatorKey', 'directionKey', 'country', 'partner']] \
+            points[['pointKey', 'operatorKey', 'directionKey', 'country', 'partner']] \
                 .drop_duplicates())
 
-    #########################
-    # Get raw flow data
-    #########################
-    flows_import_raw = get_physical_flows(
-        operator_key=keep_unique(entry_points).operatorKey.to_list(),
-        point_key=keep_unique(entry_points).pointKey.to_list(),
-        direction="entry",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_import_lng_raw = get_physical_flows(
-        operator_key=keep_unique(lng_entry_points).operatorKey.to_list(),
-        point_key=keep_unique(lng_entry_points).pointKey.to_list(),
-        direction="entry",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_production_raw = get_physical_flows(
-        operator_key=keep_unique(production_points).operatorKey.to_list(),
-        point_key=keep_unique(production_points).pointKey.to_list(),
-        direction="entry",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_consumption_raw = get_physical_flows(
-        operator_key=keep_unique(consumption_points).operatorKey.to_list(),
-        point_key=keep_unique(consumption_points).pointKey.to_list(),
-        direction="exit",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_distribution_raw = get_physical_flows(
-        operator_key=keep_unique(distribution_points).operatorKey.to_list(),
-        point_key=keep_unique(distribution_points).pointKey.to_list(),
-        direction="exit",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_export_raw = get_physical_flows(
-        operator_key=keep_unique(exit_points).operatorKey.to_list(),
-        point_key=keep_unique(exit_points).pointKey.to_list(),
-        direction="exit",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_export_lng_raw = get_physical_flows(
-        operator_key=keep_unique(lng_exit_points).operatorKey.to_list(),
-        point_key=keep_unique(lng_exit_points).pointKey.to_list(),
-        direction="exit",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_storage_entry_raw = get_physical_flows(
-        operator_key=keep_unique(storage_entry_points).operatorKey.to_list(),
-        point_key=keep_unique(storage_entry_points).pointKey.to_list(),
-        direction="entry",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_storage_exit_raw = get_physical_flows(
-        operator_key=keep_unique(storage_exit_points).operatorKey.to_list(),
-        point_key=keep_unique(storage_exit_points).pointKey.to_list(),
-        direction="exit",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_transmission_entry_raw = get_physical_flows(
-        operator_key=keep_unique(transmission_entry_points).operatorKey.to_list(),
-        point_key=keep_unique(transmission_entry_points).pointKey.to_list(),
-        direction="entry",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    flows_transmission_exit_raw = get_physical_flows(
-        operator_key=keep_unique(transmission_exit_points).operatorKey.to_list(),
-        point_key=keep_unique(transmission_exit_points).pointKey.to_list(),
-        direction="exit",
-        date_from=to_datetime(date_from),
-        date_to=to_datetime(date_to),
-    )
-
-    return (add_countries(flows_import_raw),
-            add_countries(flows_import_lng_raw),
-            add_countries(flows_export_raw),
-            add_countries(flows_export_lng_raw),
-            add_countries(flows_production_raw),
-            add_countries(flows_consumption_raw),
-            add_countries(flows_distribution_raw),
-            add_countries(flows_storage_entry_raw),
-            add_countries(flows_storage_exit_raw),
-            add_countries(flows_transmission_entry_raw),
-            add_countries(flows_transmission_exit_raw),
-            )
+    flows_raw = add_countries(flows_raw)
+    return flows_raw
 
 
-def process_non_crossborder_flows(flows_distribution_raw,
-                                  flows_consumption_raw,
-                                  flows_storage_entry_raw,
-                                  flows_storage_exit_raw,
-                                  flows_transmission_entry_raw,
-                                  flows_transmission_exit_raw
-                            ):
-
-    flows_distribution_raw['type'] = base.ENTSOG_DISTRIBUTION
-    flows_consumption_raw['type'] = base.ENTSOG_CONSUMPTION
-    flows_storage_entry_raw['type'] = base.ENTSOG_STORAGE_ENTRY
-    flows_storage_exit_raw['type'] = base.ENTSOG_STORAGE_EXIT
-    flows_transmission_entry_raw['type'] = base.ENTSOG_TRANSMISSION_ENTRY
-    flows_transmission_exit_raw['type'] = base.ENTSOG_TRANSMISSION_EXIT
-
-    flows = pd.concat([flows_distribution_raw,
-                       flows_consumption_raw,
-                       flows_storage_entry_raw,
-                       flows_storage_exit_raw,
-                       flows_transmission_entry_raw,
-                       flows_transmission_exit_raw
-                       ],
-                      axis=0) \
-        .groupby(['country', 'partner', 'date', 'type']) \
-        .agg(value=('value', np.nansum)) \
-        .reset_index() \
-        .rename(columns={'country': 'destination_iso2',
-                         'partner': 'departure_iso2',
-                         'value': 'value_kwh'}) \
-        .reset_index()
-
-    return flows
-
-
-def process_crossborder_flows(flows_import_raw,
-                                  flows_import_lng_raw,
-                                  flows_export_raw,
-                                  flows_export_lng_raw,
-                                  flows_production_raw,
-                                  flows_import_agg_cols=None,
-                                  flows_export_agg_cols=None,
-                                  remove_operators=[],
-                                  save_intermediary_to_file=False,
-                                  intermediary_filename=None,
-                                  save_to_file=False,
-                                  filename=None):
-
-    flows_import = flows_import_raw
-
-    # Adding LNG
-    if flows_import_lng_raw is not None:
-        flows_import_lng = flows_import_lng_raw
-        flows_import_lng['partner'] = 'lng'  # Making LNG a country
-        flows_import = pd.concat([flows_import, flows_import_lng], axis=0)
-
-    # Adding Production
-    if flows_production_raw is not None:
-        flows_production = flows_production_raw
-        flows_import = pd.concat([flows_import, flows_production], axis=0)
-
-    if flows_export_raw is None:
-        flows_export_raw = pd.DataFrame({'pointKey': pd.Series(dtype='str'),
-                                         'operatorKey': pd.Series(dtype='int'),
-                                         'value': pd.Series(dtype='float'),
-                                         'date': pd.Series(dtype='str'),
-                                         'type': pd.Series(dtype='str')})
-
-    flows_export = flows_export_raw
-
-    if flows_export_lng_raw is not None:
-        flows_export_lng = flows_export_lng_raw
-        flows_export_lng['country'] = 'lng'  # Making LNG a country
-        flows_export = pd.concat([flows_export, flows_export_lng], axis=0)
-
-    if flows_import_agg_cols:
-        flows_import = flows_import.groupby(flows_import_agg_cols, dropna=False) \
-            .agg(value=('value', np.nanmean)).reset_index()
-
-    if flows_export_agg_cols:
-        flows_export = flows_export.groupby(flows_export_agg_cols, dropna=False) \
-            .agg(value=('value', np.nanmean)).reset_index()
+#
+# def process_non_crossborder_flows(flows_distribution_raw,
+#                                   flows_consumption_raw,
+#                                   flows_storage_entry_raw,
+#                                   flows_storage_exit_raw,
+#                                   flows_transmission_entry_raw,
+#                                   flows_transmission_exit_raw
+#                             ):
+#
+#     flows_distribution_raw['type'] = base.ENTSOG_DISTRIBUTION
+#     flows_consumption_raw['type'] = base.ENTSOG_CONSUMPTION
+#     flows_storage_entry_raw['type'] = base.ENTSOG_STORAGE_ENTRY
+#     flows_storage_exit_raw['type'] = base.ENTSOG_STORAGE_EXIT
+#     flows_transmission_entry_raw['type'] = base.ENTSOG_TRANSMISSION_ENTRY
+#     flows_transmission_exit_raw['type'] = base.ENTSOG_TRANSMISSION_EXIT
+#
+#     flows = pd.concat([flows_distribution_raw,
+#                        flows_consumption_raw,
+#                        flows_storage_entry_raw,
+#                        flows_storage_exit_raw,
+#                        flows_transmission_entry_raw,
+#                        flows_transmission_exit_raw
+#                        ],
+#                       axis=0) \
+#         .groupby(['country', 'partner', 'date', 'type']) \
+#         .agg(value=('value', np.nansum)) \
+#         .reset_index() \
+#         .rename(columns={'country': 'destination_iso2',
+#                          'partner': 'departure_iso2',
+#                          'value': 'value_kwh'}) \
+#         .reset_index()
+#
+#     return flows
 
 
+def process_crossborder_flows(flows_raw,
+                              save_intermediary_to_file=False,
+                              intermediary_filename=None,
+                              save_to_file=False,
+                              filename=None):
+
+    # flows_import = flows_import_raw
+    #
+    # # Adding LNG
+    # if flows_import_lng_raw is not None:
+    #     flows_import_lng = flows_import_lng_raw
+    #     flows_import_lng['partner'] = 'lng'  # Making LNG a country
+    #     flows_import = pd.concat([flows_import, flows_import_lng], axis=0)
+    #
+    # # Adding Production
+    # if flows_production_raw is not None:
+    #     flows_production = flows_production_raw
+    #     flows_import = pd.concat([flows_import, flows_production], axis=0)
+    #
+    # if flows_export_raw is None:
+    #     flows_export_raw = pd.DataFrame({'pointKey': pd.Series(dtype='str'),
+    #                                      'operatorKey': pd.Series(dtype='int'),
+    #                                      'value': pd.Series(dtype='float'),
+    #                                      'date': pd.Series(dtype='str'),
+    #                                      'type': pd.Series(dtype='str')})
+    #
+    # flows_export = flows_export_raw
+    #
+    # if flows_export_lng_raw is not None:
+    #     flows_export_lng = flows_export_lng_raw
+    #     flows_export_lng['country'] = 'lng'  # Making LNG a country
+    #     flows_export = pd.concat([flows_export, flows_export_lng], axis=0)
+    #
+    # if flows_import_agg_cols:
+    #     flows_import = flows_import.groupby(flows_import_agg_cols, dropna=False) \
+    #         .agg(value=('value', np.nanmean)).reset_index()
+    #
+    # if flows_export_agg_cols:
+    #     flows_export = flows_export.groupby(flows_export_agg_cols, dropna=False) \
+    #         .agg(value=('value', np.nanmean)).reset_index()
+
+
+    # Reconcile import and exports
+    flows_import = flows_raw[flows_raw.directionKey == 'entry']
+    flows_export = flows_raw[flows_raw.directionKey == 'exit']
     flows = flows_import.merge(flows_export,
-                               left_on=['pointKey', 'date', 'country', 'partner'],
-                               right_on=['pointKey', 'date', 'partner', 'country'],
+                               left_on=['pointKey', 'date', 'country', 'partner', 'type'],
+                               right_on=['pointKey', 'date', 'partner', 'country', 'type'],
                                how='outer',
                                suffixes=['_import', '_export']
                                )
-
-    if remove_operators:
-        flows = flows.loc[~flows.operatorKey_import.isin(remove_operators)]
 
     def keep_max_duration(df):
         # Take those with max duration only
         df['duration_import'] = df['periodTo_import'] - df['periodFrom_import']
         df['duration_export'] = df['periodTo_export'] - df['periodFrom_export']
 
-        df = df.groupby(['pointKey', 'date',
+        df = df.groupby(['pointKey', 'date', 'type',
                          'operatorKey_import', 'operatorKey_export',
                          'operatorLabel_import', 'operatorLabel_export',
                          'pointLabel_import', 'pointLabel_export',
@@ -645,7 +618,7 @@ def process_crossborder_flows(flows_import_raw,
 
     def keep_confirmed_over_provisional(df):
         # Confirmed < Provisional
-        df = df.groupby(['pointKey', 'date',
+        df = df.groupby(['pointKey', 'date', 'type',
                          'operatorKey_import', 'operatorKey_export',
                          'operatorLabel_import', 'operatorLabel_export',
                          'pointLabel_import', 'pointLabel_export',
@@ -659,7 +632,6 @@ def process_crossborder_flows(flows_import_raw,
             .reset_index(drop=True)
         return df
 
-
     def average_both_sides(df):
         def nanmean(x):
             # If all is nan return nan without warning
@@ -671,9 +643,8 @@ def process_crossborder_flows(flows_import_raw,
                 logger.warning("Flows are dissimilar before averaging")
             return np.nanmean(x)
 
-
         # Average on both sides: export and import
-        df = df.groupby(['pointKey', 'date',
+        df = df.groupby(['pointKey', 'date', 'type',
                          'operatorKey_import', 'operatorKey_export',
                          'operatorLabel_import', 'operatorLabel_export',
                          'pointLabel_import', 'pointLabel_export',
@@ -681,10 +652,11 @@ def process_crossborder_flows(flows_import_raw,
                     'country_import', 'country_export',
                     'partner_import', 'partner_export'],
                         dropna=False) \
-                [['value_import', 'value_export']] \
+                [['value_kwh_import', 'value_kwh_export']] \
             .agg(nanmean) \
             .reset_index()
         return df
+
 
     def coalesce_and_aggregate(df):
 
@@ -694,21 +666,24 @@ def process_crossborder_flows(flows_import_raw,
         df['country'] = \
             np.where(df['country_import'].isnull(), df['partner_export'], df['country_import'])
 
-        df['value'] = \
-            np.where(df['value_import'].isnull(), df['value_export'], df['value_import'])
+        df['value_kwh'] = \
+            np.where(df.type == base.ENTSOG_CROSSBORDER,
+                np.where(df['value_kwh_import'].isnull(), df['value_kwh_export'], df['value_kwh_import']),
+                df.value_kwh_import.fillna(0) - df.value_kwh_export.fillna(0),
+                )
 
-        df = df.groupby(['pointKey', 'date',
+        df = df.groupby(['pointKey', 'date', 'type',
                           'operatorKey_import', 'operatorKey_export',
                           'operatorLabel_import', 'operatorLabel_export',
                          'pointLabel_import', 'pointLabel_export',
                           'country', 'partner'],
                         dropna=False) \
-            ['value'].agg(np.nansum) \
+            ['value_kwh'].agg(np.nansum) \
             .reset_index()
         return df
 
     def process(df):
-        df = keep_max_duration(flows)
+        df = keep_max_duration(df)
         df = keep_confirmed_over_provisional(df)
         df = average_both_sides(df)
         df = coalesce_and_aggregate(df)
@@ -721,19 +696,18 @@ def process_crossborder_flows(flows_import_raw,
         flows_intermediary.to_csv(intermediary_filename, index=False)
 
     flows_agg = flows_intermediary \
-        .groupby(['country', 'partner', 'date'], dropna=False) \
-        .agg(value=('value', np.nansum)) \
+        .groupby(['country', 'partner', 'date', 'type'], dropna=False) \
+        .agg({'value_kwh': np.nansum}) \
         .reset_index() \
         .rename(columns={'country': 'destination_iso2',
-                         'partner': 'departure_iso2',
-                         'value': 'value_kwh'
+                         'partner': 'departure_iso2'
                          }) \
         .reset_index()
 
-    flows_agg.loc[
-        flows_agg.departure_iso2 != flows_agg.destination_iso2, 'type'] = base.ENTSOG_CROSSBORDER
-    flows_agg.loc[
-        flows_agg.departure_iso2 == flows_agg.destination_iso2, 'type'] = base.ENTSOG_PRODUCTION
+    # flows_agg.loc[
+    #     flows_agg.departure_iso2 != flows_agg.destination_iso2, 'type'] = base.ENTSOG_CROSSBORDER
+    # flows_agg.loc[
+    #     flows_agg.departure_iso2 == flows_agg.destination_iso2, 'type'] = base.ENTSOG_PRODUCTION
 
     if save_to_file:
         filename = filename or "entsog_flows.csv"
@@ -751,109 +725,61 @@ def fix_kipi_flows(flows):
     return flows
 
 
-def update_flows_raw(date_from='2022-01-01',
-                     date_to=dt.date.today(),
-                     country_iso2=None,
-                     use_upsert=True):
+def update_db(date_from='2022-01-01',
+              date_to=dt.date.today()):
 
-    # Get raw information from ENTSOG
-    (flows_import_raw,
-     flows_import_lng_raw,
-     flows_export_raw,
-     flows_export_lng_raw,
-     flows_production_raw,
-     flows_consumption_raw,
-     flows_distribution_raw,
-     flows_storage_entry_raw,
-     flows_storage_exit_raw,
-     flows_transmission_entry_raw,
-     flows_transmission_exit_raw) = get_flows_raw(date_from=date_from,
-                                                  date_to=date_to,
-                                                  country_iso2=country_iso2,
-                                                  use_csv_selection=False)
-    # Save to DB
-    upsert_flows_raw(pd.concat([flows_import_raw,
-                                flows_import_lng_raw,
-                                flows_export_raw,
-                                flows_export_lng_raw,
-                                flows_production_raw,
-                                flows_consumption_raw,
-                                flows_distribution_raw,
-                                flows_storage_entry_raw,
-                                flows_storage_exit_raw,
-                                flows_transmission_entry_raw,
-                                flows_transmission_exit_raw]),
-                      use_upsert=use_upsert)
+    # DB should contain all points, in case opd selection changes. We'll filter later
+    points = get_points(use_csv_selection=False)
+
+    # Last date
+    date_from = session.query(sa.func.max(EntsogFlowRaw.date)).first()[0] or date_from
+
+    if to_datetime(date_to) > to_datetime(date_from):
+        flows_raw = EntsogApi.get_physical_flows(points=points,
+                                                 date_from=date_from,
+                                                 date_to=date_to)
+        # Save to DB
+        EntsogDb.upload_flows(flows_raw)
 
 
 def get_flows(date_from='2022-01-01',
               date_to=dt.date.today(),
               country_iso2=None,
-              remove_pipe_in_pipe=True,
               use_csv_selection=True,
               save_intermediary_to_file=False,
               intermediary_filename=None,
               save_to_file=False,
-              filename=None,
-              upload_raw_to_db=False,
-              use_upsert_raw=True):
+              filename=None):
 
-    # Get raw information from ENTSOG
-    (flows_import_raw,
-     flows_import_lng_raw,
-     flows_export_raw,
-     flows_export_lng_raw,
-     flows_production_raw,
-     flows_consumption_raw,
-     flows_distribution_raw,
-     flows_storage_entry_raw,
-     flows_storage_exit_raw,
-     flows_transmission_entry_raw,
-     flows_transmission_exit_raw) = get_flows_raw(date_from=date_from,
-                                                  date_to=date_to,
-                                                  country_iso2=country_iso2,
-                                                  use_csv_selection=use_csv_selection,
-                                                  remove_pipe_in_pipe=remove_pipe_in_pipe)
+    # ENTSOG API -> ENTSOG DB
+    update_db(date_from=date_from,
+              date_to=date_to)
 
-    if upload_raw_to_db:
-        # Save to DB
-        upsert_flows_raw(pd.concat([flows_import_raw,
-                                     flows_import_lng_raw,
-                                     flows_export_raw,
-                                     flows_export_lng_raw,
-                                     flows_production_raw,
-                                     flows_consumption_raw,
-                                     flows_distribution_raw,
-                                     flows_storage_entry_raw,
-                                     flows_storage_exit_raw,
-                                     flows_transmission_entry_raw,
-                                     flows_transmission_exit_raw]),
-                         use_upsert=use_upsert_raw)
-
+    # Get raw information from db
+    flows_raw = get_flows_raw(date_from=date_from,
+                              date_to=date_to,
+                              country_iso2=country_iso2,
+                              use_csv_selection=use_csv_selection,
+                              use_db=True)
 
     # Process cross border & production
-    flows_crossborder = process_crossborder_flows(flows_import_raw=flows_import_raw,
-                                              flows_export_raw=flows_export_raw,
-                                              flows_import_lng_raw=flows_import_lng_raw,
-                                              flows_export_lng_raw=flows_export_lng_raw,
-                                              flows_production_raw=flows_production_raw,
-                                              remove_operators=[],
-                                              save_intermediary_to_file=save_intermediary_to_file,
-                                              intermediary_filename=intermediary_filename,
-                                              save_to_file=save_to_file,
-                                              filename=filename)
+    flows = process_crossborder_flows(flows_raw=flows_raw,
+                                      save_intermediary_to_file=save_intermediary_to_file,
+                                      intermediary_filename=intermediary_filename,
+                                      save_to_file=save_to_file,
+                                      filename=filename)
 
     # Consumption and distribution
-    flows_cons_dist = process_non_crossborder_flows(flows_distribution_raw=flows_distribution_raw,
-                                                    flows_consumption_raw=flows_consumption_raw,
-                                                    flows_storage_entry_raw=flows_storage_entry_raw,
-                                                    flows_storage_exit_raw=flows_storage_exit_raw,
-                                                    flows_transmission_entry_raw=flows_transmission_entry_raw,
-                                                    flows_transmission_exit_raw=flows_transmission_exit_raw)
+    # flows_cons_dist = process_non_crossborder_flows(flows_distribution_raw=flows_distribution_raw,
+    #                                                 flows_consumption_raw=flows_consumption_raw,
+    #                                                 flows_storage_entry_raw=flows_storage_entry_raw,
+    #                                                 flows_storage_exit_raw=flows_storage_exit_raw,
+    #                                                 flows_transmission_entry_raw=flows_transmission_entry_raw,
+    #                                                 flows_transmission_exit_raw=flows_transmission_exit_raw)
 
 
-    flows = pd.concat([flows_crossborder,
-                       flows_cons_dist], axis=0)
+    # flows = pd.concat([flows_crossborder,
+    #                    flows_cons_dist], axis=0)
 
     flows = fix_kipi_flows(flows)
 
@@ -870,23 +796,6 @@ def get_flows(date_from='2022-01-01',
 
     return flows
 
-
-def upsert_flows_raw(flows_raw, use_upsert=True):
-    to_upload = flows_raw[['id', 'date', 'periodFrom', 'periodTo',
-    'pointKey', 'operatorKey', 'directionKey', 'flowStatus', 'value']] \
-        .rename(columns={'value': 'value_kwh'})
-
-    to_upload = to_upload[~pd.isna(to_upload.value_kwh)]
-
-    if use_upsert:
-        upsert(df=to_upload, table=DB_TABLE_ENTSOGFLOW_RAW, constraint_name=DB_TABLE_ENTSOGFLOW_RAW+'_pkey')
-    else:
-        from base.db import engine
-        to_upload.to_sql(DB_TABLE_ENTSOGFLOW_RAW,
-                      con=engine,
-                      if_exists="append",
-                      index=False)
-    return True
 
 
 def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
