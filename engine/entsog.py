@@ -302,7 +302,7 @@ class EntsogDb:
         return flows_raw
 
     @staticmethod
-    def upload_flows(flows):
+    def upload_flows_raw(flows):
         to_upload = flows[['id', 'date', 'periodFrom', 'periodTo',
                                'pointKey', 'operatorKey', 'directionKey', 'flowStatus', 'value_kwh']]
 
@@ -313,7 +313,27 @@ class EntsogDb:
             logger.info('Failed at inserting. Trying upserting instead (much slower).')
             upsert(df=to_upload, table=DB_TABLE_ENTSOGFLOW_RAW, constraint_name=DB_TABLE_ENTSOGFLOW_RAW + '_pkey')
 
-        return True
+    @staticmethod
+    def upload_flows(flows, delete_before_upload=False):
+        flows = flows[['commodity', 'departure_iso2', 'destination_iso2', 'date',
+                       'value_tonne', 'value_mwh', 'value_m3', 'type']]
+
+        # For flows update for debug or manual cleaning
+        flows['updated_on'] = dt.datetime.now()
+
+        if delete_before_upload:
+            session.query(EntsogFlow) \
+                .filter(EntsogFlow.date >= min(flows.date),
+                        EntsogFlow.date <= max(flows.date),
+                        ) \
+                .delete()
+            session.commit()
+
+        try:
+            flows.to_sql(DB_TABLE_ENTSOGFLOW, con=engine, if_exists="append", index=False)
+        except sa.exc.IntegrityError:
+            logger.info('Failed at inserting. Trying upserting instead (much slower).')
+            upsert(df=flows, table=DB_TABLE_ENTSOGFLOW, constraint_name='unique_entsogflow')
 
 
 def fix_opd_countries(opd):
@@ -510,81 +530,12 @@ def get_flows_raw(date_from='2022-01-01',
     return flows_raw
 
 
-#
-# def process_non_crossborder_flows(flows_distribution_raw,
-#                                   flows_consumption_raw,
-#                                   flows_storage_entry_raw,
-#                                   flows_storage_exit_raw,
-#                                   flows_transmission_entry_raw,
-#                                   flows_transmission_exit_raw
-#                             ):
-#
-#     flows_distribution_raw['type'] = base.ENTSOG_DISTRIBUTION
-#     flows_consumption_raw['type'] = base.ENTSOG_CONSUMPTION
-#     flows_storage_entry_raw['type'] = base.ENTSOG_STORAGE_ENTRY
-#     flows_storage_exit_raw['type'] = base.ENTSOG_STORAGE_EXIT
-#     flows_transmission_entry_raw['type'] = base.ENTSOG_TRANSMISSION_ENTRY
-#     flows_transmission_exit_raw['type'] = base.ENTSOG_TRANSMISSION_EXIT
-#
-#     flows = pd.concat([flows_distribution_raw,
-#                        flows_consumption_raw,
-#                        flows_storage_entry_raw,
-#                        flows_storage_exit_raw,
-#                        flows_transmission_entry_raw,
-#                        flows_transmission_exit_raw
-#                        ],
-#                       axis=0) \
-#         .groupby(['country', 'partner', 'date', 'type']) \
-#         .agg(value=('value', np.nansum)) \
-#         .reset_index() \
-#         .rename(columns={'country': 'destination_iso2',
-#                          'partner': 'departure_iso2',
-#                          'value': 'value_kwh'}) \
-#         .reset_index()
-#
-#     return flows
-
-
-def process_crossborder_flows(flows_raw,
+def process_flows_raw(flows_raw,
                               save_intermediary_to_file=False,
                               intermediary_filename=None,
                               save_to_file=False,
                               filename=None):
 
-    # flows_import = flows_import_raw
-    #
-    # # Adding LNG
-    # if flows_import_lng_raw is not None:
-    #     flows_import_lng = flows_import_lng_raw
-    #     flows_import_lng['partner'] = 'lng'  # Making LNG a country
-    #     flows_import = pd.concat([flows_import, flows_import_lng], axis=0)
-    #
-    # # Adding Production
-    # if flows_production_raw is not None:
-    #     flows_production = flows_production_raw
-    #     flows_import = pd.concat([flows_import, flows_production], axis=0)
-    #
-    # if flows_export_raw is None:
-    #     flows_export_raw = pd.DataFrame({'pointKey': pd.Series(dtype='str'),
-    #                                      'operatorKey': pd.Series(dtype='int'),
-    #                                      'value': pd.Series(dtype='float'),
-    #                                      'date': pd.Series(dtype='str'),
-    #                                      'type': pd.Series(dtype='str')})
-    #
-    # flows_export = flows_export_raw
-    #
-    # if flows_export_lng_raw is not None:
-    #     flows_export_lng = flows_export_lng_raw
-    #     flows_export_lng['country'] = 'lng'  # Making LNG a country
-    #     flows_export = pd.concat([flows_export, flows_export_lng], axis=0)
-    #
-    # if flows_import_agg_cols:
-    #     flows_import = flows_import.groupby(flows_import_agg_cols, dropna=False) \
-    #         .agg(value=('value', np.nanmean)).reset_index()
-    #
-    # if flows_export_agg_cols:
-    #     flows_export = flows_export.groupby(flows_export_agg_cols, dropna=False) \
-    #         .agg(value=('value', np.nanmean)).reset_index()
 
 
     # Reconcile import and exports
@@ -695,7 +646,7 @@ def process_crossborder_flows(flows_raw,
         intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
         flows_intermediary.to_csv(intermediary_filename, index=False)
 
-    flows_agg = flows_intermediary \
+    flows = flows_intermediary \
         .groupby(['country', 'partner', 'date', 'type'], dropna=False) \
         .agg({'value_kwh': np.nansum}) \
         .reset_index() \
@@ -704,25 +655,32 @@ def process_crossborder_flows(flows_raw,
                          }) \
         .reset_index()
 
-    # flows_agg.loc[
-    #     flows_agg.departure_iso2 != flows_agg.destination_iso2, 'type'] = base.ENTSOG_CROSSBORDER
-    # flows_agg.loc[
-    #     flows_agg.departure_iso2 == flows_agg.destination_iso2, 'type'] = base.ENTSOG_PRODUCTION
+    def fix_kipi_flows(flows):
+        # Bruegel: Finally, on Turkey, our assumption was to attribute:
+        # • All of Kipi to Azerbaijan,
+        # • All of Strandzha to Russia.
+        # -> we remove TR -> GR
+        idx = (flows.departure_iso2 == 'TR') & (flows.destination_iso2 == 'GR')
+        flows.loc[idx, 'departure_iso2'] = 'AZ'
+        return flows
+
+    flows = fix_kipi_flows(flows)
+    flows['value_m3'] = flows.value_kwh / base.GCV_KWH_PER_M3
+    flows['value_tonne'] = flows.value_kwh / base.GCV_KWH_PER_M3 * base.KG_PER_M3 / 1000
+    flows['value_mwh'] = flows.value_kwh / 1000
+    flows['commodity'] = 'natural_gas'
+    flows.drop(['value_kwh'], axis=1, inplace=True)
+    flows.drop(['index'], axis=1, inplace=True)
+    flows.replace({'departure_iso2': {'UK': 'GB'},
+                   'destination_iso2': {'UK': 'GB'}},
+                  inplace=True)
 
     if save_to_file:
         filename = filename or "entsog_flows.csv"
-        flows_agg.to_csv(filename, index=False)
-    return flows_agg
+        flows.to_csv(filename, index=False)
 
-
-def fix_kipi_flows(flows):
-    # Bruegel: Finally, on Turkey, our assumption was to attribute:
-    # • All of Kipi to Azerbaijan,
-    # • All of Strandzha to Russia.
-    # -> we remove TR -> GR
-    idx = (flows.departure_iso2 == 'TR') & (flows.destination_iso2 == 'GR')
-    flows.loc[idx, 'departure_iso2'] = 'AZ'
     return flows
+
 
 
 def update_db(date_from='2022-01-01',
@@ -739,7 +697,7 @@ def update_db(date_from='2022-01-01',
                                                  date_from=date_from,
                                                  date_to=date_to)
         # Save to DB
-        EntsogDb.upload_flows(flows_raw)
+        EntsogDb.upload_flows_raw(flows_raw)
 
 
 def get_flows(date_from='2022-01-01',
@@ -763,36 +721,11 @@ def get_flows(date_from='2022-01-01',
                               use_db=True)
 
     # Process cross border & production
-    flows = process_crossborder_flows(flows_raw=flows_raw,
-                                      save_intermediary_to_file=save_intermediary_to_file,
-                                      intermediary_filename=intermediary_filename,
-                                      save_to_file=save_to_file,
-                                      filename=filename)
-
-    # Consumption and distribution
-    # flows_cons_dist = process_non_crossborder_flows(flows_distribution_raw=flows_distribution_raw,
-    #                                                 flows_consumption_raw=flows_consumption_raw,
-    #                                                 flows_storage_entry_raw=flows_storage_entry_raw,
-    #                                                 flows_storage_exit_raw=flows_storage_exit_raw,
-    #                                                 flows_transmission_entry_raw=flows_transmission_entry_raw,
-    #                                                 flows_transmission_exit_raw=flows_transmission_exit_raw)
-
-
-    # flows = pd.concat([flows_crossborder,
-    #                    flows_cons_dist], axis=0)
-
-    flows = fix_kipi_flows(flows)
-
-    flows['value_m3'] = flows.value_kwh / base.GCV_KWH_PER_M3
-    flows['value_tonne'] = flows.value_kwh / base.GCV_KWH_PER_M3 * base.KG_PER_M3 / 1000
-    flows['value_mwh'] = flows.value_kwh / 1000
-    flows['commodity'] = 'natural_gas'
-
-    flows.drop(['value_kwh'], axis=1, inplace=True)
-    flows.drop(['index'], axis=1, inplace=True)
-    flows.replace({'departure_iso2': {'UK': 'GB'},
-                   'destination_iso2': {'UK': 'GB'}},
-                  inplace=True)
+    flows = process_flows_raw(flows_raw=flows_raw,
+                              save_intermediary_to_file=save_intermediary_to_file,
+                              intermediary_filename=intermediary_filename,
+                              save_to_file=save_to_file,
+                              filename=filename)
 
     return flows
 
@@ -840,22 +773,11 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
         logger_slack.error("Failed to get ENTSOG data")
         raise ValueError("Failed to get ENTSOG data.")
 
-    flows = flows[['commodity', 'departure_iso2', 'destination_iso2', 'date',
-                   'value_tonne', 'value_mwh', 'value_m3', 'type']]
+    EntsogDb.upload_flows(flows, delete_before_upload=delete_before_upload)
 
-    # For flows update for debug or manual cleaning
-    flows['updated_on'] = dt.datetime.now()
-
-    if delete_before_upload:
-        session.query(EntsogFlow) \
-            .filter(EntsogFlow.date >= min(flows.date),
-                    EntsogFlow.date <= max(flows.date),
-                    ) \
-            .delete()
-        session.commit()
-
-    upsert(df=flows, table=DB_TABLE_ENTSOGFLOW, constraint_name="unique_entsogflow")
 
     # Raise alert if no recent data was found
     if nodata_error_date_from is not None and flows.date.max() < to_datetime(nodata_error_date_from).date():
         logger_slack.error("No ENTSOG flow found after %s (most recent is %s)" % (to_datetime(nodata_error_date_from).date(), flows.date.max()))
+
+    return flows
