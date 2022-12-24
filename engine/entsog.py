@@ -406,6 +406,17 @@ def fix_opd_countries(opd):
     opd.loc[opd.pointType.str.contains('LNG Entry point'), 'partner'] = 'lng'
     opd.loc[opd.pointType.str.contains('LNG Exit point'), 'partner'] = 'lng'
 
+    # Consider Haidak as a German storage
+    opd.loc[opd.pointKey == 'UGS-00274', 'country'] = 'DE'
+    opd.loc[opd.pointKey == 'UGS-00274', 'partner'] = 'DE'
+
+    # Consider Haiming- as a German storage
+    opd.loc[opd.pointKey == 'ITP-00308', 'country'] = 'DE'
+    opd.loc[opd.pointKey == 'ITP-00308', 'partner'] = 'DE'
+
+    # Consider Etzel as NL storage
+    opd.loc[opd.pointKey == 'UGS-00266', 'country'] = 'NL'
+    opd.loc[opd.pointKey == 'UGS-00266', 'partner'] = 'NL'
     # Make storage single country (which makes it summable on user side)
     # import_storage = opd.pointType.str.contains('Cross-Border Storage') & (opd.directionKey=='entry')
     # opd.loc[import_storage, 'country'] = opd.loc[import_storage, 'partner']
@@ -430,12 +441,6 @@ def get_points(country_iso2=None,
 
     if country_iso2:
         opd = opd.loc[opd.country.isin(to_list(country_iso2)) | opd.partner.isin(to_list(country_iso2))]
-
-    if use_csv_selection:
-        to_remove = pd.read_csv('assets/entsog/opd_to_remove.csv').drop_duplicates()
-        # Do an antijoin
-        outer_join = opd.merge(to_remove, how='outer', indicator=True)
-        opd = outer_join[(outer_join._merge == 'left_only')].drop('_merge', axis=1)
 
     if remove_operators:
         opd = opd.loc[~opd.operatorKey.isin(to_list(remove_operators))]
@@ -493,6 +498,12 @@ def get_points(country_iso2=None,
     # opd.loc[is_distribution & is_entry, 'type'] = base.ENTSOG_DISTRIBUTION_ENTRY
     # opd.loc[is_distribution & is_exit, 'type'] = base.ENTSOG_DISTRIBUTION_EXIT
     opd.loc[is_trading, 'type'] = base.ENTSOG_TRADING
+
+    if use_csv_selection:
+        to_remove = pd.read_csv('assets/entsog/opd_to_remove.csv').drop_duplicates()
+        # Do an antijoin
+        outer_join = opd.merge(to_remove, how='outer', indicator=True)
+        opd = outer_join[(outer_join._merge == 'left_only')].drop('_merge', axis=1)
 
     def keep_unique(x):
         return x.drop_duplicates(subset=['pointKey', 'operatorKey', 'directionKey'])
@@ -628,7 +639,7 @@ def process_flows_raw(flows_raw,
         df['value_kwh'] = \
             np.where(df.type == base.ENTSOG_CROSSBORDER,
                 np.where(df['value_kwh_import'].isnull(), df['value_kwh_export'], df['value_kwh_import']),
-                df.value_kwh_import.fillna(0) + df.value_kwh_export.fillna(0),
+                df.value_kwh_import.fillna(0) - df.value_kwh_export.fillna(0),
                 )
 
         df = df.groupby(['pointKey', 'date', 'type',
