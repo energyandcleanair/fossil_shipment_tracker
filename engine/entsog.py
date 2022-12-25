@@ -658,7 +658,16 @@ def process_flows_raw(flows_raw,
             .reset_index()
         return df
 
+    def remove_outliers(df):
+        # IE UK have a couple outliers (>20bcm in one day...)
+        max_bcm = 20
+        max_kwh = max_bcm * 1e9 * base.GCV_KWH_PER_M3
+        df = df[pd.isna(df.value_kwh_import) | (df.value_kwh_import < max_kwh)]
+        df = df[pd.isna(df.value_kwh_export) | (df.value_kwh_export < max_kwh)]
+        return df
+
     def process(df):
+        df = remove_outliers(df)
         df = keep_max_duration(df)
         df = keep_confirmed_over_provisional(df)
         df = average_both_sides(df)
@@ -730,6 +739,7 @@ def get_flows(date_from='2022-01-01',
               date_to=dt.date.today(),
               country_iso2=None,
               use_csv_selection=True,
+              remove_pipe_in_pipe=True,
               save_intermediary_to_file=False,
               intermediary_filename=None,
               save_to_file=False,
@@ -744,7 +754,7 @@ def get_flows(date_from='2022-01-01',
                               date_to=date_to,
                               country_iso2=country_iso2,
                               use_csv_selection=use_csv_selection,
-                              remove_pipe_in_pipe=True,
+                              remove_pipe_in_pipe=remove_pipe_in_pipe,
                               use_db=True)
 
     # Process cross border & production
@@ -763,7 +773,8 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
            save_intermediary_to_file=False,
            intermediary_filename=None,
            nodata_error_date_from=None,
-           delete_before_upload=False):
+           delete_before_upload=False,
+           remove_pipe_in_pipe=True):
     """
 
     :param date_from:
@@ -788,6 +799,7 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
             flows = get_flows(date_from=date_from,
                               date_to=date_to,
                               country_iso2=country_iso2,
+                              remove_pipe_in_pipe=remove_pipe_in_pipe,
                               save_intermediary_to_file=save_intermediary_to_file,
                               intermediary_filename=intermediary_filename,
                               save_to_file=save_to_file,
