@@ -724,14 +724,16 @@ def process_flows_raw(flows_raw,
 
 
 def update_db(date_from='2022-01-01',
-              date_to=dt.date.today()):
+              date_to=dt.date.today(),
+              force=False):
 
     # DB should contain all points, in case opd selection changes. We'll filter later
     points = get_points(use_csv_selection=False,
                         remove_pipe_in_pipe=False)
 
     # Last date
-    date_from = session.query(sa.func.max(EntsogFlowRaw.date)).first()[0] or date_from
+    if not force:
+        date_from = session.query(sa.func.max(EntsogFlowRaw.date)).first()[0] or date_from
 
     if to_datetime(date_to) > to_datetime(date_from):
         flows_raw = EntsogApi.get_physical_flows(points=points,
