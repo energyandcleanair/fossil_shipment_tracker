@@ -431,12 +431,13 @@ def get_points(country_iso2=None,
               remove_operators=[],
               remove_point_labels=[],
               remove_point_ids=[],
+               remove_pipe_in_pipe=True,
               use_csv_selection=True):
 
     opd = EntsogApi.get_operator_point_directions()
     opd = fix_opd_countries(opd)
     opd = opd[['id', 'pointKey', 'pointLabel', 'operatorKey', 'operatorLabel', 'directionKey',
-               'country', 'partner', 'pointType', 'crossBorderPointType']] \
+               'country', 'partner', 'pointType', 'crossBorderPointType', 'isPipeInPipe', 'isDoubleReporting']] \
         .drop_duplicates()
 
     if country_iso2:
@@ -450,6 +451,10 @@ def get_points(country_iso2=None,
 
     if remove_point_ids:
         opd = opd.loc[~opd.id.isin(to_list(remove_point_ids))]
+
+    if remove_pipe_in_pipe:
+        opd = opd.loc[opd.isPipeInPipe.isnull() |  ~opd.isPipeInPipe \
+         | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
 
     is_crossborder = opd.pointType.str.contains('Cross-Border Transmission') \
                      | (opd.pointType.str.contains('Transmission') \
@@ -520,6 +525,7 @@ def get_flows_raw(date_from='2022-01-01',
                   remove_operators=[],
                   remove_point_labels=[],
                   remove_point_ids=[],
+                  remove_pipe_in_pipe=True,
                   use_csv_selection=True,
                   use_db=False):
 
@@ -527,6 +533,7 @@ def get_flows_raw(date_from='2022-01-01',
                         remove_operators=remove_operators,
                         remove_point_labels=remove_point_labels,
                         remove_point_ids=remove_point_ids,
+                        remove_pipe_in_pipe=remove_pipe_in_pipe,
                         use_csv_selection=use_csv_selection)
     
     if use_db:
@@ -737,6 +744,7 @@ def get_flows(date_from='2022-01-01',
                               date_to=date_to,
                               country_iso2=country_iso2,
                               use_csv_selection=use_csv_selection,
+                              remove_pipe_in_pipe=True,
                               use_db=True)
 
     # Process cross border & production
