@@ -406,17 +406,23 @@ def fix_opd_countries(opd):
     opd.loc[opd.pointType.str.contains('LNG Entry point'), 'partner'] = 'lng'
     opd.loc[opd.pointType.str.contains('LNG Exit point'), 'partner'] = 'lng'
 
-    # Consider Haidak as a German storage
-    opd.loc[opd.pointKey == 'UGS-00274', 'country'] = 'DE'
-    opd.loc[opd.pointKey == 'UGS-00274', 'partner'] = 'DE'
+    # Simplify cross-border storages -> single country
+    # Consider Haidak and Haiming as a German storage
+    is_crossborder_storage = opd.pointType.str.contains('Cross-Border Storage')
+    german = opd.pointLabel.str.contains('Haiming|Haidach')
+    opd.loc[german & is_crossborder_storage, 'country'] = 'DE'
+    opd.loc[german & is_crossborder_storage, 'partner'] = 'DE'
 
-    # Consider Haiming- as a German storage
-    opd.loc[opd.pointKey == 'ITP-00308', 'country'] = 'DE'
-    opd.loc[opd.pointKey == 'ITP-00308', 'partner'] = 'DE'
+    # Netherland storages
+    netherlands = opd.pointLabel.str.contains('Etzel|Jemgum|Enschede|Nüttermoor|Vlieghuis')
+    opd.loc[netherlands & is_crossborder_storage, 'country'] = 'NL'
+    opd.loc[netherlands & is_crossborder_storage, 'partner'] = 'NL'
 
-    # Consider Etzel as NL storage
-    opd.loc[opd.pointKey == 'UGS-00266', 'country'] = 'NL'
-    opd.loc[opd.pointKey == 'UGS-00266', 'partner'] = 'NL'
+    # Slovakia storages
+    slovakia = opd.pointLabel.str.contains('Bojanovice')
+    opd.loc[slovakia & is_crossborder_storage, 'country'] = 'SK'
+    opd.loc[slovakia & is_crossborder_storage, 'partner'] = 'SK'
+
     # Make storage single country (which makes it summable on user side)
     # import_storage = opd.pointType.str.contains('Cross-Border Storage') & (opd.directionKey=='entry')
     # opd.loc[import_storage, 'country'] = opd.loc[import_storage, 'partner']
