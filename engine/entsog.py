@@ -579,7 +579,8 @@ def process_flows_raw(flows_raw,
         df['duration_import'] = df['periodTo_import'] - df['periodFrom_import']
         df['duration_export'] = df['periodTo_export'] - df['periodFrom_export']
 
-        df = df.groupby(['pointKey', 'date', 'type',
+        df = df.sort_values(by=['duration_import', 'duration_export'], ascending=False) \
+            .groupby(['pointKey', 'date', 'type',
                          'operatorKey_import', 'operatorKey_export',
                          'operatorLabel_import', 'operatorLabel_export',
                          'pointLabel_import', 'pointLabel_export',
@@ -588,14 +589,14 @@ def process_flows_raw(flows_raw,
                          'partner_import', 'partner_export'
                          ],
                         dropna=False) \
-            .progress_apply(lambda x: x.sort_values(by=['duration_import', 'duration_export'], ascending=False) \
-                   .head(1)) \
+            .head(1) \
             .reset_index(drop=True)
         return df
 
     def keep_confirmed_over_provisional(df):
         # Confirmed < Provisional
-        df = df.groupby(['pointKey', 'date', 'type',
+        df = df.sort_values(by=['flowStatus_import', 'flowStatus_export'],  ascending=True) \
+            .groupby(['pointKey', 'date', 'type',
                          'operatorKey_import', 'operatorKey_export',
                          'operatorLabel_import', 'operatorLabel_export',
                          'pointLabel_import', 'pointLabel_export',
@@ -603,9 +604,7 @@ def process_flows_raw(flows_raw,
                          'partner_import', 'partner_export'
                          ],
                         dropna=False) \
-            .progress_apply(lambda x: x.sort_values(by=['flowStatus_import', 'flowStatus_export'],
-                                           ascending=True) \
-                   .head(1)) \
+            .head(1) \
             .reset_index(drop=True)
         return df
 
@@ -614,7 +613,7 @@ def process_flows_raw(flows_raw,
             # If all is nan return nan without warning
             if np.all(x != x):
                 return np.NaN
-            if all(x == 0):
+            if np.all(x == 0):
                 return 0
             if (np.std(x) / np.nanmean(x)) > 0.1:
                 logger.warning("Flows are dissimilar before averaging")
@@ -713,7 +712,8 @@ def update_db(date_from='2022-01-01',
               date_to=dt.date.today()):
 
     # DB should contain all points, in case opd selection changes. We'll filter later
-    points = get_points(use_csv_selection=False)
+    points = get_points(use_csv_selection=False,
+                        remove_pipe_in_pipe=False)
 
     # Last date
     date_from = session.query(sa.func.max(EntsogFlowRaw.date)).first()[0] or date_from
