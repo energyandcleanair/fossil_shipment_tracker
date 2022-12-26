@@ -495,19 +495,6 @@ def get_points(country_iso2=None,
     opd.loc[is_production, 'type'] = base.ENTSOG_PRODUCTION
     opd.loc[is_consumption, 'type'] = base.ENTSOG_CONSUMPTION
     opd.loc[is_distribution, 'type'] = base.ENTSOG_DISTRIBUTION
-
-    # opd.loc[is_storage & is_exit, 'type'] = base.ENTSOG_STORAGE_EXIT
-    # opd.loc[is_storage & is_entry, 'type'] = base.ENTSOG_STORAGE_ENTRY
-    # opd.loc[is_transmission & is_exit, 'type'] = base.ENTSOG_TRANSMISSION_EXIT
-    # opd.loc[is_transmission & is_entry, 'type'] = base.ENTSOG_TRANSMISSION_ENTRY
-    # opd.loc[is_lng & is_entry, 'type'] = base.ENTSOG_LNG_ENTRY
-    # opd.loc[is_lng & is_exit, 'type'] = base.ENTSOG_LNG_EXIT
-    # opd.loc[is_production & is_entry, 'type'] = base.ENTSOG_PRODUCTION_ENTRY
-    # opd.loc[is_production & is_exit, 'type'] = base.ENTSOG_PRODUCTION_EXIT
-    # opd.loc[is_consumption & is_entry, 'type'] = base.ENTSOG_CONSUMPTION_ENTRY
-    # opd.loc[is_consumption & is_exit, 'type'] = base.ENTSOG_CONSUMPTION_EXIT
-    # opd.loc[is_distribution & is_entry, 'type'] = base.ENTSOG_DISTRIBUTION_ENTRY
-    # opd.loc[is_distribution & is_exit, 'type'] = base.ENTSOG_DISTRIBUTION_EXIT
     opd.loc[is_trading, 'type'] = base.ENTSOG_TRADING
 
     if use_csv_selection:
@@ -531,7 +518,7 @@ def get_flows_raw(date_from='2022-01-01',
                   remove_operators=[],
                   remove_point_labels=[],
                   remove_point_ids=[],
-                  remove_pipe_in_pipe=True,
+                  remove_pipe_in_pipe=False,
                   use_csv_selection=True,
                   use_db=False):
 
@@ -568,12 +555,10 @@ def process_flows_raw(flows_raw,
                               save_to_file=False,
                               filename=None):
 
-
-
     # Reconcile import and exports
     flows_import = flows_raw[flows_raw.directionKey == 'entry']
     flows_export = flows_raw[flows_raw.directionKey == 'exit']
-    flows = flows_import.merge(flows_export,
+    flows_merged = flows_import.merge(flows_export,
                                left_on=['pointKey', 'date', 'country', 'partner', 'type'],
                                right_on=['pointKey', 'date', 'partner', 'country', 'type'],
                                how='outer',
@@ -641,7 +626,6 @@ def process_flows_raw(flows_raw,
 
 
     def coalesce_and_aggregate(df):
-
         df['partner'] = \
             np.where(df['country_export'].isnull(), df['partner_import'], df['country_export'])
 
@@ -680,7 +664,7 @@ def process_flows_raw(flows_raw,
         df = coalesce_and_aggregate(df)
         return df
 
-    flows_intermediary = process(flows)
+    flows_intermediary = process(flows_merged)
 
     if save_intermediary_to_file:
         intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
@@ -714,13 +698,13 @@ def process_flows_raw(flows_raw,
     flows.replace({'departure_iso2': {'UK': 'GB'},
                    'destination_iso2': {'UK': 'GB'}},
                   inplace=True)
-
+    flows.replace({'type': {base.LNG: base.CROSSBORDER}},
+                  inplace=True)
     if save_to_file:
         filename = filename or "entsog_flows.csv"
         flows.to_csv(filename, index=False)
 
     return flows
-
 
 
 def update_db(date_from='2022-01-01',
@@ -747,7 +731,7 @@ def get_flows(date_from='2022-01-01',
               date_to=dt.date.today(),
               country_iso2=None,
               use_csv_selection=True,
-              remove_pipe_in_pipe=True,
+              remove_pipe_in_pipe=False,
               save_intermediary_to_file=False,
               intermediary_filename=None,
               save_to_file=False,
@@ -782,7 +766,7 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
            intermediary_filename=None,
            nodata_error_date_from=None,
            delete_before_upload=False,
-           remove_pipe_in_pipe=True):
+           remove_pipe_in_pipe=False):
     """
 
     :param date_from:
