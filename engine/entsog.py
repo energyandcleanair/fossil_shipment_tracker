@@ -392,6 +392,10 @@ def fix_opd_countries(opd):
     len_after = len(opd)
     assert len_after == len_before
 
+    # Remove crossborder within countries
+    is_crossborder = opd.pointType.str.contains('Cross-Border')
+    opd = opd[(opd.country != opd.partner) | ~is_crossborder]
+
     # Brandov
     # Remove transit DE-DE
     opd = opd[opd.id != '5DE-TSO-0016ITP-00452exitDE-TSO-0020']
