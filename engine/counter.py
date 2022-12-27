@@ -38,7 +38,7 @@ def update(date_from='2021-01-01'):
         "aggregate_by": ["commodity_origin_iso2", "commodity_destination_iso2", "commodity", "date"],
         "nest_in_data": False,
         "currency": "EUR",
-        "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
+        "pricing_scenario": None
     }
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
@@ -61,7 +61,7 @@ def update(date_from='2021-01-01'):
         "nest_in_data": False,
         "currency": 'EUR',
         "status": 'completed',
-        "pricing_scenario": [PRICING_DEFAULT, PRICING_PRICECAP]
+        "pricing_scenario": None
     }
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
