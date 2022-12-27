@@ -698,7 +698,7 @@ def process_flows_raw(flows_raw,
     flows.replace({'departure_iso2': {'UK': 'GB'},
                    'destination_iso2': {'UK': 'GB'}},
                   inplace=True)
-    flows.replace({'type': {base.LNG: base.CROSSBORDER}},
+    flows.replace({'type': {base.ENTSOG_LNG: base.ENTSOG_CROSSBORDER}},
                   inplace=True)
     if save_to_file:
         filename = filename or "entsog_flows.csv"
