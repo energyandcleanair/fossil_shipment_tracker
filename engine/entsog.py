@@ -365,9 +365,6 @@ def fix_opd_countries(opd):
     opd['country'] = opd[['countryFromIc', 'tSOCountry']].bfill(axis=1).iloc[:, 0]
     opd.drop(['adjacentCountryFromIc', 'countryFromIc'], axis=1, inplace=True)
 
-    # Remove pipe in pipe (for storage only as of now)
-    opd = opd[~opd.pointType.str.contains('Storage') | ~opd.isPipeInPipe]
-
     # Manual fixes
     # Greece to Albania is 77.5 TWh in 2021 according to IEA, but ENTSOG doesn't capture it
     # We for now bypass Albania, and assume the IT / TAP (which goes from Albania to IT)
@@ -394,8 +391,6 @@ def fix_opd_countries(opd):
 
     len_after = len(opd)
     assert len_after == len_before
-
-    opd = opd[opd.hasData]
 
     # Brandov
     # Remove transit DE-DE
@@ -445,6 +440,12 @@ def get_points(country_iso2=None,
               use_csv_selection=True):
 
     opd = EntsogApi.get_operator_point_directions()
+
+    # First filters
+    opd = opd[opd.hasData]
+    # Remove pipe in pipe (for storage only as of now)
+    opd = opd[~opd.pointType.str.contains('Storage') | ~opd.isPipeInPipe]
+
     opd = fix_opd_countries(opd)
     opd = opd[['id', 'pointKey', 'pointLabel', 'operatorKey', 'operatorLabel', 'directionKey',
                'country', 'partner', 'pointType', 'crossBorderPointType', 'isPipeInPipe', 'isDoubleReporting']] \
