@@ -365,6 +365,8 @@ def fix_opd_countries(opd):
     opd['country'] = opd[['countryFromIc', 'tSOCountry']].bfill(axis=1).iloc[:, 0]
     opd.drop(['adjacentCountryFromIc', 'countryFromIc'], axis=1, inplace=True)
 
+    # Remove pipe in pipe (for storage only as of now)
+    opd = opd[~opd.pointType.str.contains('Storage') | ~opd.isPipeInPipe]
 
     # Manual fixes
     # Greece to Albania is 77.5 TWh in 2021 according to IEA, but ENTSOG doesn't capture it
@@ -392,6 +394,8 @@ def fix_opd_countries(opd):
 
     len_after = len(opd)
     assert len_after == len_before
+
+    opd = opd[opd.hasData]
 
     # Brandov
     # Remove transit DE-DE
@@ -717,9 +721,14 @@ def update_db(date_from='2022-01-01',
 
     # Last date
     if not force:
-        date_from = session.query(sa.func.max(EntsogFlowRaw.date)).first()[0] or date_from
+        date_from = session.query(sa.func.max(EntsogFlowRaw.updated_on)).first()[0] or date_from
+
+    # ENTSOG doesn't have future data...
+    date_to = min(to_datetime(date_to), to_datetime(dt.date.today()))
 
     if to_datetime(date_to) > to_datetime(date_from):
+        buffer = dt.timedelta(days=7) #ENTSOG data might not be updated simultaneously for all OPDs
+        date_from = to_datetime(date_from) - buffer
         flows_raw = EntsogApi.get_physical_flows(points=points,
                                                  date_from=date_from,
                                                  date_to=date_to)
