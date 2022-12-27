@@ -436,15 +436,13 @@ def get_points(country_iso2=None,
               remove_operators=[],
               remove_point_labels=[],
               remove_point_ids=[],
-               remove_pipe_in_pipe=True,
+              remove_pipe_in_pipe=True,
               use_csv_selection=True):
 
     opd = EntsogApi.get_operator_point_directions()
 
     # First filters
     opd = opd[opd.hasData]
-    # Remove pipe in pipe (for storage only as of now)
-    opd = opd[~opd.pointType.str.contains('Storage') | ~opd.isPipeInPipe]
 
     opd = fix_opd_countries(opd)
     opd = opd[['id', 'pointKey', 'pointLabel', 'operatorKey', 'operatorLabel', 'directionKey',
@@ -464,8 +462,11 @@ def get_points(country_iso2=None,
         opd = opd.loc[~opd.id.isin(to_list(remove_point_ids))]
 
     if remove_pipe_in_pipe:
-        opd = opd.loc[opd.isPipeInPipe.isnull() |  ~opd.isPipeInPipe \
-         | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
+        # opd = opd.loc[opd.isPipeInPipe.isnull() |  ~opd.isPipeInPipe \
+        #  | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
+        # For storage only as of now)
+        opd = opd[~opd.pointType.str.contains('Storage') | ~opd.isPipeInPipe |
+                  opd.isPipeInPipe.isnull()]
 
     is_crossborder = opd.pointType.str.contains('Cross-Border Transmission') \
                      | (opd.pointType.str.contains('Transmission') \
