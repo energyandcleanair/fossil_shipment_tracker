@@ -441,7 +441,8 @@ def get_points(country_iso2=None,
               remove_point_labels=[],
               remove_point_ids=[],
               remove_pipe_in_pipe=True,
-              use_csv_selection=True):
+              use_csv_selection=True,
+              must_include_pointkeys=['UGS-00273']):
 
     opd = EntsogApi.get_operator_point_directions()
 
@@ -470,7 +471,9 @@ def get_points(country_iso2=None,
         #  | (opd.isPipeInPipe & opd.isDoubleReporting.isnull())]
         # For storage only as of now)
         opd = opd[~opd.pointType.str.contains('Storage') | ~opd.isPipeInPipe |
-                  opd.isPipeInPipe.isnull()]
+                  opd.isPipeInPipe.isnull() \
+            | (opd.isPipeInPipe &  ~opd.isDoubleReporting.replace({np.nan: True})) \
+            | opd.pointKey.isin(must_include_pointkeys)]
 
     is_crossborder = opd.pointType.str.contains('Cross-Border Transmission') \
                      | (opd.pointType.str.contains('Transmission') \
