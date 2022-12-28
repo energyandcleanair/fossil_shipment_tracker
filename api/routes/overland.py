@@ -181,16 +181,24 @@ class PipelineFlowResource(Resource):
                              sa.or_(
                                  commodity_destination_iso2_field == any_(Price.destination_iso2s),
                                  Price.destination_iso2s == sa.null()
-                             )
+                             ),
+                             Price.departure_port_ids == sa.null(),
+                             Price.ship_owner_iso2s == sa.null(),
+                             Price.ship_insurer_iso2s == sa.null()
                          )
                         )
              .outerjoin(Currency, Currency.date == PipelineFlow.date)
              .filter(PipelineFlow.destination_iso2 != "RU")
               # Very important for pricing to have a distinct statement! And to be sorted prior that
               # so that we pick those with port ids matching, then destination iso2s, then ship etc.
-              .order_by(PipelineFlow.id, Price.scenario,
+
+              .order_by(PipelineFlow.id,
+                        Price.scenario,
                         Currency.currency,
-                        Price.destination_iso2s)
+                        Price.departure_port_ids,
+                        Price.destination_iso2s,
+                        Price.ship_insurer_iso2s,
+                        Price.ship_owner_iso2s)
               .distinct(PipelineFlow.id, Price.scenario, Currency.currency)
             )
 
