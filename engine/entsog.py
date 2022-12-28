@@ -750,6 +750,7 @@ def get_flows(date_from='2022-01-01',
               country_iso2=None,
               use_csv_selection=True,
               remove_pipe_in_pipe=False,
+              force=False,
               save_intermediary_to_file=False,
               intermediary_filename=None,
               save_to_file=False,
@@ -757,7 +758,8 @@ def get_flows(date_from='2022-01-01',
 
     # ENTSOG API -> ENTSOG DB
     update_db(date_from=date_from,
-              date_to=date_to)
+              date_to=date_to,
+              force=force)
 
     # Get raw information from db
     flows_raw = get_flows_raw(date_from=date_from,
@@ -779,10 +781,12 @@ def get_flows(date_from='2022-01-01',
 
 
 def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
-           filename=None, save_to_file=True,
+           filename=None,
+           save_to_file=True,
            save_intermediary_to_file=False,
            intermediary_filename=None,
            nodata_error_date_from=None,
+           force=False,
            delete_before_upload=False,
            remove_pipe_in_pipe=False):
     """
@@ -812,6 +816,7 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
                               remove_pipe_in_pipe=remove_pipe_in_pipe,
                               save_intermediary_to_file=save_intermediary_to_file,
                               intermediary_filename=intermediary_filename,
+                              force=force,
                               save_to_file=save_to_file,
                               filename=filename)
         except TypeError:
