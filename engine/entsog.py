@@ -247,17 +247,19 @@ class EntsogApi:
         df["periodTo"] = pd.to_datetime(df.periodTo)
         df["date"] = df.periodFrom.apply(lambda x: x.date())
 
-        len_before = len(df)
+        len_before = len(df[~pd.isna(df.value) & (df.indicator=='Physical Flow')])
+
         df = df.pivot_table(index=['pointKey', 'operatorKey', 'directionKey',
                                   'periodFrom', 'periodTo','flowStatus'],
                            columns=['indicator'],
                            values=['value'],
                            dropna=True).reset_index()
-        len_after = len(df)
-        assert len_after == len_before / 2
 
         # Remove 'value' in column names
         df.columns = [col[1] or col[0] for col in df.columns]
+        df = df[~pd.isna(df['Physical Flow'])]
+        len_after = len(df)
+        assert len_after == len_before
 
         # Fill GCV
         df['GCV'].replace({0: np.nanmedian(df.GCV),
