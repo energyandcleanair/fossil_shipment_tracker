@@ -42,6 +42,7 @@ def update(
         use_cache=False,
         cache_objects=False,
         upload_unprocessed_events=True,
+        force_rebuild=False,
         limit=None):
     """
     This function retrieves the events for a specific ship imo
