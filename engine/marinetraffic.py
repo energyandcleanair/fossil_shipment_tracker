@@ -1,19 +1,20 @@
 import requests
 import json
 import datetime as dt
-
+from psycopg2.errors import UniqueViolation
+import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
+from requests.adapters import HTTPAdapter, Retry
+import urllib.parse
 import tqdm
 
 import base
-import sqlalchemy as sa
-from sqlalchemy.exc import IntegrityError
 from base.db import session
 from base.logger import logger
 from base.env import get_env
 from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall, Event, Position
 from base.utils import to_datetime, latlon_to_point
-from requests.adapters import HTTPAdapter, Retry
-import urllib.parse
+
 
 s = requests.Session()
 retries = Retry(total=5,
@@ -266,7 +267,7 @@ class Marinetraffic:
                     session.add(unknown_ship)
                     try:
                         session.commit()
-                    except IntegrityError:
+                    except (IntegrityError, UniqueViolation):
                         session.rollback()
                         # Check if they are the same imo and name - if so, we assume its the same
                         is_same = bool(Ship.query.filter(Ship.imo==r_imo[0], Ship.name.any(r['SHIPNAME'])).count())
