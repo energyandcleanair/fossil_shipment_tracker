@@ -247,11 +247,9 @@ class EntsogApi:
         df["periodTo"] = pd.to_datetime(df.periodTo)
         df["date"] = df.periodFrom.apply(lambda x: x.date())
 
-        if all(df.indicator != 'Physical Flow'):
-            return None
-
         len_before = len(df[~pd.isna(df.value) & (df.indicator == 'Physical Flow')])
-
+        if len_before == 0:
+            return None
 
         df = df.pivot_table(index=['pointKey', 'operatorKey', 'directionKey',
                                   'periodFrom', 'periodTo', 'flowStatus'],
