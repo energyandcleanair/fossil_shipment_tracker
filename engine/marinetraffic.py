@@ -274,9 +274,9 @@ class Marinetraffic:
                         if is_same:
                             continue
                         else:
-                            n_imo_ships = Ship.query.filter(Ship.imo.op('~')(r_imo)).count()
+                            n_imo_ships = Ship.query.filter(Ship.imo.op('~')(r_imo[0])).count()
                             if n_imo_ships > 0:
-                                r_imo = "%s_v%d" % (r_imo, n_imo_ships + 1)
+                                r_imo = ["%s_v%d" % (r_imo, n_imo_ships + 1)]
                                 unknown_ship = Ship(imo=r_imo[0], mmsi=[r['MMSI']], type=r["TYPE_NAME"],
                                                     name=[r['SHIPNAME']])
                                 session.add(unknown_ship)
