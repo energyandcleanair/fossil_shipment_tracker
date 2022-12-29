@@ -262,9 +262,12 @@ class EntsogApi:
         assert len_after == len_before
 
         # Fill GCV
-        df['GCV'].replace({0: np.nanmedian(df.GCV),
-                           np.nan: np.nanmedian(df.GCV)},
-                           inplace=True)
+        if 'GCV' in df.columns:
+            df['GCV'].replace({0: np.nanmedian(df.GCV),
+                               np.nan: np.nanmedian(df.GCV)},
+                               inplace=True)
+        else:
+            df['GCV'] = base.GCV_KWH_PER_M3
 
         df.rename(columns={'Physical Flow': 'value_kwh',
                            'GCV': 'gcv_kwh_m3'},
