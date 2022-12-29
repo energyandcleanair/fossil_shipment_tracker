@@ -214,7 +214,7 @@ class EntsogApi:
                 return None
 
         params = {
-            "indicator": "Physical Flow",
+            "indicator": "Physical Flow,GCV",
             "periodType": "day",
             "timezone": "CET"
         }
@@ -240,12 +240,33 @@ class EntsogApi:
             return None
 
         df = pd.DataFrame(d.get("operationalData"))
-        df["value_kwh"] = pd.to_numeric(df.value)
+        df["value"] = pd.to_numeric(df.value)
         df["isCmpRelevant"] = df["isCmpRelevant"].astype('bool')
         df["isCamRelevant"] = df["isCamRelevant"].astype('bool')
         df["periodFrom"] = pd.to_datetime(df.periodFrom, errors='coerce')
         df["periodTo"] = pd.to_datetime(df.periodTo)
         df["date"] = df.periodFrom.apply(lambda x: x.date())
+
+        len_before = len(df)
+        df = df.pivot_table(index=['pointKey', 'operatorKey', 'directionKey',
+                                  'periodFrom', 'periodTo','flowStatus'],
+                           columns=['indicator'],
+                           values=['value'],
+                           dropna=True).reset_index()
+        len_after = len(df)
+        assert len_after == len_before / 2
+
+        # Remove 'value' in column names
+        df.columns = [col[1] or col[0] for col in df.columns]
+
+        # Fill GCV
+        df['GCV'].replace({0: np.nanmedian(df.GCV),
+                           np.nan: np.nanmedian(df.GCV)},
+                           inplace=True)
+
+        df.rename(columns={'Physical Flow': 'value_kwh',
+                           'GCV': 'gcv_kwh_m3'},
+                  inplace=True)
 
         # IMPORTANT
         # ENTSOG has duplicated records
@@ -304,7 +325,7 @@ class EntsogDb:
     @staticmethod
     def upload_flows_raw(flows):
         to_upload = flows[['id', 'date', 'periodFrom', 'periodTo',
-                               'pointKey', 'operatorKey', 'directionKey', 'flowStatus', 'value_kwh']]
+                               'pointKey', 'operatorKey', 'directionKey', 'flowStatus', 'value_kwh', 'gcv_kwh_m3']]
 
         to_upload = to_upload[~pd.isna(to_upload.value_kwh)]
         try:
@@ -632,11 +653,11 @@ def process_flows_raw(flows_raw,
                     'country_import', 'country_export',
                     'partner_import', 'partner_export'],
                         dropna=False) \
-                [['value_kwh_import', 'value_kwh_export']] \
+                [['value_kwh_import', 'value_kwh_export',
+                  'gcv_kwh_m3_import', 'gcv_kwh_m3_export']] \
             .agg(nanmean) \
             .reset_index()
         return df
-
 
     def coalesce_and_aggregate(df):
         df['partner'] = \
@@ -651,13 +672,16 @@ def process_flows_raw(flows_raw,
                 df.value_kwh_import.fillna(0) - df.value_kwh_export.fillna(0),
                 )
 
+        df['gcv_kwh_m3'] = np.where(df['gcv_kwh_m3_import'].isnull(), df['gcv_kwh_m3_export'], df['gcv_kwh_m3_import'])
+        df['value_m3'] = df.value_kwh / df.gcv_kwh_m3
+
         df = df.groupby(['pointKey', 'date', 'type',
                           'operatorKey_import', 'operatorKey_export',
                           'operatorLabel_import', 'operatorLabel_export',
                          'pointLabel_import', 'pointLabel_export',
                           'country', 'partner'],
                         dropna=False) \
-            ['value_kwh'].agg(np.nansum) \
+            [['value_kwh', 'value_m3']].agg(np.nansum) \
             .reset_index()
         return df
 
@@ -685,7 +709,7 @@ def process_flows_raw(flows_raw,
 
     flows = flows_intermediary \
         .groupby(['country', 'partner', 'date', 'type'], dropna=False) \
-        .agg({'value_kwh': np.nansum}) \
+        [['value_kwh', 'value_m3']].agg(np.nansum) \
         .reset_index() \
         .rename(columns={'country': 'destination_iso2',
                          'partner': 'departure_iso2'
@@ -702,8 +726,7 @@ def process_flows_raw(flows_raw,
         return flows
 
     flows = fix_kipi_flows(flows)
-    flows['value_m3'] = flows.value_kwh / base.GCV_KWH_PER_M3
-    flows['value_tonne'] = flows.value_kwh / base.GCV_KWH_PER_M3 * base.KG_PER_M3 / 1000
+    flows['value_tonne'] = flows.value_m3 * base.KG_PER_M3 / 1000
     flows['value_mwh'] = flows.value_kwh / 1000
     flows['commodity'] = 'natural_gas'
     flows.drop(['value_kwh'], axis=1, inplace=True)
@@ -724,10 +747,6 @@ def update_db(date_from='2022-01-01',
               date_to=dt.date.today(),
               force=False):
 
-    # DB should contain all points, in case opd selection changes. We'll filter later
-    points = get_points(use_csv_selection=False,
-                        remove_pipe_in_pipe=False)
-
     # Last date
     if not force:
         date_from = session.query(sa.func.max(EntsogFlowRaw.updated_on)).first()[0] or date_from
@@ -736,6 +755,9 @@ def update_db(date_from='2022-01-01',
     date_to = min(to_datetime(date_to), to_datetime(dt.date.today()))
 
     if to_datetime(date_to) > to_datetime(date_from):
+        # DB should contain all points, in case opd selection changes. We'll filter later
+        points = get_points(use_csv_selection=False,
+                            remove_pipe_in_pipe=False)
         buffer = dt.timedelta(days=7) #ENTSOG data might not be updated simultaneously for all OPDs
         date_from = to_datetime(date_from) - buffer
         flows_raw = EntsogApi.get_physical_flows(points=points,
@@ -788,7 +810,7 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
            nodata_error_date_from=None,
            force=False,
            delete_before_upload=False,
-           remove_pipe_in_pipe=False):
+           remove_pipe_in_pipe=True):
     """
 
     :param date_from:
