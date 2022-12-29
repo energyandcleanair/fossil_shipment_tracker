@@ -538,6 +538,7 @@ class EntsogFlowRaw(Base):
     directionKey = Column(String)
     flowStatus = Column(String)
     value_kwh = Column(Numeric)
+    gcv_kwh_m3 = Column(Numeric)
 
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
     __tablename__ = DB_TABLE_ENTSOGFLOW_RAW
