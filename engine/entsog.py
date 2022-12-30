@@ -249,7 +249,10 @@ class EntsogApi:
         df["date"] = df.periodFrom.apply(lambda x: x.date())
 
         df_kwh = df[df.indicator == 'Physical Flow']
-        df_gcv = df[df.indicator == 'GCV']
+        df_gcv = df[(df.indicator == 'GCV') & (df.unit == 'kWh/Nm3')]
+        # Remove outliers
+        df_gcv = df_gcv[df_gcv.value < base.GCV_KWH_PER_M3 * 1.5]
+        df_gcv = df_gcv[df_gcv.value > base.GCV_KWH_PER_M3 * 0.5]
 
         if len(df_kwh) == 0:
             return None
