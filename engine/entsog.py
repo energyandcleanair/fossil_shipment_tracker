@@ -255,8 +255,10 @@ class EntsogApi:
 
         df = df_kwh.merge(df_gcv[['pointKey', 'operatorKey', 'directionKey',
                                   'periodFrom', 'periodTo', 'value']] \
-                           .rename(columns={'value': 'gcv_kwh_m3'}),
-                           how='left') \
+                          .loc[~pd.isna(df_gcv.value)] \
+                          .drop_duplicates() \
+                          .rename(columns={'value': 'gcv_kwh_m3'}),
+                          how='left') \
             .rename(columns={'value': 'value_kwh'})
 
         assert all(df.unit == 'kWh/d')
