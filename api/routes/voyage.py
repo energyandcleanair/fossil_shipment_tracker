@@ -933,6 +933,8 @@ class VoyageResource(Resource):
                 date_column = "departure_date"
             if aggregate_by is not None and "arrival_date" in aggregate_by:
                 date_column = "arrival_date"
+            if aggregate_by is not None and "date" in aggregate_by:
+                date_column = "departure_date" #Pick departure by default
             if date_column is None:
                 logger.warning("No date to roll-average with. Not doing anything")
             else:
@@ -967,6 +969,9 @@ class VoyageResource(Resource):
 
             'commodity_destination_country': ['commodity_destination_iso2', 'commodity_destination_region'],
             'commodity_origin_country': ['commodity_origin_iso2', 'commodity_origin_region'],
+
+            'departure_country': ['departure_iso2', 'departure_region'],
+            'destination_country': ['destination_iso2', 'destination_region'],
 
             'ship_insurer_country': ['ship_insurer_region', 'ship_insurer_iso2'],
             'ship_owner_country': ['ship_owner_region', 'ship_owner_iso2'],
