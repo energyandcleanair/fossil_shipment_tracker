@@ -247,33 +247,26 @@ class EntsogApi:
         df["periodTo"] = pd.to_datetime(df.periodTo)
         df["date"] = df.periodFrom.apply(lambda x: x.date())
 
-        len_before = len(df[~pd.isna(df.value) & (df.indicator == 'Physical Flow')])
-        if len_before == 0:
+        df_kwh = df[df.indicator == 'Physical Flow']
+        df_gcv = df[df.indicator == 'GCV']
+
+        if len(df_kwh) == 0:
             return None
 
-        df = df.pivot_table(index=['pointKey', 'operatorKey', 'directionKey',
-                                  'periodFrom', 'periodTo', 'flowStatus'],
-                           columns=['indicator'],
-                           values=['value'],
-                           dropna=True).reset_index()
+        df = df_kwh.merge(df_gcv[['pointKey', 'operatorKey', 'directionKey',
+                                  'periodFrom', 'periodTo', 'value']] \
+                           .rename(columns={'value': 'gcv_kwh_m3'}),
+                           how='left') \
+            .rename(columns={'value': 'value_kwh'})
 
-        # Remove 'value' in column names
-        df.columns = [col[1] or col[0] for col in df.columns]
-        df = df[~pd.isna(df['Physical Flow'])]
-        len_after = len(df)
-        assert len_after == len_before
+        assert all(df.unit == 'kWh/d')
+        assert len(df) == len(df_kwh)
 
         # Fill GCV
-        if 'GCV' in df.columns:
-            df['GCV'].replace({0: np.nanmedian(df.GCV),
-                               np.nan: np.nanmedian(df.GCV)},
-                               inplace=True)
-        else:
-            df['GCV'] = base.GCV_KWH_PER_M3
-
-        df.rename(columns={'Physical Flow': 'value_kwh',
-                           'GCV': 'gcv_kwh_m3'},
-                  inplace=True)
+        default_gcv = np.nanmedian(df.gcv_kwh_m3) or base.GCV_KWH_PER_M3
+        df['gcv_kwh_m3'].replace({0: default_gcv,
+                                  np.nan: default_gcv},
+                                 inplace=True)
 
         # IMPORTANT
         # ENTSOG has duplicated records
