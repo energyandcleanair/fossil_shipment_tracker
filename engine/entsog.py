@@ -188,11 +188,12 @@ class EntsogApi:
             else:
                 return None
 
-        # Can only do limited days per call. Doing a call per quarter
+        # Can only do limited days per call. Doing a call per month
+        nmonths = 1
         dates = pd.date_range(to_datetime(date_from),
                               to_datetime(date_to),
                               freq='d').to_list()
-        dates_group = [str(x.year) + str((x.month - 1) // 3) for x in dates]
+        dates_group = [str(x.year) + str((x.month - 1) // nmonths) for x in dates]
 
         if len(set(dates_group)) > 1:
             # logger.info("Splitting by dates")
