@@ -249,13 +249,17 @@ class EntsogApi:
         df["date"] = df.periodFrom.apply(lambda x: x.date())
 
         df_kwh = df[df.indicator == 'Physical Flow']
-        df_gcv = df[(df.indicator == 'GCV') & (df.unit == 'kWh/Nm3')]
-        # Remove outliers
-        df_gcv = df_gcv[df_gcv.value < base.GCV_KWH_PER_M3 * 1.5]
-        df_gcv = df_gcv[df_gcv.value > base.GCV_KWH_PER_M3 * 0.5]
-
         if len(df_kwh) == 0:
             return None
+
+        df_gcv = df[(df.indicator == 'GCV')]
+
+        # Remove outliers
+        df_gcv = df_gcv[~pd.isna(df_gcv.value) & (df_gcv.value > 0)]
+        df_gcv = df_gcv[np.abs(df_gcv.value - df_gcv.value.mean()) <= (3 * df_gcv.value.std())]
+
+        # Nm3 to standard m3
+        df_gcv.value = df_gcv.value / base.M3_PER_NM3
 
         df = df_kwh.merge(df_gcv[['pointKey', 'operatorKey', 'directionKey',
                                   'periodFrom', 'periodTo', 'value']] \
@@ -266,6 +270,7 @@ class EntsogApi:
             .rename(columns={'value': 'value_kwh'})
 
         assert all(df.unit == 'kWh/d')
+        assert all(df_gcv.unit == 'kWh/Nm3')
         assert len(df) == len(df_kwh)
 
         # Fill GCV
