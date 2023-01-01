@@ -194,7 +194,7 @@ def upload_portcalls(portcalls):
                 continue
 
     if duplicated:
-        logger.warning("Found %d uplicated portcalls." %(duplicated,))
+        logger.warning("Found %d duplicated portcalls." %(duplicated,))
 
     return
 
@@ -302,8 +302,10 @@ def get_next_portcall(date_from,
 
         # Only keep required intervals if we already have found matching ones in db
         if filtered_cached_portcalls:
-            cached_portcalls = [x for x in cached_portcalls if (go_backward != (x.date_utc < filtered_cached_portcalls[0].date_utc) and
-                                                                x.date_utc != date_from)]
+            cached_portcalls = [x for x in cached_portcalls \
+                                if ((go_backward and x.date_utc > filtered_cached_portcalls[0].date_utc)
+                                     or (not go_backward and x.date_utc < filtered_cached_portcalls[0].date_utc))
+                                and (x.date_utc != date_from)]
             date_to = filtered_cached_portcalls[0].date_utc
 
         #IMPORTANT marinetraffic uses UTC for filtering
