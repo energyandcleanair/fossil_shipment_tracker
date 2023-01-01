@@ -1,22 +1,20 @@
 import pandas as pd
 import json
 import numpy as np
-
-from .. import routes_api
 from flask_restx import inputs
-from base.encoder import JsonEncoder
-from base.utils import to_list, df_to_json, to_datetime
-
-
 from http import HTTPStatus
 from flask import Response
 from flask_restx import Resource, reqparse
+
+from .. import routes_api
+import base
+from base.encoder import JsonEncoder
+from base.utils import to_list, df_to_json, to_datetime
 from ..counter import RussiaCounterResource
 
 
 @routes_api.route('/v0/chart/monthly_payments', strict_slashes=False)
 class ChartMonthlyPayments(Resource):
-
 
     parser = reqparse.RequestParser()
 
@@ -41,14 +39,17 @@ class ChartMonthlyPayments(Resource):
     def get(self):
 
         params = RussiaCounterResource.parser.parse_args()
-        format = params.get('format')
-        nest_in_data = params.get('nest_in_data')
+        params_chart = ChartMonthlyPayments.parser.parse_args()
+        format = params_chart.get('format')
+        nest_in_data = params_chart.get('nest_in_data')
+
+        params.update(**params_chart)
 
         params.update(**{
             'pivot_by': ['commodity_group_name'],
             'pivot_value': 'value_eur',
             'use_eu': True,
-            # 'date_from': '2022-01-01',
+            'pricing_scenario': [base.PRICING_DEFAULT],
             'sort_by': ['value_eur'],
             'currency': 'EUR',
             'keep_zeros': True,
@@ -63,7 +64,7 @@ class ChartMonthlyPayments(Resource):
         data = data.groupby(['destination_region', 'month', 'variable']) \
             .agg(Oil=('Oil', np.average),
                  Gas=('Gas', np.average),
-                 Coal = ('Coal', np.average),
+                 Coal=('Coal', np.average),
                  ndays=('Oil', len)) \
             .reset_index()
         data = data[data.ndays >= 10].drop(['ndays'], axis=1)
