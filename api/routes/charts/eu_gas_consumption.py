@@ -70,7 +70,7 @@ class ChartEUGasConsumption(Resource):
             "date_from": to_datetime(date_from) - dt.timedelta(days=rolling_days),
             "nest_in_data": False,
             'rolling_days': rolling_days,
-            'type': ['distribution', 'consumption', 'storage_entry', 'storage_exit', 'crossborder', 'production'],
+            'type': ['distribution', 'consumption', 'storage', 'crossborder', 'production'],
             'currency': 'EUR',
             'pricing_scenario': [PRICING_DEFAULT]
         }
@@ -115,7 +115,7 @@ class ChartEUGasConsumption(Resource):
         production = 'Production'
 
         wide['date'] = pd.to_datetime(wide.date).dt.date
-        wide[storage_drawdown] = wide.storage_entry - wide.storage_exit
+        wide[storage_drawdown] = wide.storage
         wide[production] = wide.production
         wide[imports] = wide.crossborder_in - wide.crossborder_out
         wide[implied_consumption] = wide[imports] + wide.production + wide[storage_drawdown]
