@@ -943,6 +943,7 @@ class VoyageResource(Resource):
                 daterange = pd.date_range(min_date, max_date).rename(date_column)
 
                 result[date_column] = result[date_column].dt.floor('D')  # Should have been done already
+                result = result[~pd.isna(result[date_column])] # Can happen for ongoing + arrival_date
                 result = result \
                     .groupby([x for x in result.columns if x not in [date_column, 'ship_dwt',
                                                                      'value_tonne', 'value_m3',
@@ -987,13 +988,12 @@ class VoyageResource(Resource):
                      and x not in pivot_by_dependencies]
 
             result[to_list(pivot_by)] = result[to_list(pivot_by)].fillna(base.UNKNOWN)
-            result = result.pivot_table(index=index,
+            result['variable'] = pivot_value
+            result = result.pivot_table(index=index + ['variable'],
                                         columns=to_list(pivot_by),
                                         values=pivot_value,
                                         sort=False,
                                         fill_value=0).reset_index()
-            result['variable'] = pivot_value
-
         return result
 
 
