@@ -28,6 +28,11 @@ class ChartMonthlyPayments(Resource):
                         default=['destination_region', 'commodity_group', 'date'],
                         help='which variables to aggregate by. Could be any of commodity, type, destination_region, date')
 
+    parser.add_argument('destination_region', type=str, action='split')
+
+    parser.add_argument('add_total_region', help='Whether to add a sum of all regions',
+                        type=inputs.boolean, default=False)
+
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('download', help='Whether to return results as a file or not.',
@@ -42,6 +47,8 @@ class ChartMonthlyPayments(Resource):
         params_chart = ChartMonthlyPayments.parser.parse_args()
         format = params_chart.get('format')
         nest_in_data = params_chart.get('nest_in_data')
+        add_total_region = params_chart.get('add_total_region')
+        destination_region = params_chart.get('destination_region')
 
         params.update(**params_chart)
 
@@ -54,7 +61,8 @@ class ChartMonthlyPayments(Resource):
             'currency': 'EUR',
             'keep_zeros': True,
             'format': 'json',
-            'nest_in_data': True
+            'nest_in_data': True,
+            'destination_region': None
         })
 
         response = RussiaCounterResource().get_from_params(params)
@@ -69,9 +77,29 @@ class ChartMonthlyPayments(Resource):
             .reset_index()
         data = data[data.ndays >= 10].drop(['ndays'], axis=1)
 
+        if add_total_region:
+            data_global = data.groupby(['month', 'variable']) \
+                [['Oil', 'Coal', 'Gas']] \
+                .sum() \
+                .reset_index()
+
+            data_global['destination_region'] = 'Total'
+
+            data = pd.concat([
+                data,
+                data_global
+            ])
+
+        # Then only can filter region
+        if destination_region:
+            data = data[data.destination_region.isin(to_list(destination_region + ['Total']))]
+
         # Sort by region
         data['Total'] = data.Coal + data.Oil + data.Gas
-        regions = data.groupby(['destination_region'])['Total'].sum().sort_values(ascending=False).reset_index()[['destination_region']]
+        regions = data.groupby(['destination_region'])['Total'] \
+            .sum() \
+            .sort_values(ascending=False) \
+            .reset_index()[['destination_region']]
         data = regions.merge(data).drop('Total', axis=1)
 
         return self.build_response(result=data,
