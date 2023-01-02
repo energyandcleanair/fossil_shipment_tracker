@@ -240,12 +240,13 @@ class TemplateResource(Resource):
                         and x not in to_list(pivot_by)
                         and x not in pivot_by_dependencies]
 
-            result = result.pivot_table(index=index,
+            result['variable'] = pivot_value
+            result = result.pivot_table(index=index + ['variable'],
                                         columns=to_list(pivot_by),
                                         values=pivot_value,
                                         sort=False,
                                         fill_value=pivot_fill_value).reset_index()
-            result['variable'] = pivot_value
+
 
         return result
 
