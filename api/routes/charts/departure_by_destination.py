@@ -68,6 +68,8 @@ class ChartDepartureDestination(Resource):
         nest_in_data = params_chart.get('nest_in_data')
         country_grouping = params_chart.get('country_grouping')
         language = params_chart.get('language')
+        rolling_days = params_chart.get('rolling_days')
+        aggregate_by = params_chart.get('aggregate_by')
 
         params.update(**params_chart)
         params.update(**{
@@ -79,6 +81,7 @@ class ChartDepartureDestination(Resource):
             # 'date_from': '2022-01-01',
             'pricing_scenario': [base.PRICING_DEFAULT],
             # 'sort_by': ['value_tonne'],
+            "rolling_days": None,
             'currency': 'EUR',
             'keep_zeros': True,
             'format': 'json',
@@ -162,17 +165,20 @@ class ChartDepartureDestination(Resource):
         # Any ongoing shipments do not show as to EU - this can look misleading so set them as unknown
         data['destination_region'] = np.where(((data['status'] == 'ongoing')
                                                         & (data['commodity_group_name'] == 'Crude oil')
-                                                        & (data['destination_region'] == 'EU'))
+                                                        & (data['destination_region'] == 'EU')
+                                                        & (data['destination_iso2'] != 'BG')
+                                               )
                                                         |
                                                         (
                                                        (data['destination_region'] == 'EU')
                                                        & (data['commodity_group_name'] == 'Crude oil')
+                                                       & (data['destination_iso2'] != 'BG')
                                                        & (data['departure_date'] > '2022-12-05')
                                               ), 'Unknown',
                                                         data['destination_region'])
 
         data = data.drop('status', axis=1)
-
+        data = VoyageResource().roll_average(result=data, aggregate_by=aggregate_by, rolling_days=rolling_days)
         data = group_countries(data, country_grouping)
         data = pivot_data(data)
         data = translate(data=data, language=language)
