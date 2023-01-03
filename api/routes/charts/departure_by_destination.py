@@ -67,6 +67,7 @@ class ChartDepartureDestination(Resource):
         format = params_chart.get('format')
         nest_in_data = params_chart.get('nest_in_data')
         country_grouping = params_chart.get('country_grouping')
+        date_to = params_chart.get('date_to')
         language = params_chart.get('language')
         rolling_days = params_chart.get('rolling_days')
         aggregate_by = params_chart.get('aggregate_by')
@@ -78,6 +79,8 @@ class ChartDepartureDestination(Resource):
             'use_eu': True,
             'commodity_origin_iso2': 'RU',
             'commodity_destination_iso2_not': 'RU',
+            'date_to': None,
+            'departure_date_to': date_to,
             # 'date_from': '2022-01-01',
             'pricing_scenario': [base.PRICING_DEFAULT],
             # 'sort_by': ['value_tonne'],
@@ -112,6 +115,7 @@ class ChartDepartureDestination(Resource):
                 top_n.loc[len(top_n)] = ['Unknown', 'Unknown']
                 top_n = top_n.drop_duplicates()
                 data = data \
+                    .fillna({'destination_country': 'Unknown'}) \
                     .merge(top_n[['destination_country', 'region']],
                            how='left') \
                     .fillna({'region': 'Others'})
@@ -123,7 +127,8 @@ class ChartDepartureDestination(Resource):
                 data['region'] = data.destination_region
 
             data = data.groupby(['commodity_group', 'commodity_group_name',
-                                 'region', 'departure_date'])['value_tonne'].sum() \
+                                 'region', 'departure_date'],
+                                dropna=False)['value_tonne'].sum() \
                 .reset_index() \
                 .sort_values(['departure_date'])
 
@@ -133,7 +138,8 @@ class ChartDepartureDestination(Resource):
 
             # Add the variable for transparency sake
             data['variable'] = variable
-            result = data.groupby(['region', 'departure_date', 'commodity_group_name', 'variable']) \
+            result = data.groupby(['region', 'departure_date', 'commodity_group_name', 'variable'],
+                                  dropna=False) \
                 .value_tonne.sum() \
                 .reset_index() \
                 .pivot_table(index=['commodity_group_name', 'departure_date', 'variable'],
@@ -159,6 +165,7 @@ class ChartDepartureDestination(Resource):
             data.loc[(data.destination_region == 'EU') & (data.commodity_group == 'coal')
                      & (pd.to_datetime(data.departure_date) >= pd.to_datetime(date_stop)),
                      ["value_eur", "value_tonne"]] = 0
+            return data
 
 
         response = VoyageResource().get_from_params(params)
