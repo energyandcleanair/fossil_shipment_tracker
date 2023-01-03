@@ -28,6 +28,11 @@ class ChartMonthlyPayments(Resource):
                         default=['destination_region', 'commodity_group', 'date'],
                         help='which variables to aggregate by. Could be any of commodity, type, destination_region, date')
 
+    parser.add_argument('pricing_scenario', help='Pricing scenario (standard or pricecap)',
+                        action='split',
+                        default=[base.PRICING_DEFAULT],
+                        required=False)
+
     parser.add_argument('destination_region', type=str, action='split')
 
     parser.add_argument('add_total_region', help='Whether to add a sum of all regions',
@@ -56,7 +61,6 @@ class ChartMonthlyPayments(Resource):
             'pivot_by': ['commodity_group_name'],
             'pivot_value': 'value_eur',
             'use_eu': True,
-            'pricing_scenario': [base.PRICING_DEFAULT],
             'sort_by': ['value_eur'],
             'currency': 'EUR',
             'keep_zeros': True,
