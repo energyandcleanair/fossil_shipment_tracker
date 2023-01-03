@@ -190,8 +190,14 @@ def update_info_from_equasis():
                                                                            imo=owner_imo,
                                                                            address=owner_address))
                 owner.updated_on = dt.datetime.now()
-                session.add(owner)
-                session.commit()
+
+                # Verify we DID find a matching company_id using find_or_create_company_id otherwise we will have an
+                # integrity error
+                if owner.company_id is not None:
+                    session.add(owner)
+                    session.commit()
+                else:
+                    logger.warning("Failed to find/create company_id for company %s, ship_imo %s.".format(owner.company_raw_name, owner.ship_imo))
 
 
 def fill_country():
