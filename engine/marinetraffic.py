@@ -19,6 +19,9 @@ from base.utils import to_datetime, latlon_to_point
 s = requests.Session()
 retries = Retry(total=5,
                 backoff_factor=0.1,
+                # Return 3xx status rather than MaxRetry error if we exceed total attempts or are outside status list
+                raise_on_redirect=False,
+                raise_on_status=False,
                 status_forcelist=[500, 502, 503, 504])
 s.mount('https://', HTTPAdapter(max_retries=retries))
 
