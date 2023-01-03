@@ -127,7 +127,8 @@ class ChartProductOnWater(Resource):
                 & (data['status'] == 'completed'))
             ]
 
-        data['commodity_destination_region'] = np.where(data['commodity_destination_country'] == 'United Kingdom', 'EU',
+        #
+        data['commodity_destination_region'] = np.where(data['commodity_destination_country'].isin(['United Kingdom', 'United States', 'South Korea']), 'Others',
                                                         data['commodity_destination_region'])
 
         # Fix coal
