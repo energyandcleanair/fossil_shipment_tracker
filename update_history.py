@@ -100,7 +100,10 @@ def update_departures_portcalls(date_from, date_to, departure_port_iso2=None):
                                                                       use_call_based=True)
                 portcall.upload_portcalls(portcalls)
 
-def update_arrival_portcalls(date_from, date_to, commodities, departure_port_iso2=None):
+def update_arrival_portcalls(date_from, date_to,
+                             commodities,
+                             departure_port_iso2=None,
+                             use_credit_key_if_short=False):
 
     query_departure = session.query(
                           Departure.id,
@@ -200,7 +203,7 @@ def update_arrival_portcalls(date_from, date_to, commodities, departure_port_iso
         for interval in intervals:
             # VERY IMPORTANT TO USE THE RIGHT KEY!!
             use_call_based = (interval[1] - interval[0]) > dt.timedelta(days=20)
-            if use_call_based:
+            if use_call_based or use_credit_key_if_short:
                 # Might as well query more, same cost
                 interval[1] = max(interval[1], interval[0] + delta_time)
 
