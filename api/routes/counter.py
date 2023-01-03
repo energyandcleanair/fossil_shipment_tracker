@@ -18,7 +18,7 @@ from . import routes_api
 from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session
-from base.models import Counter, Commodity, Country, Currency
+from base.models import Counter, Commodity, Country, Currency, PriceScenario
 from base.utils import to_datetime, to_list, intersect, df_to_json
 from engine.commodity import get_subquery as get_commodity_subquery
 
@@ -153,11 +153,13 @@ class RussiaCounterResource(Resource):
                 Counter.value_eur,
                 Currency.currency,
                 value_currency_field,
-                Counter.pricing_scenario
+                Counter.pricing_scenario,
+                PriceScenario.name.label('pricing_scenario_name')
             ) \
             .outerjoin(commodity_subquery, Counter.commodity == commodity_subquery.c.id) \
             .outerjoin(Country, Counter.destination_iso2 == Country.iso2) \
             .outerjoin(Currency, Counter.date == Currency.date) \
+            .outerjoin(PriceScenario, Counter.pricing_scenario == PriceScenario.id) \
             .filter(Counter.date >= to_datetime(date_from)) \
             .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
@@ -195,7 +197,7 @@ class RussiaCounterResource(Resource):
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor('D')  # Should have been done already
             cols = intersect(["commodity", "commodity_group", 'commodity_group_name',
                               'destination_iso2', 'destination_country', "destination_region",
-                              'currency', 'pricing_scenario'], counter.columns)
+                              'currency', 'pricing_scenario', 'pricing_scenario_name'], counter.columns)
 
             counter = counter \
                 .groupby(cols, dropna=False) \
@@ -212,7 +214,8 @@ class RussiaCounterResource(Resource):
 
         if cumulate and "date" in counter:
             groupby_cols = [x for x in ['commodity', 'commodity_group', 'commodity_group_name', 'destination_iso2',
-                                        'destination_country', 'destination_region', 'currency', 'pricing_scenario'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
+                                        'destination_country', 'destination_region', 'currency',
+                                        'pricing_scenario', 'pricing_scenario_name'] if aggregate_by is None or not aggregate_by or x in aggregate_by]
             counter['value_eur'] = counter.groupby(groupby_cols, dropna=False)['value_eur'].transform(pd.Series.cumsum)
             counter['value_tonne'] = counter.groupby(groupby_cols, dropna=False)['value_tonne'].transform(pd.Series.cumsum)
             counter['value_currency'] = counter.groupby(groupby_cols, dropna=False)['value_currency'].transform(pd.Series.cumsum)
@@ -223,7 +226,8 @@ class RussiaCounterResource(Resource):
                 .groupby(intersect(["commodity", "commodity_name", "commodity_group", 'commodity_group_name',
                                     'destination_iso2',
                                     'destination_country',
-                                    "destination_region", 'currency', 'pricing_scenario'], counter.columns),
+                                    "destination_region", 'currency',
+                                    'pricing_scenario', 'pricing_scenario_name'], counter.columns),
                          dropna=False) \
                 .apply(lambda x: x.set_index('date') \
                        .resample("D").sum() \
@@ -292,7 +296,7 @@ class RussiaCounterResource(Resource):
         # Aggregating
         aggregateby_cols_dict = {
             'currency': [subquery.c.currency],
-            'pricing_scenario': [subquery.c.pricing_scenario],
+            'pricing_scenario': [subquery.c.pricing_scenario, subquery.c.pricing_scenario_name],
             'date': [subquery.c.date],
             'month': [func.date_trunc('month', subquery.c.date).label("month")],
             'year': [func.date_trunc('year', subquery.c.date).label("year")],
@@ -389,6 +393,7 @@ class RussiaCounterResource(Resource):
             'commodity_group_name': ['commodity', 'commodity_group'],
             'destination_country': ['destination_iso2', 'destination_region'],
             'destination_iso2': ['destination_country', 'destination_region'],
+            'pricing_scenario': ['pricing_scenario_name'],
         }
 
         if pivot_by:

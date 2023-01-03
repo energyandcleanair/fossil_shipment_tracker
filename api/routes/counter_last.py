@@ -18,7 +18,7 @@ from . import routes_api
 from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
-from base.models import Country
+from base.models import Country, PriceScenario
 from base.models import Counter
 from base.utils import to_datetime, to_list, intersect
 from engine.commodity import get_subquery as get_commodity_subquery
@@ -91,12 +91,14 @@ class RussiaCounterLastResource(Resource):
             Counter.date,
             func.sum(Counter.value_tonne).label("value_tonne"),
             func.sum(Counter.value_eur).label("value_eur"),
-            Counter.pricing_scenario
+            Counter.pricing_scenario,
+            PriceScenario.name.label('pricing_scenario_name')
         ) \
             .join(commodity_subquery, Counter.commodity == commodity_subquery.c.id) \
             .join(Country, Country.iso2 == Counter.destination_iso2) \
+            .outerjoin(PriceScenario, PriceScenario.id == Counter.pricing_scenario) \
             .group_by(Counter.commodity, Counter.destination_iso2, Country.name, destination_region_field,
-                      Counter.date, commodity_subquery.c.group, Counter.pricing_scenario) \
+                      Counter.date, commodity_subquery.c.group, Counter.pricing_scenario, PriceScenario.name) \
             .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
         if destination_region:
@@ -121,41 +123,21 @@ class RussiaCounterLastResource(Resource):
 
         counter = pd.read_sql(query.statement, session.bind)
         counter.replace({np.nan: None}, inplace=True)
-
-        groupby_cols = set([x for x in ['destination_iso2', 'destination_country',
-                                        'destination_region', 'commodity', 'commodity_group',
-                                        'pricing_scenario'] if
-                        aggregate_by is None or not aggregate_by or x in aggregate_by])
-
-        if 'commodity' in groupby_cols:
-            groupby_cols.add('commodity_group')
-
-        if 'destination_iso2' in groupby_cols or 'destination_country' in groupby_cols:
-            groupby_cols.update(['destination_iso2', 'destination_country'])
-
-        groupby_cols = list(groupby_cols)
-
-        counter_last = self.get_last(counter=counter, groupby_cols=groupby_cols)
-
-        now = dt.datetime.utcnow()
-        counter_last["now"] = now
-        counter_last['total_eur'] = counter_last.total_eur + (now - counter_last.date) / np.timedelta64(1, 'D') * counter_last.eur_per_day
-
-        if "commodity_group" in counter_last.columns:
-            counter_last = counter_last.loc[~counter_last.commodity_group.isna()]
-
-
-        counter_last = counter_last.groupby(groupby_cols).sum()
+        counter_last = self.get_last(counter=counter)
 
         # Add total
-        total = pd.DataFrame(counter_last.sum()).T
-        total[list(counter_last.index.names)] = "total"
+        group_by_total = ['pricing_scenario', 'pricing_scenario_name']
+        index_total = [x for x in counter_last.index.names if x not in group_by_total]
+        total = counter_last.groupby(group_by_total, dropna=False).sum().reset_index()
+        total[index_total] = "total"
+        total['date'] = counter_last.date.unique()
+
         counter_last = pd.concat([
             counter_last.reset_index(),
             total
         ])
 
-        counter_last['date'] = now
+        # counter_last['date'] = dt.datetime.utcnow()
         counter_last['eur_per_sec'] = counter_last['eur_per_day'] / 24 / 3600
 
         if "index" in counter_last.columns:
@@ -175,8 +157,9 @@ class RussiaCounterLastResource(Resource):
                 mimetype='application/json')
 
 
-    def get_last(self, counter, groupby_cols):
+    def get_last(self, counter):
 
+        groupby_cols = list(set(counter.select_dtypes(exclude=np.number).columns.tolist()) - set(['date']))
         counter_last = counter.sort_values(['date']) \
             .groupby(groupby_cols) \
             .agg(
@@ -217,6 +200,17 @@ class RussiaCounterLastResource(Resource):
 
         counter_last_merged = counter_last.merge(counter_last_increment,
                                        how='left', on=groupby_cols)
+
+        now = dt.datetime.utcnow()
+        counter_last_merged["now"] = now
+        counter_last_merged['total_eur'] = counter_last_merged.total_eur + \
+                                           (now - counter_last_merged.date) / np.timedelta64(1,'D') * counter_last_merged.eur_per_day
+
+        if "commodity_group" in counter_last_merged.columns:
+            counter_last_merged = counter_last_merged.loc[~counter_last_merged.commodity_group.isna()]
+
+        counter_last_merged = counter_last_merged.groupby(groupby_cols).sum()
+        counter_last_merged['date'] = now
         return counter_last_merged
 
 
@@ -243,7 +237,7 @@ class RussiaCounterLastResource(Resource):
         # Aggregating
         aggregateby_cols_dict = {
             'date': [subquery.c.date],
-            'pricing_scenario': [subquery.c.pricing_scenario],
+            'pricing_scenario': [subquery.c.pricing_scenario, subquery.c.pricing_scenario_name],
             'destination_iso2': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_country': [subquery.c.destination_iso2, subquery.c.destination_country, subquery.c.destination_region],
             'destination_region': [subquery.c.destination_region],
