@@ -5,6 +5,7 @@ import pandas as pd
 import shapely
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
+import datetime as dt
 from fiona.drvsupport import supported_drivers
 
 import base
@@ -94,29 +95,20 @@ def fill_portcalls_around_sts(
             PortCall.date_utc
         ).all()
 
+
     for event in tqdm.tqdm(unique_events):
 
         if for_arriving:
             portcall.get_next_portcall(imo=event.ship_imo,
                                        date_from=event.date_utc,
-                                       arrival_or_departure=None)
-
-            if go_backward:
-                portcall.get_next_portcall(imo=event.ship_imo,
-                                           date_from=event.date_utc,
-                                           arrival_or_departure=None,
-                                           go_backward=True)
+                                       arrival_or_departure=None,
+                                       go_backward=go_backward)
 
         if for_departing:
             portcall.get_next_portcall(imo=event.interacting_ship_imo,
                                        date_from=event.date_utc,
-                                       arrival_or_departure=None)
-
-            if go_backward:
-                portcall.get_next_portcall(imo=event.interacting_ship_imo,
-                                           date_from=event.date_utc,
-                                           arrival_or_departure=None,
-                                           go_backward=go_backward)
+                                       arrival_or_departure=None,
+                                       go_backward=go_backward)
 
 
 def update_sts_locations():
