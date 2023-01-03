@@ -161,10 +161,6 @@ class ChartProductOnWater(Resource):
 
         result = pd.concat(result)
 
-        result['value_tonne'] = np.where((result['commodity_destination_region'] == 'EU')
-                                         & (result['date'] > '2022-12-05')
-                                         & (result['commodity'] == 'Crude oil'), 0, result['value_tonne'])
-
         result = result.pivot_table(
             index=['commodity', 'date'],
             columns = 'commodity_destination_region',
