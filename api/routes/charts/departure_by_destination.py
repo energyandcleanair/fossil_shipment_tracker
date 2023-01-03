@@ -109,6 +109,8 @@ class ChartDepartureDestination(Resource):
                 # Otherwise Flourish will show empty lines
                 # which might make viewer things values are actually 0
                 top_n = top_n[['destination_country', 'region']].drop_duplicates()
+                top_n.loc[len(top_n)] = ['Unknown', 'Unknown']
+                top_n = top_n.drop_duplicates()
                 data = data \
                     .merge(top_n[['destination_country', 'region']],
                            how='left') \
@@ -153,11 +155,17 @@ class ChartDepartureDestination(Resource):
 
             return data
 
+        def remove_coal_to_eu(data, date_stop=dt.date(2022, 8, 11)):
+            data.loc[(data.destination_region == 'EU') & (data.commodity_group == 'coal')
+                     & (pd.to_datetime(data.departure_date) >= pd.to_datetime(date_stop)),
+                     ["value_eur", "value_tonne"]] = 0
+
 
         response = VoyageResource().get_from_params(params)
 
         data = pd.DataFrame(response.json['data'])
         data = data[data.destination_iso2 != 'RU']
+        data = remove_coal_to_eu(data)
         data['departure_date'] = pd.to_datetime(data.departure_date)
         data.replace({base.UNKNOWN: 'Unknown'}, inplace=True)
 
