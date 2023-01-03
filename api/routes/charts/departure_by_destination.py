@@ -25,7 +25,7 @@ class ChartDepartureDestination(Resource):
                         default="2021-12-01", required=False)
 
     parser.add_argument('date_to', type=str, help='start date for counter data (format 2020-01-15)',
-                        default=-3,
+                        default=-2,
                         required=False)
 
     parser.add_argument('country_grouping', type=str,
@@ -162,7 +162,7 @@ class ChartDepartureDestination(Resource):
             return data
 
         def remove_coal_to_eu(data, date_stop=dt.date(2022, 8, 11)):
-            data.loc[(data.destination_region == 'EU') & (data.commodity_group == 'coal')
+            data.loc[(data.destination_region == 'EU') & (data.commodity_group.str.lower() == 'coal')
                      & (pd.to_datetime(data.departure_date) >= pd.to_datetime(date_stop)),
                      ["value_eur", "value_tonne"]] = 0
             return data
