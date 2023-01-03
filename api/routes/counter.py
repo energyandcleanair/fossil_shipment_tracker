@@ -394,6 +394,7 @@ class RussiaCounterResource(Resource):
             'destination_country': ['destination_iso2', 'destination_region'],
             'destination_iso2': ['destination_country', 'destination_region'],
             'pricing_scenario': ['pricing_scenario_name'],
+            'pricing_scenario_name': ['pricing_scenario'],
         }
 
         if pivot_by:
