@@ -212,7 +212,7 @@ def update_arrival_portcalls(date_from, date_to,
                                                        arrival_or_departure=None,
                                                        imo=imo,
                                                        use_call_based=use_call_based,
-                                                       use_cache=False,
+                                                       use_cache=not use_call_based,
                                                        filter=lambda x: False
                                                        )
             else:
