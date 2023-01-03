@@ -178,6 +178,19 @@ def update_from_positions():
 
     shipments_all = return_combined_shipments(session)
 
+    shipments_distinct_departure = session.query(
+        shipments_all.c.shipment_departure_id
+    ) \
+        .distinct(shipments_all.c.shipment_departure_id) \
+        .subquery()
+
+    shipment_next_departure_date = session.query(
+        shipments_distinct_departure.c.shipment_departure_id,
+        func.lead(Departure.date_utc).over(
+            Departure.ship_imo,
+            Departure.date_utc).label('date_utc')) \
+        .join(Departure, Departure.id == shipments_distinct_departure.c.shipment_departure_id).subquery()
+
     # add last_destination_name to shipment table for faster retrieval
     # we add in all position we have stored for the shipment and then take the latest date position with destination
     shipments_w_last_position = session.query(shipments_all.c.shipment_id,
@@ -186,16 +199,20 @@ def update_from_positions():
                                           Position.destination_port_id
                                           ) \
         .join(Departure, Departure.id == shipments_all.c.shipment_departure_id) \
+        .outerjoin(shipment_next_departure_date,
+                   shipment_next_departure_date.c.shipment_departure_id == shipments_all.c.shipment_departure_id) \
         .outerjoin(Arrival, Arrival.id == shipments_all.c.shipment_arrival_id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
-        sa.and_(
-            shipments_all.c.shipment_last_destination_name == sa.null(),
-            Position.date_utc >= Departure.date_utc,
-            Position.destination_name != sa.null(),
-            sa.or_(Arrival.date_utc == sa.null(),
-                   Position.date_utc <= Arrival.date_utc)
-        )) \
+            sa.and_(
+                shipments_all.c.shipment_last_destination_name == sa.null(),
+                Position.date_utc >= Departure.date_utc,
+                Position.destination_name != sa.null(),
+                sa.or_(Arrival.date_utc == sa.null(),
+                       Position.date_utc <= Arrival.date_utc),
+                sa.or_(shipment_next_departure_date.c.date_utc == sa.null(),
+                       Position.date_utc < shipment_next_departure_date.c.date_utc)
+            )) \
         .distinct(shipments_all.c.shipment_id) \
         .order_by(shipments_all.c.shipment_id, Position.date_utc.desc()) \
         .subquery()
@@ -220,6 +237,8 @@ def update_from_positions():
                        .label('previous_destination_name')
                        ) \
         .join(Departure, Departure.id == shipments_all.c.shipment_departure_id) \
+        .outerjoin(shipment_next_departure_date,
+                   shipment_next_departure_date.c.shipment_departure_id == shipments_all.c.shipment_departure_id) \
         .outerjoin(Arrival, Arrival.id == shipments_all.c.shipment_arrival_id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
@@ -228,7 +247,10 @@ def update_from_positions():
                 Position.date_utc >= Departure.date_utc,
                 Position.destination_name != sa.null(),
                 sa.or_(Arrival.date_utc == sa.null(),
-                       Position.date_utc <= Arrival.date_utc))) \
+                       Position.date_utc <= Arrival.date_utc),
+                sa.or_(shipment_next_departure_date.c.date_utc == sa.null(),
+                       Position.date_utc < shipment_next_departure_date.c.date_utc)
+            )) \
         .order_by(shipments_all.c.shipment_id, Position.date_utc) \
         .subquery()
 
