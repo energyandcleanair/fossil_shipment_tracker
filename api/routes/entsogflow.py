@@ -313,14 +313,14 @@ class EntsogFlowResource(Resource):
         if rolling_days is not None:
             date_col = "date"
             date_cols = ['date', 'month', 'year']
+            value_cols = ["value_tonne", "value_m3", "value_eur", 'value_currency']
             min_date = result[date_col].min()
             max_date = result[date_col].max() # change your date here
             daterange = pd.date_range(min_date, max_date).rename(date_col)
 
             result[date_col] = result[date_col].dt.floor('D')  # Should have been done already
             result = result \
-                .groupby([x for x in result.columns if x not in [date_cols, "ship_dwt", "value_tonne", "value_m3",
-                                                                 "value_eur", 'value_currency']]) \
+                .groupby([x for x in result.columns if x not in date_cols + value_cols]) \
                 .apply(lambda x: x.set_index(date_col) \
                        .resample("D").sum() \
                        .reindex(daterange) \
