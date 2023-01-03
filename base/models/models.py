@@ -31,6 +31,7 @@ from . import DB_TABLE_SHIPMENTARRIVALBERTH
 from . import DB_TABLE_SHIPMENTDEPARTUREBERTH
 from . import DB_TABLE_MTVOYAGEINFO
 from . import DB_TABLE_PRICE
+from . import DB_TABLE_PRICE_SCENARIO
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
 from . import DB_TABLE_COUNTER100BN
@@ -522,6 +523,15 @@ class Price(Base):
                       Index("idx_price_new_commodity", "commodity"),
                       Index("idx_price_new_date", "date")
                       )
+
+
+class PriceScenario(Base):
+
+    id = Column(String, primary_key=True)
+    name = Column(String)
+    others = Column(JSONB)
+
+    __tablename__ = DB_TABLE_PRICE_SCENARIO
 
 
 # ENTSOG data after outer join flows
