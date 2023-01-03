@@ -751,7 +751,9 @@ class VoyageResource(Resource):
             shipments_rich = shipments_rich.filter(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2)))
 
         if commodity_destination_iso2_not is not None:
-            shipments_rich = shipments_rich.filter(sa.not_(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2_not))))
+            shipments_rich = shipments_rich.filter(sa.or_(
+                CommodityDestinationCountry.iso2 == sa.null(),
+                sa.not_(CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2_not)))))
 
         if commodity_destination_region is not None:
             shipments_rich = shipments_rich.filter(CommodityDestinationCountry.region.in_(to_list(commodity_destination_region)))
