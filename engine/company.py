@@ -8,10 +8,14 @@ from base.db_utils import execute_statement
 from difflib import SequenceMatcher
 import re
 import base
+import json
+
+from base.encoder import JsonEncoder
+from base.utils import to_list
 from base.db import session
 from base.env import get_env
 from base.logger import logger
-from base.models import Departure, ShipInsurer, ShipOwner, ShipManager, Company, Country
+from base.models import Departure, ShipInsurer, ShipOwner, ShipManager, Company, Country, Ship
 from engine.equasis import Equasis
 
 from selenium import webdriver
@@ -86,13 +90,12 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
     return company_id
 
 
-def update_info_from_equasis():
+def update_info_from_equasis(commodities=None, last_updated=dt.date.today() - dt.timedelta(days=31)):
     """
     Collect infos from equasis about shipments that either don't have infos,
     or for infos that are potentially outdated
     :return:
     """
-    max_age = dt.timedelta(days=31)
     equasis = Equasis()
 
     imos = session.query(Departure.ship_imo) \
@@ -100,10 +103,16 @@ def update_info_from_equasis():
         .outerjoin(ShipOwner, ShipOwner.ship_imo == Departure.ship_imo) \
         .outerjoin(ShipManager, ShipManager.ship_imo == Departure.ship_imo) \
         .filter(sa.or_(sa.and_(
-        ShipInsurer.id == sa.null(),
-        ShipOwner.id == sa.null(),
-        ShipManager.id == sa.null()),
-        ShipInsurer.updated_on <= dt.datetime.now() - max_age)) \
+            ShipInsurer.id == sa.null(),
+            ShipOwner.id == sa.null(),
+            ShipManager.id == sa.null()),
+            ShipInsurer.updated_on <= last_updated))
+
+    if commodities:
+        imos = imos.join(Ship, Ship.imo == Departure.ship_imo) \
+            .filter(Ship.commodity.in_(to_list(commodities)))
+
+    imos = imos \
         .distinct() \
         .all()
 
@@ -129,7 +138,14 @@ def update_info_from_equasis():
 
         if equasis_infos is not None:
 
-
+            # Update ship record
+            ship = session.query(Ship).filter(Ship.imo==imo).first()
+            others = dict(ship.others)
+            others.update({'equasis': equasis_infos})
+            # To convert datetimes to str
+            others = json.loads(json.dumps(others, cls=JsonEncoder))
+            ship.others = others
+            session.commit()
 
             # Insurer
             if equasis_infos.get('insurer'):
@@ -157,7 +173,8 @@ def update_info_from_equasis():
                 # See if exists
                 manager = session.query(ShipManager).filter(ShipManager.company_raw_name == manager_raw_name,
                                                             ShipManager.imo == manager_imo,
-                                                            ShipManager.ship_imo == imo).first()
+                                                            ShipManager.ship_imo == imo,
+                                                            ShipManager.date_from == manager_date_from).first()
                 if not manager:
                     manager = ShipManager(company_raw_name=manager_raw_name,
                                           ship_imo=imo,
@@ -180,7 +197,8 @@ def update_info_from_equasis():
 
                 # See if exists
                 owner = session.query(ShipOwner).filter(ShipOwner.company_raw_name == owner_raw_name,
-                                                        ShipOwner.ship_imo == imo).first()
+                                                        ShipOwner.ship_imo == imo,
+                                                        ShipOwner.date_from == owner_date_from).first()
                 if not owner:
                     owner = ShipOwner(company_raw_name=owner_raw_name,
                                       ship_imo=imo,
