@@ -19,7 +19,7 @@ from base.models import Shipment, Ship, Arrival, Departure, Port, Berth,\
     ShipOwner, ShipInsurer, ShipManager, Company, \
     ShipmentDepartureBerth, ShipmentArrivalBerth, Commodity, Trajectory, \
     Destination, Country, Price, Currency, ShipmentWithSTS, Event, \
-    ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, STSLocation, PortCall
+    ShipmentDepartureLocationSTS, ShipmentArrivalLocationSTS, STSLocation, PortCall, PriceScenario
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
@@ -581,6 +581,7 @@ class VoyageResource(Resource):
                                     Currency.currency,
                                     (value_eur_field*shipments_combined.c.weight*shipments_combined.c.arrival_weight * Currency.per_eur).label('value_currency'),
                                     Price.scenario.label('pricing_scenario'),
+                                    PriceScenario.name.label('pricing_scenario_name'),
 
                                     DepartureBerth.id.label("departure_berth_id"),
                                     DepartureBerth.name.label("departure_berth_name"),
@@ -656,6 +657,7 @@ class VoyageResource(Resource):
                                      ))
 
              .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
+             .outerjoin(PriceScenario, PriceScenario.id == Price.scenario)
              .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
              .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
 
@@ -847,7 +849,7 @@ class VoyageResource(Resource):
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
-            'pricing_scenario': [subquery.c.pricing_scenario],
+            'pricing_scenario': [subquery.c.pricing_scenario, subquery.c.pricing_scenario_name],
             'currency': [subquery.c.currency],
             'commodity': [subquery.c.commodity, subquery.c.commodity_name,
                           subquery.c.commodity_group, subquery.c.commodity_group_name],
@@ -978,7 +980,10 @@ class VoyageResource(Resource):
 
             'ship_insurer_country': ['ship_insurer_region', 'ship_insurer_iso2'],
             'ship_owner_country': ['ship_owner_region', 'ship_owner_iso2'],
-            'ship_manager_country': ['ship_manager_region', 'ship_manager_iso2']
+            'ship_manager_country': ['ship_manager_region', 'ship_manager_iso2'],
+
+            'pricing_scenario': ['pricing_scenario_name'],
+            'pricing_scenario_name': ['pricing_scenario']
         }
 
         if pivot_by:
