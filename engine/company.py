@@ -53,7 +53,6 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
     -------
 
     """
-
     company_sq = session.query(Company.id,
                                Company.imo,
                                func.unnest(Company.names).label('name')).subquery()
@@ -90,7 +89,9 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
     return company_id
 
 
-def update_info_from_equasis(commodities=None, last_updated=dt.date.today() - dt.timedelta(days=31)):
+def update_info_from_equasis(commodities=None,
+                             last_updated=dt.date.today() - dt.timedelta(days=31),
+                             departure_date_from=None):
     """
     Collect infos from equasis about shipments that either don't have infos,
     or for infos that are potentially outdated
@@ -111,6 +112,9 @@ def update_info_from_equasis(commodities=None, last_updated=dt.date.today() - dt
     if commodities:
         imos = imos.join(Ship, Ship.imo == Departure.ship_imo) \
             .filter(Ship.commodity.in_(to_list(commodities)))
+
+    if departure_date_from:
+        imos = imos.filter(Departure.date_utc >= departure_date_from)
 
     imos = imos \
         .distinct() \
@@ -157,7 +161,8 @@ def update_info_from_equasis(commodities=None, last_updated=dt.date.today() - dt
                     insurer = ShipInsurer(company_raw_name=insurer_raw_name,
                                           imo=None,
                                           ship_imo=imo,
-                                          company_id=find_or_create_company_id(raw_name=insurer_raw_name))
+                                          company_id=find_or_create_company_id(raw_name=insurer_raw_name),
+                                          date_from=dt.datetime.now())
                 insurer.updated_on = dt.datetime.now()
                 session.add(insurer)
                 session.commit()

@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import datetime as dt
 import pandas as pd
 
+import base
 from base.env import get_env
 from base.utils import to_list
 
@@ -104,12 +105,13 @@ class Equasis():
         headers = {'User-Agent': 'Mozilla/5.0'}
         ship_data = {}
         ship_data['imo'] = imo
+        ship_data['updated_on'] = dt.datetime.now()
         payload = {
             "P_IMO": imo
         }
 
         try:
-            resp = self.session.post(url,headers=headers,data=payload)
+            resp = self.session.post(url, headers=headers,data=payload)
         except Exception as e:
             self._log("Error getting response")
             raise e
@@ -135,6 +137,10 @@ class Equasis():
         pni_div = html_obj.body.find('div', attrs={'id': 'collapse6'})
         if pni_div:
             ship_data['insurer'] = {'name': self._find_pni(pni_div)}
+        else:
+            # We'lladd an empty insurer to be safe
+            # Meaning the ship will be shown as not having an insurer
+            ship_data['insurer'] = {'name': base.UNKNOWN_INSURER}
 
         # Manager & Owner
         management_div = html_obj.body.find('div', attrs={'id': 'collapse3'})
