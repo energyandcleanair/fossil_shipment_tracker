@@ -38,7 +38,8 @@ class Equasis():
         return next_credentials
 
     def _get_all_credentials(self):
-        emails = ['hubert+%03d@energyandcleanair.org'%(x) for x in range(1, 22)]
+        emails = ['hubert+%03d@energyandcleanair.org'%(x) for x in range(1, 22)] + \
+                 ['jan+%d@energyandcleanair.org'%(x) for x in range(1, 12)]
         password = get_env('EQUASIS_PASSWORD')
         return [{'username':x, 'password': password} for x in emails]
 
