@@ -14,6 +14,7 @@ from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from .. import routes_api
 from ..voyage import VoyageResource
+from ..overland import PipelineFlowResource
 
 
 @routes_api.route('/v0/chart/departure_by_destination', strict_slashes=False)
@@ -28,9 +29,12 @@ class ChartDepartureDestination(Resource):
                         default=-2,
                         required=False)
 
+    parser.add_argument('add_total_region', help='Whether to add a sum of all regions',
+                        type=inputs.boolean, default=True)
+
     parser.add_argument('country_grouping', type=str,
                         help="How to group countries. Can be 'region' or 'top_n' (e.g. top_5)",
-                        default='top_8')
+                        default='top_5')
 
     parser.add_argument('commodity_grouping', type=str,
                         help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
@@ -64,7 +68,10 @@ class ChartDepartureDestination(Resource):
 
         params = VoyageResource.parser.parse_args()
         params_chart = ChartDepartureDestination.parser.parse_args()
+        params_overland = PipelineFlowResource.parser.parse_args()
+
         format = params_chart.get('format')
+        add_total_region = params_chart.get('add_total_region')
         nest_in_data = params_chart.get('nest_in_data')
         country_grouping = params_chart.get('country_grouping')
         date_to = params_chart.get('date_to')
@@ -85,6 +92,20 @@ class ChartDepartureDestination(Resource):
             'pricing_scenario': [base.PRICING_DEFAULT],
             # 'sort_by': ['value_tonne'],
             "rolling_days": None,
+            'currency': 'EUR',
+            'keep_zeros': True,
+            'format': 'json',
+            'nest_in_data': True
+        })
+        params_overland.update(**{
+            'commodity_origin_iso2': 'RU',
+            'commodity_grouping': 'split_gas',
+            'commodity': 'natural_gas',
+            'aggregate_by': ['destination_country', 'commodity_group', 'date'],
+            'date_from': '2022-01-01',
+            'date_to': date_to,
+            'pricing_scenario': [base.PRICING_DEFAULT],
+            "rolling_days": rolling_days,
             'currency': 'EUR',
             'keep_zeros': True,
             'format': 'json',
@@ -167,6 +188,11 @@ class ChartDepartureDestination(Resource):
                      ["value_eur", "value_tonne"]] = 0
             return data
 
+        overland_response = PipelineFlowResource().get_from_params(params_overland)
+
+        data_overland = pd.DataFrame(overland_response.json['data'])
+        data_overland.rename(columns={'date':'departure_date'}, inplace=True)
+        data_overland['departure_date'] = pd.to_datetime(data_overland.departure_date)
 
         response = VoyageResource().get_from_params(params)
 
@@ -192,10 +218,26 @@ class ChartDepartureDestination(Resource):
                                               ), 'Unknown',
                                                         data['destination_region'])
 
-        data = data.drop('status', axis=1)
+        data = data.drop(['status', 'ship_dwt', 'count'], axis=1)
         data = VoyageResource().roll_average(result=data, aggregate_by=aggregate_by, rolling_days=rolling_days)
+
+        data = pd.concat([data, data_overland])
         data = group_countries(data, country_grouping)
         data = pivot_data(data)
+
+        if add_total_region:
+            data_global = data.groupby(['departure_date', 'variable']) \
+                [[c for c in data.columns if c not in ['commodity_group_name', 'departure_date', 'variable']]] \
+                .sum() \
+                .reset_index()
+
+            data_global['commodity_group_name'] = 'Total'
+
+            data = pd.concat([
+                data,
+                data_global
+            ])
+
         data = translate(data=data, language=language)
         return self.build_response(result=data,
                                    format=format,
