@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import datetime as dt
+import pandas as pd
 
 from base.env import get_env
 from base.utils import to_list
@@ -37,7 +38,7 @@ class Equasis():
         return next_credentials
 
     def _get_all_credentials(self):
-        emails = ['hubert+%03d@energyandcleanair.org'%(x) for x in range(1,12)]
+        emails = ['hubert+%03d@energyandcleanair.org'%(x) for x in range(1, 22)]
         password = get_env('EQUASIS_PASSWORD')
         return [{'username':x, 'password': password} for x in emails]
 
@@ -155,6 +156,90 @@ class Equasis():
                                       'address': owner_info.get('address'),
                                       'date_from': self._parse_doa(owner_info.get('doa')),
                                     }
+            except StopIteration:
+                pass
+
+        if list(ship_data.keys()) == ['imo']:
+            pass
+
+        return ship_data
+
+    def get_ship_history(self, imo, itry=1, max_try=11):
+
+        if itry > max_try:
+            return None
+
+        url = "https://www.equasis.org/EquasisWeb/restricted/ShipHistory?fs=Search"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        ship_data = {}
+        ship_data['imo'] = imo
+        payload = {
+            "P_IMO": imo
+        }
+
+        try:
+            resp = self.session.post(url, headers=headers, data=payload)
+        except Exception as e:
+            self._log("Error getting response")
+            raise e
+        except requests.exceptions.HTTPError as e:
+            self._log("HTTP error")
+            raise e
+
+        if "session has expired" in str(resp.content):
+            self._login()
+            return self.get_ship_infos(imo=imo, itry=itry + 1)
+        html_obj = BeautifulSoup(resp.content, "html.parser")
+
+        # In case ship info is required
+        # info_box = html_obj.body.find('div', attrs={'class':'info-details'})
+        if (not html_obj or not html_obj.body) and itry == 1:
+            self._login()
+            return self.get_ship_infos(imo=imo, itry=itry + 1)
+
+        if not html_obj or not html_obj.body:
+            return None
+
+        # Table
+        company_h3 = html_obj.body.find('h3', text=lambda x: x.startswith('Company') if x else False)
+        if company_h3:
+            table = company_h3.find_parent('div', attrs={'class':'container-fluid'}).find('table')
+            # Extract the column headers from the table
+            column_headers = [th.text.strip() for th in table.find_all('th')]
+
+            # Extract the data for each row in the table
+            data_rows = []
+            for tr in table.find_all('tr'):
+                data_cells = []
+                for td in tr.find_all('td'):
+                    data_cells.append(td.text.strip())
+                data_rows.append(data_cells)
+
+            # Create a Pandas dataframe with the extracted data
+            df = pd.DataFrame(data_rows, columns=column_headers)
+
+
+        # Manager & Owner
+        management_div = html_obj.body.find('div', attrs={'id': 'collapse3'})
+        if management_div:
+            management_raw = self._find_management(management_div)
+            try:
+                manager_info = next(x for x in management_raw if x['role'] == 'ISM Manager')
+                ship_data['manager'] = {'name': manager_info.get('company'),
+                                        'imo': manager_info.get('imo'),  # IMO of company
+                                        'address': manager_info.get('address'),
+                                        'date_from': self._parse_doa(manager_info.get('doa'))
+                                        }
+            except StopIteration:
+                pass
+
+            try:
+                owner_info = next(x for x in management_raw if x['role'] == 'Registered owner')
+                ship_data['owner'] = {'name': owner_info.get('company'),
+                                      'imo': owner_info.get('imo'),  # IMO of company
+                                      'address': owner_info.get('address'),
+                                      'date_from': self._parse_doa(owner_info.get('doa')),
+                                      }
             except StopIteration:
                 pass
 
