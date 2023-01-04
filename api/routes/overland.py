@@ -13,7 +13,7 @@ from sqlalchemy import func, case, any_
 from . import routes_api
 from flask_restx import inputs
 
-from base.models import PipelineFlow, Country, Commodity, Currency, Price
+from base.models import PipelineFlow, Country, Commodity, Currency, Price, PriceScenario
 from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
@@ -146,6 +146,7 @@ class PipelineFlowResource(Resource):
         flows_rich = (session.query(PipelineFlow.id,
                                     PipelineFlow.commodity,
                                     commodity_subquery.c.group.label('commodity_group'),
+                                    commodity_subquery.c.group_name.label('commodity_group_name'),
 
                                     # Commodity origin and destination
                                     commodity_origin_iso2_field,
@@ -167,7 +168,8 @@ class PipelineFlowResource(Resource):
                                     value_eur_field,
                                     Currency.currency,
                                     value_currency_field,
-                                    Price.scenario.label('pricing_scenario'))
+                                    Price.scenario.label('pricing_scenario'),
+                                    PriceScenario.name.label('pricing_scenario_name'))
              .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
              .outerjoin(DestinationCountry, PipelineFlow.destination_iso2 == DestinationCountry.iso2)
              .outerjoin(CommodityOriginCountry, CommodityOriginCountry.iso2 == commodity_origin_iso2_field)
@@ -187,6 +189,7 @@ class PipelineFlowResource(Resource):
                              Price.ship_insurer_iso2s == sa.null()
                          )
                         )
+             .outerjoin(PriceScenario, PriceScenario.id == Price.scenario)
              .outerjoin(Currency, Currency.date == PipelineFlow.date)
              .filter(PipelineFlow.destination_iso2 != "RU")
               # Very important for pricing to have a distinct statement! And to be sorted prior that
@@ -292,10 +295,10 @@ class PipelineFlowResource(Resource):
             aggregate_by.remove('')
         # Aggregating
         aggregateby_cols_dict = {
-            'pricing_scenario': [subquery.c.pricing_scenario],
+            'pricing_scenario': [subquery.c.pricing_scenario, subquery.c.pricing_scenario_name],
             'currency': [subquery.c.currency],
             'commodity': [subquery.c.commodity, subquery.c.commodity_group],
-            'commodity_group': [subquery.c.commodity_group],
+            'commodity_group': [subquery.c.commodity_group, subquery.c.commodity_group_name],
             'date': [subquery.c.date],
             'commodity_origin_iso2': [subquery.c.commodity_origin_iso2, subquery.c.commodity_origin_country,
                                       subquery.c.commodity_origin_region],
