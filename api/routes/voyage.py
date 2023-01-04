@@ -639,7 +639,12 @@ class VoyageResource(Resource):
                                          Price.date == func.date_trunc('day', Departure.date_utc),
                                          Price.commodity == commodity_subquery.c.pricing_commodity,
                                          sa.or_(
-                                             destination_iso2_field == any_(Price.destination_iso2s),
+                                             sa.and_(destination_iso2_field == any_(Price.destination_iso2s),
+                                                     commodity_field == base.CRUDE_OIL,
+                                                     sa.or_(
+                                                         shipments_combined.c.shipment_status == 'completed',
+                                                         DestinationCountry.region != 'EU'
+                                                     )),
                                              Price.destination_iso2s == sa.null()
                                          ),
                                          sa.or_(
