@@ -253,7 +253,7 @@ previous_arrival AS (
          preva.move_type = 'arrival'
          AND preva.date_utc > nextd.departure_date_utc
          AND preva.date_utc <= nextd.nextdeparture_date_utc
-        AND nextd.nextdeparture_previous_portcall_id NOT IN (
+        AND preva.id NOT IN (
             SELECT
                 id
             FROM
