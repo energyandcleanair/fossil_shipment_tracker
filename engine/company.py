@@ -161,12 +161,23 @@ def update_info_from_equasis(commodities=None,
                 # See if exists
                 insurer = session.query(ShipInsurer).filter(ShipInsurer.company_raw_name == insurer_raw_name,
                                                             ShipInsurer.ship_imo == imo).first()
+
                 if not insurer:
+
+                    # If this is the first time we collect insurer for this ship,
+                    # We assume it has always been this insurer
+                    # This is important because we only start querying a ship insurer
+                    # After we had a departure with it, and so the first insurer
+                    # would always be after the first departure otherwise
+                    has_insurer = session.query(ShipInsurer) \
+                        .filter(ShipInsurer.ship_imo == imo) \
+                        .count() > 0
+                    date_from_ = dt.datetime.now() if has_insurer else None
                     insurer = ShipInsurer(company_raw_name=insurer_raw_name,
                                           imo=None,
                                           ship_imo=imo,
                                           company_id=find_or_create_company_id(raw_name=insurer_raw_name),
-                                          date_from=dt.datetime.now())
+                                          date_from=date_from_)
                 insurer.updated_on = dt.datetime.now()
                 session.add(insurer)
                 session.commit()
