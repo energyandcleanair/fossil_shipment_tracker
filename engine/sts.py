@@ -9,7 +9,7 @@ import datetime as dt
 from fiona.drvsupport import supported_drivers
 
 import base
-from base.logger import logger
+from base.logger import logger, logger_slack
 from base.db import session
 from base.models import ShipmentWithSTS, PortCall, Departure, ShipmentDepartureLocationSTS, \
     ShipmentArrivalLocationSTS, Event, STSLocation, Arrival, Ship
@@ -29,6 +29,8 @@ def update(date_from = '2021-01-01'):
 
     :return:
     """
+
+    logger_slack.info("=== Updating STS information ===")
 
     fill_portcalls_around_sts(date_from=date_from, go_backward=True)
     fill_portcalls_around_sts(date_from=date_from, go_backward=False)
