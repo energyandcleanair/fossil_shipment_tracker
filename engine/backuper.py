@@ -46,7 +46,7 @@ def upload(df, client_bucket, folder, filename, exts=['RDS', 'csv.gz']):
 
 
 def backup_voyages(client_bucket, folder, now):
-    params = {'date_from': '2022-01-01',
+    params = {'date_from': '2021-01-01',
               'commodity_grouping': 'default',
               'currency': ['USD', 'EUR'],
               'pricing_scenario': base.PRICING_DEFAULT,
@@ -58,7 +58,7 @@ def backup_voyages(client_bucket, folder, now):
 
 
 def backup_overland(client_bucket, folder, now):
-    params = {'date_from': '2022-01-01',
+    params = {'date_from': '2021-01-01',
               'commodity_grouping': 'default',
               'currency': ['USD', 'EUR'],
               'keep_zeros': False,
@@ -71,7 +71,7 @@ def backup_overland(client_bucket, folder, now):
 
 
 def backup_counter(client_bucket, folder, now):
-    params = {'date_from': '2022-01-01',
+    params = {'date_from': '2021-01-01',
               'commodity_grouping': 'default',
               'currency': ['USD', 'EUR'],
               'keep_zeros': False,
