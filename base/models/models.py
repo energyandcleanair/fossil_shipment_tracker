@@ -319,7 +319,7 @@ class ShipInsurer(Base):
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_SHIP_INSURER
-    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', name='unique_ship_insurer'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', 'date_from', name='unique_ship_insurer'),)
 
 
 class ShipOwner(Base):
@@ -333,7 +333,7 @@ class ShipOwner(Base):
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_SHIP_OWNER
-    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', name='unique_ship_owner'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', 'date_from', name='unique_ship_owner'),)
 
 
 class ShipManager(Base):
@@ -347,7 +347,7 @@ class ShipManager(Base):
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_SHIP_MANAGER
-    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', name='unique_ship_manager'),)
+    __table_args__ = (UniqueConstraint('ship_imo', 'company_raw_name', 'date_from', name='unique_ship_manager'),)
 
 
 class Position(Base):

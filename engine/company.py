@@ -90,8 +90,9 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
 
 
 def update_info_from_equasis(commodities=None,
-                             last_updated=dt.date.today() - dt.timedelta(days=31),
-                             departure_date_from=None):
+                             last_updated=dt.date.today() - dt.timedelta(days=7),
+                             departure_date_from=None,
+                             imo=None):
     """
     Collect infos from equasis about shipments that either don't have infos,
     or for infos that are potentially outdated
@@ -115,6 +116,9 @@ def update_info_from_equasis(commodities=None,
 
     if departure_date_from:
         imos = imos.filter(Departure.date_utc >= departure_date_from)
+
+    if imo:
+        imos = imos.filter(Departure.ship_imo.in_(to_list(imo)))
 
     imos = imos \
         .distinct() \
