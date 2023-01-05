@@ -634,32 +634,33 @@ class VoyageResource(Resource):
                         ShipInsurerDistinct.c.date_from == sa.null())))
              .outerjoin(ShipInsurerCompany, ShipInsurerDistinct.c.company_id == ShipInsurerCompany.id)
              .outerjoin(ShipInsurerCountry, ShipInsurerCompany.country_iso2 == ShipInsurerCountry.iso2)
-                          .outerjoin(Price,
-                                     sa.and_(
-                                         Price.date == func.date_trunc('day', Departure.date_utc),
-                                         Price.commodity == commodity_subquery.c.pricing_commodity,
+             .outerjoin(Price,
+                         sa.and_(
+                             Price.date == func.date_trunc('day', Departure.date_utc),
+                             Price.commodity == commodity_subquery.c.pricing_commodity,
+                             sa.or_(
+                                 sa.and_(destination_iso2_field == any_(Price.destination_iso2s),
                                          sa.or_(
-                                             sa.and_(destination_iso2_field == any_(Price.destination_iso2s),
-                                                     commodity_field == base.CRUDE_OIL,
-                                                     sa.or_(
-                                                         shipments_combined.c.shipment_status == 'completed',
-                                                         DestinationCountry.region != 'EU'
-                                                     )),
-                                             Price.destination_iso2s == sa.null()
-                                         ),
-                                         sa.or_(
-                                             DeparturePort.id == any_(Price.departure_port_ids),
-                                             Price.departure_port_ids == sa.null()
-                                         ),
-                                         sa.or_(
-                                             ShipOwnerCountry.iso2 == any_(Price.ship_owner_iso2s),
-                                             Price.ship_owner_iso2s == sa.null()
-                                         ),
-                                         sa.or_(
-                                             ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
-                                             Price.ship_insurer_iso2s == sa.null()
-                                         )
-                                     ))
+                                             Departure.date_utc <= '2022-12-05',
+                                             commodity_field != base.CRUDE_OIL,
+                                             shipments_combined.c.shipment_status == 'completed',
+                                             DestinationCountry.region != 'EU'
+                                         )),
+                                 Price.destination_iso2s == sa.null()
+                             ),
+                             sa.or_(
+                                 DeparturePort.id == any_(Price.departure_port_ids),
+                                 Price.departure_port_ids == sa.null()
+                             ),
+                             sa.or_(
+                                 ShipOwnerCountry.iso2 == any_(Price.ship_owner_iso2s),
+                                 Price.ship_owner_iso2s == sa.null()
+                             ),
+                             sa.or_(
+                                 ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
+                                 Price.ship_insurer_iso2s == sa.null()
+                             )
+                         ))
 
              .outerjoin(Currency, Currency.date == func.date_trunc('day', Departure.date_utc))
              .outerjoin(PriceScenario, PriceScenario.id == Price.scenario)
