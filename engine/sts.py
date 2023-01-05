@@ -30,7 +30,8 @@ def update(date_from = '2021-01-01'):
     :return:
     """
 
-    fill_portcalls_around_sts(date_from=date_from)
+    fill_portcalls_around_sts(date_from=date_from, go_backward=True)
+    fill_portcalls_around_sts(date_from=date_from, go_backward=False)
 
     update_sts_locations()
 
@@ -99,12 +100,14 @@ def fill_portcalls_around_sts(
     for event in tqdm.tqdm(unique_events):
 
         if for_arriving:
+            logger.info("Finding portcalls for arriving ship_imo: {}, date_from: {}, go_backward: {}.".format(event.ship_imo, event.date_utc, go_backward))
             portcall.get_next_portcall(imo=event.ship_imo,
                                        date_from=event.date_utc,
                                        arrival_or_departure=None,
                                        go_backward=go_backward)
 
         if for_departing:
+            logger.info("Finding portcalls for departing ship_imo: {}, date_from: {}, go_backward: {}.".format(event.interacting_ship_imo, event.date_utc, go_backward))
             portcall.get_next_portcall(imo=event.interacting_ship_imo,
                                        date_from=event.date_utc,
                                        arrival_or_departure=None,
