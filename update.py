@@ -17,6 +17,8 @@ from engine import company
 from engine import mtevents
 from engine import flaring
 from engine import sts
+from engine import backuper
+
 import integrity
 import base
 
@@ -46,6 +48,7 @@ def update():
     flaring.update()
     alert.update()
     counter.update()
+    backuper.update()
     integrity.check()
     return
 
