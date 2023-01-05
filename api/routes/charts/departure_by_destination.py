@@ -29,7 +29,7 @@ class ChartDepartureDestination(Resource):
                         default=-2,
                         required=False)
 
-    parser.add_argument('add_total_region', help='Whether to add a sum of all regions',
+    parser.add_argument('add_total_commodity', help='Whether to add a sum of all commodities',
                         type=inputs.boolean, default=True)
 
     parser.add_argument('country_grouping', type=str,
@@ -55,7 +55,8 @@ class ChartDepartureDestination(Resource):
     parser.add_argument('rolling_days', type=int,
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=30)
-
+    parser.add_argument('pivot_value', type=str, help='pivoted value. Default: value_tonne.',
+                        required=False, default='value_tonne')
     parser.add_argument('nest_in_data', help='Whether to nest the geojson content in a data key.',
                         type=inputs.boolean, default=True)
     parser.add_argument('download', help='Whether to return results as a file or not.',
@@ -71,10 +72,12 @@ class ChartDepartureDestination(Resource):
         params_overland = PipelineFlowResource.parser.parse_args()
 
         format = params_chart.get('format')
-        add_total_region = params_chart.get('add_total_region')
+        add_total_commodity = params_chart.get('add_total_commodity')
         nest_in_data = params_chart.get('nest_in_data')
         country_grouping = params_chart.get('country_grouping')
         date_to = params_chart.get('date_to')
+        pivot_value = params_chart.get('pivot_value')
+        departure_date_from = params_chart.get('departure_date_from')
         language = params_chart.get('language')
         rolling_days = params_chart.get('rolling_days')
         aggregate_by = params_chart.get('aggregate_by')
@@ -102,7 +105,7 @@ class ChartDepartureDestination(Resource):
             'commodity_grouping': 'split_gas',
             'commodity': 'natural_gas',
             'aggregate_by': ['destination_country', 'commodity_group', 'date'],
-            'date_from': '2022-01-01',
+            'date_from': departure_date_from,
             'date_to': date_to,
             'pricing_scenario': [base.PRICING_DEFAULT],
             "rolling_days": rolling_days,
@@ -119,8 +122,13 @@ class ChartDepartureDestination(Resource):
                 data.loc[data.destination_region == 'EU', 'destination_country'] = 'EU'
                 data.loc[data.destination_region == 'EU', 'destination_iso2'] = 'EU'
 
+                # When including pipeline, small countries would show up because it's mainly EU and China
+                exclude_countries = ['RS', 'MK', 'MD', 'SM', 'CH']
+
+
                 n = int(country_grouping.replace('top_', ''))
-                top_n = data[data.departure_date >= max(data.departure_date) - dt.timedelta(days=30)] \
+                top_n = data[(data.departure_date >= max(data.departure_date) - dt.timedelta(days=30)) &
+                             ~data.destination_iso2.isin(exclude_countries)] \
                         .groupby(['commodity_group', 'destination_country']) \
                     .value_tonne.sum() \
                     .reset_index() \
@@ -149,19 +157,19 @@ class ChartDepartureDestination(Resource):
 
             data = data.groupby(['commodity_group', 'commodity_group_name',
                                  'region', 'departure_date'],
-                                dropna=False)['value_tonne'].sum() \
+                                dropna=False)[['value_tonne', 'value_eur']].sum() \
                 .reset_index() \
                 .sort_values(['departure_date'])
 
             return data
 
-        def pivot_data(data, variable='value_tonne'):
+        def pivot_data(data, variable):
 
             # Add the variable for transparency sake
             data['variable'] = variable
             result = data.groupby(['region', 'departure_date', 'commodity_group_name', 'variable'],
                                   dropna=False) \
-                .value_tonne.sum() \
+                [variable].sum() \
                 .reset_index() \
                 .pivot_table(index=['commodity_group_name', 'departure_date', 'variable'],
                              columns=['region'],
@@ -223,9 +231,9 @@ class ChartDepartureDestination(Resource):
 
         data = pd.concat([data, data_overland])
         data = group_countries(data, country_grouping)
-        data = pivot_data(data)
+        data = pivot_data(data, variable=pivot_value)
 
-        if add_total_region:
+        if add_total_commodity:
             data_global = data.groupby(['departure_date', 'variable']) \
                 [[c for c in data.columns if c not in ['commodity_group_name', 'departure_date', 'variable']]] \
                 .sum() \
