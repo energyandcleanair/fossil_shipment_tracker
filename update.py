@@ -38,7 +38,7 @@ def update():
     company.update()
     mtevents.update()
     shipment.update()
-    position.update()
+    position.update(date_from=dt.date.today() - dt.timedelta(days=90))
     destination.update()
     berth.update()
     sts.update(date_from=dt.date.today() - dt.timedelta(days=90))
