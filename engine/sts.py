@@ -20,7 +20,7 @@ from base.db_utils import upsert
 from base.models import DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, \
     DB_TABLE_STSARRIVALLOCATION
 
-from engine import portcall
+from engine import portcall, mtevents
 
 
 def update(date_from = '2021-01-01'):
@@ -40,6 +40,8 @@ def update(date_from = '2021-01-01'):
 
 def fill_portcalls_around_sts(
         date_from='2022-01-01',
+        ship_imo=None,
+        event_id=None,
         collapse_events=False,
         go_backward=True,
         for_departing=True,
@@ -52,6 +54,8 @@ def fill_portcalls_around_sts(
     :param collapse_events: whether to collapse events between existing portcalls
     :param go_backward: whether to check portcall backwards as well
     :param for_departing: whether to fill portcalls around departing [interacting] ship
+    :param event_id: event id to filter for
+    :param ship_imo: ship imo to filter for
     :return:
     """
 
@@ -67,13 +71,23 @@ def fill_portcalls_around_sts(
         .join(MainShip, MainShip.imo == Event.ship_imo) \
         .join(IntShip, IntShip.imo == Event.interacting_ship_imo) \
         .filter(
-        Event.date_utc >= date_from,
         Event.interacting_ship_details['distance_meters'] != sa.null(),
         sa.or_(
             MainShip.commodity == IntShip.commodity,
             sa.and_(MainShip.commodity.in_([base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS]),
                     IntShip.commodity.in_([base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS]))
-        )).all()
+        ))
+
+    if date_from:
+        unique_events = unique_events.filter(Event.date_utc >= date_from)
+
+    if ship_imo:
+        unique_events = unique_events.filter(MainShip.imo.in_(to_list(ship_imo)))
+
+    if event_id:
+        unique_events = unique_events.filter(Event.id.in_(to_list(event_id)))
+
+    unique_events = unique_events.all()
 
     if collapse_events:
         unique_events = session.query(
