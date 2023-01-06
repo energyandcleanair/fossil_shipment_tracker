@@ -220,12 +220,12 @@ def get_next_portcall(date_from,
             cached_portcalls = cached_portcalls.filter(PortCall.move_type == arrival_or_departure)
         if go_backward:
             direction = -1
-            cached_portcalls = cached_portcalls.filter(PortCall.date_utc <= date_from)
+            cached_portcalls = cached_portcalls.filter(PortCall.date_utc < date_from)
             if date_to:
                 cached_portcalls = cached_portcalls.filter(PortCall.date_utc >= date_to)
         else:
             direction = 1
-            cached_portcalls = cached_portcalls.filter(PortCall.date_utc >= date_from)
+            cached_portcalls = cached_portcalls.filter(PortCall.date_utc > date_from)
             if date_to:
                 cached_portcalls = cached_portcalls.filter(PortCall.date_utc <= date_to)
         if imo:
