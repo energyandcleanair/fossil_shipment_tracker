@@ -23,7 +23,7 @@ from base.models import DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, \
 from engine import portcall, mtevents
 
 
-def update(date_from = '2021-01-01'):
+def update(date_from='2021-01-01'):
     """
     This function collects the before/after portcall for STS events so we can verify draught change
 
@@ -38,25 +38,19 @@ def update(date_from = '2021-01-01'):
     update_sts_locations()
 
 
-def fill_portcalls_around_sts(
+def return_unique_events(
         date_from='2022-01-01',
         ship_imo=None,
         event_id=None,
-        collapse_events=False,
-        go_backward=True,
-        for_departing=True,
-        for_arriving=True):
+        collapse_events=False):
     """
-    The purpose of this function is to find the first preceeding and proceeding portcall for sts events
 
-    :param date_from: Date from which to check events
-    :param for_arriving: Whether to fill portcalls around arriving ship
-    :param collapse_events: whether to collapse events between existing portcalls
-    :param go_backward: whether to check portcall backwards as well
-    :param for_departing: whether to fill portcalls around departing [interacting] ship
-    :param event_id: event id to filter for
-    :param ship_imo: ship imo to filter for
-    :return:
+    Parameters
+    ----------
+    date_from :
+    ship_imo :
+    event_id :
+    collapse_events :
     """
 
     MainShip = aliased(Ship)
@@ -112,18 +106,50 @@ def fill_portcalls_around_sts(
             PortCall.date_utc
         ).all()
 
+    return unique_events
+
+
+def fill_portcalls_around_sts(
+        date_from='2022-01-01',
+        ship_imo=None,
+        event_id=None,
+        collapse_events=False,
+        go_backward=True,
+        for_departing=True,
+        for_arriving=True):
+    """
+    The purpose of this function is to find the first preceeding and proceeding portcall for sts events
+
+    :param date_from: Date from which to check events
+    :param for_arriving: Whether to fill portcalls around arriving ship
+    :param collapse_events: whether to collapse events between existing portcalls
+    :param go_backward: whether to check portcall backwards as well
+    :param for_departing: whether to fill portcalls around departing [interacting] ship
+    :param event_id: event id to filter for
+    :param ship_imo: ship imo to filter for
+    :return:
+    """
+
+    unique_events = return_unique_events(date_from=date_from,
+                                         ship_imo=ship_imo,
+                                         event_id=event_id,
+                                         collapse_events=collapse_events)
 
     for event in tqdm.tqdm(unique_events):
 
         if for_arriving:
-            logger.info("Finding portcalls for arriving ship_imo: {}, date_from: {}, go_backward: {}.".format(event.ship_imo, event.date_utc, go_backward))
+            logger.info(
+                "Finding portcalls for arriving ship_imo: {}, date_from: {}, go_backward: {}.".format(event.ship_imo,
+                                                                                                      event.date_utc,
+                                                                                                      go_backward))
             portcall.get_next_portcall(imo=event.ship_imo,
                                        date_from=event.date_utc,
                                        arrival_or_departure=None,
                                        go_backward=go_backward)
 
         if for_departing:
-            logger.info("Finding portcalls for departing ship_imo: {}, date_from: {}, go_backward: {}.".format(event.interacting_ship_imo, event.date_utc, go_backward))
+            logger.info("Finding portcalls for departing ship_imo: {}, date_from: {}, go_backward: {}.".format(
+                event.interacting_ship_imo, event.date_utc, go_backward))
             portcall.get_next_portcall(imo=event.interacting_ship_imo,
                                        date_from=event.date_utc,
                                        arrival_or_departure=None,
