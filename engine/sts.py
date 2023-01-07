@@ -38,8 +38,59 @@ def update(date_from='2021-01-01'):
     update_sts_locations()
 
 
+def check_multi_stage_sts():
+    """
+    This function checks existing sts shipments for further sts performed by the interacting ship to generate
+    multistage sts shipments
+
+    Returns
+    -------
+
+    """
+    shipment_sts_departures = session.query(
+        ShipmentWithSTS,
+        Event.date_utc.label('event_date_utc'),
+        Event.id.label('event_id'),
+        Departure.event_id.label('departure_event_id'),
+        Departure.ship_imo
+    ) \
+        .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
+        .join(Event, Event.id == Departure.event_id) \
+        .filter(Departure.event_id != sa.null()) \
+        .all()
+
+    def check_events(ship_imo, date_from):
+        # force check to see if we have next portcall to limit our event query later
+        next_portcall = portcall.get_next_portcall(imo=ship_imo,
+                                                   date_from=date_from,
+                                                   arrival_or_departure=None,
+                                                   go_backward=False)
+
+        # if we do not have a next portcall yet, we leave for now
+        if not next_portcall: return
+
+        # check if other events exist further in the journey until the next portcall
+        mtevents.update(date_from=date_from,
+                        date_to=next_portcall.date_utc,
+                        ship_imo=ship_imo,
+                        force_rebuild=True,
+                        between_existing_only=True)
+
+        # collapse potentially found events
+        unique_events = return_unique_events(date_from=date_from + dt.timedelta(minutes=1), date_to=next_portcall.date_utc - dt.timedelta(minutes=1), ship_imo=ship_imo)
+
+        if not unique_events: return
+
+        for e in unique_events:
+            check_events(ship_imo=e.interacting_ship_imo, date_from=e.date_utc)
+
+    for shipment in shipment_sts_departures:
+        check_events(ship_imo=shipment.ship_imo, date_from=shipment.event_date_utc)
+
+
 def return_unique_events(
         date_from='2022-01-01',
+        date_to=None,
         ship_imo=None,
         event_id=None,
         collapse_events=False):
@@ -74,6 +125,9 @@ def return_unique_events(
 
     if date_from:
         unique_events = unique_events.filter(Event.date_utc >= date_from)
+
+    if date_to:
+        unique_events = unique_events.filter(Event.date_utc <= date_to)
 
     if ship_imo:
         unique_events = unique_events.filter(MainShip.imo.in_(to_list(ship_imo)))
