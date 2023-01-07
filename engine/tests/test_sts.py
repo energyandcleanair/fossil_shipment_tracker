@@ -7,6 +7,9 @@ from engine.mtevents import back_fill_ship_position
 import datetime as dt
 
 
+def test_find_multistage_sts():
+    sts.check_multi_stage_sts()
+
 def test_find_portcall():
     sts.fill_portcalls_around_sts()
 
