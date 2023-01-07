@@ -117,7 +117,7 @@ def update(
 
             # if we did check this ship before and force rebuild is false, only query since last time
             if last_event_call and last_event_call is not None:
-                date_from = to_datetime(last_event_call.params['todate']) + dt.timedelta(minutes=1)
+                date_from = to_datetime(last_event_call.params['todate'])
 
             date_bounds = [(date_from, date_to)]
 
@@ -125,15 +125,21 @@ def update(
             date_bounds = [(date_from, date_to)]
 
         if force_rebuild and between_existing_only and not between_shipments_only:
-            event_calls = session.query(MarineTrafficCall) \
-                .filter(MarineTrafficCall.method == base.VESSEL_EVENTS,
-                        MarineTrafficCall.params['imo'].astext == ship_imo,
-                        MarineTrafficCall.status == base.HTTP_OK) \
-                .order_by(MarineTrafficCall.params['todate'].desc()) \
-                .all()
+            cached_events = Event.query
 
-            event_date_froms = [to_datetime(date_from)] + [x.date_utc + dt.timedelta(minutes=1) for x in event_calls]
-            event_date_tos = [x.date_utc - dt.timedelta(minutes=1) for x in event_calls] + [to_datetime(date_to)]
+            if date_from:
+                cached_events = cached_events.filter(Event.date_utc > date_from)
+
+            if date_to:
+                cached_events = cached_events.filter(Event.date_utc <= date_to)
+
+            if ship_imo:
+                cached_events = cached_events.filter(Event.ship_imo.in_(to_list(ship_imo)))
+
+            cached_events = cached_events.all()
+
+            event_date_froms = [to_datetime(date_from)] + [x.date_utc for x in cached_events]
+            event_date_tos = [x.date_utc for x in cached_events] + [to_datetime(date_to)]
             date_bounds = list(zip(event_date_froms, event_date_tos))
 
         if force_rebuild and between_shipments_only:
@@ -188,13 +194,13 @@ def update(
 
             for _d in range(0, int(day_delta / polling_limit_days)):
                 query_dates.append([query_date_from, query_date_from + polling_limit])
-                query_date_from = query_date_from + polling_limit + datetime.timedelta(minutes=1)
+                query_date_from = query_date_from + polling_limit
 
             query_dates.append([query_date_from, query_date_to])
 
         for dates in query_dates:
-            query_date_from = dates[0]
-            query_date_to = dates[1]
+            query_date_from = dates[0] + dt.timedelta(minutes=1)
+            query_date_to = dates[1] - dt.timedelta(minutes=1)
 
             if query_date_to <= query_date_from:
                 continue
