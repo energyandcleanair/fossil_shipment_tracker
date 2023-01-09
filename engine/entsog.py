@@ -832,6 +832,8 @@ def update(date_from=-7, date_to=dt.date.today(), country_iso2=None,
     :return:
     """
 
+    logger_slack.info("=== ENTSOG update ===")
+
     if isinstance(date_from, int):
         last_date = session.query(sa.func.max(EntsogFlow.date)).filter(EntsogFlow.value_m3 > 0).first()[0]
         date_from = to_datetime(last_date) + dt.timedelta(days=date_from)
