@@ -122,17 +122,6 @@ def update_arrival_portcalls(date_from, date_to,
     if departure_port_iso2:
         query_departure = query_departure.filter(Port.iso2.in_(to_list(departure_port_iso2)))
 
-    queried = session.query(
-        MarineTrafficCall.params['imo'].label('imo'),
-        MarineTrafficCall.params['fromdate'].label('date_from'),
-        MarineTrafficCall.params['todate'].label('date_to'),
-        MarineTrafficCall.records
-        ) \
-    .filter(MarineTrafficCall.method == 'portcalls/',
-            MarineTrafficCall.params['movetype'] == sa.null(),
-            MarineTrafficCall.status == base.HTTP_OK
-    )
-
     # Get departures of interest
     departure_df = pd.read_sql(query_departure.statement, session.bind)
     departure_df['next_departure_date'] = departure_df \
@@ -151,7 +140,10 @@ def update_arrival_portcalls(date_from, date_to,
                                                       axis=1)
     departures = departure_df[pd.isna(departure_df.next_arrival)]
     departure_dates = departures.groupby('imo').agg(date_from=('departure_date', min),
-                                               date_to=('departure_date', max))
+                                                    date_to=('departure_date', max))
+
+    departure_dates.loc[departure_dates.date_from == departure_dates.date_to, 'date_to'] = \
+        departure_dates.loc[departure_dates.date_from == departure_dates.date_to, 'date_from'] + dt.timedelta(days=189)
 
     departure_dates = departure_dates.reset_index()
     departure_dates['dates'] = departure_dates.apply(
@@ -160,6 +152,19 @@ def update_arrival_portcalls(date_from, date_to,
     departure_dates = departure_dates[['imo', 'dates']].explode('dates').drop_duplicates().sort_values(['imo', 'dates'])
 
     # Get information on calls already made to MT
+    queried = session.query(
+        MarineTrafficCall.params['imo'].label('imo'),
+        MarineTrafficCall.params['fromdate'].label('date_from'),
+        MarineTrafficCall.params['todate'].label('date_to'),
+        MarineTrafficCall.records
+    ) \
+        .filter(MarineTrafficCall.method == 'portcalls/',
+                MarineTrafficCall.params['movetype'] == sa.null(),
+                MarineTrafficCall.status == base.HTTP_OK,
+                MarineTrafficCall.params['imo'].in_(list(departure_dates.imo.unique())),
+                MarineTrafficCall.date_utc >= departure_dates.dates.min()
+                )
+
     queried_df = pd.read_sql(queried.statement, session.bind)
     queried_df = queried_df[queried_df.imo.isin(departure_dates.imo)]
 
