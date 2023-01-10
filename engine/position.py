@@ -46,6 +46,8 @@ def update_shipment_last_position():
             Departure.date_utc).label('date_utc')) \
         .join(Departure, Departure.id == shipments_distinct_departure.c.shipment_departure_id).subquery()
 
+    existing_positions = session.query(shipments_all.c.shipment_last_position_id)
+
     shipments_w_last_position = session.query(shipments_all.c.shipment_id,
                                               Position.id.label('position_id'),
                                               Position.destination_name,
@@ -57,6 +59,7 @@ def update_shipment_last_position():
         .outerjoin(Arrival, Arrival.id == shipments_all.c.shipment_arrival_id) \
         .join(Position, Position.ship_imo == Departure.ship_imo) \
         .filter(
+        Position.id.notin_(existing_positions),
         sa.and_(
             Position.date_utc >= Departure.date_utc,
             sa.or_(Arrival.date_utc == sa.null(),
