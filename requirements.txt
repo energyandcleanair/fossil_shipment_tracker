@@ -36,3 +36,4 @@ seaborn~=0.12.1
 slack-sdk==3.19.5
 google-cloud-storage==2.7.0
 pyreadr==0.4.7
+pre-commit
