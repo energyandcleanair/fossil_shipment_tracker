@@ -13,12 +13,11 @@ from base.logger import logger, logger_slack
 from base.db import session
 from base.models import ShipmentWithSTS, PortCall, Departure, ShipmentDepartureLocationSTS, \
     ShipmentArrivalLocationSTS, Event, STSLocation, Arrival, Ship
+from base.models import DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, \
+    DB_TABLE_STSARRIVALLOCATION
 
 from base.utils import update_geometry_from_wkb, to_list
 from base.db_utils import upsert
-
-from base.models import DB_TABLE_STS_LOCATIONS, DB_TABLE_STSDEPARTURELOCATION, \
-    DB_TABLE_STSARRIVALLOCATION
 
 from engine import portcall, mtevents
 
@@ -67,7 +66,8 @@ def check_multi_stage_sts():
                                                    go_backward=False)
 
         # if we do not have a next portcall yet, we leave for now
-        if not next_portcall: return
+        if not next_portcall:
+            return
 
         # check if other events exist further in the journey until the next portcall
         mtevents.update(date_from=date_from,
@@ -77,9 +77,12 @@ def check_multi_stage_sts():
                         between_existing_only=True)
 
         # collapse potentially found events
-        unique_events = return_unique_events(date_from=date_from + dt.timedelta(minutes=1), date_to=next_portcall.date_utc - dt.timedelta(minutes=1), ship_imo=ship_imo)
+        unique_events = return_unique_events(date_from=date_from + dt.timedelta(minutes=1),
+                                             date_to=next_portcall.date_utc - dt.timedelta(minutes=1),
+                                             ship_imo=ship_imo)
 
-        if not unique_events: return
+        if not unique_events:
+            return
 
         for e in unique_events:
             check_events(ship_imo=e.interacting_ship_imo, date_from=e.date_utc)
