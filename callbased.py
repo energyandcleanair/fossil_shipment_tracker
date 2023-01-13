@@ -26,7 +26,7 @@ MIN_DAYS = 10  # Not worth using the call-based key uncer MIN_DAYS
 tqdm.pandas()
 
 
-def update_history(
+def update(
     date_from,
     date_to,
     departure_port_iso2,
@@ -40,13 +40,13 @@ def update_history(
     #
     # We use it to fill historical data and laundromat countries
 
-    update_departures_portcalls(
+    update_departures(
         date_from=date_from, date_to=date_to, departure_port_iso2=departure_port_iso2
     )
 
     departure.update(date_from=date_from)
 
-    update_arrival_portcalls(
+    update_arrivals(
         date_from=date_from,
         date_to=date_to,
         commodities=commodities,
@@ -87,7 +87,7 @@ def get_queried_port_hours(port_id, date_from=None):
         queried_df["date_to"] = pd.to_datetime(queried_df.date_to)
         queried_df["dates"] = queried_df.apply(
             lambda row: pd.date_range(
-                row.date_from.floor("H"), row.date_to.floor("H"), freq="H"
+                row.date_from.ceil("H"), row.date_to.floor("H"), freq="H"
             ),
             axis=1,
         )
@@ -209,7 +209,7 @@ def get_intervals(
     # Rename the columns to date_from and date_to
     intervals.columns = ["date_from", "date_to"]
 
-    # Merge consecutive intervals if they are within 189 days
+    # Merge consecutive intervals if they are within MAX_DAYS
     # Reset the index of the intervals DataFrame
     intervals = intervals.reset_index(drop=True)
 
@@ -230,10 +230,9 @@ def get_intervals(
     return intervals.to_dict(orient="records")
 
 
-def update_departures_portcalls(date_from, date_to, departure_port_iso2=None):
-    # Brute force: 3 calls per port
+def update_departures(date_from, date_to=None, departure_port_iso2=None):
     date_from = to_datetime(date_from)
-    date_to = to_datetime(date_to)
+    date_to = to_datetime(date_to) if date_to else dt.datetime.now()
     ports = session.query(Port).filter(Port.check_departure)
     if departure_port_iso2:
         ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
@@ -270,7 +269,7 @@ def update_departures_portcalls(date_from, date_to, departure_port_iso2=None):
                 )
 
 
-def update_arrival_portcalls(
+def update_arrivals(
     commodities,  # Forcing a choice to avoid wasting credits
     date_from,
     date_to=dt.datetime.now(),
@@ -357,6 +356,7 @@ def update_arrival_portcalls(
                     "Not worth using call-based key. Using credit-based key for ship %s, interval %s"
                     % (imo, interval)
                 )
+
                 portcalls = portcall.get_next_portcall(
                     date_from=interval["date_from"],
                     date_to=interval["date_to"],
@@ -371,8 +371,3 @@ def update_arrival_portcalls(
                     "Not worth using call-based key. Skipping for ship %s, interval %s"
                     % (imo, interval)
                 )
-
-
-if __name__ == "__main__":
-    print("=== Using %s environment ===" % (base.db.environment,))
-    update_history()
