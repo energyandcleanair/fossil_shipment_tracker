@@ -37,7 +37,7 @@ def update(date_from='2021-01-01'):
     update_sts_locations()
 
 
-def check_multi_stage_sts():
+def check_multi_stage_sts(date_from="2022-01-01"):
     """
     This function checks existing sts shipments for further sts performed by the interacting ship to generate
     multistage sts shipments
@@ -55,8 +55,12 @@ def check_multi_stage_sts():
     ) \
         .join(Departure, Departure.id == ShipmentWithSTS.departure_id) \
         .join(Event, Event.id == Departure.event_id) \
-        .filter(Departure.event_id != sa.null()) \
-        .all()
+        .filter(Departure.event_id != sa.null())
+
+    if date_from:
+        shipment_sts_departures = shipment_sts_departures.filter(Event.date_utc >= date_from)
+
+    shipment_sts_departures = shipment_sts_departures.all()
 
     def check_events(ship_imo, date_from):
         # force check to see if we have next portcall to limit our event query later
@@ -74,7 +78,8 @@ def check_multi_stage_sts():
                         date_to=next_portcall.date_utc,
                         ship_imo=ship_imo,
                         force_rebuild=True,
-                        between_existing_only=True)
+                        between_existing_only=True,
+                        silent=True)
 
         # collapse potentially found events
         unique_events = return_unique_events(date_from=date_from + dt.timedelta(minutes=1),
