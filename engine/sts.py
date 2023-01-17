@@ -87,7 +87,7 @@ def check_multi_stage_sts():
         for e in unique_events:
             check_events(ship_imo=e.interacting_ship_imo, date_from=e.date_utc)
 
-    for shipment in shipment_sts_departures:
+    for shipment in tqdm.tqdm(shipment_sts_departures):
         check_events(ship_imo=shipment.ship_imo, date_from=shipment.event_date_utc)
 
 
