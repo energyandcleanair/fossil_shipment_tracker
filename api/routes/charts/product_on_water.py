@@ -41,6 +41,9 @@ class ChartProductOnWater(Resource):
                         help='rolling average window (in days). Default: no rolling averaging',
                         required=False, default=None)
 
+    parser.add_argument("pivot_value", type=str, help="pivoted value. Default: value_tonne.", required=False,
+                        default="value_tonne")
+
     parser.add_argument('language', type=str, help='en or ua',
                         default="en", required=False)
 
@@ -61,6 +64,7 @@ class ChartProductOnWater(Resource):
         format = params_chart.get('format')
         language = params_chart.get('language')
         nest_in_data = params_chart.get('nest_in_data')
+        pivot_value = params_chart.get("pivot_value")
 
         params.update(**params_chart)
         params.update(**{
@@ -156,19 +160,35 @@ class ChartProductOnWater(Resource):
         for d in date_range:
             _data = data[(data['departure_date'] <= d) & (data['arrival_detected_date'] >= d)] \
                           .groupby(['commodity', 'commodity_destination_region']).agg(
-                {'value_tonne': 'sum'}).reset_index()
+                {pivot_value: 'sum'}).reset_index()
             _data['date'] = d
             result.append(_data)
 
         result = pd.concat(result)
 
-        result = result.pivot_table(
-            index=['commodity', 'date'],
-            columns = 'commodity_destination_region',
-            values='value_tonne',
-            sort=False,
-            fill_value=0) \
-        .reset_index()
+        def pivot_data(data, variable):
+
+            # Add the variable for transparency sake
+            data["variable"] = variable
+            result = (
+                data.groupby(
+                    ["commodity_destination_region", "date", "commodity", "variable"],
+                    dropna=False,
+                )[variable]
+                .sum()
+                .reset_index()
+                .pivot_table(
+                    index=["commodity", "date", "variable"],
+                    columns=["commodity_destination_region"],
+                    values=variable,
+                    sort=False,
+                    fill_value=0,
+                )
+                .reset_index()
+            )
+            return result
+
+        result = pivot_data(result, variable=pivot_value)
 
         result = translate(data=result, language=language)
 
