@@ -43,7 +43,8 @@ def update(
         cache_objects=False,
         upload_unprocessed_events=True,
         force_rebuild=False,
-        limit=None):
+        limit=None,
+        silent=False):
     """
     This function retrieves the events for a specific ship imo
 
@@ -64,7 +65,9 @@ def update(
     -------
 
     """
-    logger_slack.info("=== Updating events for ships ===")
+
+    if not silent:
+        logger_slack.info("=== Updating events for ships ===")
 
     ships = session.query(
         Departure.ship_imo.distinct().label("ship_imo"),
