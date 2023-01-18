@@ -103,13 +103,18 @@ def return_unique_events(
         event_id=None,
         collapse_events=False):
     """
+    This function returns unique events based on our assumptions of STS interactions:
+        - the commodities of hte two ships have to soft-match; see below
+        - we must have confirmed distance at time of event between the two ships
+        - if we collapse, we remove any events which point to the same next portcall (i.e. two same ships interact together multiple
+        times before a portcall)
 
     Parameters
     ----------
-    date_from :
-    ship_imo :
-    event_id :
-    collapse_events :
+    date_from : date from which to get events
+    ship_imo : ship imo to filter for
+    event_id : event id to filter for
+    collapse_events : whether to collapse events based on next portcall
     """
 
     MainShip = aliased(Ship)
@@ -294,6 +299,7 @@ def fill():
 
 def detect_sts_departure_location(shipment_id=None):
     """
+    Find sts departure locations based on pre-defined areas we have created (i.e. Gibraltar...)
 
     Parameters
     ----------
