@@ -46,7 +46,7 @@ def update(
         limit=None,
         silent=False):
     """
-    This function retrieves the events for a specific ship imo
+    This function retrieves the events for departing RU ships we have in our db with specific constraints
 
     Parameters
     ----------
@@ -60,6 +60,7 @@ def update(
     force_rebuild : force rebuild ignoring previous calls
     upload_unprocessed_events : whether to upload events where we failed to get some date
     limit : the limit of the number of ships we want to process
+    silent: whether to print logger message
 
     Returns
     -------
@@ -105,146 +106,190 @@ def update(
         # add ship to processed
         processed_ships.append(ship_imo)
 
-        # dates to query
-        date_bounds = []
+        get_and_process_ship_events_between_dates(
+            date_from=date_from,
+            date_to=date_to,
+            ship_imo=ship_imo,
+            between_existing_only=between_existing_only,
+            between_shipments_only=between_shipments_only,
+            use_cache=use_cache,
+            cache_objects=cache_objects,
+            upload_unprocessed_events=upload_unprocessed_events,
+            force_rebuild=force_rebuild
+        )
 
-        if not force_rebuild:
 
-            # check whether we called this ship imo in the MTCall table and get latest date
-            last_event_call = session.query(MarineTrafficCall) \
-                .filter(MarineTrafficCall.method == base.VESSEL_EVENTS,
-                        MarineTrafficCall.params['imo'].astext == ship_imo,
-                        MarineTrafficCall.status == base.HTTP_OK) \
-                .order_by(MarineTrafficCall.params['todate'].desc()) \
-                .first()
+def get_and_process_ship_events_between_dates(
+        date_from="2022-01-01",
+        date_to=dt.date.today() + dt.timedelta(days=1),
+        ship_imo=None,
+        between_existing_only=False,
+        between_shipments_only=False,
+        use_cache=False,
+        cache_objects=False,
+        upload_unprocessed_events=True,
+        force_rebuild=False):
+    """
+    This function retrieves the events for a specific ship imo
 
-            # if we did check this ship before and force rebuild is false, only query since last time
-            if last_event_call and last_event_call is not None:
-                date_from = to_datetime(last_event_call.params['todate'])
+    Parameters
+    ----------
+    between_shipments_only : will only query events between existing shipments and ignore them otherwise
+    between_existing_only : will only query between existing events
+    date_from : date we want to query from
+    date_to : date we want to query to
+    ship_imo : the ship imo(s)s
+    use_cache : whether we want to check cache
+    cache_objects : whether we want to cache objects
+    force_rebuild : force rebuild ignoring previous calls
+    upload_unprocessed_events : whether to upload events where we failed to get some date
 
-            date_bounds = [(date_from, date_to)]
+    Returns
+    -------
 
-        if force_rebuild and not between_existing_only and not between_shipments_only:
-            date_bounds = [(date_from, date_to)]
+    """
 
-        if force_rebuild and between_existing_only and not between_shipments_only:
-            cached_events = Event.query
+    logger.info("Processing ship_imo: {}.".format(ship_imo))
 
-            if date_from:
-                cached_events = cached_events.filter(Event.date_utc > date_from)
+    # dates to query
+    date_bounds = []
 
-            if date_to:
-                cached_events = cached_events.filter(Event.date_utc <= date_to)
+    if not force_rebuild:
 
-            if ship_imo:
-                cached_events = cached_events.filter(Event.ship_imo.in_(to_list(ship_imo)))
+        # check whether we called this ship imo in the MTCall table and get latest date
+        last_event_call = session.query(MarineTrafficCall) \
+            .filter(MarineTrafficCall.method == base.VESSEL_EVENTS,
+                    MarineTrafficCall.params['imo'].astext == ship_imo,
+                    MarineTrafficCall.status == base.HTTP_OK) \
+            .order_by(MarineTrafficCall.params['todate'].desc()) \
+            .first()
 
-            cached_events = cached_events.all()
+        # if we did check this ship before and force rebuild is false, only query since last time
+        if last_event_call and last_event_call is not None:
+            date_from = to_datetime(last_event_call.params['todate'])
 
-            event_date_froms = [to_datetime(date_from)] + [x.date_utc for x in cached_events]
-            event_date_tos = [x.date_utc for x in cached_events] + [to_datetime(date_to)]
-            date_bounds = list(zip(event_date_froms, event_date_tos))
+        date_bounds = [(date_from, date_to)]
 
-        if force_rebuild and between_shipments_only:
-            # to reduce the amount of credits/unneeded events - we can query only between existing departures / arrivals
-            # for shipments in our db - if we do not have an arrival, we use the next departure date for undeteced
-            # arrival shipments, and otherwise todays date
-            shipments = session.query(
-                Shipment.id.label('shipment_id'),
-                Departure.date_utc.label('departure_date_utc'),
-                Arrival.date_utc.label('arrival_date_utc'),
-                sa.func.lag(Departure.date_utc).over(Departure.ship_imo, order_by=Departure.date_utc.desc()).label(
-                    'next_departure_date')
-            ) \
-                .join(Departure, Departure.id == Shipment.departure_id) \
-                .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
-                .filter(Departure.ship_imo == ship_imo,
-                        Departure.date_utc >= to_datetime(date_from),
-                        Departure.date_utc <= to_datetime(date_to)) \
-                .order_by(Departure.date_utc.asc()).subquery()
+    if force_rebuild and not between_existing_only and not between_shipments_only:
+        date_bounds = [(date_from, date_to)]
 
-            shipment_dates = session.query(
-                shipments.c.departure_date_utc.label('date_from'),
-                sa.case(
-                    [
-                        (shipments.c.arrival_date_utc != sa.null(), shipments.c.arrival_date_utc),
-                        (sa.and_(shipments.c.arrival_date_utc == sa.null(),
-                                 shipments.c.next_departure_date != sa.null()), shipments.c.next_departure_date)
-                    ], else_=datetime.date.today()
-                ).label('date_to')
-            )
+    if force_rebuild and between_existing_only and not between_shipments_only:
+        cached_events = Event.query
 
-            date_bounds = shipment_dates.all()
+        if date_from:
+            cached_events = cached_events.filter(Event.date_utc > date_from)
 
-        # there is a max query date for marinetraffic, so we need to possibly break down dates to <180 day difference
-        query_dates = []
+        if date_to:
+            cached_events = cached_events.filter(Event.date_utc <= date_to)
 
-        for dates in date_bounds:
-            query_date_from = dates[0]
-            query_date_to = dates[1]
+        if ship_imo:
+            cached_events = cached_events.filter(Event.ship_imo.in_(to_list(ship_imo)))
 
-            if query_date_to <= query_date_from:
+        cached_events = cached_events.all()
+
+        event_date_froms = [to_datetime(date_from)] + [x.date_utc for x in cached_events]
+        event_date_tos = [x.date_utc for x in cached_events] + [to_datetime(date_to)]
+        date_bounds = list(zip(event_date_froms, event_date_tos))
+
+    if force_rebuild and between_shipments_only:
+        # to reduce the amount of credits/unneeded events - we can query only between existing departures / arrivals
+        # for shipments in our db - if we do not have an arrival, we use the next departure date for undeteced
+        # arrival shipments, and otherwise todays date
+        shipments = session.query(
+            Shipment.id.label('shipment_id'),
+            Departure.date_utc.label('departure_date_utc'),
+            Arrival.date_utc.label('arrival_date_utc'),
+            sa.func.lag(Departure.date_utc).over(Departure.ship_imo, order_by=Departure.date_utc.desc()).label(
+                'next_departure_date')
+        ) \
+            .join(Departure, Departure.id == Shipment.departure_id) \
+            .outerjoin(Arrival, Arrival.id == Shipment.arrival_id) \
+            .filter(Departure.ship_imo == ship_imo,
+                    Departure.date_utc >= to_datetime(date_from),
+                    Departure.date_utc <= to_datetime(date_to)) \
+            .order_by(Departure.date_utc.asc()).subquery()
+
+        shipment_dates = session.query(
+            shipments.c.departure_date_utc.label('date_from'),
+            sa.case(
+                [
+                    (shipments.c.arrival_date_utc != sa.null(), shipments.c.arrival_date_utc),
+                    (sa.and_(shipments.c.arrival_date_utc == sa.null(),
+                             shipments.c.next_departure_date != sa.null()), shipments.c.next_departure_date)
+                ], else_=datetime.date.today()
+            ).label('date_to')
+        )
+
+        date_bounds = shipment_dates.all()
+
+    # there is a max query date for marinetraffic, so we need to possibly break down dates to <180 day difference
+    query_dates = []
+
+    for dates in date_bounds:
+        query_date_from = dates[0]
+        query_date_to = dates[1]
+
+        if query_date_to <= query_date_from:
+            continue
+
+        day_delta = (query_date_to - query_date_from).days
+
+        if day_delta < 180:
+            query_dates.append(dates)
+            continue
+
+        polling_limit_days = 179
+        polling_limit = datetime.timedelta(polling_limit_days)
+
+        for _d in range(0, int(day_delta / polling_limit_days)):
+            query_dates.append([query_date_from, query_date_from + polling_limit])
+            query_date_from = query_date_from + polling_limit
+
+        query_dates.append([query_date_from, query_date_to])
+
+    for dates in query_dates:
+        query_date_from = dates[0] + dt.timedelta(minutes=1)
+        query_date_to = dates[1] - dt.timedelta(minutes=1)
+
+        if query_date_to <= query_date_from:
+            continue
+
+        events = Marinetraffic.get_ship_events_between_dates(
+            imo=ship_imo,
+            date_from=to_datetime(query_date_from),
+            date_to=to_datetime(query_date_to),
+            use_cache=use_cache,
+            cache_objects=cache_objects
+        )
+
+        if not events:
+            print("No vessel events found for ship_imo: {}.".format(ship_imo))
+            continue
+
+        event_process_state = [add_interacting_ship_details_to_event(e) for e in events]
+
+        if event_process_state.count(False) > 0:
+            print("Failed to process {} events out of {}".format(event_process_state.count(False),
+                                                                 len(event_process_state)))
+
+        # Store them in db so that we won't query them
+        for event in events:
+
+            if not upload_unprocessed_events and event.interacting_ship_imo is None:
                 continue
 
-            day_delta = (query_date_to - query_date_from).days
-
-            if day_delta < 180:
-                query_dates.append(dates)
+            try:
+                session.add(event)
+                session.commit()
+                if force_rebuild:
+                    print("Found a missing event")
+            except sqlalchemy.exc.IntegrityError as e:
+                if "psycopg2.errors.UniqueViolation" in str(e):
+                    print("Failed to upload event: duplicated event")
+                else:
+                    print("Failed to upload event: %s" % (str(e),))
+                session.rollback()
                 continue
-
-            polling_limit_days = 179
-            polling_limit = datetime.timedelta(polling_limit_days)
-
-            for _d in range(0, int(day_delta / polling_limit_days)):
-                query_dates.append([query_date_from, query_date_from + polling_limit])
-                query_date_from = query_date_from + polling_limit
-
-            query_dates.append([query_date_from, query_date_to])
-
-        for dates in query_dates:
-            query_date_from = dates[0] + dt.timedelta(minutes=1)
-            query_date_to = dates[1] - dt.timedelta(minutes=1)
-
-            if query_date_to <= query_date_from:
-                continue
-
-            events = Marinetraffic.get_ship_events_between_dates(
-                imo=ship_imo,
-                date_from=to_datetime(query_date_from),
-                date_to=to_datetime(query_date_to),
-                use_cache=use_cache,
-                cache_objects=cache_objects
-            )
-
-            if not events:
-                print("No vessel events found for ship_imo: {}.".format(ship_imo))
-                continue
-
-            event_process_state = [add_interacting_ship_details_to_event(e) for e in events]
-
-            if event_process_state.count(False) > 0:
-                print("Failed to process {} events out of {}".format(event_process_state.count(False),
-                                                                     len(event_process_state)))
-
-            # Store them in db so that we won't query them
-            for event in events:
-
-                if not upload_unprocessed_events and event.interacting_ship_imo is None:
-                    continue
-
-                try:
-                    session.add(event)
-                    session.commit()
-                    if force_rebuild:
-                        print("Found a missing event")
-                except sqlalchemy.exc.IntegrityError as e:
-                    if "psycopg2.errors.UniqueViolation" in str(e):
-                        print("Failed to upload event: duplicated event")
-                    else:
-                        print("Failed to upload event: %s" % (str(e),))
-                    session.rollback()
-                    continue
-
 
 def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time, window_hours = 2, use_cache = True, cache_only= False):
     """

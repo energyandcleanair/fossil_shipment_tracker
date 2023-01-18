@@ -74,12 +74,11 @@ def check_multi_stage_sts(date_from="2022-01-01"):
             return
 
         # check if other events exist further in the journey until the next portcall
-        mtevents.update(date_from=date_from,
-                        date_to=next_portcall.date_utc,
-                        ship_imo=ship_imo,
-                        force_rebuild=True,
-                        between_existing_only=True,
-                        silent=True)
+        mtevents.get_and_process_ship_events_between_dates(date_from=date_from,
+                                                           date_to=next_portcall.date_utc,
+                                                           ship_imo=ship_imo,
+                                                           force_rebuild=True,
+                                                           between_existing_only=True)
 
         # collapse potentially found events
         unique_events = return_unique_events(date_from=date_from + dt.timedelta(minutes=1),
@@ -147,20 +146,19 @@ def return_unique_events(
     unique_events = unique_events.all()
 
     if collapse_events:
-
         # get the next portcall date for each event
         next_portcall = session.query(
             Event.id,
             PortCall.date_utc.label('next_portcall_date_utc')
         ) \
-        .outerjoin(PortCall, PortCall.ship_imo == Event.ship_imo) \
-        .filter(Event.id.in_([e.id for e in unique_events])) \
-        .filter(PortCall.date_utc > Event.date_utc) \
-        .order_by(
+            .outerjoin(PortCall, PortCall.ship_imo == Event.ship_imo) \
+            .filter(Event.id.in_([e.id for e in unique_events])) \
+            .filter(PortCall.date_utc > Event.date_utc) \
+            .order_by(
             Event.id,
             PortCall.date_utc.asc()
         ) \
-        .distinct(
+            .distinct(
             Event.id
         ).subquery()
 
