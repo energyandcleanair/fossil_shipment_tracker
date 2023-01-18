@@ -84,7 +84,8 @@ def check_multi_stage_sts(date_from="2022-01-01"):
         # collapse potentially found events
         unique_events = return_unique_events(date_from=date_from + dt.timedelta(minutes=1),
                                              date_to=next_portcall.date_utc - dt.timedelta(minutes=1),
-                                             ship_imo=ship_imo)
+                                             ship_imo=ship_imo,
+                                             collapse_events=True)
 
         if not unique_events:
             return
@@ -146,26 +147,40 @@ def return_unique_events(
     unique_events = unique_events.all()
 
     if collapse_events:
+
+        # get the next portcall date for each event
+        next_portcall = session.query(
+            Event.id,
+            PortCall.date_utc.label('next_portcall_date_utc')
+        ) \
+        .outerjoin(PortCall, PortCall.ship_imo == Event.ship_imo) \
+        .filter(Event.id.in_([e.id for e in unique_events])) \
+        .filter(PortCall.date_utc > Event.date_utc) \
+        .order_by(
+            Event.id,
+            PortCall.date_utc.asc()
+        ) \
+        .distinct(
+            Event.id
+        ).subquery()
+
         unique_events = session.query(
             Event.id,
             Event.ship_imo,
             Event.interacting_ship_imo,
             Event.date_utc,
-            PortCall.date_utc.label('next_portcall_date_utc')
+            next_portcall.c.next_portcall_date_utc
         ) \
-            .outerjoin(PortCall, PortCall.ship_imo == Event.ship_imo) \
-            .filter(PortCall.date_utc > Event.date_utc) \
-            .filter(Event.id.in_([e.id for e in unique_events])) \
+            .join(next_portcall, next_portcall.c.id == Event.id) \
             .order_by(
             Event.ship_imo,
             Event.interacting_ship_imo,
-            Event.date_utc,
-            PortCall.date_utc.asc()
+            next_portcall.c.next_portcall_date_utc.desc()
         ) \
             .distinct(
             Event.ship_imo,
             Event.interacting_ship_imo,
-            PortCall.date_utc
+            next_portcall.c.next_portcall_date_utc
         ).all()
 
     return unique_events
