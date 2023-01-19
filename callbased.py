@@ -233,6 +233,8 @@ def get_intervals(
 def update_departures(date_from, date_to=None, departure_port_iso2=None):
     date_from = to_datetime(date_from)
     date_to = to_datetime(date_to) if date_to else dt.datetime.now()
+    # Otherwise, we would think we queried portcalls that we actually didn't
+    assert date_to < dt.datetime.now()
     ports = session.query(Port).filter(Port.check_departure)
     if departure_port_iso2:
         ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
@@ -276,6 +278,9 @@ def update_arrivals(
     departure_port_iso2=None,
     use_credit_key_if_short=False,
 ):
+    date_to = to_datetime(date_to) if date_to else dt.datetime.now()
+    # Otherwise, we would think we queried portcalls that we actually didn't
+    assert date_to < dt.datetime.now()
 
     query_departure = (
         session.query(
