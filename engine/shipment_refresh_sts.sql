@@ -1,7 +1,7 @@
 -- first delete existing sts shipments for refresh - we do this as we have non-unqiue departure/arrival ids and hence
 -- we refresh whole table each time
 -- CLEAN UP BEGIN
-WITH deleted_sts_shipments AS (
+WITH RECURSIVE deleted_sts_shipments AS (
      DELETE FROM shipment_with_sts
      RETURNING
         id,
@@ -168,7 +168,8 @@ FROM
 	  ev.id as event_id,
 	  ev.interacting_ship_imo,
 	  ev.interacting_ship_name,
-	  pprev_ship.next_date_utc as next_portcall_date_utc
+	  pprev_ship.next_date_utc as next_portcall_date_utc,
+	  pprev_intship.next_date_utc as intship_next_portcall_date_utc
 	  FROM
 	    event ev
 	  JOIN ship mainship ON mainship.imo = ev.ship_imo
@@ -301,6 +302,18 @@ departures_sts AS (
 			SELECT event_id
 			FROM sts_arrival
 		)
+),
+-- recursively find the event chain from the sts departures,
+with event_chain as (
+	SELECT ship_imo, interacting_ship_imo, event_id, null::bigint as event_to, event_date_utc, next_portcall_date_utc, 1 as level
+	FROM unique_events WHERE event_id IN (select event_id FROM departures_sts)
+		UNION ALL
+	select unique_events.ship_imo, e.interacting_ship_imo, unique_events.event_id, e.event_id AS event_to, unique_events.event_date_utc, unique_events.next_portcall_date_utc, e.level + 1
+	from unique_events
+	join e ON (
+		unique_events.interacting_ship_imo = e.ship_imo AND
+        (e.event_date_utc BETWEEN unique_events.event_date_utc AND unique_events.intship_next_portcall_date_utc)
+  )
 ),
 -- now look at departures from sts and check if we have any matching arrivals
 sts_departures_with_next AS (
