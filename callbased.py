@@ -167,6 +167,7 @@ def get_intervals(
     date_to=None,
     queried_hours=[],
     merge_under_max_days=True,
+    extend=True,
 ):
     """
     Build intervals to auery, based on date_from, date_to, and the hours that have already been queried.
@@ -226,6 +227,25 @@ def get_intervals(
                 intervals = intervals.reset_index(drop=True)
             else:
                 i += 1
+
+    if extend and len(intervals) > 0:
+
+        def extend_date_to(row):
+            date_from = pd.to_datetime(row["date_from"])
+            date_to = pd.to_datetime(row["date_to"])
+            now = dt.datetime.now()
+            diff = date_to - date_from
+            if diff < dt.timedelta(days=MAX_DAYS) and diff > dt.timedelta(
+                days=MIN_DAYS
+            ):
+                date_to = min(
+                    date_from + dt.timedelta(days=MAX_DAYS), now - dt.timedelta(hours=1)
+                )
+                date_to = date_to.floor("h")
+
+            return date_to
+
+        intervals["date_to"] = intervals.apply(extend_date_to, axis=1)
 
     return intervals.to_dict(orient="records")
 
@@ -338,6 +358,9 @@ def update_arrivals(
         intervals = get_intervals(
             wanted_intervals=wanted_intervals, queried_hours=queried_hours
         )
+
+        # Only consider those invervals that start before date_to
+        intervals = [x for x in intervals if x["date_from"] < date_to]
 
         for interval in intervals:
             if interval["date_to"] - interval["date_from"] > dt.timedelta(
