@@ -1,5 +1,6 @@
 from tqdm import tqdm
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 import base
 import json
 
@@ -114,7 +115,7 @@ def fill(imos=[], mmsis=[]):
         return [x for x in imos if str(x) not in existing_imos]
 
     def get_missing_ships_mmsis(mmsis):
-        existing_mmsis = [mmsi for s in session.query(Ship).all() for mmsi in s.mmsi]
+        existing_mmsis = [x for x, in session.query(func.unnest(Ship.mmsi)).all()]
         return [x for x in mmsis if str(x) not in existing_mmsis]
 
     if not get_missing_ships_imos(imos) and not get_missing_ships_mmsis(mmsis):
