@@ -210,16 +210,37 @@ def get_intervals(
     # Rename the columns to date_from and date_to
     intervals.columns = ["date_from", "date_to"]
 
+    # Split those above MAX_DAYS
+    split_rows = []
+    for _, row in intervals.iterrows():
+        date_diff = row["date_to"] - row["date_from"]
+        if date_diff.days > MAX_DAYS:
+            new_row1 = {
+                "date_from": row["date_from"],
+                "date_to": row["date_from"] + pd.Timedelta(MAX_DAYS, unit="d"),
+            }
+            new_row2 = {
+                "date_from": row["date_from"] + pd.Timedelta(MAX_DAYS, unit="d"),
+                "date_to": row["date_to"],
+            }
+            split_rows.append(new_row1)
+            split_rows.append(new_row2)
+        else:
+            split_rows.append(row)
+
+    intervals = pd.DataFrame(split_rows, columns=["date_from", "date_to"])
+
     # Merge consecutive intervals if they are within MAX_DAYS
     # Reset the index of the intervals DataFrame
     intervals = intervals.reset_index(drop=True)
+    intervals.sort_values("date_from", inplace=True)
 
     if merge_under_max_days:
         i = 0
         while i < len(intervals) - 1:
-            if intervals.loc[i, "date_to"] >= intervals.loc[
-                i + 1, "date_from"
-            ] - pd.Timedelta(days=MAX_DAYS):
+            if intervals.loc[i + 1, "date_to"] <= intervals.loc[
+                i, "date_from"
+            ] + pd.Timedelta(days=MAX_DAYS):
                 intervals.loc[i, "date_to"] = max(
                     intervals.loc[i, "date_to"], intervals.loc[i + 1, "date_to"]
                 )
