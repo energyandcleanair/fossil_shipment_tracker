@@ -15,7 +15,15 @@ from base.utils import to_list
 from base.db import session
 from base.env import get_env
 from base.logger import logger
-from base.models import Departure, ShipInsurer, ShipOwner, ShipManager, Company, Country, Ship
+from base.models import (
+    Departure,
+    ShipInsurer,
+    ShipOwner,
+    ShipManager,
+    Company,
+    Country,
+    Ship,
+)
 from engine.equasis import Equasis
 
 from selenium import webdriver
@@ -53,25 +61,27 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
     -------
 
     """
-    company_sq = session.query(Company.id,
-                               Company.imo,
-                               func.unnest(Company.names).label('name')).subquery()
-    existing_company = session.query(company_sq) \
-        .filter(company_sq.c.name == raw_name,
-                sa.or_(
-                    imo is None,
-                    company_sq.c.imo == imo)
-                ) \
+    company_sq = session.query(
+        Company.id, Company.imo, func.unnest(Company.names).label("name")
+    ).subquery()
+    existing_company = (
+        session.query(company_sq)
+        .filter(
+            company_sq.c.name == raw_name, sa.or_(imo is None, company_sq.c.imo == imo)
+        )
         .first()
+    )
 
     if existing_company:
         company_id = existing_company.id
     else:
-        new_company = Company(imo=imo,
-                              name=raw_name,
-                              names=[raw_name],
-                              address=address,
-                              addresses=[address])
+        new_company = Company(
+            imo=imo,
+            name=raw_name,
+            names=[raw_name],
+            address=address,
+            addresses=[address],
+        )
         session.add(new_company)
         try:
             session.commit()
@@ -83,16 +93,21 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
             if ratio > 0.9:
                 company_id = existing_company.id
             else:
-                logger.warning('Inconsistency: %s != %s (IMO=%s)' % (existing_company.name, raw_name, imo))
+                logger.warning(
+                    "Inconsistency: %s != %s (IMO=%s)"
+                    % (existing_company.name, raw_name, imo)
+                )
                 company_id = None
 
     return company_id
 
 
-def update_info_from_equasis(commodities=None,
-                             last_updated=dt.date.today() - dt.timedelta(days=7),
-                             departure_date_from=None,
-                             imo=None):
+def update_info_from_equasis(
+    commodities=None,
+    last_updated=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
+    departure_date_from=None,
+    imo=None,
+):
     """
     Collect infos from equasis about shipments that either don't have infos,
     or for infos that are potentially outdated
@@ -100,19 +115,27 @@ def update_info_from_equasis(commodities=None,
     """
     equasis = Equasis()
 
-    imos = session.query(Departure.ship_imo) \
-        .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Departure.ship_imo) \
-        .outerjoin(ShipOwner, ShipOwner.ship_imo == Departure.ship_imo) \
-        .outerjoin(ShipManager, ShipManager.ship_imo == Departure.ship_imo) \
-        .filter(sa.or_(sa.and_(
-            ShipInsurer.id == sa.null(),
-            ShipOwner.id == sa.null(),
-            ShipManager.id == sa.null()),
-            ShipInsurer.updated_on <= last_updated))
+    imos = (
+        session.query(Departure.ship_imo)
+        .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Departure.ship_imo)
+        .outerjoin(ShipOwner, ShipOwner.ship_imo == Departure.ship_imo)
+        .outerjoin(ShipManager, ShipManager.ship_imo == Departure.ship_imo)
+        .filter(
+            sa.or_(
+                sa.and_(
+                    ShipInsurer.id == sa.null(),
+                    ShipOwner.id == sa.null(),
+                    ShipManager.id == sa.null(),
+                ),
+                ShipInsurer.updated_on <= last_updated,
+            )
+        )
+    )
 
     if commodities:
-        imos = imos.join(Ship, Ship.imo == Departure.ship_imo) \
-            .filter(Ship.commodity.in_(to_list(commodities)))
+        imos = imos.join(Ship, Ship.imo == Departure.ship_imo).filter(
+            Ship.commodity.in_(to_list(commodities))
+        )
 
     if departure_date_from:
         imos = imos.filter(Departure.date_utc >= departure_date_from)
@@ -120,15 +143,17 @@ def update_info_from_equasis(commodities=None,
     if imo:
         imos = imos.filter(Departure.ship_imo.in_(to_list(imo)))
 
-    imos = imos \
-        .distinct() \
-        .all()
+    imos = imos.distinct().all()
 
     imos = [x[0] for x in imos]
     ntries = 3
 
     # Remove thos we know can't be found
-    imos = [x for x in imos if x is not None and not re.search('_v|NOTFOUND_', x, re.IGNORECASE)]
+    imos = [
+        x
+        for x in imos
+        if x is not None and not re.search("_v|NOTFOUND_", x, re.IGNORECASE)
+    ]
 
     for imo in tqdm(imos):
 
@@ -147,20 +172,26 @@ def update_info_from_equasis(commodities=None,
         if equasis_infos is not None:
 
             # Update ship record
-            ship = session.query(Ship).filter(Ship.imo==imo).first()
+            ship = session.query(Ship).filter(Ship.imo == imo).first()
             others = dict(ship.others)
-            others.update({'equasis': equasis_infos})
+            others.update({"equasis": equasis_infos})
             # To convert datetimes to str
             others = json.loads(json.dumps(others, cls=JsonEncoder))
             ship.others = others
             session.commit()
 
             # Insurer
-            if equasis_infos.get('insurer'):
-                insurer_raw_name = equasis_infos.get('insurer').get('name')
+            if equasis_infos.get("insurer"):
+                insurer_raw_name = equasis_infos.get("insurer").get("name")
                 # See if exists
-                insurer = session.query(ShipInsurer).filter(ShipInsurer.company_raw_name == insurer_raw_name,
-                                                            ShipInsurer.ship_imo == imo).first()
+                insurer = (
+                    session.query(ShipInsurer)
+                    .filter(
+                        ShipInsurer.company_raw_name == insurer_raw_name,
+                        ShipInsurer.ship_imo == imo,
+                    )
+                    .first()
+                )
 
                 if not insurer:
 
@@ -169,64 +200,89 @@ def update_info_from_equasis(commodities=None,
                     # This is important because we only start querying a ship insurer
                     # After we had a departure with it, and so the first insurer
                     # would always be after the first departure otherwise
-                    has_insurer = session.query(ShipInsurer) \
-                        .filter(ShipInsurer.ship_imo == imo) \
-                        .count() > 0
+                    has_insurer = (
+                        session.query(ShipInsurer)
+                        .filter(ShipInsurer.ship_imo == imo)
+                        .count()
+                        > 0
+                    )
                     date_from_ = dt.datetime.now() if has_insurer else None
-                    insurer = ShipInsurer(company_raw_name=insurer_raw_name,
-                                          imo=None,
-                                          ship_imo=imo,
-                                          company_id=find_or_create_company_id(raw_name=insurer_raw_name),
-                                          date_from=date_from_)
+                    insurer = ShipInsurer(
+                        company_raw_name=insurer_raw_name,
+                        imo=None,
+                        ship_imo=imo,
+                        company_id=find_or_create_company_id(raw_name=insurer_raw_name),
+                        date_from=date_from_,
+                    )
                 insurer.updated_on = dt.datetime.now()
                 session.add(insurer)
                 session.commit()
 
             # Manager
-            manager_info = equasis_infos.get('manager')
+            manager_info = equasis_infos.get("manager")
             if manager_info:
-                manager_raw_name = manager_info.get('name')
-                manager_address = manager_info.get('address')
-                manager_imo = manager_info.get('imo')
-                manager_date_from = manager_info.get('date_from')
+                manager_raw_name = manager_info.get("name")
+                manager_address = manager_info.get("address")
+                manager_imo = manager_info.get("imo")
+                manager_date_from = manager_info.get("date_from")
 
                 # See if exists
-                manager = session.query(ShipManager).filter(ShipManager.company_raw_name == manager_raw_name,
-                                                            ShipManager.imo == manager_imo,
-                                                            ShipManager.ship_imo == imo,
-                                                            ShipManager.date_from == manager_date_from).first()
+                manager = (
+                    session.query(ShipManager)
+                    .filter(
+                        ShipManager.company_raw_name == manager_raw_name,
+                        ShipManager.imo == manager_imo,
+                        ShipManager.ship_imo == imo,
+                        ShipManager.date_from == manager_date_from,
+                    )
+                    .first()
+                )
                 if not manager:
-                    manager = ShipManager(company_raw_name=manager_raw_name,
-                                          ship_imo=imo,
-                                          imo=manager_imo,
-                                          date_from=manager_date_from,
-                                          company_id=find_or_create_company_id(raw_name=manager_raw_name,
-                                                                               imo=manager_imo,
-                                                                               address=manager_address))
+                    manager = ShipManager(
+                        company_raw_name=manager_raw_name,
+                        ship_imo=imo,
+                        imo=manager_imo,
+                        date_from=manager_date_from,
+                        company_id=find_or_create_company_id(
+                            raw_name=manager_raw_name,
+                            imo=manager_imo,
+                            address=manager_address,
+                        ),
+                    )
                 manager.updated_on = dt.datetime.now()
                 session.add(manager)
                 session.commit()
 
             # Owner
-            owner_info = equasis_infos.get('owner')
+            owner_info = equasis_infos.get("owner")
             if owner_info:
-                owner_raw_name = owner_info.get('name')
-                owner_address = owner_info.get('address')
-                owner_imo = owner_info.get('imo')
-                owner_date_from = owner_info.get('date_from')
+                owner_raw_name = owner_info.get("name")
+                owner_address = owner_info.get("address")
+                owner_imo = owner_info.get("imo")
+                owner_date_from = owner_info.get("date_from")
 
                 # See if exists
-                owner = session.query(ShipOwner).filter(ShipOwner.company_raw_name == owner_raw_name,
-                                                        ShipOwner.ship_imo == imo,
-                                                        ShipOwner.date_from == owner_date_from).first()
+                owner = (
+                    session.query(ShipOwner)
+                    .filter(
+                        ShipOwner.company_raw_name == owner_raw_name,
+                        ShipOwner.ship_imo == imo,
+                        ShipOwner.date_from == owner_date_from,
+                    )
+                    .first()
+                )
                 if not owner:
-                    owner = ShipOwner(company_raw_name=owner_raw_name,
-                                      ship_imo=imo,
-                                      imo=owner_imo,
-                                      date_from=owner_date_from,
-                                      company_id=find_or_create_company_id(raw_name=owner_raw_name,
-                                                                           imo=owner_imo,
-                                                                           address=owner_address))
+                    owner = ShipOwner(
+                        company_raw_name=owner_raw_name,
+                        ship_imo=imo,
+                        imo=owner_imo,
+                        date_from=owner_date_from,
+                        company_id=find_or_create_company_id(
+                            raw_name=owner_raw_name,
+                            imo=owner_imo,
+                            address=owner_address,
+                        ),
+                    )
                 owner.updated_on = dt.datetime.now()
 
                 # Verify we DID find a matching company_id using find_or_create_company_id otherwise we will have an
@@ -235,7 +291,11 @@ def update_info_from_equasis(commodities=None,
                     session.add(owner)
                     session.commit()
                 else:
-                    logger.warning("Failed to find/create company_id for company %s, ship_imo %s.".format(owner.company_raw_name, owner.ship_imo))
+                    logger.warning(
+                        "Failed to find/create company_id for company %s, ship_imo %s.".format(
+                            owner.company_raw_name, owner.ship_imo
+                        )
+                    )
 
 
 def fill_country():
@@ -255,12 +315,20 @@ def fill_country():
         -------
 
         """
-        country_regex = session.query(Country.iso2,
-                                      ('[\.| |,|_|-|/]{1}' + Country.name + '[\.]?$').label('regexp')).subquery()
-        update = Company.__table__.update().values(country_iso2=country_regex.c.iso2) \
-            .where(sa.and_(
-            Company.country_iso2 == sa.null(),
-            Company.address.op('~*')(country_regex.c.regexp)))
+        country_regex = session.query(
+            Country.iso2,
+            ("[\.| |,|_|-|/]{1}" + Country.name + "[\.]?$").label("regexp"),
+        ).subquery()
+        update = (
+            Company.__table__.update()
+            .values(country_iso2=country_regex.c.iso2)
+            .where(
+                sa.and_(
+                    Company.country_iso2 == sa.null(),
+                    Company.address.op("~*")(country_regex.c.regexp),
+                )
+            )
+        )
         execute_statement(update)
 
     def fill_using_address_regexps():
@@ -273,19 +341,20 @@ def fill_country():
 
         """
         address_regexps = {
-            'US': ['USA[\.]?$'],
-            'SG': ['Singapore [0-9]*$'],
-            'TW': ['\(Taiwan\)[\.]?'],
-            'PT': ['Madeira[\.]?$'],
-            'HK': ['Hong Kong, China[\.]?[\w]*[0-9]*'],
-            'IM': ['Isle of Man'],
-            'JE': ['Jersey']
+            "US": ["USA[\.]?$"],
+            "SG": ["Singapore [0-9]*$"],
+            "TW": ["\(Taiwan\)[\.]?"],
+            "PT": ["Madeira[\.]?$"],
+            "HK": ["Hong Kong, China[\.]?[\w]*[0-9]*"],
+            "IM": ["Isle of Man"],
+            "JE": ["Jersey"],
         }
 
         for key, regexps in address_regexps.items():
-            condition = sa.or_(*[Company.address.op('~')(regexp) for regexp in regexps])
-            update = Company.__table__.update().values(country_iso2=key) \
-                .where(condition)
+            condition = sa.or_(*[Company.address.op("~")(regexp) for regexp in regexps])
+            update = (
+                Company.__table__.update().values(country_iso2=key).where(condition)
+            )
             execute_statement(update)
 
     def fill_using_name_regexps():
@@ -297,37 +366,44 @@ def fill_country():
 
         """
         name_regexps = {
-            'BM': ['\(Bermuda\)$'],
-            'GB': ['Britannia Steamship insurance Association Ld',
-                   'North of England P&I Association',
-                   'UK P&I Club',
-                   'The London P&I Club',
-                   'The West of  England Shipowners',
-                   'Standard P&I Club per Charles Taylor & Co'],
-            'LU': ['The Ship owners\' Mutual P&I Association \(Luxembourg\)'],
-            'JP': ['Japan Ship Owners\' P&I Association'],
-            'NO': ['Norway$', '^Hydor AS$'],
-            'SE': ['\(Swedish Club\)$'],
-            'US': ['American Steamship Owner P&I association$'],
-            'NL': ['Noord Nederlandsche P&I Club$'],
-            'RU': ['VSK Insurance Company']
+            "BM": ["\(Bermuda\)$"],
+            "GB": [
+                "Britannia Steamship insurance Association Ld",
+                "North of England P&I Association",
+                "UK P&I Club",
+                "The London P&I Club",
+                "The West of  England Shipowners",
+                "Standard P&I Club per Charles Taylor & Co",
+            ],
+            "LU": ["The Ship owners' Mutual P&I Association \(Luxembourg\)"],
+            "JP": ["Japan Ship Owners' P&I Association"],
+            "NO": ["Norway$", "^Hydor AS$"],
+            "SE": ["\(Swedish Club\)$"],
+            "US": ["American Steamship Owner P&I association$"],
+            "NL": ["Noord Nederlandsche P&I Club$"],
+            "RU": ["VSK Insurance Company"],
         }
 
         for key, regexps in name_regexps.items():
             condition = sa.and_(
                 Company.address == sa.null(),
-                sa.or_(*[Company.name.op('~')(regexp) for regexp in regexps]))
-            update = Company.__table__.update().values(country_iso2=key,
-                                                       registration_country_iso2=key) \
+                sa.or_(*[Company.name.op("~")(regexp) for regexp in regexps]),
+            )
+            update = (
+                Company.__table__.update()
+                .values(country_iso2=key, registration_country_iso2=key)
                 .where(condition)
+            )
             execute_statement(update)
 
     def remove_care_of():
-        to_remove = ['^Care of']
+        to_remove = ["^Care of"]
         condition = sa.and_(
-            sa.or_(*[Company.address.op('~')(regexp) for regexp in to_remove]))
-        update = Company.__table__.update().values(country_iso2=sa.null()) \
-            .where(condition)
+            sa.or_(*[Company.address.op("~")(regexp) for regexp in to_remove])
+        )
+        update = (
+            Company.__table__.update().values(country_iso2=sa.null()).where(condition)
+        )
         execute_statement(update)
 
     def fill_using_file():
@@ -338,37 +414,40 @@ def fill_country():
         -------
 
         """
-        companies_df = pd.read_csv("assets/companies.csv", dtype={'imo': str})
-        companies_df = companies_df.dropna(subset=['imo', 'registration_iso2'])
+        companies_df = pd.read_csv("assets/companies.csv", dtype={"imo": str})
+        companies_df = companies_df.dropna(subset=["imo", "registration_iso2"])
         imo_country = dict(zip(companies_df.imo, companies_df.registration_iso2))
         from sqlalchemy.sql import case
 
-        session.query(Company).filter(
-            Company.imo.in_(imo_country)
-        ).update({
-            Company.registration_country_iso2: case(
-                imo_country,
-                value=Company.imo,
-            )
-        }, synchronize_session='fetch')
+        session.query(Company).filter(Company.imo.in_(imo_country)).update(
+            {
+                Company.registration_country_iso2: case(
+                    imo_country,
+                    value=Company.imo,
+                )
+            },
+            synchronize_session="fetch",
+        )
         session.commit()
 
         # For those without imo
-        companies_df = pd.read_csv("assets/companies.csv", dtype={'imo': str})
+        companies_df = pd.read_csv("assets/companies.csv", dtype={"imo": str})
         companies_df = companies_df[pd.isna(companies_df.imo)]
-        companies_df = companies_df.dropna(subset=['name', 'registration_iso2'])
+        companies_df = companies_df.dropna(subset=["name", "registration_iso2"])
         name_country = dict(zip(companies_df.name, companies_df.registration_iso2))
         from sqlalchemy.sql import case
 
         session.query(Company).filter(
-            Company.name.in_(name_country),
-            Company.imo == sa.null()
-        ).update({
-            Company.registration_country_iso2: case(
-                name_country,
-                value=Company.name,
-            )
-        }, synchronize_session='fetch')
+            Company.name.in_(name_country), Company.imo == sa.null()
+        ).update(
+            {
+                Company.registration_country_iso2: case(
+                    name_country,
+                    value=Company.name,
+                )
+            },
+            synchronize_session="fetch",
+        )
         session.commit()
 
     fill_using_country_ending()
@@ -387,48 +466,43 @@ def fill_using_imo_website():
     -------
 
     """
-    scraper = CompanyImoScraper(
-        base_url=base.IMO_BASE_URL,
-        service=None
-    )
+    scraper = CompanyImoScraper(base_url=base.IMO_BASE_URL, service=None)
 
     scraper.initialise_browser(headless=True)
 
     if not scraper.perform_login(get_env("IMO_USER"), get_env("IMO_PASSWORD")):
         return False
 
-    db_countries = dict(session.query(
-        Country.name,
-        Country.iso2
-    ).all())
+    db_countries = dict(session.query(Country.name, Country.iso2).all())
 
     # some countries from IMO website are not the same as standard/official names in our db, so let's add them
     additional_countries = {
-        'USA':'US',
-        'United States of America':'US',
-        "China, People's Republic of":'CN',
-        'Korea, South':'KR',
-        'Virgin Islands, British':'VI',
-        'Singapore':'SG',
-        'Taiwan':'TW',
-        'Hong Kong, China':'HK',
-        'Madeira':'PT',
-        'St Kitts & Nevis':'KN',
-        'Antigua & Barbuda':'AG',
-        'Irish Republic':'IE',
-        'St Vincent & The Grenadines':'VC'
+        "USA": "US",
+        "United States of America": "US",
+        "China, People's Republic of": "CN",
+        "Korea, South": "KR",
+        "Virgin Islands, British": "VI",
+        "Singapore": "SG",
+        "Taiwan": "TW",
+        "Hong Kong, China": "HK",
+        "Madeira": "PT",
+        "St Kitts & Nevis": "KN",
+        "Antigua & Barbuda": "AG",
+        "Irish Republic": "IE",
+        "St Vincent & The Grenadines": "VC",
     }
 
     country_dict = {**db_countries, **additional_countries}
 
-    companies = session.query(
-        Company
-    ) \
-        .filter(sa.and_(
-        Company.registration_country_iso2 == sa.null(),
-        Company.imo != sa.null())
-    ) \
+    companies = (
+        session.query(Company)
+        .filter(
+            sa.and_(
+                Company.registration_country_iso2 == sa.null(), Company.imo != sa.null()
+            )
+        )
         .all()
+    )
 
     for company in tqdm(companies):
 
@@ -436,7 +510,11 @@ def fill_using_imo_website():
         company_info = scraper.get_information(search_text=str(company.imo))
 
         if company_info is None or len(company_info) > 1:
-            logger.warning("Company not found, or more than one company with this search term ({}), skipping...".format(company.imo))
+            logger.warning(
+                "Company not found, or more than one company with this search term ({}), skipping...".format(
+                    company.imo
+                )
+            )
             continue
 
         company_info = company_info[0]
@@ -445,9 +523,17 @@ def fill_using_imo_website():
             company.registration_country_iso2 = country_dict[company_info[0]]
             session.commit()
         except KeyError:
-            logger.warning("We did not find the ISO2 for imo {}, country {}. Considering adding manually.".format(company.imo, company_info[0]))
+            logger.warning(
+                "We did not find the ISO2 for imo {}, country {}. Considering adding manually.".format(
+                    company.imo, company_info[0]
+                )
+            )
         except IndexError:
-            logger.warning("Failed to parse correct information from IMO website for {}.".format(company.imo))
+            logger.warning(
+                "Failed to parse correct information from IMO website for {}.".format(
+                    company.imo
+                )
+            )
 
 
 class CompanyImoScraper:
@@ -482,7 +568,9 @@ class CompanyImoScraper:
             browser = self.browser
 
         try:
-            element = WebDriverWait(browser, wait_time).until(EC.presence_of_element_located((by, item)))
+            element = WebDriverWait(browser, wait_time).until(
+                EC.presence_of_element_located((by, item))
+            )
         except TimeoutException:
             print("Failed to find object...")
             return None
@@ -525,26 +613,28 @@ class CompanyImoScraper:
             return False
 
         author_select = Select(browser.find_element(By.CSS_SELECTOR, AUTHOR_CSS))
-        author_select.select_by_visible_text('Public Users')
+        author_select.select_by_visible_text("Public Users")
 
-        username_select = WebDriverWait(browser, 10, ignored_exceptions=EC.StaleElementReferenceException). \
-            until(EC.element_to_be_clickable((By.CSS_SELECTOR, LOGIN_FIELD_CSS)))
+        username_select = WebDriverWait(
+            browser, 10, ignored_exceptions=EC.StaleElementReferenceException
+        ).until(EC.element_to_be_clickable((By.CSS_SELECTOR, LOGIN_FIELD_CSS)))
 
         # selenium doesn't support webelement refresh, so we have to retry manually
 
         for i in range(0, 3):
 
             try:
-                username_select = self.browser.find_element(By.CSS_SELECTOR, LOGIN_FIELD_CSS)
+                username_select = self.browser.find_element(
+                    By.CSS_SELECTOR, LOGIN_FIELD_CSS
+                )
 
-                ActionChains(browser) \
-                    .click(username_select) \
-                    .send_keys(username) \
-                    .send_keys(Keys.ENTER) \
-                    .perform()
+                ActionChains(browser).click(username_select).send_keys(
+                    username
+                ).send_keys(Keys.ENTER).perform()
 
-                login_button = WebDriverWait(browser, 3, ignored_exceptions=EC.StaleElementReferenceException). \
-                    until(EC.element_to_be_clickable((By.CSS_SELECTOR, LOGIN_BTN_CSS)))
+                login_button = WebDriverWait(
+                    browser, 3, ignored_exceptions=EC.StaleElementReferenceException
+                ).until(EC.element_to_be_clickable((By.CSS_SELECTOR, LOGIN_BTN_CSS)))
             except TimeoutException:
                 continue
             except EC.StaleElementReferenceException:
@@ -557,15 +647,14 @@ class CompanyImoScraper:
         if pwd_field is None:
             return False
 
-        ActionChains(browser) \
-            .click(pwd_field) \
-            .send_keys(password) \
-            .send_keys(Keys.ENTER) \
-            .perform()
+        ActionChains(browser).click(pwd_field).send_keys(password).send_keys(
+            Keys.ENTER
+        ).perform()
 
         # verify we logged in
-        search_button = WebDriverWait(browser, 10, ignored_exceptions=EC.StaleElementReferenceException). \
-            until(EC.element_to_be_clickable((By.CSS_SELECTOR, SRCH_BTN)))
+        search_button = WebDriverWait(
+            browser, 10, ignored_exceptions=EC.StaleElementReferenceException
+        ).until(EC.element_to_be_clickable((By.CSS_SELECTOR, SRCH_BTN)))
 
         if not search_button:
             return False
@@ -588,19 +677,20 @@ class CompanyImoScraper:
 
         if not options:
             options = webdriver.ChromeOptions()
-            options.add_argument('ignore-certificate-errors')
+            options.add_argument("ignore-certificate-errors")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             if headless:
                 options.add_argument("--headless")
 
         if not browser:
-            if not self.service: self.service = Service(ChromeDriverManager().install())
+            if not self.service:
+                self.service = Service(ChromeDriverManager().install())
             self.browser = webdriver.Chrome(service=self.service, options=options)
         else:
             self.browser = browser
 
-    def get_information(self, search_text, search_by='ImoNumber', browser=None):
+    def get_information(self, search_text, search_by="ImoNumber", browser=None):
         """
         Returns the registration and address of selected name or imo of company
 
@@ -619,7 +709,9 @@ class CompanyImoScraper:
         if not browser:
             browser = self.browser
 
-        table_html = self._search_data(search_text=search_text, search_by=search_by, browser=browser)
+        table_html = self._search_data(
+            search_text=search_text, search_by=search_by, browser=browser
+        )
 
         if table_html:
             table_df = pd.read_html(table_html)[0]
@@ -628,9 +720,11 @@ class CompanyImoScraper:
                 return None
 
             try:
-                registration, name, imo = table_df['Registered in'].values.tolist(), \
-                                          table_df['Name'].values.tolist(), \
-                                          table_df['IMO Company Number'].values.tolist()
+                registration, name, imo = (
+                    table_df["Registered in"].values.tolist(),
+                    table_df["Name"].values.tolist(),
+                    table_df["IMO Company Number"].values.tolist(),
+                )
 
                 return list(zip(registration, name, imo))
 
@@ -639,7 +733,7 @@ class CompanyImoScraper:
 
         return None
 
-    def get_detailed_information(self, search_text, search_by='IMO'):
+    def get_detailed_information(self, search_text, search_by="IMO"):
         """
         Find the address of selected imo/name
 
@@ -654,38 +748,54 @@ class CompanyImoScraper:
 
         """
 
-        results_row = self.browser.find_element(By.XPATH, "//td[text()='{}']/..".format(search_text))
+        results_row = self.browser.find_element(
+            By.XPATH, "//td[text()='{}']/..".format(search_text)
+        )
 
         results_row.click()
 
-        address_table = WebDriverWait(self.browser, 10, ignored_exceptions=EC.StaleElementReferenceException). \
-            until(
+        address_table = WebDriverWait(
+            self.browser, 10, ignored_exceptions=EC.StaleElementReferenceException
+        ).until(
             EC.presence_of_element_located(
-                (By.XPATH, "//td[contains(text(), '{}')]/ancestor::table[@class='table']".format(search_by))))
+                (
+                    By.XPATH,
+                    "//td[contains(text(), '{}')]/ancestor::table[@class='table']".format(
+                        search_by
+                    ),
+                )
+            )
+        )
 
         if address_table is None:
             return None
 
-        table_df = pd.read_html(address_table.get_attribute('outerHTML'), index_col=0)[0].T
+        table_df = pd.read_html(address_table.get_attribute("outerHTML"), index_col=0)[
+            0
+        ].T
 
         if table_df.empty:
             return None
 
         try:
-            address, status = table_df['Company address:'].values.tolist(), \
-                              table_df['Company status:'].values.tolist()
+            address, status = (
+                table_df["Company address:"].values.tolist(),
+                table_df["Company status:"].values.tolist(),
+            )
 
             return list(zip(address, status))
 
         except KeyError:
             return None
 
-    def _search_data(self,
-                     search_text,
-                     search_by,
-                     loaded_text_css="[id$=gridCompanies][class='gridviewer_grid']",
-                     execute_css="[id$=btnSearchCompanies][class='button']",
-                     browser=None):
+    def _search_data(
+        self,
+        search_text,
+        search_by,
+        loaded_text_css="[id$=gridCompanies][class='gridviewer_grid']",
+        execute_css="[id$=btnSearchCompanies][class='button']",
+        browser=None,
+    ):
         """
         Searches the IMO website using the imo/company name given
 
@@ -719,7 +829,9 @@ class CompanyImoScraper:
 
         input_box.send_keys(search_text)
 
-        search = WebDriverWait(browser, 20).until(EC.element_to_be_clickable((By.CSS_SELECTOR, execute_css)))
+        search = WebDriverWait(browser, 20).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, execute_css))
+        )
 
         if not search:
             return None
@@ -727,11 +839,13 @@ class CompanyImoScraper:
         search.click()
 
         try:
-            table = WebDriverWait(browser, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, loaded_text_css)))
+            table = WebDriverWait(browser, 30).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, loaded_text_css))
+            )
         except TimeoutException:
             return None
 
         if table:
-            return table.get_attribute('outerHTML')
+            return table.get_attribute("outerHTML")
 
         return None
