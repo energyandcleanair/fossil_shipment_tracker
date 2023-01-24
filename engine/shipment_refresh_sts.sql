@@ -304,15 +304,31 @@ departures_sts AS (
 		)
 ),
 -- recursively find the event chain from the sts departures,
-with event_chain as (
-	SELECT ship_imo, interacting_ship_imo, event_id, null::bigint as event_to, event_date_utc, next_portcall_date_utc, 1 as level
-	FROM unique_events WHERE event_id IN (select event_id FROM departures_sts)
+event_chain as (
+	SELECT
+	    ship_imo,
+	    interacting_ship_imo,
+	    event_id as event_from,
+	    null::bigint as event_to,
+	    event_date_utc,
+	    intship_next_portcall_date_utc,
+	    1 as level,
+	    ROW_NUMBER() OVER() as id
+	FROM unique_events
 		UNION ALL
-	select unique_events.ship_imo, e.interacting_ship_imo, unique_events.event_id, e.event_id AS event_to, unique_events.event_date_utc, unique_events.next_portcall_date_utc, e.level + 1
-	from unique_events
-	join e ON (
-		unique_events.interacting_ship_imo = e.ship_imo AND
-        (e.event_date_utc BETWEEN unique_events.event_date_utc AND unique_events.intship_next_portcall_date_utc)
+	SELECT
+	    unique_events.ship_imo,
+	    unique_events.interacting_ship_imo,
+	    e.event_from, unique_events.event_id AS event_to,
+	    unique_events.event_date_utc,
+	    unique_events.intship_next_portcall_date_utc,
+	    e.level + 1,
+	    e.id
+	FROM e
+	JOIN unique_events ON (
+		unique_events.ship_imo = e.interacting_ship_imo AND
+        (unique_events.event_date_utc > e.event_date_utc AND
+         unique_events.event_date_utc < e.intship_next_portcall_date_utc)
   )
 ),
 -- now look at departures from sts and check if we have any matching arrivals
