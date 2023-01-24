@@ -7,6 +7,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import aliased
 from tqdm import tqdm
 import pandas as pd
+import numpy as np
 
 
 import base
@@ -236,7 +237,8 @@ def get_missing_berths(max_speed=0.5,
                        hours_from_arrival=24*7,
                        arrival_iso2=None,
                        format='kml',
-                       export_file='missing_berths.kml'):
+                       export_file='missing_berths',
+                       chunks=None):
     """
     Get potential unloading positions of ships that haven't an arrival berth identified
     This is being used to feed in new berths after manually looking for them (e.g. GEM)
@@ -251,6 +253,7 @@ def get_missing_berths(max_speed=0.5,
     :param hours_from_arrival:
     :param format:
     :param export_file:
+    :param chunks:
     :return:
     """
 
@@ -307,9 +310,18 @@ def get_missing_berths(max_speed=0.5,
         import fiona
         import io
         fiona.supported_drivers['KML'] = 'rw'
-        if os.path.exists(export_file):
-            os.remove(export_file)
-        result_gdf.to_file(export_file, driver='KML')
+
+        df_chunks = [result_gdf]
+        if chunks:
+            df_chunks = np.array_split(result_gdf, chunks)
+
+        export_files = []
+
+        for i, df in enumerate(df_chunks):
+            _export_file = export_file+"_"+str(i)+".kml"
+            if os.path.exists(_export_file):
+                os.remove(_export_file)
+            df.to_file(_export_file, driver='KML')
 
 
 def cluster(positions, cluster_m=50, only_one_per_shipment=False):
