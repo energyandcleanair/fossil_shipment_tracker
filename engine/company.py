@@ -41,7 +41,17 @@ import time
 
 
 def update():
-    update_info_from_equasis()
+    # For crude oil and oil products, force a daily refresh
+    # given the importance for price caps and bans
+    all_commodities = [x[0] for x in session.query(Ship.commodity).distinct().all()]
+    daily_commodities = [base.OIL_PRODUCTS, base.OIL_OR_CHEMICAL, base.CRUDE_OIL]
+    other_commodities = [x for x in all_commodities if x not in daily_commodities]
+    update_info_from_equasis(
+        commodities=daily_commodities,
+        last_updated=dt.datetime.now() - dt.timedelta(hours=20),
+    )
+    update_info_from_equasis(commodities=other_commodities)
+
     fill_country()
     return
 
