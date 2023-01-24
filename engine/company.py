@@ -50,7 +50,10 @@ def update():
         commodities=daily_commodities,
         last_updated=dt.datetime.now() - dt.timedelta(hours=20),
     )
-    update_info_from_equasis(commodities=other_commodities)
+    update_info_from_equasis(
+        commodities=other_commodities,
+        last_updated=dt.datetime.now() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
+    )
 
     fill_country()
     return
