@@ -14,7 +14,7 @@ from base.encoder import JsonEncoder
 from base.utils import to_list
 from base.db import session
 from base.env import get_env
-from base.logger import logger
+from base.logger import logger, logger_slack
 from base.models import (
     Departure,
     ShipInsurer,
@@ -41,6 +41,7 @@ import time
 
 
 def update():
+    logger_slack.info("=== Company update ===")
     # For crude oil and oil products, force a daily refresh
     # given the importance for price caps and bans
     all_commodities = [x[0] for x in session.query(Ship.commodity).distinct().all()]
