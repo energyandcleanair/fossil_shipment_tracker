@@ -66,6 +66,7 @@ def get_queried_port_hours(port_id, date_from=None):
         MarineTrafficCall.params["portid"].label("port_id"),
         MarineTrafficCall.params["fromdate"].label("date_from"),
         MarineTrafficCall.params["todate"].label("date_to"),
+        MarineTrafficCall.date_utc,  # call date
         MarineTrafficCall.records,
     ).filter(
         MarineTrafficCall.method == "portcalls/",
@@ -85,6 +86,11 @@ def get_queried_port_hours(port_id, date_from=None):
     if len(queried_df):
         queried_df["date_from"] = pd.to_datetime(queried_df.date_from)
         queried_df["date_to"] = pd.to_datetime(queried_df.date_to)
+        # Capping date_to to account for potential Marine Traffic latency
+        queried_df["date_to_cap"] = pd.to_datetime(queried_df.date_utc) - dt.timedelta(
+            hours=base.MARINETRAFFIC_LATENCY_HOURS
+        )
+        queried_df["date_to"] = queried_df[["date_to", "date_to_cap"]].min(axis=1)
         queried_df["dates"] = queried_df.apply(
             lambda row: pd.date_range(
                 row.date_from.ceil("H"), row.date_to.floor("H"), freq="H"
@@ -111,6 +117,7 @@ def get_queried_ship_hours(ship_imo, date_from=None):
         MarineTrafficCall.params["imo"].label("imo"),
         MarineTrafficCall.params["fromdate"].label("date_from"),
         MarineTrafficCall.params["todate"].label("date_to"),
+        MarineTrafficCall.date_utc,  # call date
         MarineTrafficCall.records,
     ).filter(
         MarineTrafficCall.method == "portcalls/",
@@ -127,6 +134,11 @@ def get_queried_ship_hours(ship_imo, date_from=None):
     if len(queried_df):
         queried_df["date_from"] = pd.to_datetime(queried_df.date_from)
         queried_df["date_to"] = pd.to_datetime(queried_df.date_to)
+        # Capping date_to to account for potential Marine Traffic latency
+        queried_df["date_to_cap"] = pd.to_datetime(queried_df.date_utc) - dt.timedelta(
+            hours=base.MARINETRAFFIC_LATENCY_HOURS
+        )
+        queried_df["date_to"] = queried_df[["date_to", "date_to_cap"]].min(axis=1)
         queried_df["dates"] = queried_df.apply(
             lambda row: pd.date_range(
                 row.date_from.floor("H"), row.date_to.floor("H"), freq="H"
@@ -274,8 +286,10 @@ def get_intervals(
 def update_departures(date_from, date_to=None, departure_port_iso2=None):
     date_from = to_datetime(date_from)
     date_to = to_datetime(date_to) if date_to else dt.datetime.now()
+
     # Otherwise, we would think we queried portcalls that we actually didn't
     assert date_to < dt.datetime.now()
+
     ports = session.query(Port).filter(Port.check_departure)
     if departure_port_iso2:
         ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
