@@ -238,7 +238,10 @@ def get_intervals(
             split_rows.append(new_row1)
             split_rows.append(new_row2)
         else:
-            split_rows.append(row)
+            split_rows.append({
+                "date_from": row["date_from"],
+                "date_to": row["date_to"]
+            })
 
     intervals = pd.DataFrame(split_rows, columns=["date_from", "date_to"])
 
