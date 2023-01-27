@@ -396,19 +396,25 @@ def update_arrivals(
 
     departures["now"] = dt.datetime.now()
     departures["date_to"] = (
-        departures[["arrival_date", "next_departure_date", "now"]]
+        departures[["next_departure_date", "now"]]
         .bfill(axis=1)
         .iloc[:, 0]
     )
+
+    departures["date_from"] = (
+        departures[["arrival_date", "departure_date", "now"]]
+        .bfill(axis=1)
+        .iloc[:, 0]
+    )
+
     departures = departures[~departures.imo.str.contains("NOTFOUND")]
 
     imos = departures.imo.unique()
 
     for imo in tqdm(imos):
         ship_departures = departures[departures.imo == imo]
-        wanted_intervals = ship_departures[["departure_date", "date_to"]].rename(
-            columns={"departure_date": "date_from"}
-        )
+        wanted_intervals = ship_departures[["date_from", "date_to"]]
+
         queried_hours = get_queried_ship_hours(
             ship_imo=imo, date_from=wanted_intervals.date_from.min()
         )
