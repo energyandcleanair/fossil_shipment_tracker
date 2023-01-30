@@ -8,6 +8,7 @@ from sqlalchemy.orm import aliased
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
+import pygeos
 
 
 import base
@@ -237,7 +238,7 @@ def get_missing_berths(max_speed=0.5,
                        hours_from_arrival=24*7,
                        arrival_iso2=None,
                        format='kml',
-                       export_file='missing_berths',
+                       export_file='missing_berths.kml',
                        chunks=None):
     """
     Get potential unloading positions of ships that haven't an arrival berth identified

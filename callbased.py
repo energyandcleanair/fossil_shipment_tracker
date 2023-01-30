@@ -238,7 +238,10 @@ def get_intervals(
             split_rows.append(new_row1)
             split_rows.append(new_row2)
         else:
-            split_rows.append(row)
+            split_rows.append({
+                "date_from": row["date_from"],
+                "date_to": row["date_to"]
+            })
 
     intervals = pd.DataFrame(split_rows, columns=["date_from", "date_to"])
 
@@ -331,9 +334,26 @@ def update_arrivals(
     commodities,  # Forcing a choice to avoid wasting credits
     date_from,
     date_to=dt.datetime.now(),
+    ship_imo=None,
     departure_port_iso2=None,
     use_credit_key_if_short=False,
 ):
+    """
+    Update arrivals using callbased key for when we want to save credits and collect over long period
+
+    Parameters
+    ----------
+    commodities : commodities to filter for
+    date_from : date from
+    date_to : date to
+    ship_imo : ship imo
+    departure_port_iso2 : port iso2 to filter for
+    use_credit_key_if_short : whether to resort to credit based key if time interval is short
+
+    Returns
+    -------
+
+    """
     date_to = to_datetime(date_to) if date_to else dt.datetime.now()
     # Otherwise, we would think we queried portcalls that we actually didn't
     assert date_to < dt.datetime.now()
@@ -364,6 +384,11 @@ def update_arrivals(
             Port.iso2.in_(to_list(departure_port_iso2))
         )
 
+    if ship_imo:
+        query_departure = query_departure.filter(
+            Ship.imo.in_(to_list(ship_imo))
+        )
+
     # Get departures of interest
     departures = pd.read_sql(query_departure.statement, session.bind)
     departures["next_departure_date"] = (
@@ -375,19 +400,25 @@ def update_arrivals(
 
     departures["now"] = dt.datetime.now()
     departures["date_to"] = (
-        departures[["arrival_date", "next_departure_date", "now"]]
+        departures[["next_departure_date", "now"]]
         .bfill(axis=1)
         .iloc[:, 0]
     )
+
+    departures["date_from"] = (
+        departures[["arrival_date", "departure_date", "now"]]
+        .bfill(axis=1)
+        .iloc[:, 0]
+    )
+
     departures = departures[~departures.imo.str.contains("NOTFOUND")]
 
     imos = departures.imo.unique()
 
     for imo in tqdm(imos):
         ship_departures = departures[departures.imo == imo]
-        wanted_intervals = ship_departures[["departure_date", "date_to"]].rename(
-            columns={"departure_date": "date_from"}
-        )
+        wanted_intervals = ship_departures[["date_from", "date_to"]]
+
         queried_hours = get_queried_ship_hours(
             ship_imo=imo, date_from=wanted_intervals.date_from.min()
         )
