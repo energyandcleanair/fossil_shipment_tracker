@@ -308,6 +308,10 @@ def get_missing_berths(max_speed=0.5,
         result_gdf = result_gdf.sjoin(coastline, how="inner")[list(result_gdf.columns)]
 
     if format == "kml":
+
+        if '.kml' not in export_file:
+            export_file = export_file+".kml"
+
         import fiona
         import io
         fiona.supported_drivers['KML'] = 'rw'
@@ -319,7 +323,7 @@ def get_missing_berths(max_speed=0.5,
         export_files = []
 
         for i, df in enumerate(df_chunks):
-            _export_file = export_file+"_"+str(i)+".kml"
+            _export_file = export_file.split(".")[0]+"_"+str(i)+".kml"
             if os.path.exists(_export_file):
                 os.remove(_export_file)
             df.to_file(_export_file, driver='KML')
