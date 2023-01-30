@@ -338,6 +338,7 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
             positions.c.navigation_status,
             positions.c.imo,
             positions.c.type,
+            positions.c.commodity,
             positions.c.subtype,
             positions.c.date_utc,
             positions.c.arrival_date,
@@ -351,6 +352,7 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
         # we force another cluster if this is not the case
         clustered_points2 = session.query(clustered_points.c.shipment_id,
                                           clustered_points.c.imo,
+                                          clustered_points.c.commodity,
                                           clustered_points.c.subtype,
                                           clustered_points.c.geometry,
                                           clustered_points.c.date_utc,
@@ -365,6 +367,7 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
 
         clustered_points3 = session.query(clustered_points2.c.shipment_id,
                                           clustered_points2.c.imo,
+                                          clustered_points2.c.commodity,
                                           clustered_points2.c.subtype,
                                           clustered_points2.c.arrival_date,
                                           func.min(clustered_points2.c.date_utc).label("date_utc"),
@@ -372,6 +375,7 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
                                           ST_Centroid(ST_Union(clustered_points2.c.geometry)).label("geometry")) \
             .group_by(clustered_points2.c.shipment_id,
                       clustered_points2.c.imo,
+                      clustered_points2.c.commodity,
                       clustered_points2.c.subtype,
                       clustered_points2.c.cluster,
                       clustered_points2.c.arrival_date) \
