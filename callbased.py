@@ -272,7 +272,8 @@ def get_intervals(
                 days=MIN_DAYS
             ):
                 date_to = min(
-                    date_from + dt.timedelta(days=MAX_DAYS), now - dt.timedelta(hours=1)
+                    date_from + dt.timedelta(days=MAX_DAYS),
+                    now - dt.timedelta(hours=1),
                 )
                 date_to = pd.to_datetime(date_to).floor("H")
 
