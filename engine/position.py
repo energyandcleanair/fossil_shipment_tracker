@@ -239,6 +239,7 @@ def get_missing_berths(max_speed=0.5,
                        arrival_iso2=None,
                        format='kml',
                        export_file='missing_berths.kml',
+                       sample=None,
                        chunks=None):
     """
     Get potential unloading positions of ships that haven't an arrival berth identified
@@ -255,6 +256,7 @@ def get_missing_berths(max_speed=0.5,
     :param format:
     :param export_file:
     :param chunks:
+    :param sample:
     :return:
     """
 
@@ -299,6 +301,9 @@ def get_missing_berths(max_speed=0.5,
 
     positions_df = update_geometry_from_wkb(positions_df)
     result_gdf = gpd.GeoDataFrame(positions_df, geometry='geometry')
+
+    if sample:
+        result_gdf = result_gdf.sample(sample)
 
     if distance_to_coast_m:
         coastline = gpd.read_file('assets/ne_10m_coastline/ne_10m_coastline.shp')
