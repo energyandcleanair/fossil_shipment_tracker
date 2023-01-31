@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from requests.adapters import HTTPAdapter, Retry
 import urllib.parse
-import tqdm
+from tqdm import tqdm
 
 import base
 from base.db import session
@@ -294,6 +294,11 @@ class Marinetraffic:
             imo_mmsi_dict = dict(
                 zip([x[1] for x in mmsi_imo], [x[0] for x in mmsi_imo])
             )
+
+        if len(response_datas) <= 500:
+            response_datas
+        else:
+            response_datas = tqdm(response_datas)
 
         for r in response_datas:
             # IMO's missing
@@ -641,7 +646,7 @@ class Marinetraffic:
         ]
 
         logger.info("Querying intervals for ship imo: {}.".format(imo))
-        for interval in tqdm.tqdm(intervals):
+        for interval in tqdm(intervals):
             date_from = interval[0]
             date_to = interval[1]
 

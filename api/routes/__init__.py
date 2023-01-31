@@ -1,11 +1,26 @@
 from flask import Blueprint
-from flask_restx import Api
+from flask_restx import Api, Namespace
 
-routes = Blueprint('routes', __name__)
-routes_api = Api(routes,
-                 title='Russia Fossil Tracker API',
-                 description="Users' guide is available " +
-                             "<a href='https://docs.google.com/document/d/10_JD9nVtJq4oZtgw4Q7pQ-k_oMjRBFYQiqS5xgUIaTo/edit?usp=sharing' target='_blank'>here</a>")
+routes = Blueprint("routes", __name__)
+routes_api = Api(
+    routes,
+    title="Russia Fossil Tracker API",
+    description="Users' guide is available "
+    + "<a href='https://docs.google.com/document/d/10_JD9nVtJq4oZtgw4Q7pQ-k_oMjRBFYQiqS5xgUIaTo/edit?usp=sharing' target='_blank'>here</a>",
+    default="",
+    default_label="",
+)
+
+
+ns_charts = Namespace("Charts", description="For retrieving plotting data.", path="/")
+
+ns_alerts = Namespace(
+    "Alerts", description="For processing alerts information.", path="/"
+)
+
+routes_api.add_namespace(ns_charts)
+routes_api.add_namespace(ns_alerts)
+
 
 from .ship import *
 from .port import *

@@ -12,12 +12,12 @@ from flask_restx import Resource, reqparse
 import base
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
-from .. import routes_api
+from .. import routes_api, ns_charts
 from ..voyage import VoyageResource
 from ..overland import PipelineFlowResource
 
 
-@routes_api.route("/v0/chart/departure_by_destination", strict_slashes=False)
+@ns_charts.route("/v0/chart/departure_by_destination", strict_slashes=False)
 class ChartDepartureDestination(Resource):
 
     parser = reqparse.RequestParser()

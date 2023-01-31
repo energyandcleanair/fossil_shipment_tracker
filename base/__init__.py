@@ -13,13 +13,18 @@ UNKNOWN_COMMODITY = "unknown"
 PIPELINE_GAS = "natural_gas"
 PIPELINE_OIL = "pipeline_oil"
 
+# Transport mode
+SEABORNE = "seaborne"
+PIPELINE = "pipeline"
+RAIL_ROAD = "rail_road"
+
 # MARINE TRAFFIC METHODS
 VESSEL_DATA = "vesselmasterdata/"
 VESSEL_EVENTS = "vesselevents/"
 VESSEL_POSITION = "exportvesseltrack/"
 VESSEL_PORTCALLS = "portcalls/"
 HTTP_OK = "200"
-
+MARINETRAFFIC_LATENCY_HOURS = 12
 
 # LOAD STATUS
 FULLY_LADEN = "fully_laden"
