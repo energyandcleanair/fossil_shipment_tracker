@@ -239,6 +239,7 @@ def get_missing_berths(max_speed=0.5,
                        arrival_iso2=None,
                        format='kml',
                        export_file='missing_berths.kml',
+                       sample=None,
                        chunks=None):
     """
     Get potential unloading positions of ships that haven't an arrival berth identified
@@ -255,6 +256,7 @@ def get_missing_berths(max_speed=0.5,
     :param format:
     :param export_file:
     :param chunks:
+    :param sample:
     :return:
     """
 
@@ -300,6 +302,9 @@ def get_missing_berths(max_speed=0.5,
     positions_df = update_geometry_from_wkb(positions_df)
     result_gdf = gpd.GeoDataFrame(positions_df, geometry='geometry')
 
+    if sample:
+        result_gdf = result_gdf.sample(sample)
+
     if distance_to_coast_m:
         coastline = gpd.read_file('assets/ne_10m_coastline/ne_10m_coastline.shp')
         coastline = coastline.to_crs(3857)  # Pick another
@@ -308,6 +313,10 @@ def get_missing_berths(max_speed=0.5,
         result_gdf = result_gdf.sjoin(coastline, how="inner")[list(result_gdf.columns)]
 
     if format == "kml":
+
+        if '.kml' not in export_file:
+            export_file = export_file+".kml"
+
         import fiona
         import io
         fiona.supported_drivers['KML'] = 'rw'
@@ -319,7 +328,7 @@ def get_missing_berths(max_speed=0.5,
         export_files = []
 
         for i, df in enumerate(df_chunks):
-            _export_file = export_file+"_"+str(i)+".kml"
+            _export_file = export_file.split(".")[0]+"_"+str(i)+".kml"
             if os.path.exists(_export_file):
                 os.remove(_export_file)
             df.to_file(_export_file, driver='KML')
@@ -334,6 +343,7 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
             positions.c.navigation_status,
             positions.c.imo,
             positions.c.type,
+            positions.c.commodity,
             positions.c.subtype,
             positions.c.date_utc,
             positions.c.arrival_date,
@@ -347,6 +357,7 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
         # we force another cluster if this is not the case
         clustered_points2 = session.query(clustered_points.c.shipment_id,
                                           clustered_points.c.imo,
+                                          clustered_points.c.commodity,
                                           clustered_points.c.subtype,
                                           clustered_points.c.geometry,
                                           clustered_points.c.date_utc,
@@ -361,6 +372,7 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
 
         clustered_points3 = session.query(clustered_points2.c.shipment_id,
                                           clustered_points2.c.imo,
+                                          clustered_points2.c.commodity,
                                           clustered_points2.c.subtype,
                                           clustered_points2.c.arrival_date,
                                           func.min(clustered_points2.c.date_utc).label("date_utc"),
@@ -368,6 +380,7 @@ def cluster(positions, cluster_m=50, only_one_per_shipment=False):
                                           ST_Centroid(ST_Union(clustered_points2.c.geometry)).label("geometry")) \
             .group_by(clustered_points2.c.shipment_id,
                       clustered_points2.c.imo,
+                      clustered_points2.c.commodity,
                       clustered_points2.c.subtype,
                       clustered_points2.c.cluster,
                       clustered_points2.c.arrival_date) \

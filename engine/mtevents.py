@@ -37,6 +37,7 @@ def update(
                      base.OIL_PRODUCTS,
                      base.OIL_OR_CHEMICAL],
         min_dwt=base.DWT_MIN,
+        only_for_ongoing_shipments=True,
         between_existing_only=False,
         between_shipments_only=False,
         use_cache=False,
@@ -70,6 +71,8 @@ def update(
     if not silent:
         logger_slack.info("=== Updating events for ships ===")
 
+    arrivals = session.query(Arrival.departure_id).distinct()
+
     ships = session.query(
         Departure.ship_imo.distinct().label("ship_imo"),
     ) \
@@ -85,6 +88,8 @@ def update(
         ships = ships.filter(Ship.dwt >= min_dwt)
     if limit:
         ships = ships.limit(limit)
+    if only_for_ongoing_shipments:
+        ships = ships.filter(Departure.id.notin_(arrivals))
 
     processed_ships = []
 
