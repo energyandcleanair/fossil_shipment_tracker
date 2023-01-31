@@ -12,13 +12,12 @@ routes_api = Api(
 )
 
 
-ns_charts = Namespace("Charts", description="For retrieving plotting data.", path="/")
-
-ns_alerts = Namespace(
-    "Alerts", description="For processing alerts information.", path="/"
-)
+ns_charts = Namespace("Charts", description="For plotting data.", path="/")
+ns_flaring = Namespace("Flaring", description="For flaring data.", path="/")
+ns_alerts = Namespace("Alerts", description="For shipment alerts.", path="/")
 
 routes_api.add_namespace(ns_charts)
+routes_api.add_namespace(ns_flaring)
 routes_api.add_namespace(ns_alerts)
 
 
