@@ -230,7 +230,8 @@ def get_missing_berths(max_speed=0.5,
                        date_from=None,
                        date_to=None,
                        commodity=None,
-                       exclude_in_berth=False,
+                       exclude_positions_in_berth=False,
+                       exclude_shipments_in_berth=False,
                        do_cluster=True,
                        only_one_per_shipment=False,
                        distance_to_coast_m=None,
@@ -249,6 +250,7 @@ def get_missing_berths(max_speed=0.5,
     :param date_to:
     :param commodity:
     :param exclude_in_berth:
+    :param exclude_shipments_in_berth:
     :param do_cluster:
     :param only_one_per_shipment:
     :param cluster_m:
@@ -279,13 +281,28 @@ def get_missing_berths(max_speed=0.5,
     if commodity:
         positions = positions.filter(Ship.commodity.in_(to_list(commodity)))
 
-    if exclude_in_berth:
-        positions = positions\
-            .outerjoin(Berth, func.ST_Contains(Berth.geometry, Position.geometry)) \
-            .filter(Berth.id == sa.null())
+    if exclude_positions_in_berth or exclude_shipments_in_berth:
         positions = positions \
-            .outerjoin(ShipmentArrivalBerth, Shipment.id == ShipmentArrivalBerth.shipment_id) \
-            .filter(ShipmentArrivalBerth.id == sa.null())
+            .outerjoin(Berth, func.ST_Contains(Berth.geometry, Position.geometry)) \
+            .outerjoin(ShipmentArrivalBerth, Shipment.id == ShipmentArrivalBerth.shipment_id)
+
+        positions_in_berth = positions.filter(
+            sa.or_(
+                Berth.id != sa.null(),
+                ShipmentArrivalBerth.id != sa.null()
+            )
+        ).subquery()
+
+        if exclude_shipments_in_berth:
+            positions = positions.filter(
+                Shipment.id.notin_(session.query(positions_in_berth.c.shipment_id).distinct())
+            )
+
+        if exclude_positions_in_berth:
+            positions = positions.filter(
+                Berth.id == sa.null(),
+                ShipmentArrivalBerth.id == sa.null()
+            )
 
     if hours_from_arrival:
         positions = positions \
