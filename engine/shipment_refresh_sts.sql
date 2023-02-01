@@ -319,16 +319,16 @@ event_chain as (
 	SELECT
 	    unique_events.ship_imo,
 	    unique_events.interacting_ship_imo,
-	    e.event_from, unique_events.event_id AS event_to,
+	    event_chain.event_from, unique_events.event_id AS event_to,
 	    unique_events.event_date_utc,
 	    unique_events.intship_next_portcall_date_utc,
-	    e.level + 1,
-	    e.id
-	FROM e
+	    event_chain.level + 1,
+	    event_chain.id
+	FROM event_chain
 	JOIN unique_events ON (
-		unique_events.ship_imo = e.interacting_ship_imo AND
-        (unique_events.event_date_utc > e.event_date_utc AND
-         unique_events.event_date_utc < e.intship_next_portcall_date_utc)
+		unique_events.ship_imo = event_chain.interacting_ship_imo AND
+        (unique_events.event_date_utc > event_chain.event_date_utc AND
+         unique_events.event_date_utc < event_chain.intship_next_portcall_date_utc)
   )
 ),
 -- now look at departures from sts and check if we have any matching arrivals
