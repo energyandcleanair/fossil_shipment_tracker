@@ -308,22 +308,23 @@ event_chain as (
 	SELECT
 	    ship_imo,
 	    interacting_ship_imo,
-	    event_id as event_from,
-	    null::bigint as event_to,
+		event_id as origin_event,
+	    null::bigint as event_from,
+	    event_id as event_to,
 	    event_date_utc,
 	    intship_next_portcall_date_utc,
 	    1 as level,
-	    ROW_NUMBER() OVER() as id
 	FROM unique_events
 		UNION ALL
 	SELECT
 	    unique_events.ship_imo,
 	    unique_events.interacting_ship_imo,
-	    event_chain.event_from, unique_events.event_id AS event_to,
+		event_chain.origin_event,
+	    event_chain.event_to as event_from,
+		unique_events.event_id AS event_to,
 	    unique_events.event_date_utc,
 	    unique_events.intship_next_portcall_date_utc,
-	    event_chain.level + 1,
-	    event_chain.id
+	    event_chain.level + 1
 	FROM event_chain
 	JOIN unique_events ON (
 		unique_events.ship_imo = event_chain.interacting_ship_imo AND
