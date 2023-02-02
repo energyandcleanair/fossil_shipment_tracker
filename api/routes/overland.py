@@ -46,7 +46,6 @@ class PipelineFlowResource(Resource):
         help="commodity(ies) of interest. Default: returns all of them. Options: %s"
         % (",".join(commodity.get_ids(transport=[base.PIPELINE, base.RAIL_ROAD]))),
         default=None,
-        choices=commodity.get_ids(transport=[base.PIPELINE, base.RAIL_ROAD]),
         action="split",
         required=False,
     )
