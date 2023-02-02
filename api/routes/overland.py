@@ -24,7 +24,11 @@ from engine import commodity
 from engine.commodity import get_subquery as get_commodity_subquery
 
 
-@routes_api.route("/v0/overland", strict_slashes=False)
+@routes_api.route(
+    "/v0/overland",
+    strict_slashes=False,
+    doc={"description": "Retrieve pipeline and roal/raid flows of fossil fuels."},
+)
 class PipelineFlowResource(Resource):
 
     parser = reqparse.RequestParser()
@@ -42,6 +46,7 @@ class PipelineFlowResource(Resource):
         help="commodity(ies) of interest. Default: returns all of them. Options: %s"
         % (",".join(commodity.get_ids(transport=[base.PIPELINE, base.RAIL_ROAD]))),
         default=None,
+        choices=commodity.get_ids(transport=[base.PIPELINE, base.RAIL_ROAD]),
         action="split",
         required=False,
     )
@@ -168,7 +173,7 @@ class PipelineFlowResource(Resource):
         default=True,
     )
 
-    @routes_api.expect(parser)
+    @routes_api.expect(parser, validate=True)
     def get(self):
         params = PipelineFlowResource.parser.parse_args()
         return self.get_from_params(params)
@@ -288,10 +293,20 @@ class PipelineFlowResource(Resource):
                         commodity_destination_iso2_field
                         == any_(Price.destination_iso2s),
                         Price.destination_iso2s == sa.null(),
+                        Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
-                    Price.departure_port_ids == sa.null(),
-                    Price.ship_owner_iso2s == sa.null(),
-                    Price.ship_insurer_iso2s == sa.null(),
+                    sa.or_(
+                        Price.departure_port_ids == sa.null(),
+                        Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
+                    ),
+                    sa.or_(
+                        Price.ship_owner_iso2s == sa.null(),
+                        Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    ),
+                    sa.or_(
+                        Price.ship_insurer_iso2s == sa.null(),
+                        Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    ),
                 ),
             )
             .outerjoin(PriceScenario, PriceScenario.id == Price.scenario)

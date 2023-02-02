@@ -1,3 +1,5 @@
+import sqlalchemy as sa
+
 CRUDE_OIL = "crude_oil"
 OIL_PRODUCTS = "oil_products"
 OIL_OR_CHEMICAL = "oil_or_chemical"
@@ -95,3 +97,7 @@ UNKNOWN_INSURER = "unknown"
 
 # COMPANY REFRESHING
 REFRESH_COMPANY_DAYS = 3
+
+# NULL FOR POSTGRES CONSTRAINTS TO WORK
+PRICE_NULLARRAY_CHAR = sa.sql.expression.literal_column("array[NULL::varchar]")
+PRICE_NULLARRAY_INT = sa.sql.expression.literal_column("array[NULL::bigint]")
