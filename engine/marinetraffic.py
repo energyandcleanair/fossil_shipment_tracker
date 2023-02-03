@@ -1,6 +1,7 @@
 import requests
 import json
 import datetime as dt
+import time
 from psycopg2.errors import UniqueViolation
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
@@ -47,9 +48,26 @@ class Marinetraffic:
     cache_file_events = "cache/marinetraffic/events.json"
     cache_ship = load_cache(cache_file_ship)
     cache_events = load_cache(cache_file_events)
+    last_call_dt = None
+
+    @classmethod
+    def wait(cls, interval_after_last_call=dt.timedelta(minutes=1)):
+
+        if cls.last_call_dt is not None:
+            interval_since_last_call = dt.datetime.now() - cls.last_call_dt
+
+            if interval_since_last_call < interval_after_last_call:
+                wait_time = interval_after_last_call - interval_since_last_call
+                time.sleep(wait_time.total_seconds())
+
+        cls.last_call_dt = dt.datetime.now()
 
     @classmethod
     def call(cls, method, params, api_key, credits_per_record, save_empty_record=True):
+
+        # Ensure a minimum time has passed since we made the last call
+        cls.wait()
+
         params_string = urllib.parse.urlencode(params)
         api_result = s.get(
             Marinetraffic.api_base + method + api_key + "?" + params_string
