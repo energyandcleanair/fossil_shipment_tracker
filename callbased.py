@@ -74,7 +74,10 @@ def get_queried_port_hours(port_id, date_from=None):
             MarineTrafficCall.params["movetype"] == sa.null(),
             MarineTrafficCall.params["movetype"] == str(MOVETYPE_DEPARTURE),
         ),
-        MarineTrafficCall.status == base.HTTP_OK,
+        sa.or_(
+            MarineTrafficCall.status == base.HTTP_OK,
+            MarineTrafficCall.status.op("~*")("404.*"),
+        ),
         MarineTrafficCall.params["portid"] == '"%s"' % (port_id),
     )
 
@@ -238,10 +241,9 @@ def get_intervals(
             split_rows.append(new_row1)
             split_rows.append(new_row2)
         else:
-            split_rows.append({
-                "date_from": row["date_from"],
-                "date_to": row["date_to"]
-            })
+            split_rows.append(
+                {"date_from": row["date_from"], "date_to": row["date_to"]}
+            )
 
     intervals = pd.DataFrame(split_rows, columns=["date_from", "date_to"])
 
@@ -385,9 +387,7 @@ def update_arrivals(
         )
 
     if ship_imo:
-        query_departure = query_departure.filter(
-            Ship.imo.in_(to_list(ship_imo))
-        )
+        query_departure = query_departure.filter(Ship.imo.in_(to_list(ship_imo)))
 
     # Get departures of interest
     departures = pd.read_sql(query_departure.statement, session.bind)
