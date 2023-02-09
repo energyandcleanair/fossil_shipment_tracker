@@ -359,6 +359,7 @@ class Shipment(Base):
     destination_iso2s = Column(ARRAY(String))
 
     __tablename__ = DB_TABLE_SHIPMENT
+    __table_args__ = (Index("idx_shipment_departure_id", "departure_id"),)
 
 
 class ShipmentWithSTS(Base):
