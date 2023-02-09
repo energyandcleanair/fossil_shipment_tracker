@@ -537,6 +537,9 @@ class VoyageResource(Resource):
         DepartureShip = aliased(Ship)
         ArrivalShip = aliased(Ship)
 
+        DepartureShipmentSTS = aliased(ShipmentWithSTS)
+        ArrivalShipmentSTS = aliased(ShipmentWithSTS)
+
         NextDeparturePortcall = aliased(PortCall)
 
         if aggregate_by and "" in aggregate_by:
@@ -592,15 +595,6 @@ class VoyageResource(Resource):
 
         # combine sts shipment table with normal (non-sts) shipments
 
-        shipment_sts_departures = (
-            session.query(
-                ShipmentWithSTS, Departure.event_id.label("departure_event_id")
-            )
-            .join(Departure, Departure.id == ShipmentWithSTS.departure_id)
-            .filter(Departure.event_id != sa.null())
-            .subquery()
-        )
-
         shipment_sts_weights = (
             session.query(
                 ShipmentWithSTS.id,
@@ -628,7 +622,8 @@ class VoyageResource(Resource):
 
         shipment_sts_arrival_weights = (
             session.query(
-                ShipmentWithSTS.id,
+                ShipmentWithSTS,
+                shipment_sts_weights.c.id.label("shipment_departure_id"),
                 func.least(
                     1.0,
                     ArrivalShip.dwt
@@ -660,13 +655,13 @@ class VoyageResource(Resource):
             session.query(
                 ShipmentWithSTS.id,
                 ShipmentWithSTS.departure_id,
-                shipment_sts_departures.c.arrival_id.label("arrival_id"),
-                shipment_sts_departures.c.last_position_id,
-                shipment_sts_departures.c.last_destination_name,
-                shipment_sts_departures.c.status,
-                shipment_sts_departures.c.destination_names,
-                shipment_sts_departures.c.destination_dates,
-                shipment_sts_departures.c.destination_iso2s,
+                shipment_sts_arrival_weights.c.arrival_id.label("arrival_id"),
+                shipment_sts_arrival_weights.c.last_position_id,
+                shipment_sts_arrival_weights.c.last_destination_name,
+                shipment_sts_arrival_weights.c.status,
+                shipment_sts_arrival_weights.c.destination_names,
+                shipment_sts_arrival_weights.c.destination_dates,
+                shipment_sts_arrival_weights.c.destination_iso2s,
                 case(
                     [
                         (
@@ -687,15 +682,11 @@ class VoyageResource(Resource):
             .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id)
             .outerjoin(Event, Event.id == Arrival.event_id)
             .outerjoin(
-                shipment_sts_departures,
-                shipment_sts_departures.c.departure_event_id == Arrival.event_id,
-            )
-            .outerjoin(
                 shipment_sts_weights, shipment_sts_weights.c.id == ShipmentWithSTS.id
             )
             .outerjoin(
                 shipment_sts_arrival_weights,
-                shipment_sts_arrival_weights.c.id == shipment_sts_departures.c.id,
+                shipment_sts_arrival_weights.c.shipment_departure_id == ShipmentWithSTS.id,
             )
             .outerjoin(ArrivalShip, ArrivalShip.imo == shipment_sts_weights.c.imo)
             .filter(Departure.event_id == sa.null())
