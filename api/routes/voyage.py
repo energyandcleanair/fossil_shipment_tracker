@@ -48,6 +48,7 @@ from base.utils import to_list, df_to_json, to_datetime
 from base.logger import logger
 from base import PRICING_DEFAULT
 from base.utils import update_geometry_from_wkb
+from base.env import get_env
 import base
 from engine.commodity import get_subquery as get_commodity_subquery
 from sqlalchemy.sql import extract
@@ -63,6 +64,14 @@ class VoyageResource(Resource):
     default_date_from = "2022-01-01"
 
     # Query content
+    parser.add_argument(
+        "bypass_maintenance",
+        help="bypass maintenance when in maintenance",
+        default=False,
+        required=False,
+        type=inputs.boolean,
+    )
+
     parser.add_argument(
         "id",
         help="id(s) of voyage. Default: returns all of them",
@@ -403,7 +412,20 @@ class VoyageResource(Resource):
     @routes_api.expect(parser)
     def get(self):
         params = VoyageResource.parser.parse_args()
+
+        maintenance_resp = self.get_maintenance_response(params)
+        if maintenance_resp:
+            return maintenance_resp
+
         return self.get_from_params(params)
+
+    def get_maintenance_response(self, params):
+        is_in_maintenance = bool(get_env("MAINTENANCE", False))
+        bypass_maintenance = params.get("bypass_maintenance", False)
+        if is_in_maintenance and not bypass_maintenance:
+            return {"message": "API is currently in maintenance mode."}, 503
+        else:
+            return None
 
     def get_from_params(self, params):
         id = params.get("id")
@@ -1027,22 +1049,22 @@ class VoyageResource(Resource):
                                 DestinationCountry.region != "EU",
                             ),
                         ),
-                        Price.destination_iso2s == sa.null(),
+                        # Price.destination_iso2s == sa.null(),
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                     sa.or_(
                         DeparturePort.id == any_(Price.departure_port_ids),
-                        Price.departure_port_ids == sa.null(),
+                        # Price.departure_port_ids == sa.null(),
                         Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     ),
                     sa.or_(
                         ShipOwnerCountry.iso2 == any_(Price.ship_owner_iso2s),
-                        Price.ship_owner_iso2s == sa.null(),
+                        # Price.ship_owner_iso2s == sa.null(),
                         Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                     sa.or_(
                         ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
-                        Price.ship_insurer_iso2s == sa.null(),
+                        # Price.ship_insurer_iso2s == sa.null(),
                         Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                 ),
@@ -1057,7 +1079,7 @@ class VoyageResource(Resource):
             # so that we pick those with port ids matching, then destination iso2s, then ship etc.
             .order_by(
                 shipments_combined.c.shipment_id,
-                shipments_combined.c.ship_imo,
+                # shipments_combined.c.ship_imo,
                 Price.scenario,
                 Currency.currency,
                 Price.departure_port_ids,
@@ -1068,7 +1090,7 @@ class VoyageResource(Resource):
             # TODO confirm with Jan these are good columns to do so
             .distinct(
                 shipments_combined.c.shipment_id,
-                shipments_combined.c.ship_imo,
+                # shipments_combined.c.ship_imo,
                 Price.scenario,
                 Currency.currency,
             )
