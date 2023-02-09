@@ -1134,30 +1134,30 @@ class VoyageResource(Resource):
 
         if departure_date_from is not None:
             shipments_rich = shipments_rich.filter(
-                Departure.date_utc >= to_datetime(departure_date_from)
+                Departure.date_utc >= str(to_datetime(departure_date_from))
             )
 
         if arrival_date_from is not None:
             shipments_rich = shipments_rich.filter(
-                Arrival.date_utc >= to_datetime(arrival_date_from)
+                Arrival.date_utc >= str(to_datetime(arrival_date_from))
             )
 
         if date_to is not None:
             shipments_rich = shipments_rich.filter(
                 sa.or_(
-                    Arrival.date_utc <= to_datetime(date_to),
-                    Departure.date_utc <= to_datetime(date_to),
+                    Arrival.date_utc <= str(to_datetime(date_to)),
+                    Departure.date_utc <= str(to_datetime(date_to)),
                 )
             )
 
         if departure_date_to is not None:
             shipments_rich = shipments_rich.filter(
-                Departure.date_utc <= to_datetime(departure_date_to)
+                Departure.date_utc <= str(to_datetime(departure_date_to))
             )
 
         if arrival_date_to is not None:
             shipments_rich = shipments_rich.filter(
-                Arrival.date_utc <= to_datetime(arrival_date_to)
+                Arrival.date_utc <= str(to_datetime(arrival_date_to))
             )
 
         if departure_port_area is not None:
