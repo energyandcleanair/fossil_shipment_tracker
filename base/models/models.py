@@ -679,6 +679,10 @@ class Price(Base):
         CheckConstraint("eur_per_tonne >= 0", name="price_positive"),
         Index("idx_price_commodity", "commodity"),
         Index("idx_price_date", "date"),
+        Index("idx_price_destination_iso2s", "destination_iso2s"),
+        Index("idx_price_departure_port_ids", "departure_port_ids"),
+        Index("idx_price_ship_owner_iso2s", "ship_owner_iso2s"),
+        Index("idx_price_ship_insurer_iso2s", "ship_insurer_iso2s"),
     )
 
 
