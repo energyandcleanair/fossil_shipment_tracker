@@ -683,7 +683,6 @@ class Price(Base):
 
 
 class PriceScenario(Base):
-
     id = Column(String, primary_key=True)
     name = Column(String)
     others = Column(JSONB)
