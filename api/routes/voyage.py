@@ -59,7 +59,6 @@ from sqlalchemy.sql import extract
     doc={"description": "Retrieve shipments of fossil fuels."},
 )
 class VoyageResource(Resource):
-
     parser = reqparse.RequestParser()
     default_date_from = "2022-01-01"
 
@@ -695,7 +694,7 @@ class VoyageResource(Resource):
             .join(Ship, Ship.imo == Departure.ship_imo)
         )
 
-        shipments_combined = shipments_non_sts.union(
+        shipments_combined = shipments_non_sts.union_all(
             shipments_sts_with_arrival
         ).subquery()
 
@@ -1527,7 +1526,6 @@ class VoyageResource(Resource):
         return query
 
     def roll_average(self, result, aggregate_by, rolling_days):
-
         if rolling_days is not None:
             date_column = None
             if aggregate_by is not None and "departure_date" in aggregate_by:
@@ -1583,7 +1581,6 @@ class VoyageResource(Resource):
         return result
 
     def pivot_result(self, result, pivot_by, pivot_value):
-
         dependencies = {
             "commodity": ["commodity_name", "commodity_group", "commodity_group_name"],
             "commodity_name": ["commodity", "commodity_group", "commodity_group_name"],
@@ -1683,7 +1680,6 @@ class VoyageResource(Resource):
         return result
 
     def select(self, result, select):
-
         if not select:
             return result
 
@@ -1724,7 +1720,6 @@ class VoyageResource(Resource):
         return result
 
     def limit_result(self, result, limit, aggregate_by, sort_by, limit_by):
-
         if not limit:
             return result
 
@@ -1789,7 +1784,6 @@ class VoyageResource(Resource):
         download,
         routed_trajectory=False,
     ):
-
         result.replace({np.nan: None}, inplace=True)
 
         # If bulk and departure berth is coal, replace commodity with coal
