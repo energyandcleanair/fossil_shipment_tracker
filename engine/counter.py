@@ -21,7 +21,7 @@ except ImportError:
 import base
 
 
-def update(date_from='2021-01-01'):
+def update(date_from="2021-01-01"):
     """
     Fill counter
     :return:
@@ -35,12 +35,19 @@ def update(date_from='2021-01-01'):
         "download": False,
         "date_from": date_from,
         "commodity_origin_iso2": ["RU"],
-        "aggregate_by": ["commodity_origin_iso2", "commodity_destination_iso2", "commodity", "date"],
+        "aggregate_by": [
+            "commodity_origin_iso2",
+            "commodity_destination_iso2",
+            "commodity",
+            "date",
+        ],
         "nest_in_data": False,
         "currency": "EUR",
-        "pricing_scenario": None
+        "pricing_scenario": None,
     }
-    pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
+    pipelineflows_resp = PipelineFlowResource().get_from_params(
+        params=params_pipelineflows
+    )
     pipelineflows = json.loads(pipelineflows_resp.response[0])
     pipelineflows = pd.DataFrame(pipelineflows)
 
@@ -56,37 +63,61 @@ def update(date_from='2021-01-01'):
         "format": "json",
         "download": False,
         "date_from": date_from,
-        "commodity_origin_iso2": ['RU'],
-        "aggregate_by": ['commodity_origin_iso2', "commodity_destination_iso2", "commodity", "arrival_date", "status"],
+        "commodity_origin_iso2": ["RU"],
+        "aggregate_by": [
+            "commodity_origin_iso2",
+            "commodity_destination_iso2",
+            "commodity",
+            "arrival_date",
+            "status",
+        ],
         "nest_in_data": False,
-        "currency": 'EUR',
-        "status": 'completed',
-        "pricing_scenario": None
+        "currency": "EUR",
+        "status": "completed",
+        "pricing_scenario": None,
+        "bypass_maintenance": True,
     }
     voyages_resp = VoyageResource().get_from_params(params=params_voyage)
     voyages = json.loads(voyages_resp.response[0])
     voyages = pd.DataFrame(voyages)
-    voyages = voyages.loc[voyages.commodity_origin_iso2 == 'RU']
-    voyages = voyages.loc[voyages.commodity_destination_iso2 != 'RU']
-    voyages = voyages.loc[voyages.status == base.COMPLETED] # just to confirm
-    voyages.rename(columns={'arrival_date': 'date'}, inplace=True)
+    voyages = voyages.loc[voyages.commodity_origin_iso2 == "RU"]
+    voyages = voyages.loc[voyages.commodity_destination_iso2 != "RU"]
+    voyages = voyages.loc[voyages.status == base.COMPLETED]  # just to confirm
+    voyages.rename(columns={"arrival_date": "date"}, inplace=True)
 
     # Aggregate
     # Fill missing dates so that we're sure we're erasing everything
     # But only within commodity, to keep the last date available
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
-    result = pd.concat([pipelineflows, voyages]) \
-        .sort_values(['date', 'commodity']) \
-        [["commodity", 'commodity_group', 'commodity_destination_region', "commodity_destination_iso2", "date", "value_tonne", "value_eur",
-          "pricing_scenario"]]
-    result["date"] = pd.to_datetime(result["date"]).dt.floor('D')  # Should have been done already
-    result = result \
-        .groupby(["commodity", 'commodity_group', "commodity_destination_iso2", 'commodity_destination_region', 'pricing_scenario'],
-                 dropna=False) \
-        .apply(lambda x: x.set_index("date") \
-               .resample("D").sum() \
-               .fillna(0)) \
+    result = pd.concat([pipelineflows, voyages]).sort_values(["date", "commodity"])[
+        [
+            "commodity",
+            "commodity_group",
+            "commodity_destination_region",
+            "commodity_destination_iso2",
+            "date",
+            "value_tonne",
+            "value_eur",
+            "pricing_scenario",
+        ]
+    ]
+    result["date"] = pd.to_datetime(result["date"]).dt.floor(
+        "D"
+    )  # Should have been done already
+    result = (
+        result.groupby(
+            [
+                "commodity",
+                "commodity_group",
+                "commodity_destination_iso2",
+                "commodity_destination_region",
+                "pricing_scenario",
+            ],
+            dropna=False,
+        )
+        .apply(lambda x: x.set_index("date").resample("D").sum().fillna(0))
         .reset_index()
+    )
 
     result = result[~pd.isna(result.pricing_scenario)]
 
@@ -103,43 +134,53 @@ def update(date_from='2021-01-01'):
     # result = resume_eu_shipments(result, n_days=3)
 
     # Sanity check before updating counter
-    ok, global_new, global_old, eu_new, eu_old = sanity_check(result.loc[result.pricing_scenario == PRICING_DEFAULT])
+    ok, global_new, global_old, eu_new, eu_old = sanity_check(
+        result.loc[result.pricing_scenario == PRICING_DEFAULT]
+    )
 
     if not ok:
-        logger_slack.error("[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check." % (global_new / 1e9, global_old / 1e9))
+        logger_slack.error(
+            "[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check."
+            % (global_new / 1e9, global_old / 1e9)
+        )
     else:
-        logger_slack.info("[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)" %
-                          (global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9))
+        logger_slack.info(
+            "[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)"
+            % (global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9)
+        )
 
-        result.drop(['commodity_destination_region', 'commodity_group'], axis=1, inplace=True)
-        result.rename(columns={'commodity_destination_iso2': 'destination_iso2'}, inplace=True)
+        result.drop(
+            ["commodity_destination_region", "commodity_group"], axis=1, inplace=True
+        )
+        result.rename(
+            columns={"commodity_destination_iso2": "destination_iso2"}, inplace=True
+        )
 
         if True:
             # Erase and replace everything
             Counter.query.delete()
             session.commit()
-            result.to_sql(DB_TABLE_COUNTER,
-                      con=engine,
-                      if_exists="append",
-                      index=False)
+            result.to_sql(DB_TABLE_COUNTER, con=engine, if_exists="append", index=False)
             session.commit()
         else:
             # For manual purposes
-            upsert(df=result[result.pricing_scenario == PRICING_PRICECAP],
-                   table=DB_TABLE_COUNTER,
-                   constraint_name="unique_counter")
+            upsert(
+                df=result[result.pricing_scenario == PRICING_PRICECAP],
+                table=DB_TABLE_COUNTER,
+                constraint_name="unique_counter",
+            )
 
 
 def sanity_check(result):
-
     ok = True
     missing_price = result.loc[
-        (result.value_tonne > 0) &
-        (result.value_eur <= 0) &
-        (result.commodity != 'bulk_not_coal') &
-        (result.commodity != 'general_cargo') &
-        (result.commodity != 'lpg') &
-        (pd.to_datetime(result.date) <= dt.datetime.now())]
+        (result.value_tonne > 0)
+        & (result.value_eur <= 0)
+        & (result.commodity != "bulk_not_coal")
+        & (result.commodity != "general_cargo")
+        & (result.commodity != "lpg")
+        & (pd.to_datetime(result.date) <= dt.datetime.now())
+    ]
 
     if len(missing_price) > 0:
         logger_slack.error("Missing prices")
@@ -154,94 +195,138 @@ def sanity_check(result):
         logger_slack.error("Missing pricing scenario")
         ok = ok and False
 
-    coal_ban = result[(result.commodity_destination_region == 'EU') & \
-        (result.commodity.isin(['coal_rail_road', 'coke_rail_road']) &
-         (result.date >= '2022-08-11'))].value_tonne.sum()
+    coal_ban = result[
+        (result.commodity_destination_region == "EU")
+        & (
+            result.commodity.isin(["coal_rail_road", "coke_rail_road"])
+            & (result.date >= "2022-08-11")
+        )
+    ].value_tonne.sum()
 
     if coal_ban > 0:
         logger_slack.error("Counter has overland coal after august 10")
         ok = ok and False
 
     def get_comparison_df(compared_cols):
-        old_data = pd.read_sql(session.query(Counter,
-                                             Counter.destination_iso2.label('commodity_destination_iso2'),
-                                             Country.region.label('commodity_destination_region'),
-                                             Commodity.group.label('commodity_group')) \
-                               .outerjoin(Country, Country.iso2 == Counter.destination_iso2) \
-                               .join(Commodity, Commodity.id == Counter.commodity) \
-                               .filter(Counter.pricing_scenario == PRICING_DEFAULT).statement,
-                               session.bind)
-        old = old_data \
-            .loc[old_data.date >= '2022-02-24'] \
-            .loc[old_data.date <= pd.to_datetime(dt.date.today())] \
-            .groupby(compared_cols, dropna=False) \
-            .agg(old_eur=('value_eur', np.nansum)) \
+        old_data = pd.read_sql(
+            session.query(
+                Counter,
+                Counter.destination_iso2.label("commodity_destination_iso2"),
+                Country.region.label("commodity_destination_region"),
+                Commodity.group.label("commodity_group"),
+            )
+            .outerjoin(Country, Country.iso2 == Counter.destination_iso2)
+            .join(Commodity, Commodity.id == Counter.commodity)
+            .filter(Counter.pricing_scenario == PRICING_DEFAULT)
+            .statement,
+            session.bind,
+        )
+        old = (
+            old_data.loc[old_data.date >= "2022-02-24"]
+            .loc[old_data.date <= pd.to_datetime(dt.date.today())]
+            .groupby(compared_cols, dropna=False)
+            .agg(old_eur=("value_eur", np.nansum))
             .replace(np.nan, 0)
+        )
 
-        new = result \
-            .loc[result.date >= '2022-02-24'] \
-            .loc[result.date <= pd.to_datetime(dt.date.today())] \
-            .groupby(compared_cols, dropna=False) \
-            .agg(new_eur=('value_eur', np.nansum))
+        new = (
+            result.loc[result.date >= "2022-02-24"]
+            .loc[result.date <= pd.to_datetime(dt.date.today())]
+            .groupby(compared_cols, dropna=False)
+            .agg(new_eur=("value_eur", np.nansum))
+        )
 
-        comparison = pd.merge(old, new,
-                 how='outer',
-                 left_on=compared_cols,
-                 right_on=compared_cols) \
-            .replace(np.nan, 0)
+        comparison = pd.merge(
+            old, new, how="outer", left_on=compared_cols, right_on=compared_cols
+        ).replace(np.nan, 0)
 
-        comparison['ok'] = (comparison.new_eur >= comparison.old_eur * 0.95) \
-                           & (comparison.new_eur <= comparison.old_eur * 1.1)
+        comparison["ok"] = (comparison.new_eur >= comparison.old_eur * 0.95) & (
+            comparison.new_eur <= comparison.old_eur * 1.1
+        )
         comparison = comparison.reset_index()
         return comparison
 
-    comparison = get_comparison_df(compared_cols=['commodity_group', 'commodity_destination_region'])
+    comparison = get_comparison_df(
+        compared_cols=["commodity_group", "commodity_destination_region"]
+    )
     ok = ok and comparison.ok.all()
 
-    logger_slack.info(comparison.reset_index() \
-                      .rename(columns={'commodity_destination_region': 'region',
-                                       'commodity_group': 'com.'}) \
-                      .to_string(col_space=10, index=False,
-                                 justify='left'))
+    logger_slack.info(
+        comparison.reset_index()
+        .rename(
+            columns={
+                "commodity_destination_region": "region",
+                "commodity_group": "com.",
+            }
+        )
+        .to_string(col_space=10, index=False, justify="left")
+    )
     if not ok:
         # Print a more detailed version
-        comparison_detailed = get_comparison_df(compared_cols=['commodity_group', 'commodity', 'commodity_destination_iso2', 'commodity_destination_region'])
+        comparison_detailed = get_comparison_df(
+            compared_cols=[
+                "commodity_group",
+                "commodity",
+                "commodity_destination_iso2",
+                "commodity_destination_region",
+            ]
+        )
         comparison_detailed = comparison_detailed.loc[~comparison_detailed.ok]
-        logger_slack.info(comparison_detailed.reset_index() \
-                          .rename(columns={'commodity_destination_region': 'region',
-                                           'commodity_group': 'com.'}) \
-                          .to_string(col_space=10, index=False,
-                                     justify='left'))
+        logger_slack.info(
+            comparison_detailed.reset_index()
+            .rename(
+                columns={
+                    "commodity_destination_region": "region",
+                    "commodity_group": "com.",
+                }
+            )
+            .to_string(col_space=10, index=False, justify="left")
+        )
 
     global_old = comparison.old_eur.sum()
     global_new = comparison.new_eur.sum()
 
-    eu_old = comparison.loc[comparison.commodity_destination_region == 'EU'].old_eur.sum()
-    eu_new = comparison.loc[comparison.commodity_destination_region == 'EU'].new_eur.sum()
+    eu_old = comparison.loc[
+        comparison.commodity_destination_region == "EU"
+    ].old_eur.sum()
+    eu_new = comparison.loc[
+        comparison.commodity_destination_region == "EU"
+    ].new_eur.sum()
 
     return ok, global_new, global_old, eu_new, eu_old
 
 
-def remove_pipeline_lng(result, n_days=10,
-                        date_stop=dt.date(2022, 6, 6)):
-    result.loc[(result.commodity == 'lng_pipeline') & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
-               ["value_eur", "value_tonne"]] = 0
-    result.loc[(result.commodity == 'lng_pipeline') & (pd.to_datetime(result.date) <= pd.to_datetime(date_stop)),
-               ["value_eur", "value_tonne"]] *= max(0, 1 - 1 / n_days * (dt.date.today() - date_stop).days)
+def remove_pipeline_lng(result, n_days=10, date_stop=dt.date(2022, 6, 6)):
+    result.loc[
+        (result.commodity == "lng_pipeline")
+        & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
+        ["value_eur", "value_tonne"],
+    ] = 0
+    result.loc[
+        (result.commodity == "lng_pipeline")
+        & (pd.to_datetime(result.date) <= pd.to_datetime(date_stop)),
+        ["value_eur", "value_tonne"],
+    ] *= max(0, 1 - 1 / n_days * (dt.date.today() - date_stop).days)
     return result
 
 
-def remove_coal_to_eu(result, date_stop=dt.date(2022,8,11)):
-    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'coal')
-               & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
-               ["value_eur", "value_tonne"]] = 0
+def remove_coal_to_eu(result, date_stop=dt.date(2022, 8, 11)):
+    result.loc[
+        (result.commodity_destination_region == "EU")
+        & (result.commodity == "coal")
+        & (pd.to_datetime(result.date) >= pd.to_datetime(date_stop)),
+        ["value_eur", "value_tonne"],
+    ] = 0
 
     return result
 
 
-def resume_pipeline_oil_eu(result, n_days=14,
-                           date_start_resuming = dt.date(2022, 10, 4),
-                           date_break = dt.date(2022, 9, 1)):
+def resume_pipeline_oil_eu(
+    result,
+    n_days=14,
+    date_start_resuming=dt.date(2022, 10, 4),
+    date_break=dt.date(2022, 9, 1),
+):
     """
     We missed EU pipeline oil for a couple weeks but didn't want to restore it
     in one go just before the 100 bn counter. We're adding a slow catchup
@@ -250,16 +335,24 @@ def resume_pipeline_oil_eu(result, n_days=14,
     :param date_stop:
     :return:
     """
-    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity == 'pipeline_oil')
-               & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
-               ["value_eur", "value_tonne"]] *= min(1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days))
+    result.loc[
+        (result.commodity_destination_region == "EU")
+        & (result.commodity == "pipeline_oil")
+        & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
+        ["value_eur", "value_tonne"],
+    ] *= min(
+        1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days)
+    )
 
     return result
 
 
-def resume_eu_shipments(result, n_days=10,
-                        date_start_resuming = dt.date(2022, 10, 4),
-                        date_break = dt.date(2022, 9, 26)):
+def resume_eu_shipments(
+    result,
+    n_days=10,
+    date_start_resuming=dt.date(2022, 10, 4),
+    date_break=dt.date(2022, 9, 26),
+):
     """
     We missed EU pipeline oil for a couple weeks but didn't want to restore it
     in one go just before the 100 bn counter. We're adding a slow catchup
@@ -268,12 +361,16 @@ def resume_eu_shipments(result, n_days=10,
     :param date_stop:
     :return:
     """
-    result.loc[(result.commodity_destination_region == 'EU') & (result.commodity.isin(['lng', 'crude_oil', 'oil_products']))
-               & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
-               ["value_eur", "value_tonne"]] *= min(1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600  / 24 / n_days))
+    result.loc[
+        (result.commodity_destination_region == "EU")
+        & (result.commodity.isin(["lng", "crude_oil", "oil_products"]))
+        & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
+        ["value_eur", "value_tonne"],
+    ] *= min(
+        1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days)
+    )
 
     return result
-
 
 
 def add_estimates(result):
@@ -289,28 +386,28 @@ def add_estimates(result):
     """
 
     import datetime as dt
+
     daterange = pd.date_range(min(result.date), dt.datetime.today()).rename("date")
 
     def resample_and_fill(x):
-        x = x.set_index("date") \
-            .resample("D").sum() \
-            .fillna(0)
+        x = x.set_index("date").resample("D").sum().fillna(0)
         # cut 2 last days and take the 7-day mean
         means = x[["value_tonne", "value_eur"]].shift(2).tail(7).mean()
-        x = x.reindex(daterange) \
-            .fillna(means)
+        x = x.reindex(daterange).fillna(means)
         return x
 
     # TODO Get previous estimate
-    result_estimated = result \
-        .groupby(["commodity", "destination_region"]) \
-        .apply(resample_and_fill) \
+    result_estimated = (
+        result.groupby(["commodity", "destination_region"])
+        .apply(resample_and_fill)
         .reset_index()
+    )
 
-    m = pd.merge(result[["commodity", "date"]], result_estimated, how='outer', indicator=True)
-    result_to_upload = m[m['_merge'] == 'right_only'].drop('_merge', axis=1)
+    m = pd.merge(
+        result[["commodity", "date"]], result_estimated, how="outer", indicator=True
+    )
+    result_to_upload = m[m["_merge"] == "right_only"].drop("_merge", axis=1)
     result_to_upload["type"] = base.COUNTER_ESTIMATED
-    result_to_upload.to_sql(DB_TABLE_COUNTER,
-                  con=engine,
-                  if_exists="append",
-                  index=False)
+    result_to_upload.to_sql(
+        DB_TABLE_COUNTER, con=engine, if_exists="append", index=False
+    )
