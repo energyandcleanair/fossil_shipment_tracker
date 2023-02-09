@@ -27,7 +27,6 @@ from engine.commodity import get_subquery as get_commodity_subquery
 
 @routes_api.route("/v0/counter", strict_slashes=False)
 class RussiaCounterResource(Resource):
-
     parser = reqparse.RequestParser()
     parser.add_argument(
         "cumulate",
@@ -575,7 +574,6 @@ class RussiaCounterResource(Resource):
                 sorting_groupers = ["destination_country"]
 
             if aggregate_by:
-
                 dependencies = {
                     "commodity": ["commodity_group", "commodity_group_name"],
                     "commodity_group": ["commodity", "commodity_group_name"],
@@ -608,7 +606,6 @@ class RussiaCounterResource(Resource):
         return result
 
     def pivot_result(self, result, pivot_by, pivot_value):
-
         # Concatenate if there are several pivot_values (e.g. value_eur and value_tonne)
         pivot_values = to_list(pivot_value)
         if len(pivot_values) > 1:
@@ -620,6 +617,9 @@ class RussiaCounterResource(Resource):
                     for x in pivot_values
                 ]
             )
+        else:
+            pivot_value = pivot_values[0]
+
         dependencies = {
             "commodity": ["commodity_group", "commodity_group_name"],
             "commodity_group": ["commodity", "commodity_group_name"],
@@ -631,7 +631,6 @@ class RussiaCounterResource(Resource):
         }
 
         if pivot_by:
-
             pivot_by_dependencies = [
                 d for x in to_list(pivot_by) for d in dependencies.get(x, [])
             ]
@@ -655,7 +654,6 @@ class RussiaCounterResource(Resource):
         return result
 
     def limit_result(self, result, limit, aggregate_by, sort_by, limit_by, keep_zeros):
-
         if not keep_zeros:
             result = result[(result.value_eur != 0) | (result.value_tonne != 0)]
 
@@ -698,7 +696,6 @@ class RussiaCounterResource(Resource):
         return result
 
     def sort_columns(self, result, columns_order):
-
         if columns_order:
             # We keep all other columns
             cols = columns_order + [x for x in result.columns if x not in columns_order]
