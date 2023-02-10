@@ -42,7 +42,6 @@ def load_cache(f):
 
 
 class Marinetraffic:
-
     api_base = "https://services.marinetraffic.com/api/"
     cache_file_ship = "cache/marinetraffic/ships.json"
     cache_file_events = "cache/marinetraffic/events.json"
@@ -52,7 +51,6 @@ class Marinetraffic:
 
     @classmethod
     def wait(cls, interval_after_last_call=dt.timedelta(minutes=1)):
-
         if cls.last_call_dt is not None:
             interval_since_last_call = dt.datetime.now() - cls.last_call_dt
 
@@ -63,10 +61,18 @@ class Marinetraffic:
         cls.last_call_dt = dt.datetime.now()
 
     @classmethod
-    def call(cls, method, params, api_key, credits_per_record, save_empty_record=True):
-
+    def call(
+        cls,
+        method,
+        params,
+        api_key,
+        credits_per_record,
+        save_empty_record=True,
+        wait=True,
+    ):
         # Ensure a minimum time has passed since we made the last call
-        cls.wait()
+        if wait:
+            cls.wait()
 
         params_string = urllib.parse.urlencode(params)
         api_result = s.get(
@@ -121,12 +127,10 @@ class Marinetraffic:
 
     @classmethod
     def get_ship(cls, imo=None, mmsi=None, mt_id=None, use_cache=True):
-
         api_key = get_env("KEY_MARINETRAFFIC_VD02")
 
         # First look in cache to save query credits
         if use_cache:
-
             ship_filter = (
                 lambda x: (imo is not None and str(x["IMO"]) == str(imo))
                 or (mmsi is not None and str(x["MMSI"]) == str(mmsi))
@@ -166,6 +170,7 @@ class Marinetraffic:
                 api_key=api_key,
                 params=params,
                 credits_per_record=3,
+                wait=False,
             )
 
             if response_data and "DATA" in response_data:
@@ -237,7 +242,6 @@ class Marinetraffic:
         arrival_or_departure=None,
         use_call_based=False,
     ):
-
         if imo is None and unlocode is None and marinetraffic_port_id is None:
             raise ValueError(
                 "Need to specify either imo, unlocode or marinetraffic_port_id"
@@ -282,6 +286,7 @@ class Marinetraffic:
             params=params,
             credits_per_record=4,
             save_empty_record=True,
+            wait=use_call_based,
         )
 
         if response_datas is None:
@@ -475,7 +480,6 @@ class Marinetraffic:
 
     @classmethod
     def get_voyage_info(cls, imo, date_from):
-
         # First look in cache to save query credits
         cached_info = MTVoyageInfo.query.filter(
             sa.and_(
@@ -613,7 +617,6 @@ class Marinetraffic:
 
     @classmethod
     def parse_position_response_data(cls, response_data, imo):
-
         positions = [
             Position(
                 **{
@@ -731,7 +734,6 @@ class Marinetraffic:
             response_datas = None
 
         if not response_datas:
-
             params = {
                 "protocol": "jsono",
                 "fromdate": date_from.strftime("%Y-%m-%d %H:%M"),
@@ -759,7 +761,6 @@ class Marinetraffic:
                 return []
 
             for r in response_datas:
-
                 # if we are not using cache and queried MT, let's add ship imo to response and then cache object
                 r["IMO"] = imo
                 if cache_objects:
@@ -767,7 +768,6 @@ class Marinetraffic:
 
         events = []
         for r in response_datas:
-
             events.append(cls.parse_event(r))
 
         return events
