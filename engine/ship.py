@@ -63,7 +63,6 @@ def collect_mt_for_large_oil_products():
             logger.info("Was already using MT")
 
 
-#
 # def collect_mt_for_insurers(date_from='2022-02-24',
 #                          commodity=[base.CRUDE_OIL, base.LNG]):
 #
@@ -90,6 +89,23 @@ def collect_mt_for_large_oil_products():
 
 
 def fill_missing_commodity():
+    # First fill type if missing
+    # Datalastic (or us) seem to have been missing a few in the past
+    ships = Ship.query.filter(Ship.type == sa.null()).all()
+    for ship in tqdm(ships):
+        new_ship = Datalastic.get_ship(imo=ship.imo, use_cache=False)
+        if new_ship:
+            print(new_ship.imo)
+            ship.others.update({"datalastic": new_ship.others.get("datalastic")})
+            new_ship.others.update(ship.others)
+            # new_ship.others.update(ship.others)
+            (commodity, quantity, unit) = ship_to_commodity(new_ship)
+            new_ship.commodity = commodity
+            new_ship.quantity = quantity
+            new_ship.unit = unit
+            session.merge(new_ship)
+            session.commit()
+
     ships = Ship.query.filter(Ship.commodity == sa.null()).all()
     for ship in tqdm(ships):
         (commodity, quantity, unit) = ship_to_commodity(ship)
@@ -303,7 +319,6 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
         # collapse all sources into lists, eg equasis, datalastic, marinetraffic
         sources = {}
         for ship in ships:
-
             if not ship.others:
                 continue
 
@@ -479,7 +494,6 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
             and len(names) == 1
             and len(mmsis) == 1
         ):
-
             old_imo = ship_to_keep.imo
 
             # fix the rest of the ship versions by changing departures/portcalls and deleting them after
@@ -535,7 +549,6 @@ def fix_duplicate_imo(imo=None, handle_not_found=True):
                     found_ship = Marinetraffic.get_ship(imo=base_imo)
 
                 if found_ship is not None:
-
                     found_mmsi, found_name = found_ship.mmsi[0], found_ship.name[0]
                     # add or over ride existing others data with newest
                     for source, data in found_ship.others.items():
@@ -654,7 +667,6 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                     session.rollback()
 
             if len(existing_ship) == 1:
-
                 if existing_ship[0].mmsi == mmsi:
                     # Just need to plug with existing ship
                     ship_portcalls = PortCall.query.filter(
