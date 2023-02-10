@@ -45,7 +45,7 @@ from base.models import (
 )
 from base.db import session
 from base.encoder import JsonEncoder
-from base.utils import to_list, df_to_json, to_datetime
+from base.utils import to_list, df_to_json, to_datetime, to_bool
 from base.logger import logger
 from base import PRICING_DEFAULT
 from base.utils import update_geometry_from_wkb
@@ -421,7 +421,7 @@ class VoyageResource(Resource):
         return self.get_from_params(params)
 
     def get_maintenance_response(self, params):
-        is_in_maintenance = bool(get_env("MAINTENANCE", False))
+        is_in_maintenance = to_bool(get_env("MAINTENANCE", False))
         bypass_maintenance = params.get("bypass_maintenance", False)
         if is_in_maintenance and not bypass_maintenance:
             return {"message": "API is currently in maintenance mode."}, 503

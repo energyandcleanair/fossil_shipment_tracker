@@ -18,7 +18,7 @@ from base.env import get_env
 from base.models import PipelineFlow, Country, Commodity, Currency, Price, PriceScenario
 from base.db import session
 from base.encoder import JsonEncoder
-from base.utils import to_list, to_datetime
+from base.utils import to_list, to_datetime, to_bool
 from base.logger import logger
 from base import PRICING_DEFAULT
 from engine import commodity
@@ -190,7 +190,7 @@ class PipelineFlowResource(Resource):
         return self.get_from_params(params)
 
     def get_maintenance_response(self, params):
-        is_in_maintenance = bool(get_env("MAINTENANCE", False))
+        is_in_maintenance = to_bool(get_env("MAINTENANCE", False))
         bypass_maintenance = params.get("bypass_maintenance", False)
         if is_in_maintenance and not bypass_maintenance:
             return {"message": "API is currently in maintenance mode."}, 503
