@@ -14,6 +14,7 @@ from . import routes_api
 from flask_restx import inputs
 
 import base
+from base.env import get_env
 from base.models import PipelineFlow, Country, Commodity, Currency, Price, PriceScenario
 from base.db import session
 from base.encoder import JsonEncoder
@@ -30,8 +31,15 @@ from engine.commodity import get_subquery as get_commodity_subquery
     doc={"description": "Retrieve pipeline and roal/raid flows of fossil fuels."},
 )
 class PipelineFlowResource(Resource):
-
     parser = reqparse.RequestParser()
+
+    parser.add_argument(
+        "bypass_maintenance",
+        help="bypass maintenance when in maintenance",
+        default=False,
+        required=False,
+        type=inputs.boolean,
+    )
 
     # Query content
     parser.add_argument(
@@ -175,7 +183,19 @@ class PipelineFlowResource(Resource):
     @routes_api.expect(parser, validate=True)
     def get(self):
         params = PipelineFlowResource.parser.parse_args()
+        maintenance_resp = self.get_maintenance_response(params)
+        if maintenance_resp:
+            return maintenance_resp
+
         return self.get_from_params(params)
+
+    def get_maintenance_response(self, params):
+        is_in_maintenance = bool(get_env("MAINTENANCE", False))
+        bypass_maintenance = params.get("bypass_maintenance", False)
+        if is_in_maintenance and not bypass_maintenance:
+            return {"message": "API is currently in maintenance mode."}, 503
+        else:
+            return None
 
     def get_from_params(self, params):
         id = params.get("id")
@@ -500,7 +520,6 @@ class PipelineFlowResource(Resource):
         return query
 
     def roll_average(self, result, aggregate_by, rolling_days):
-
         if rolling_days is not None:
             date_column = "date"
             min_date = result[date_column].min()
@@ -564,7 +583,6 @@ class PipelineFlowResource(Resource):
         return result
 
     def build_response(self, result, format, nest_in_data, aggregate_by, download):
-
         result.replace({np.nan: None}, inplace=True)
 
         # If bulk and departure berth is coal, replace commodity with coal
