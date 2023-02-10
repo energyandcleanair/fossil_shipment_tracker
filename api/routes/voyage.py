@@ -7,6 +7,7 @@ from http import HTTPStatus
 from flask import Response
 from flask_restx import Resource, reqparse
 from flask_restx import inputs
+from sqlalchemy.dialects.postgresql import array
 
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
@@ -686,7 +687,8 @@ class VoyageResource(Resource):
             )
             .outerjoin(
                 shipment_sts_arrival_weights,
-                shipment_sts_arrival_weights.c.shipment_departure_id == ShipmentWithSTS.id,
+                shipment_sts_arrival_weights.c.shipment_departure_id
+                == ShipmentWithSTS.id,
             )
             .outerjoin(ArrivalShip, ArrivalShip.imo == shipment_sts_weights.c.imo)
             .filter(Departure.event_id == sa.null())
@@ -1045,21 +1047,23 @@ class VoyageResource(Resource):
                     ),
                     sa.or_(
                         # Use GIN index, or try to ~
-                        Price.departure_port_ids.contains([DeparturePort.id]),
+                        Price.departure_port_ids.contains(array([DeparturePort.id])),
                         # DeparturePort.id == any_(Price.departure_port_ids),
                         # Price.departure_port_ids == sa.null(),
                         Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     ),
                     sa.or_(
                         # Use GIN index, or try to ~
-                        Price.ship_owner_iso2s.contains([ShipOwnerCountry.iso2]),
+                        Price.ship_owner_iso2s.contains(array([ShipOwnerCountry.iso2])),
                         # ShipOwnerCountry.iso2 == any_(Price.ship_owner_iso2s),
                         # Price.ship_owner_iso2s == sa.null(),
                         Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                     sa.or_(
                         # Use GIN index, or try to ~
-                        Price.ship_insurer_iso2s.contains([ShipInsurerCountry.iso2]),
+                        Price.ship_insurer_iso2s.contains(
+                            array([ShipInsurerCountry.iso2])
+                        ),
                         # ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
                         # Price.ship_insurer_iso2s == sa.null(),
                         Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
