@@ -15,11 +15,11 @@ def update():
                 "library(remotes)",
                 # "remotes::install_github('energyandcleanair/rcrea', upgrade=F, force=F)",
                 "library(rcrea)",
-                "remotes::install_github('energyandcleanair/202203_russian_gas', upgrade=F, force=F)",
+                "remotes::install_github('energyandcleanair/fossil_shipment_tracker_r', upgrade=F, force=F)",
                 # To ensure latest version is being used
                 "if('russiacounter' %in% (.packages())){detach('package:russiacounter', unload=T)}",
                 "library(russiacounter)",
-                "russiacounter::update_counter()"
+                "russiacounter::update_counter()",
             ]
         },
         "environment_variables": [
@@ -27,8 +27,8 @@ def update():
             "FOSSIL_DB_PRODUCTION",
             "GITHUB_PAT",
             "CREA_MONGODB_URL",
-            "EIA_KEY"
-        ]
+            "EIA_KEY",
+        ],
     }
 
     itry = 0
