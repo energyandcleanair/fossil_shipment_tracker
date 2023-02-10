@@ -1044,17 +1044,23 @@ class VoyageResource(Resource):
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                     sa.or_(
-                        DeparturePort.id == any_(Price.departure_port_ids),
+                        # Use GIN index, or try to ~
+                        Price.departure_port_ids.contains([DeparturePort.id]),
+                        # DeparturePort.id == any_(Price.departure_port_ids),
                         # Price.departure_port_ids == sa.null(),
                         Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     ),
                     sa.or_(
-                        ShipOwnerCountry.iso2 == any_(Price.ship_owner_iso2s),
+                        # Use GIN index, or try to ~
+                        Price.ship_owner_iso2s.contains([ShipOwnerCountry.iso2]),
+                        # ShipOwnerCountry.iso2 == any_(Price.ship_owner_iso2s),
                         # Price.ship_owner_iso2s == sa.null(),
                         Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                     sa.or_(
-                        ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
+                        # Use GIN index, or try to ~
+                        Price.ship_insurer_iso2s.contains([ShipInsurerCountry.iso2]),
+                        # ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
                         # Price.ship_insurer_iso2s == sa.null(),
                         Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
