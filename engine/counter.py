@@ -44,6 +44,7 @@ def update(date_from="2021-01-01"):
         "nest_in_data": False,
         "currency": "EUR",
         "pricing_scenario": None,
+        "bypass_maintenance": True,
     }
     pipelineflows_resp = PipelineFlowResource().get_from_params(
         params=params_pipelineflows
