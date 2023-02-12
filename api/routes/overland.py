@@ -534,20 +534,14 @@ class PipelineFlowResource(Resource):
                     [
                         x
                         for x in result.columns
-                        if x
-                        not in [
-                            date_column,
-                            "ship_dwt",
-                            "value_tonne",
-                            "value_m3",
-                            "value_eur",
-                        ]
+                        if x not in [date_column, "ship_dwt"]
+                        and not x.startswith("value_")
                     ]
                 )
                 .apply(
                     lambda x: x.set_index(date_column)
                     .resample("D")
-                    .sum()
+                    .sum(numeric_only=True)
                     .reindex(daterange)
                     .fillna(0)
                     .rolling(rolling_days, min_periods=rolling_days)
@@ -566,7 +560,7 @@ class PipelineFlowResource(Resource):
         index_cols = [
             x
             for x in result.columns
-            if x not in ["currency", "value_currency", "value_eur"]
+            if x not in ["currency"] and not x.startswith("value_")
         ]
 
         result = (
