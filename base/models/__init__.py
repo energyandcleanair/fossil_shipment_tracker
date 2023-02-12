@@ -32,7 +32,7 @@ DB_TABLE_STSARRIVALLOCATION = "shipmentarrivallocationsts"
 
 DB_TABLE_PIPELINEFLOW = "pipelineflow"
 DB_TABLE_COUNTER = "counter"
-DB_TABLE_COUNTER100BN = "counter_100bn"
+DB_TABLE_ENDPOINTCACHE = "endpoint_cache"
 
 # Marine Traffic cache
 DB_TABLE_MTVOYAGEINFO = "voyageinfo"

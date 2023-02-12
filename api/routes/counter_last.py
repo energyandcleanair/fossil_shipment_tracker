@@ -15,6 +15,7 @@ from sqlalchemy import case
 import base
 from base import PRICING_DEFAULT
 from . import routes_api
+from .endpoint_cache import EndpointCacher
 from base.encoder import JsonEncoder
 from base.logger import logger
 from base.db import session
@@ -26,6 +27,8 @@ from engine.commodity import get_subquery as get_commodity_subquery
 
 @routes_api.route("/v0/counter_last", strict_slashes=False)
 class RussiaCounterLastResource(Resource):
+    max_age_minutes = 5
+
     parser = reqparse.RequestParser()
     parser.add_argument(
         "destination_iso2",
@@ -100,6 +103,18 @@ class RussiaCounterLastResource(Resource):
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterLastResource.parser.parse_args()
+        counter_last = self.get_from_params(params)
+        return self.build_response(
+            counter_last=counter_last, format=params.get("format")
+        )
+
+    def get_from_params(self, params):
+        cache = EndpointCacher.get_cache(
+            endpoint=self.endpoint, params=params, max_age_minutes=self.max_age_minutes
+        )
+        if cache:
+            return pd.DataFrame(cache)
+
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
         date_from = params.get("date_from")
@@ -108,7 +123,6 @@ class RussiaCounterLastResource(Resource):
         aggregate_by = params.get("aggregate_by")
         pricing_scenario = params.get("pricing_scenario")
         use_eu = params.get("use_eu")
-        format = params.get("format")
 
         destination_region_field = case(
             [
@@ -206,6 +220,14 @@ class RussiaCounterLastResource(Resource):
         if "index" in counter_last.columns:
             counter_last.drop(["index"], axis=1, inplace=True)
 
+        EndpointCacher.set_cache(
+            endpoint=self.endpoint,
+            params=params,
+            response=counter_last.to_dict(orient="records"),
+        )
+        return counter_last
+
+    def build_response(self, counter_last, format):
         if format == "csv":
             return Response(
                 response=counter_last.to_csv(index=False),

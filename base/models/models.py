@@ -44,7 +44,7 @@ from . import DB_TABLE_PRICE
 from . import DB_TABLE_PRICE_SCENARIO
 from . import DB_TABLE_PIPELINEFLOW
 from . import DB_TABLE_COUNTER
-from . import DB_TABLE_COUNTER100BN
+from . import DB_TABLE_ENDPOINTCACHE
 from . import DB_TABLE_COMMODITY
 from . import DB_TABLE_ENTSOGFLOW
 from . import DB_TABLE_ENTSOGFLOW_RAW
@@ -803,26 +803,20 @@ class Counter(Base):
     )
 
 
-class Counter100bn(Base):
+class EndpointCache(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + ".id"), nullable=False)
+    endpoint = Column(String)
+    params = Column(JSONB)
+    response = Column(JSONB)
+    updated_on = Column(
+        DateTime(timezone=False),
+        default=dt.datetime.utcnow,
+        onupdate=dt.datetime.utcnow,
+    )
 
-    destination_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + ".iso2"))
-
-    date = Column(DateTime(timezone=False))
-    value_tonne = Column(Numeric)
-    value_eur = Column(Numeric)
-    pricing_scenario = Column(String)
-
-    __tablename__ = DB_TABLE_COUNTER100BN
+    __tablename__ = DB_TABLE_ENDPOINTCACHE
     __table_args__ = (
-        UniqueConstraint(
-            "date",
-            "commodity",
-            "destination_iso2",
-            "pricing_scenario",
-            name="unique_counter_100bn",
-        ),
+        UniqueConstraint("endpoint", "params", name="unique_endpointcache"),
     )
 
 
