@@ -16,6 +16,8 @@
 # - Computations of flaring
 # - Upload of flaring data to database
 #
+# Results can be browsed at https://crea.shinyapps.io/russia_flaring/
+#
 # License: MIT
 #
 
@@ -66,7 +68,6 @@ def update(
         facilities = FacilityScraper.download_facilities()
 
     if missing_dates_only:
-        # Only compute missing dates
         date_from = FlaringComputer.get_last_flaring_date() or date_from
 
     # Compute flaring
@@ -78,7 +79,6 @@ def update(
 
     # Upload flaring
     FlaringComputer.upload_flaring(flaring=flaring)
-
     return
 
 
@@ -91,6 +91,7 @@ class FlaringComputer:
     https://doi.org/10.3390/rs13163078
     """
 
+    # Constants from publication
     sigma = 5.67e-8
     b1 = 0.0294
     d = 0.7
@@ -148,7 +149,6 @@ class FlaringComputer:
         res = res[["id", "date", "unit", "value", "buffer_km"]].rename(
             columns={"id": "facility_id"}
         )
-
         return res
 
     @classmethod
@@ -330,6 +330,11 @@ class FlaringComputer:
 
 
 class FacilityScraper:
+    """
+    Class to collect flaring facilities (fields, pipelines, terminals etc)
+    from various sites
+    """
+
     @classmethod
     def fill_facilities(cls):
         """
@@ -383,7 +388,6 @@ class FacilityScraper:
         # Convert to GeoDataFrame
         facilities = update_geometry_from_wkb(facilities, to="wkt")
         facilities = gpd.GeoDataFrame(facilities)
-
         return facilities
 
     @classmethod
@@ -420,7 +424,6 @@ class FacilityScraper:
 
         fields["type"] = "Field"
         fields["name"] = fields.clusterCaption
-
         return fields
 
     @classmethod
@@ -451,11 +454,15 @@ class FacilityScraper:
         points["geometry"] = gpd.points_from_xy(points.lng, points.lat)
         points["type"] = "LNG Terminal"
         lines["type"] = "Pipeline"
-
         return pd.concat([points, lines]).rename(columns={"project": "name"})
 
 
 class VnfScraper:
+    """
+    Class to collect VIIRS Night Fire data
+    from the Earth Observation Group at Mines School.
+    """
+
     @classmethod
     def download_vnf_date(cls, date, force=False):
         """
@@ -509,7 +516,6 @@ class VnfScraper:
 
         if os.path.exists(output_file_gz):
             os.remove(output_file_gz)
-
         return output_file
 
     @classmethod
@@ -533,6 +539,6 @@ class VnfScraper:
     @staticmethod
     def date_to_localpath(date, ext="csv"):
         gis_dir = get_env("GIS_DIR")
-        vnf_folder = os.path.join(gis_dir, "fire", "nvf")
-        basename = "nvf_%s.%s" % (date.strftime("%Y%m%d"), ext)
+        vnf_folder = os.path.join(gis_dir, "fire", "vnf")
+        basename = "vnf_%s.%s" % (date.strftime("%Y%m%d"), ext)
         return os.path.join(vnf_folder, basename)
