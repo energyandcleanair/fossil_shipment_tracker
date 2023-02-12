@@ -139,24 +139,26 @@ class RussiaCounterLastResource(Resource):
                 Country.name.label("destination_country"),
                 destination_region_field,
                 Counter.date,
-                func.sum(Counter.value_tonne).label("value_tonne"),
-                func.sum(Counter.value_eur).label("value_eur"),
+                # func.sum(Counter.value_tonne).label("value_tonne"),
+                # func.sum(Counter.value_eur).label("value_eur"),
+                Counter.value_tonne,
+                Counter.value_eur,
                 Counter.pricing_scenario,
                 PriceScenario.name.label("pricing_scenario_name"),
             )
             .join(commodity_subquery, Counter.commodity == commodity_subquery.c.id)
             .join(Country, Country.iso2 == Counter.destination_iso2)
             .outerjoin(PriceScenario, PriceScenario.id == Counter.pricing_scenario)
-            .group_by(
-                Counter.commodity,
-                Counter.destination_iso2,
-                Country.name,
-                destination_region_field,
-                Counter.date,
-                commodity_subquery.c.group,
-                Counter.pricing_scenario,
-                PriceScenario.name,
-            )
+            # .group_by(
+            #     Counter.commodity,
+            #     Counter.destination_iso2,
+            #     Country.name,
+            #     destination_region_field,
+            #     Counter.date,
+            #     commodity_subquery.c.group,
+            #     Counter.pricing_scenario,
+            #     PriceScenario.name,
+            # )
             .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
         )
 
@@ -169,14 +171,14 @@ class RussiaCounterLastResource(Resource):
             query = query.filter(Counter.destination_iso2 == destination_iso2)
 
         if date_from:
-            query = query.filter(Counter.date >= to_datetime(date_from))
+            query = query.filter(Counter.date >= str(to_datetime(date_from)))
 
         if date_to:
-            query = query.filter(Counter.date <= to_datetime(date_to))
+            query = query.filter(Counter.date <= str(to_datetime(date_to)))
 
         # Important to force this
         # so that future flows (e.g. fixed pipeline) aren't included
-        query = query.filter(Counter.date <= dt.date.today())
+        query = query.filter(Counter.date <= str(dt.date.today()))
 
         # Aggregate
         query = self.aggregate(query=query, aggregate_by=aggregate_by)
