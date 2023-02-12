@@ -27,7 +27,7 @@ from engine.commodity import get_subquery as get_commodity_subquery
 
 @routes_api.route("/v0/counter_last", strict_slashes=False)
 class RussiaCounterLastResource(Resource):
-    max_age_minutes = 5
+    max_age_minutes = 10
 
     parser = reqparse.RequestParser()
     parser.add_argument(
@@ -109,8 +109,13 @@ class RussiaCounterLastResource(Resource):
         )
 
     def get_from_params(self, params):
+        # original parameters (before any potential modifications)
+        original_params = params.copy()
+
         cache = EndpointCacher.get_cache(
-            endpoint=self.endpoint, params=params, max_age_minutes=self.max_age_minutes
+            endpoint=self.endpoint,
+            params=original_params,
+            max_age_minutes=self.max_age_minutes,
         )
         if cache:
             return pd.DataFrame(cache)
@@ -222,7 +227,7 @@ class RussiaCounterLastResource(Resource):
 
         EndpointCacher.set_cache(
             endpoint=self.endpoint,
-            params=params,
+            params=original_params,
             response=counter_last.to_dict(orient="records"),
         )
         return counter_last
