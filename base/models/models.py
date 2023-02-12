@@ -797,6 +797,9 @@ class Counter(Base):
             "pricing_scenario",
             name="unique_counter",
         ),
+        Index("idx_counter_date", "date"),
+        Index("idx_counter_commodity", "commodity"),
+        Index("idx_counter_pricing_scenario", "pricing_scenario"),
     )
 
 
