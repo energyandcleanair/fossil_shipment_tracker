@@ -7,6 +7,7 @@ env_variables:
 entrypoint: gunicorn --log-level debug -b :$PORT -w 8 -t 300 app:app
 automatic_scaling:
   min_instances: 1
+  max_instances: 5
 
 handlers:
 - url: /.*
