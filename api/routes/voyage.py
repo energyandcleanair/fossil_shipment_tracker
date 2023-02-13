@@ -8,6 +8,7 @@ from flask import Response
 from flask_restx import Resource, reqparse
 from flask_restx import inputs
 from sqlalchemy.dialects.postgresql import array
+from sqlalchemy import nullslast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
@@ -505,15 +506,6 @@ class VoyageResource(Resource):
         CommodityOriginCountry = aliased(Country)
         CommodityDestinationCountry = aliased(Country)
 
-        # TODO Find a better way, so that we can also keep information for older shipments
-        ShipOwnerDistinct = ShipOwner.query.distinct(ShipOwner.ship_imo).subquery()
-        ShipManagerDistinct = ShipManager.query.distinct(
-            ShipManager.ship_imo
-        ).subquery()
-        ShipInsurerDistinct = ShipInsurer.query.distinct(
-            ShipInsurer.ship_imo
-        ).subquery()
-
         ShipOwnerCompany = aliased(Company)
         ShipManagerCompany = aliased(Company)
         ShipInsurerCompany = aliased(Company)
@@ -677,6 +669,7 @@ class VoyageResource(Resource):
                 ArrivalShip,
                 Event.date_utc.label("event_date_utc"),
                 Event.ship_closest_position.label("sts_position"),
+                Departure.date_utc.label("departure_date_utc"),
             )
             .join(Departure, Departure.id == ShipmentWithSTS.departure_id)
             .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id)
@@ -703,6 +696,7 @@ class VoyageResource(Resource):
                 Ship,
                 sa.null().label("event_date_utc"),
                 sa.null().label("sts_position"),
+                Departure.date_utc.label("departure_date_utc"),
             )
             .join(Departure, Departure.id == Shipment.departure_id)
             .join(Ship, Ship.imo == Departure.ship_imo)
@@ -711,6 +705,98 @@ class VoyageResource(Resource):
         shipments_combined = shipments_non_sts.union_all(
             shipments_sts_with_arrival
         ).subquery()
+
+        def add_companies(shipments_combined, buffer_days=14):
+            # Add Owner
+            shipments_combined = (
+                session.query(
+                    shipments_combined,
+                    ShipOwner.company_id.label("ship_owner_company_id"),
+                )
+                .outerjoin(
+                    ShipOwner,
+                    sa.and_(
+                        sa.or_(
+                            ShipOwner.date_from
+                            <= shipments_combined.c.departure_date_utc
+                            # Adding a buffer because in many instances
+                            # we collected insurance company after the shipment had been detected
+                            # TODO IMPROVE
+                            + dt.timedelta(days=buffer_days),
+                            ShipOwner.date_from == None,
+                        ),
+                        ShipOwner.ship_imo == shipments_combined.c.ship_imo,
+                    ),
+                )
+                .distinct(shipments_combined.c.shipment_id, ShipOwner.ship_imo)
+                .order_by(
+                    shipments_combined.c.shipment_id,
+                    ShipOwner.ship_imo,
+                    nullslast(ShipOwner.date_from.desc()),
+                )
+            ).subquery()
+
+            # Add Manager
+            shipments_combined = (
+                session.query(
+                    shipments_combined,
+                    ShipManager.company_id.label("ship_manager_company_id"),
+                )
+                .outerjoin(
+                    ShipManager,
+                    sa.and_(
+                        sa.or_(
+                            ShipManager.date_from
+                            <= shipments_combined.c.departure_date_utc
+                            # Adding a buffer because in many instances
+                            # we collected insurance company after the shipment had been detected
+                            # TODO IMPROVE
+                            + dt.timedelta(days=buffer_days),
+                            ShipManager.date_from == None,
+                        ),
+                        ShipManager.ship_imo == shipments_combined.c.ship_imo,
+                    ),
+                )
+                .distinct(shipments_combined.c.shipment_id, ShipManager.ship_imo)
+                .order_by(
+                    shipments_combined.c.shipment_id,
+                    ShipManager.ship_imo,
+                    nullslast(ShipManager.date_from.desc()),
+                )
+            ).subquery()
+
+            # Add Insurer
+            shipments_combined = (
+                session.query(
+                    shipments_combined,
+                    ShipInsurer.company_id.label("ship_insurer_company_id"),
+                )
+                .outerjoin(
+                    ShipInsurer,
+                    sa.and_(
+                        sa.or_(
+                            ShipInsurer.date_from
+                            <= shipments_combined.c.departure_date_utc
+                            # Adding a buffer because in many instances
+                            # we collected insurance company after the shipment had been detected
+                            # TODO IMPROVE
+                            + dt.timedelta(days=buffer_days),
+                            ShipInsurer.date_from == None,
+                        ),
+                        ShipInsurer.ship_imo == shipments_combined.c.ship_imo,
+                    ),
+                )
+                .distinct(shipments_combined.c.shipment_id, ShipInsurer.ship_imo)
+                .order_by(
+                    shipments_combined.c.shipment_id,
+                    ShipInsurer.ship_imo,
+                    nullslast(ShipInsurer.date_from.desc()),
+                )
+            ).subquery()
+
+            return shipments_combined
+
+        shipments_combined = add_companies(shipments_combined)
 
         value_eur_field = (Ship.dwt * Price.eur_per_tonne).label("value_eur")
 
@@ -975,52 +1061,23 @@ class VoyageResource(Resource):
                 DestinationCountry, DestinationCountry.iso2 == destination_iso2_field
             )
             .outerjoin(
-                ShipOwnerDistinct,
-                sa.and_(
-                    ShipOwnerDistinct.c.ship_imo == Departure.ship_imo,
-                    sa.or_(
-                        Departure.date_utc >= ShipOwnerDistinct.c.date_from,
-                        ShipOwnerDistinct.c.date_from == sa.null(),
-                    ),
-                ),
-            )
-            .outerjoin(
-                ShipOwnerCompany, ShipOwnerDistinct.c.company_id == ShipOwnerCompany.id
+                ShipOwnerCompany,
+                shipments_combined.c.ship_owner_company_id == ShipOwnerCompany.id,
             )
             .outerjoin(
                 ShipOwnerCountry, ShipOwnerCompany.country_iso2 == ShipOwnerCountry.iso2
             )
             .outerjoin(
-                ShipManagerDistinct,
-                sa.and_(
-                    ShipManagerDistinct.c.ship_imo == Departure.ship_imo,
-                    sa.or_(
-                        Departure.date_utc >= ShipManagerDistinct.c.date_from,
-                        ShipManagerDistinct.c.date_from == sa.null(),
-                    ),
-                ),
-            )
-            .outerjoin(
                 ShipManagerCompany,
-                ShipManagerDistinct.c.company_id == ShipManagerCompany.id,
+                shipments_combined.c.ship_manager_company_id == ShipManagerCompany.id,
             )
             .outerjoin(
                 ShipManagerCountry,
                 ShipManagerCompany.country_iso2 == ShipManagerCountry.iso2,
             )
             .outerjoin(
-                ShipInsurerDistinct,
-                sa.and_(
-                    ShipInsurerDistinct.c.ship_imo == Departure.ship_imo,
-                    sa.or_(
-                        Departure.date_utc >= ShipInsurerDistinct.c.date_from,
-                        ShipInsurerDistinct.c.date_from == sa.null(),
-                    ),
-                ),
-            )
-            .outerjoin(
                 ShipInsurerCompany,
-                ShipInsurerDistinct.c.company_id == ShipInsurerCompany.id,
+                shipments_combined.c.ship_insurer_company_id == ShipInsurerCompany.id,
             )
             .outerjoin(
                 ShipInsurerCountry,
