@@ -689,6 +689,8 @@ class Price(Base):
         Index(
             "idx_price_ship_insurer_iso2s", "ship_insurer_iso2s", postgresql_using="gin"
         ),
+        # To add in SqlAlchemy format
+        # CREATE INDEX idx_price_departure_port_ids_is_null ON price ((departure_port_ids=ARRAY[NULL]::bigint[]));
     )
 
 

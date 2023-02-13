@@ -413,11 +413,6 @@ class VoyageResource(Resource):
     @routes_api.expect(parser)
     def get(self):
         params = VoyageResource.parser.parse_args()
-
-        maintenance_resp = self.get_maintenance_response(params)
-        if maintenance_resp:
-            return maintenance_resp
-
         return self.get_from_params(params)
 
     def get_maintenance_response(self, params):
@@ -429,6 +424,10 @@ class VoyageResource(Resource):
             return None
 
     def get_from_params(self, params):
+        maintenance_resp = self.get_maintenance_response(params)
+        if maintenance_resp:
+            return maintenance_resp
+
         id = params.get("id")
         commodity = params.get("commodity")
         status = params.get("status")
