@@ -428,6 +428,7 @@ class ShipInsurer(Base):
 
     __tablename__ = DB_TABLE_SHIP_INSURER
     __table_args__ = (
+        Index("idx_ship_insurer_ship_imo", "ship_imo"),
         UniqueConstraint(
             "ship_imo", "company_raw_name", "date_from", name="unique_ship_insurer"
         ),
@@ -453,6 +454,7 @@ class ShipOwner(Base):
 
     __tablename__ = DB_TABLE_SHIP_OWNER
     __table_args__ = (
+        Index("idx_ship_owner_ship_imo", "ship_imo"),
         UniqueConstraint(
             "ship_imo", "company_raw_name", "date_from", name="unique_ship_owner"
         ),
