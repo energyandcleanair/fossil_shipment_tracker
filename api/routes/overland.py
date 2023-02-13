@@ -311,21 +311,11 @@ class PipelineFlowResource(Resource):
                     sa.or_(
                         commodity_destination_iso2_field
                         == any_(Price.destination_iso2s),
-                        Price.destination_iso2s == sa.null(),
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
-                    sa.or_(
-                        Price.departure_port_ids == sa.null(),
-                        Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
-                    ),
-                    sa.or_(
-                        Price.ship_owner_iso2s == sa.null(),
-                        Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    ),
-                    sa.or_(
-                        Price.ship_insurer_iso2s == sa.null(),
-                        Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    ),
+                    Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
+                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
                 ),
             )
             .outerjoin(PriceScenario, PriceScenario.id == Price.scenario)
