@@ -9,7 +9,6 @@ from base.utils import to_list
 
 
 class Equasis:
-
     session = None
     current_credentials_idx = -1
 
@@ -41,9 +40,7 @@ class Equasis:
         return next_credentials
 
     def _get_all_credentials(self):
-        emails = ["hubert+%03d@energyandcleanair.org" % (x) for x in range(1, 31)] + [
-            "jan+%d@energyandcleanair.org" % (x) for x in range(1, 12)
-        ]
+        emails = ["insurergetter+%d@proton.me" % (x) for x in range(1, 100)]
         password = get_env("EQUASIS_PASSWORD")
         return [{"username": x, "password": password} for x in emails]
 
@@ -100,7 +97,6 @@ class Equasis:
         return None
 
     def get_ship_infos(self, imo, itry=1, max_try=11):
-
         if itry > max_try:
             return None
 
@@ -179,7 +175,6 @@ class Equasis:
         return ship_data
 
     def get_ship_history(self, imo, itry=1, max_try=11):
-
         if itry > max_try:
             return None
 

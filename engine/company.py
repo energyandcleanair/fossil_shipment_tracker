@@ -45,15 +45,16 @@ def update():
     # For crude oil and oil products, force a daily refresh
     # given the importance for price caps and bans
     all_commodities = [x[0] for x in session.query(Ship.commodity).distinct().all()]
-    daily_commodities = [base.OIL_PRODUCTS, base.OIL_OR_CHEMICAL, base.CRUDE_OIL]
-    other_commodities = [x for x in all_commodities if x not in daily_commodities]
+    frequent_commodities = [base.CRUDE_OIL]
+    other_commodities = [x for x in all_commodities if x not in frequent_commodities]
     update_info_from_equasis(
-        commodities=daily_commodities,
-        last_updated=dt.datetime.now() - dt.timedelta(hours=20),
+        commodities=frequent_commodities,
+        last_updated=dt.datetime.now() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
     )
     update_info_from_equasis(
         commodities=other_commodities,
-        last_updated=dt.datetime.now() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
+        last_updated=dt.datetime.now()
+        - dt.timedelta(days=2 * base.REFRESH_COMPANY_DAYS),
     )
 
     fill_country()
@@ -170,7 +171,6 @@ def update_info_from_equasis(
     ]
 
     for imo in tqdm(imos):
-
         itry = 0
         equasis_infos = None
 
@@ -184,7 +184,6 @@ def update_info_from_equasis(
                 logger.warning("Connection failed, trying again.")
 
         if equasis_infos is not None:
-
             # Update ship record
             ship = session.query(Ship).filter(Ship.imo == imo).first()
             others = dict(ship.others)
@@ -208,7 +207,6 @@ def update_info_from_equasis(
                 )
 
                 if not insurer:
-
                     # If this is the first time we collect insurer for this ship,
                     # We assume it has always been this insurer
                     # This is important because we only start querying a ship insurer
@@ -519,7 +517,6 @@ def fill_using_imo_website():
     )
 
     for company in tqdm(companies):
-
         # check imo website for company imo or name
         company_info = scraper.get_information(search_text=str(company.imo))
 
@@ -557,7 +554,6 @@ class CompanyImoScraper:
     """
 
     def __init__(self, base_url, service=None):
-
         self.service = service
         self.browser = None
         self.base = base_url
@@ -636,7 +632,6 @@ class CompanyImoScraper:
         # selenium doesn't support webelement refresh, so we have to retry manually
 
         for i in range(0, 3):
-
             try:
                 username_select = self.browser.find_element(
                     By.CSS_SELECTOR, LOGIN_FIELD_CSS
