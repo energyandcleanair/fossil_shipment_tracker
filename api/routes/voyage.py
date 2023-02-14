@@ -1549,6 +1549,13 @@ class VoyageResource(Resource):
             ],
             "destination_region": [subquery.c.destination_region],
             "arrival_berth_owner": [subquery.c.arrival_berth_owner],
+            "ship": [
+                subquery.c.ship_imo,
+                subquery.c.ship_name,
+                subquery.c.ship_mmsi,
+                subquery.c.ship_type,
+                subquery.c.ship_subtype,
+            ],
             "ship_insurer": [
                 subquery.c.ship_insurer,
                 subquery.c.ship_insurer_imo,
