@@ -103,22 +103,11 @@ class RussiaCounterLastResource(Resource):
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterLastResource.parser.parse_args()
-        counter_last = self.get_from_params(params)
-        return self.build_response(
-            counter_last=counter_last, format=params.get("format")
-        )
+        return self.get_from_params(params)
 
     def get_from_params(self, params):
         # original parameters (before any potential modifications)
         original_params = params.copy()
-
-        cache = EndpointCacher.get_cache(
-            endpoint=self.endpoint,
-            params=original_params,
-            max_age_minutes=self.max_age_minutes,
-        )
-        if cache:
-            return pd.DataFrame(cache)
 
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
@@ -128,6 +117,18 @@ class RussiaCounterLastResource(Resource):
         aggregate_by = params.get("aggregate_by")
         pricing_scenario = params.get("pricing_scenario")
         use_eu = params.get("use_eu")
+        format = params.get("format", "json")
+
+        cache = EndpointCacher.get_cache(
+            endpoint=self.endpoint,
+            params=original_params,
+            max_age_minutes=self.max_age_minutes,
+        )
+        if cache:
+            return self.build_response(
+                counter_last=pd.DataFrame(cache),
+                format=format
+            )
 
         destination_region_field = case(
             [
@@ -178,7 +179,6 @@ class RussiaCounterLastResource(Resource):
             #     Counter.pricing_scenario,
             #     PriceScenario.name,
             # )
-            .filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
         )
 
         if destination_region:
@@ -194,6 +194,9 @@ class RussiaCounterLastResource(Resource):
 
         if date_to:
             query = query.filter(Counter.date <= str(to_datetime(date_to)))
+
+        if pricing_scenario is not None:
+            query = query.filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
         # Important to force this
         # so that future flows (e.g. fixed pipeline) aren't included
@@ -230,7 +233,13 @@ class RussiaCounterLastResource(Resource):
             params=original_params,
             response=counter_last.to_dict(orient="records"),
         )
-        return counter_last
+
+        response = self.build_response(
+            counter_last=counter_last,
+            format=format
+        )
+
+        return response
 
     def build_response(self, counter_last, format):
         if format == "csv":
@@ -274,7 +283,7 @@ class RussiaCounterLastResource(Resource):
         ).rename("date")
 
         def resample_and_fill(x):
-            x = x.set_index("date").resample("D").sum(numeric_only=True).fillna(0)
+            x = x.set_index("date").resample("D").sum().fillna(0)
             # cut 2 last days and take the 7-day mean
             # but only on last ten days to avoid old shipments (like US)
             means = (
