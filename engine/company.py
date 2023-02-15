@@ -44,18 +44,22 @@ def update():
     logger_slack.info("=== Company update ===")
     # For crude oil and oil products, force a daily refresh
     # given the importance for price caps and bans
-    all_commodities = [x[0] for x in session.query(Ship.commodity).distinct().all()]
-    frequent_commodities = [base.CRUDE_OIL]
-    other_commodities = [x for x in all_commodities if x not in frequent_commodities]
-    update_info_from_equasis(
-        commodities=frequent_commodities,
-        last_updated=dt.datetime.now() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
-    )
-    update_info_from_equasis(
-        commodities=other_commodities,
-        last_updated=dt.datetime.now()
-        - dt.timedelta(days=2 * base.REFRESH_COMPANY_DAYS),
-    )
+
+    max_age = {
+        base.CRUDE_OIL: 3,
+        base.OIL_PRODUCTS: 3,
+        base.OIL_OR_CHEMICAL: 3,
+        base.LNG: 3,
+        base.COAL: 15,
+        base.BULK: 15,
+    }
+
+    for commodity, max_age in max_age.items():
+        logger.info("Updating %s" % commodity)
+        update_info_from_equasis(
+            commodities=to_list(commodity),
+            last_updated=dt.datetime.now() - dt.timedelta(days=max_age),
+        )
 
     fill_country()
     return
