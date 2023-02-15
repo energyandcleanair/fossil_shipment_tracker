@@ -97,6 +97,14 @@ class ChartDepartureOwnership(Resource):
         default="json",
     )
 
+    parser.add_argument(
+        "departure_port_area",
+        action="split",
+        help="area of departure ports to consider e.g. Baltic,Arctic,Pacific,Black Sea,Caspian Sea",
+        required=False,
+        default=None,
+    )
+
     @routes_api.expect(parser)
     def get(self):
 
@@ -107,6 +115,7 @@ class ChartDepartureOwnership(Resource):
         nest_in_data = params_chart.get("nest_in_data")
         language = params_chart.get("language")
         group_eug7_insurernorwary = params_chart.get("group_eug7_insurernorwary")
+        departure_port_area = params.get("departure_port_area")
 
         default_aggregate_by = [
             "ship_owner_country",
@@ -129,7 +138,7 @@ class ChartDepartureOwnership(Resource):
                 "currency": "EUR",
                 "keep_zeros": True,
                 "format": "json",
-                "nest_in_data": True,
+                "nest_in_data": True
             }
         )
 
