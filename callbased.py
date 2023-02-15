@@ -31,8 +31,8 @@ def update(
     date_to,
     departure_port_iso2,
     commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG],
+    use_credit_key_if_short=False,
 ):
-
     # This call is to update history using the CALL-BASED MARINE TRAFFIC KEY
     # meaning we'll try to maximize number of records captured per call
     # and minimize the number of calls made
@@ -51,6 +51,7 @@ def update(
         date_to=date_to,
         commodities=commodities,
         departure_port_iso2=departure_port_iso2,
+        use_credit_key_if_short=use_credit_key_if_short,
     )
 
 
@@ -303,18 +304,15 @@ def update_departures(date_from, date_to=None, departure_port_iso2=None):
     ports = ports.all()
 
     for port in tqdm(ports):
-
         port_id = port.unlocode or port.marinetraffic_id
         queried_hours = get_queried_port_hours(port_id=port_id, date_from=date_from)
         intervals = get_intervals(
             date_from=date_from, date_to=date_to, queried_hours=queried_hours
         )
         for interval in intervals:
-
             if interval["date_to"] - interval["date_from"] > dt.timedelta(
                 days=MIN_DAYS
             ):
-
                 portcalls = Marinetraffic.get_portcalls_between_dates(
                     arrival_or_departure="departure",
                     unlocode=port.unlocode,
@@ -429,7 +427,6 @@ def update_arrivals(
             if interval["date_to"] - interval["date_from"] > dt.timedelta(
                 days=MIN_DAYS
             ):
-
                 portcalls = portcall.get_next_portcall(
                     date_from=interval["date_from"],
                     date_to=interval["date_to"],
