@@ -62,6 +62,10 @@ def get_queried_port_hours(port_id, date_from=None):
     :param date_from:
     :return:
     """
+
+    if port_id is None:
+        return []
+
     # Get information on calls already made to MT
     queried = session.query(
         MarineTrafficCall.params["portid"].label("port_id"),
@@ -309,10 +313,12 @@ def update_departures(
     ports = ports.all()
 
     for port in tqdm(ports):
-        port_id = port.unlocode or port.marinetraffic_id
-        queried_hours = get_queried_port_hours(port_id=port_id, date_from=date_from)
+        queried_hours = set(
+            get_queried_port_hours(port_id=port.unlocode, date_from=date_from)
+            + get_queried_port_hours(port_id=port.marinetraffic_id, date_from=date_from)
+        )
         intervals = get_intervals(
-            date_from=date_from, date_to=date_to, queried_hours=queried_hours
+            date_from=date_from, date_to=date_to, queried_hours=list(queried_hours)
         )
         for interval in intervals:
             if interval["date_to"] - interval["date_from"] > dt.timedelta(
