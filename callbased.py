@@ -313,6 +313,7 @@ def update_departures(
     ports = ports.all()
 
     for port in tqdm(ports):
+        port_id = port.unlocode or port.marinetraffic_id
         queried_hours = set(
             get_queried_port_hours(port_id=port.unlocode, date_from=date_from)
             + get_queried_port_hours(port_id=port.marinetraffic_id, date_from=date_from)
