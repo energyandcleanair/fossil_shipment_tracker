@@ -198,6 +198,20 @@ class RussiaCounterResource(Resource):
         default=None,
     )
 
+    parser.add_argument(
+        "add_total_commodity",
+        help="Whether to add a sum of all commodities",
+        type=inputs.boolean,
+        default=False,
+    )
+
+    parser.add_argument(
+        "add_total_region",
+        help="Whether to add a sum of all regions",
+        type=inputs.boolean,
+        default=False,
+    )
+
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterResource.parser.parse_args()
@@ -214,6 +228,8 @@ class RussiaCounterResource(Resource):
         destination_region = params.get("destination_region")
         destination_region_not = params.get("destination_region_not")
         commodity = params.get("commodity")
+        include_total_commodity = params.get("add_total_commodity")
+        include_total_region = params.get("add_total_region")
         commodity_group = params.get("commodity_group")
         commodity_grouping = params.get("commodity_grouping")
         nest_in_data = params.get("nest_in_data")
@@ -435,6 +451,43 @@ class RussiaCounterResource(Resource):
             limit_by=limit_by,
             keep_zeros=keep_zeros,
         )
+
+        def add_total_commodity(data):
+            groupby_cols = [
+                c for c in data.columns if not re.match("commodity|value", c)
+            ]
+            value_cols = [c for c in data.columns if re.match("value", c)]
+            data_global = (
+                data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
+            )
+
+            data_global["commodity_group"] = "Total"
+            data_global["commodity"] = "Total"
+
+            data = pd.concat([data, data_global])
+            return data
+
+        def add_total_region(data):
+            groupby_cols = [
+                c for c in data.columns if not re.match("destination|value", c)
+            ]
+            value_cols = [c for c in data.columns if re.match("value", c)]
+            data_global = (
+                data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
+            )
+
+            data_global["destination_region"] = "Total"
+
+            data = pd.concat([data, data_global])
+            return data
+
+        if include_total_region:
+            counter = add_total_region(counter)
+
+        if include_total_commodity:
+            counter = add_total_commodity(counter)
+            if commodity:
+                counter = counter[counter.commodity.isin(to_list(commodity) + ["Total"])]
 
         # Pivot
         counter = self.pivot_result(
