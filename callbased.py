@@ -290,7 +290,9 @@ def get_intervals(
     return intervals.to_dict(orient="records")
 
 
-def update_departures(date_from, date_to=None, departure_port_iso2=None):
+def update_departures(
+    date_from, date_to=None, departure_port_iso2=None, departure_port_id=None
+):
     date_from = to_datetime(date_from)
     date_to = to_datetime(date_to) if date_to else dt.datetime.now()
 
@@ -300,6 +302,9 @@ def update_departures(date_from, date_to=None, departure_port_iso2=None):
     ports = session.query(Port).filter(Port.check_departure)
     if departure_port_iso2:
         ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
+
+    if departure_port_id:
+        ports = ports.filter(Port.id.in_(to_list(departure_port_id)))
 
     ports = ports.all()
 
