@@ -420,7 +420,9 @@ class Marinetraffic:
         :return: two things: (first_matching_portcall, list_of_portcalls_collected)
         """
         delta_time = (
-            dt.timedelta(hours=6) if not use_call_based else dt.timedelta(days=190)
+            dt.timedelta(hours=base.MARINETRAFFIC_PORTCALL_WINDOW_HOURS)
+            if not use_call_based
+            else dt.timedelta(days=190)
         )
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
