@@ -550,7 +550,7 @@ class PipelineFlowResource(Resource):
         index_cols = [
             x
             for x in result.columns
-            if x not in ["currency"] and not x.startswith("value_")
+            if x not in ["currency", "value_currency", "value_eur"]
         ]
 
         result = (
