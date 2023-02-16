@@ -9,6 +9,7 @@ from flask_restx import Resource, reqparse
 from flask_restx import inputs
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy import nullslast
+from sqlalchemy import case
 
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
@@ -538,8 +539,6 @@ class VoyageResource(Resource):
             aggregate_by.remove("")
 
         # Commodity
-        from sqlalchemy import case
-
         commodity_field = case(
             [
                 (
@@ -567,6 +566,30 @@ class VoyageResource(Resource):
                         ArrivalBerth.commodity.ilike("%coal%"),
                     ),
                     "coal",
+                ),
+                (
+                    # India: forcing to Oil products when crude oil
+                    # After comparing with Kpler
+                    sa.and_(
+                        Ship.commodity.in_([base.CRUDE_OIL]),
+                        DeparturePort.iso2 == "IN",
+                    ),
+                    "oil_products",
+                ),
+                (
+                    # China: forcing to Oil products when crude oil
+                    # in ports that did not export crude oil in 2022
+                    # according to Kpler
+                    sa.and_(
+                        Ship.commodity.in_([base.CRUDE_OIL]),
+                        DeparturePort.iso2 == "CN",
+                        sa.not_(
+                            DeparturePort.name.op("~*")(
+                                "^dalian|^yangpu|^qingdao|^bohai|^lufeng|^lanqiao|^dongjiakou|^shanghai"
+                            )
+                        ),
+                    ),
+                    "oil_products",
                 ),
                 (Ship.commodity.ilike("%bulk%"), "bulk_not_coal"),
             ],
