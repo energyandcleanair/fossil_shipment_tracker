@@ -103,7 +103,9 @@ class RussiaCounterLastResource(Resource):
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterLastResource.parser.parse_args()
-        return self.get_from_params(params)
+        response = self.get_from_params(params)
+        response.headers['Cache-Control'] = 'public'
+        return response
 
     def get_from_params(self, params):
         # original parameters (before any potential modifications)
