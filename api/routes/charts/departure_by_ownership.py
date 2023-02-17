@@ -16,7 +16,6 @@ from ..voyage import VoyageResource
 
 @ns_charts.route("/v0/chart/departure_by_ownership", strict_slashes=False)
 class ChartDepartureOwnership(Resource):
-
     parser = reqparse.RequestParser()
 
     parser.add_argument(
@@ -107,7 +106,6 @@ class ChartDepartureOwnership(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-
         params = VoyageResource.parser.parse_args()
         params_chart = ChartDepartureOwnership.parser.parse_args()
         format = params_chart.get("format")
@@ -134,11 +132,12 @@ class ChartDepartureOwnership(Resource):
                 "commodity_destination_iso2_not": "RU",
                 # 'date_from': '2022-01-01',
                 "pricing_scenario": [base.PRICING_DEFAULT],
+                "departure_port_area": departure_port_area,
                 # 'sort_by': ['value_tonne'],
                 "currency": "EUR",
                 "keep_zeros": True,
                 "format": "json",
-                "nest_in_data": True
+                "nest_in_data": True,
             }
         )
 
@@ -214,7 +213,6 @@ class ChartDepartureOwnership(Resource):
         )
 
     def build_response(self, result, format, nest_in_data):
-
         result.replace({np.nan: None}, inplace=True)
 
         # If bulk and departure berth is coal, replace commodity with coal
