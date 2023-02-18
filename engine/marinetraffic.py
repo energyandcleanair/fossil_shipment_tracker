@@ -591,6 +591,7 @@ class Marinetraffic:
             params=params,
             credits_per_record=1,
             save_empty_record=True,
+            wait=False
         )
 
         if response_datas is None:
@@ -754,6 +755,7 @@ class Marinetraffic:
                 params=params,
                 credits_per_record=2,
                 save_empty_record=True,
+                wait=False
             )
 
             if response_datas is None:
