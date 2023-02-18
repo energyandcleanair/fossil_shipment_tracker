@@ -40,7 +40,7 @@ class Equasis:
         return next_credentials
 
     def _get_all_credentials(self):
-        emails = ["insurergetter+%d@proton.me" % (x) for x in range(1, 100)]
+        emails = ["rutankers+%d@protonmail.com" % (x) for x in range(1, 13)]
         password = get_env("EQUASIS_PASSWORD")
         return [{"username": x, "password": password} for x in emails]
 
@@ -135,7 +135,7 @@ class Equasis:
         if pni_div:
             ship_data["insurer"] = {"name": self._find_pni(pni_div)}
         else:
-            # We'lladd an empty insurer to be safe
+            # We'll add an empty insurer to be safe
             # Meaning the ship will be shown as not having an insurer
             ship_data["insurer"] = {"name": base.UNKNOWN_INSURER}
 
