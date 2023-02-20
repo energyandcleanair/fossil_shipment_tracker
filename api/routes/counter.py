@@ -37,8 +37,8 @@ class RussiaCounterResource(Resource):
                 "pricing_scenario_name",
             ],
             "date": ["date"],
-            "month": ["month"],
-            "year": ["year"],
+            "month": ["date"],
+            "year": ["date"],
             "commodity": [
                 "commodity",
                 "commodity_group",
@@ -322,8 +322,6 @@ class RussiaCounterResource(Resource):
                 Country.name.label("destination_country"),
                 destination_region_field,
                 Counter.date,
-                func.date_trunc("month", Counter.date).label("month"),
-                func.date_trunc("year", Counter.date).label("year"),
                 Counter.value_tonne,
                 Counter.value_eur,
                 Currency.currency,
@@ -571,6 +569,11 @@ class RussiaCounterResource(Resource):
             func.sum(subquery.c.value_currency).label("value_currency"),
         ]
 
+        optional_calculated_cols = {
+            "month": [func.date_trunc("month", subquery.c.date).label("month")],
+            "year": [func.date_trunc("year", subquery.c.date).label("year")],
+        }
+
         # Adding must have grouping columns
         must_group_by = ["currency", "pricing_scenario"]
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
@@ -579,6 +582,9 @@ class RussiaCounterResource(Resource):
 
         # Aggregating
         aggregateby_cols_dict = self.get_aggregateby_cols(subquery)
+
+        # Update functional aggregate by options
+        aggregateby_cols_dict.update(optional_calculated_cols)
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):
             logger.warning(
