@@ -90,6 +90,18 @@ def test_counter(app):
                                 'value_tonne', 'value_eur', 'value_usd'])
         assert set(data_df.columns) == expected_columns
 
+        params = {"format": "json", "aggregate_by": "destination_country,month", "date_from":"2022-02-24"}
+        response = test_client.get('/v0/counter?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+        data_df = pd.DataFrame(data)
+
+        expected_columns = set(['month',
+                                'destination_iso2', 'destination_country', 'destination_region',
+                                'value_tonne', 'value_eur', 'value_usd'])
+        assert len([c for c in expected_columns if c in data_df.columns]) == len(expected_columns)
+
 def test_counter_use_eu(app):
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
