@@ -189,12 +189,19 @@ class RussiaCounterResource(Resource):
         required=False,
         default=True,
     )
-
     parser.add_argument(
         "postcompute",
         type=str,
         help="Post=compute function",
         required=False,
+        default=None,
+    )
+    parser.add_argument(
+        "select",
+        type=str,
+        help="selecting specific columns only, with the possibility to rename e.g. new_name1(var1),var2,var3",
+        required=False,
+        action="split",
         default=None,
     )
 
@@ -243,6 +250,7 @@ class RussiaCounterResource(Resource):
         limit_by = params.get("limit_by")
         keep_zeros = params.get("keep_zeros")
         columns_order = params.get("columns_order")
+        select = params.get("select")
 
         if aggregate_by and "" in aggregate_by:
             aggregate_by.remove("")
@@ -487,7 +495,9 @@ class RussiaCounterResource(Resource):
         if include_total_commodity:
             counter = add_total_commodity(counter)
             if commodity:
-                counter = counter[counter.commodity.isin(to_list(commodity) + ["Total"])]
+                counter = counter[
+                    counter.commodity.isin(to_list(commodity) + ["Total"])
+                ]
 
         # Pivot
         counter = self.pivot_result(
@@ -499,6 +509,9 @@ class RussiaCounterResource(Resource):
 
         # Post Compute
         counter = self.postcompute(result=counter, params=params)
+
+        # Select, rename
+        counter = self.select(counter, select=select)
 
         if format == "csv":
             return Response(
@@ -660,6 +673,9 @@ class RussiaCounterResource(Resource):
 
     def pivot_result(self, result, pivot_by, pivot_value):
         # Concatenate if there are several pivot_values (e.g. value_eur and value_tonne)
+        if not pivot_by:
+            return result
+
         pivot_values = to_list(pivot_value)
         if len(pivot_values) > 1:
             return pd.concat(
@@ -754,6 +770,27 @@ class RussiaCounterResource(Resource):
             cols = columns_order + [x for x in result.columns if x not in columns_order]
             result = result[cols]
 
+        return result
+
+    def select(self, result, select):
+        if not select:
+            return result
+
+        names = []
+        variables = []
+
+        for s in to_list(select):
+            m = re.match("(.*)\\((.*)\\)", s)
+            if m:
+                names.append(m[1])
+                variables.append(m[2])
+            else:
+                # No asc(.*) or desc(.*)
+                names.append(s)
+                variables.append(s)
+
+        result = result[variables]
+        result.columns = names
         return result
 
     def postcompute(self, result, params=None):
