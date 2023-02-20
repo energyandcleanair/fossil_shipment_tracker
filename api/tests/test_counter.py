@@ -305,7 +305,7 @@ def test_counter_against_voyage(app):
         counter1 = counter_df.groupby(['destination_region', 'commodity_group']) \
         .agg(value_eur=('value_eur', lambda x: np.nansum(x)/1e9))
 
-        counter1 == counter2
+        assert counter1 == counter2
 
 
 def test_pricing_gt0(app):
