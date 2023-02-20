@@ -28,7 +28,7 @@ from engine.commodity import get_subquery as get_commodity_subquery
 class RussiaCounterResource(Resource):
 
     @staticmethod
-    def return_aggregateby_cols(subquery=None):
+    def get_aggregateby_cols(subquery=None):
 
         aggregate_cols_dict = {
             "currency": ["currency"],
@@ -87,7 +87,7 @@ class RussiaCounterResource(Resource):
         type=str,
         action="split",
         default=None,
-        help="which variables to aggregate by. Can be one of {}.".format(", ".join(return_aggregateby_cols.__func__())),
+        help="which variables to aggregate by. Can be one of {}.".format(", ".join(get_aggregateby_cols.__func__().keys())),
     )
     parser.add_argument(
         "rolling_days",
@@ -578,7 +578,7 @@ class RussiaCounterResource(Resource):
             aggregate_by.remove("")
 
         # Aggregating
-        aggregateby_cols_dict = self.return_aggregateby_cols(subquery)
+        aggregateby_cols_dict = self.get_aggregateby_cols(subquery)
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):
             logger.warning(
