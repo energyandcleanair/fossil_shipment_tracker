@@ -10,7 +10,7 @@ python-decouple==3.6
 google-cloud-secret-manager==1.0.0
 shapely==1.8.0
 geoalchemy2==0.11.1
-pandas~=1.4
+pandas~=1.4.3
 geopandas==0.11.0
 psycopg2==2.9.1
 gunicorn==20.1.0
