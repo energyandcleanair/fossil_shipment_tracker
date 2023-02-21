@@ -693,6 +693,7 @@ class VoyageResource(Resource):
                 Event.date_utc.label("event_date_utc"),
                 Event.ship_closest_position.label("sts_position"),
                 Departure.date_utc.label("departure_date_utc"),
+                Departure.ship_imo.label("departure_ship_imo"),
             )
             .join(Departure, Departure.id == ShipmentWithSTS.departure_id)
             .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id)
@@ -720,6 +721,7 @@ class VoyageResource(Resource):
                 sa.null().label("event_date_utc"),
                 sa.null().label("sts_position"),
                 Departure.date_utc.label("departure_date_utc"),
+                Departure.ship_imo.label("departure_ship_imo"),
             )
             .join(Departure, Departure.id == Shipment.departure_id)
             .join(Ship, Ship.imo == Departure.ship_imo)
@@ -748,7 +750,7 @@ class VoyageResource(Resource):
                             + dt.timedelta(days=buffer_days),
                             ShipOwner.date_from == None,
                         ),
-                        ShipOwner.ship_imo == shipments_combined.c.ship_imo,
+                        ShipOwner.ship_imo == shipments_combined.c.departure_ship_imo,
                     ),
                 )
                 .distinct(shipments_combined.c.shipment_id, ShipOwner.ship_imo)
@@ -777,7 +779,7 @@ class VoyageResource(Resource):
                             + dt.timedelta(days=buffer_days),
                             ShipManager.date_from == None,
                         ),
-                        ShipManager.ship_imo == shipments_combined.c.ship_imo,
+                        ShipManager.ship_imo == shipments_combined.c.departure_ship_imo,
                     ),
                 )
                 .distinct(shipments_combined.c.shipment_id, ShipManager.ship_imo)
@@ -806,7 +808,7 @@ class VoyageResource(Resource):
                             + dt.timedelta(days=buffer_days),
                             ShipInsurer.date_from == None,
                         ),
-                        ShipInsurer.ship_imo == shipments_combined.c.ship_imo,
+                        ShipInsurer.ship_imo == shipments_combined.c.departure_ship_imo,
                     ),
                 )
                 .distinct(shipments_combined.c.shipment_id, ShipInsurer.ship_imo)
