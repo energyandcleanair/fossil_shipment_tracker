@@ -2,9 +2,10 @@ import requests
 from bs4 import BeautifulSoup
 import datetime as dt
 import pandas as pd
-
+import re
 import base
 from base.env import get_env
+from base.logger import logger_slack, logger
 from base.utils import to_list
 
 
@@ -55,7 +56,28 @@ class Equasis:
         pni_ps = pni_div.find_all("p")
         if not len(pni_ps) > 1:
             return
-        return self._clean_text(pni_ps[0].text)
+
+        result = {}
+        result["name"] = self._clean_text(pni_ps[0].text)
+
+        def extract_inception_date(p):
+            if p.startswith("Inception at "):
+                # Extract date from date_from_p that can be in various formats, including dd/mm/YYY, YYYY-mm-dd
+                formats = ["%d/%m/%Y", "%Y-%m-%d"]
+                for format in formats:
+                    try:
+                        result = dt.datetime.strptime(
+                            p.replace("Inception at ", ""), format
+                        )
+                        return result.date()
+                    except ValueError:
+                        continue
+            return None
+
+        date_from = extract_inception_date(self._clean_text(pni_ps[1].text))
+        if date_from:
+            result["date_from"] = date_from
+        return result
 
     def _find_management(self, parent):
         resp = []
@@ -133,11 +155,7 @@ class Equasis:
         # Insurer
         pni_div = html_obj.body.find("div", attrs={"id": "collapse6"})
         if pni_div:
-            ship_data["insurer"] = {"name": self._find_pni(pni_div)}
-        else:
-            # We'll add an empty insurer to be safe
-            # Meaning the ship will be shown as not having an insurer
-            ship_data["insurer"] = {"name": base.UNKNOWN_INSURER}
+            ship_data["insurer"] = self._find_pni(pni_div)
 
         # Manager & Owner
         management_div = html_obj.body.find("div", attrs={"id": "collapse3"})
@@ -171,6 +189,12 @@ class Equasis:
 
         if list(ship_data.keys()) == ["imo"]:
             pass
+
+        # If (and only if) we have owner or manager but no insurer, we'll add an empty insurer
+        if "owner" in ship_data or "manager" in ship_data:
+            if "insurer" not in ship_data:
+                logger.debug("No owner, manager or insurer found for ship %s:" % (imo))
+                ship_data["insurer"] = {"name": base.UNKNOWN_INSURER}
 
         return ship_data
 
