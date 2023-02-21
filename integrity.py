@@ -241,38 +241,31 @@ def test_insurer():
     """
 
     raw_sql = """
-    WITH count
-     AS (SELECT ship_imo,
-                Count(*) AS count
+    WITH unknown
+     AS (SELECT *
          FROM   ship_insurer
-         GROUP  BY 1),
-     max_updated_date_from_null
-     AS (SELECT ship_imo,
-                Max(updated_on) AS known_updated_on
+         WHERE  company_raw_name = 'unknown'),
+     known
+     AS (SELECT *
          FROM   ship_insurer
-         WHERE  date_from IS NULL
-         GROUP  BY 1),
-     date_from_unknown
-     AS (SELECT ship_imo,
-                Max(date_from)  AS unknown_date_from,
-                Max(updated_on) AS unknown_updated_on
-         FROM   ship_insurer
-         WHERE  company_raw_name = 'unknown'
-         GROUP  BY 1),
+         WHERE  company_raw_name != 'unknown'),
      problematic
-     AS (SELECT count.*,
-                m.known_updated_on,
-                d.unknown_date_from,
-                d.unknown_updated_on
-         FROM   count
-                LEFT JOIN max_updated_date_from_null m
-                       ON count.ship_imo = m.ship_imo
-                LEFT JOIN date_from_unknown d
-                       ON count.ship_imo = d.ship_imo
-         WHERE  count.count >= 2
-                AND m.known_updated_on > d.unknown_date_from)
-    SELECT *
-    FROM   problematic
+     AS (SELECT s.commodity,
+                u.updated_on - u.date_from,
+                u.*,
+                k.date_from,
+                k.updated_on
+         FROM   unknown u
+                LEFT JOIN known k
+                       ON u.ship_imo = k.ship_imo
+                LEFT JOIN ship s
+                       ON s.imo = u.ship_imo
+         WHERE  ( k.date_from < u.date_from
+                   OR k.date_from IS NULL )
+                AND ( k.updated_on > u.updated_on )
+                AND u.updated_on - u.date_from < '7 days')
+        SELECT *
+        FROM   problematic;
     """
 
     result = session.execute(raw_sql)
