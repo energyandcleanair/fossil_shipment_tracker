@@ -188,7 +188,9 @@ class ChartDepartureOwnership(Resource):
             data.replace({base.UNKNOWN: "Unknown"}, inplace=True)
 
         group_by_cols = ["region", "departure_date", "commodity_group_name"] + [
-            x for x in aggregate_by if x not in default_aggregate_by
+            x
+            for x in aggregate_by
+            if x not in default_aggregate_by and x in data.columns
         ]
         pivot_cols = ["region"]
         index_cols = [x for x in group_by_cols if x not in pivot_cols]

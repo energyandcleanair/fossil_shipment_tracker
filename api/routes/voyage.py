@@ -801,11 +801,16 @@ class VoyageResource(Resource):
                     sa.and_(
                         sa.or_(
                             ShipInsurer.date_from
-                            <= shipments_combined.c.departure_date_utc
+                            <= shipments_combined.c.departure_date_utc,
                             # Adding a buffer because in many instances
                             # we collected insurance company after the shipment had been detected
                             # TODO IMPROVE
-                            + dt.timedelta(days=buffer_days),
+                            sa.and_(
+                                ShipInsurer.date_from
+                                <= shipments_combined.c.departure_date_utc
+                                + dt.timedelta(days=buffer_days),
+                                ShipInsurer.company_raw_name != base.UNKNOWN_INSURER,
+                            ),
                             ShipInsurer.date_from == None,
                         ),
                         ShipInsurer.ship_imo == shipments_combined.c.departure_ship_imo,
