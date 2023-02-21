@@ -23,6 +23,7 @@ from base.models import (
     Company,
     Country,
     Ship,
+    Port,
 )
 from engine.equasis import Equasis
 
@@ -127,14 +128,14 @@ def update_info_from_equasis(
     last_updated=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
     departure_date_from=None,
     imo=None,
+    departure_port_id=None,
+    departure_port_iso2=None,
 ):
     """
     Collect infos from equasis about shipments that either don't have infos,
     or for infos that are potentially outdated
     :return:
     """
-    equasis = Equasis()
-
     imos = (
         session.query(
             Departure.ship_imo,
@@ -155,6 +156,14 @@ def update_info_from_equasis(
     if imo:
         imos = imos.filter(Departure.ship_imo.in_(to_list(imo)))
 
+    if departure_port_id:
+        imos = imos.filter(Departure.port_id.in_(to_list(departure_port_id)))
+
+    if departure_port_iso2:
+        imos = imos.join(Port, Port.id == Departure.port_id).filter(
+            Port.iso2.in_(to_list(departure_port_iso2))
+        )
+
     imos = imos.subquery()
     imos = session.query(imos).filter(
         sa.or_(imos.c.last_updated <= last_updated, imos.c.last_updated == None)
@@ -169,8 +178,14 @@ def update_info_from_equasis(
     imos = [
         x
         for x in imos
-        if x is not None and not re.search("_v|NOTFOUND_", x, re.IGNORECASE)
+        # if x is not None and not re.search("_v|NOTFOUND_", x, re.IGNORECASE)
+        if x is not None and not re.search("_v", x, re.IGNORECASE)
     ]
+
+    if imos:
+        equasis = Equasis()
+    else:
+        equasis = None
 
     for imo in tqdm(imos):
         itry = 0
@@ -179,7 +194,8 @@ def update_info_from_equasis(
         while equasis_infos is None and itry <= ntries:
             itry += 1
             try:
-                equasis_infos = equasis.get_ship_infos(imo=imo)
+                imo_equasis = imo.replace("NOTFOUND_", "")
+                equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
             except requests.exceptions.HTTPError as e:
                 logger.warning("Failed to get equasis ship info, trying again.")
             except requests.exceptions.ConnectionError as e:
@@ -188,7 +204,7 @@ def update_info_from_equasis(
         if equasis_infos is not None:
             # Update ship record
             ship = session.query(Ship).filter(Ship.imo == imo).first()
-            others = dict(ship.others)
+            others = dict(ship.others) if ship.others else {}
             others.update({"equasis": equasis_infos})
             # To convert datetimes to str
             others = json.loads(json.dumps(others, cls=JsonEncoder))
@@ -198,6 +214,7 @@ def update_info_from_equasis(
             # Insurer
             if equasis_infos.get("insurer"):
                 insurer_raw_name = equasis_infos.get("insurer").get("name")
+                insurer_raw_date_from = equasis_infos.get("insurer").get("date_from")
                 # See if exists
                 insurer = (
                     session.query(ShipInsurer)
@@ -220,7 +237,11 @@ def update_info_from_equasis(
                         .count()
                         > 0
                     )
-                    date_from_ = dt.datetime.now() if has_insurer else None
+                    date_from_ = (
+                        insurer_raw_date_from or dt.datetime.now()
+                        if has_insurer
+                        else None
+                    )
                     insurer = ShipInsurer(
                         company_raw_name=insurer_raw_name,
                         imo=None,
@@ -229,6 +250,12 @@ def update_info_from_equasis(
                         date_from=date_from_,
                     )
                 insurer.updated_on = dt.datetime.now()
+                if insurer_raw_date_from and insurer.date_from is not None:
+                    # HEURISTIC
+                    # Very important assumption about equasis: we only update the date_from if it is not null
+                    # It may happen indeed that it was the same insurer before the incpetion date
+                    # and that the contract was only renewed
+                    insurer.date_from = insurer_raw_date_from
                 session.add(insurer)
                 session.commit()
 
