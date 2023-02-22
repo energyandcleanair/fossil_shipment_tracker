@@ -128,15 +128,7 @@ class KplerScraper:
 def fill_products():
     scraper = KplerScraper()
     products = scraper.get_products()
-    try:
-        products.to_sql(
-            DB_TABLE_KPLER_PRODUCT, con=engine, if_exists="append", index=False
-        )
-    except sa.exc.IntegrityError:
-        logger.info("Cannot copy. Upserting instead")
-        upsert(products, DB_TABLE_KPLER_PRODUCT, "kpler_product_pkey")
-
-    session.commit()
+    upsert(products, DB_TABLE_KPLER_PRODUCT, "kpler_product_pkey")
     return
 
 
@@ -154,5 +146,10 @@ def update_flows(date_from=None, origin_iso2s=["RU"]):
                 product=product,
                 split=FlowsSplit.DestinationCountries,
             )
-            upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
-            session.commit()
+            try:
+                df.to_sql(
+                    DB_TABLE_KPLER_FLOW, con=engine, if_exists="append", index=False
+                )
+            except sa.exc.IntegrityError:
+                logger.info("Cannot copy. Upserting instead")
+                upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
