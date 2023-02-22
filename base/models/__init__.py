@@ -51,5 +51,9 @@ DB_TABLE_FLARING = "flaring"
 DB_TABLE_FLARING_ANOMALY = "flaring_anomaly"
 DB_TABLE_FLARING_ANOMALY_ALGORITHM = "flaring_anomaly_algorithm"
 
+# Kpler data
+DB_TABLE_KPLER_PRODUCT = "kpler_product"
+DB_TABLE_KPLER_FLOW = "kpler_flow"
+
 
 from .models import *
