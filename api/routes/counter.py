@@ -127,7 +127,7 @@ class RussiaCounterResource(Resource):
     )
     parser.add_argument(
         "pricing_scenario",
-        help="Pricing scenario (standard or pricecap)",
+        help="Pricing scenario (default or pricecap)",  # TODO Add list
         action="split",
         default=[PRICING_DEFAULT],
         required=False,
@@ -340,7 +340,6 @@ class RussiaCounterResource(Resource):
 
         query = self.aggregate(query, aggregate_by)
         counter = pd.read_sql(query.statement, session.bind)
-        counter.replace({np.nan: None}, inplace=True)
 
         if "id" in counter:
             counter.drop(["id"], axis=1, inplace=True)
