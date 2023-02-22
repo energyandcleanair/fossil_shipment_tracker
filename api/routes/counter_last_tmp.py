@@ -102,9 +102,12 @@ class RussiaCounterLastResource(Resource):
     def get(self):
         params = RussiaCounterLastResource.parser.parse_args()
         counter_last = self.get_from_params(params)
-        return self.build_response(
+        response = self.build_response(
             counter_last=counter_last, format=params.get("format")
         )
+
+        response.headers['Cache-Control'] = 'public'
+        return response
 
     def get_from_params(self, params):
         # original parameters (before any potential modifications)
