@@ -66,8 +66,9 @@ from . import DB_TABLE_ALERT_CRITERIA_ASSOC
 
 from . import DB_TABLE_FLARING
 from . import DB_TABLE_FLARING_FACILITY
-from . import DB_TABLE_FLARING_ANOMALY
-from . import DB_TABLE_FLARING_ANOMALY_ALGORITHM
+
+from . import DB_TABLE_KPLER_PRODUCT
+from . import DB_TABLE_KPLER_FLOW
 
 
 class Ship(Base):
@@ -1032,18 +1033,43 @@ class Flaring(Base):
     __tablename__ = DB_TABLE_FLARING
 
 
-# class FlaringAnomaly(Base):
-#     """Geometries of Oil/Gas related installations"""
-#     id = Column(String, unique=True, primary_key=True)
-#     flaring_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING + '.id', ondelete="CASCADE"), nullable=False)
-#     algorithm = Column(Numeric)
-#
-#     __tablename__ = DB_TABLE_FLARING_ANOMALY
-#
-# class FlaringAnomalyAlgorithm(Base):
-#     """Geometries of Oil/Gas related installations"""
-#     id = Column(String, unique=True, primary_key=True)
-#     flaring_id = Column(BigInteger, ForeignKey(DB_TABLE_FLARING + '.id', ondelete="CASCADE"), nullable=False)
-#     algorithm = Column(Numeric)
-#
-#     __tablename__ = DB_TABLE_FLARING_ANOMALY_ALGORITHM
+class KplerProduct(Base):
+    name = Column(String, primary_key=True)
+    group = Column(String)
+    family = Column(String)
+
+    __tablename__ = DB_TABLE_KPLER_PRODUCT
+
+
+class KplerFlow(Base):
+    id = Column(BigInteger, unique=True, primary_key=True)
+
+    origin_iso2 = Column(String)
+    destination_iso2 = Column(String)
+
+    from_installation = Column(String)
+    to_installation = Column(String)
+
+    date = Column(Date, nullable=False)
+    unit = Column(String, nullable=False)
+    product = Column(
+        String,
+        ForeignKey(DB_TABLE_KPLER_PRODUCT + ".name", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    value = Column(Numeric, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "origin_iso2",
+            "destination_iso2",
+            "from_installation",
+            "to_installation",
+            "date",
+            "unit",
+            "product",
+            name="unique_kpler_flow",
+        ),
+    )
+    __tablename__ = DB_TABLE_KPLER_FLOW
