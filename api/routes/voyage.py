@@ -187,7 +187,7 @@ class VoyageResource(Resource):
     parser.add_argument(
         "commodity_origin_iso2",
         action="split",
-        help="iso2(s) of origin of commodity. Default to Russia only",
+        help="iso2(s) of origin of commodity.",
         required=False,
         default=None,
     )
@@ -571,8 +571,7 @@ class VoyageResource(Resource):
                     # India: forcing to Oil products when crude oil
                     # After comparing with Kpler
                     sa.and_(
-                        Ship.commodity.in_([base.CRUDE_OIL]),
-                        DeparturePort.iso2 == "IN",
+                        Ship.commodity.in_([base.CRUDE_OIL]), DeparturePort.iso2 == "IN"
                     ),
                     "oil_products",
                 ),
@@ -834,10 +833,7 @@ class VoyageResource(Resource):
         # but since we know there's a single ship per shipment
         # a rename will be faster
         value_tonne_field = case(
-            [
-                (Ship.unit == "tonne", Ship.quantity),
-            ],
-            else_=Ship.dwt,
+            [(Ship.unit == "tonne", Ship.quantity)], else_=Ship.dwt
         ).label("value_tonne")
 
         value_m3_field = case(

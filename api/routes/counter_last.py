@@ -210,7 +210,6 @@ class RussiaCounterLastResource(Resource):
         query = self.aggregate(query=query, aggregate_by=aggregate_by)
 
         counter = pd.read_sql(query.statement, session.bind)
-        counter.replace({np.nan: None}, inplace=True)
         counter_last = self.get_last(counter=counter)
 
         # Add total
