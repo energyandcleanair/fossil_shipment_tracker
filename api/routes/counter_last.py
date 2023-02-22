@@ -104,7 +104,7 @@ class RussiaCounterLastResource(Resource):
     def get(self):
         params = RussiaCounterLastResource.parser.parse_args()
         response = self.get_from_params(params)
-        response.headers['Cache-Control'] = 'public'
+        response.headers["Cache-Control"] = "public"
         return response
 
     def get_from_params(self, params):
@@ -121,16 +121,16 @@ class RussiaCounterLastResource(Resource):
         use_eu = params.get("use_eu")
         format = params.get("format", "json")
 
-        cache = EndpointCacher.get_cache(
-            endpoint=self.endpoint,
-            params=original_params,
-            max_age_minutes=self.max_age_minutes,
-        )
-        if cache:
-            return self.build_response(
-                counter_last=pd.DataFrame(cache),
-                format=format
-            )
+        # cache = EndpointCacher.get_cache(
+        #     endpoint=self.endpoint,
+        #     params=original_params,
+        #     max_age_minutes=self.max_age_minutes,
+        # )
+        # if cache:
+        #     return self.build_response(
+        #         counter_last=pd.DataFrame(cache),
+        #         format=format
+        #     )
 
         destination_region_field = case(
             [
@@ -198,7 +198,9 @@ class RussiaCounterLastResource(Resource):
             query = query.filter(Counter.date <= str(to_datetime(date_to)))
 
         if pricing_scenario is not None:
-            query = query.filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
+            query = query.filter(
+                Counter.pricing_scenario.in_(to_list(pricing_scenario))
+            )
 
         # Important to force this
         # so that future flows (e.g. fixed pipeline) aren't included
@@ -230,16 +232,13 @@ class RussiaCounterLastResource(Resource):
         if "index" in counter_last.columns:
             counter_last.drop(["index"], axis=1, inplace=True)
 
-        EndpointCacher.set_cache(
-            endpoint=self.endpoint,
-            params=original_params,
-            response=counter_last.to_dict(orient="records"),
-        )
+        # EndpointCacher.set_cache(
+        #     endpoint=self.endpoint,
+        #     params=original_params,
+        #     response=counter_last.to_dict(orient="records"),
+        # )
 
-        response = self.build_response(
-            counter_last=counter_last,
-            format=format
-        )
+        response = self.build_response(counter_last=counter_last, format=format)
 
         return response
 
