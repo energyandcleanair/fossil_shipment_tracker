@@ -10,6 +10,7 @@ from base.logger import logger
 import pandas as pd
 from tqdm import tqdm
 import sqlalchemy as sa
+from unidecode import unidecode
 
 from kpler.sdk.configuration import Configuration
 from kpler.sdk import Platform
@@ -43,10 +44,12 @@ class KplerScraper:
         date_to=dt.datetime.now(),
     ):
         origin_country = (
-            self.cc.convert(origin_iso2, to="name") if origin_iso2 else None
+            unidecode(self.cc.convert(origin_iso2, to="name")) if origin_iso2 else None
         )
         destination_country = (
-            self.cc.convert(destination_iso2, to="name") if destination_iso2 else None
+            unidecode(self.cc.convert(destination_iso2, to="name"))
+            if destination_iso2
+            else None
         )
 
         params = {
