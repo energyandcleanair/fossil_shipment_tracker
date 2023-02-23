@@ -203,17 +203,21 @@ def fill_products():
     return
 
 
-def update_flows(date_from=None, date_to=None, products=None, origin_iso2s=["RU"]):
+def update_flows(
+    date_from=None, date_to=None, platforms=None, products=None, origin_iso2s=["RU"]
+):
     scraper = KplerScraper()
 
-    for platform in scraper.platforms:
-        products = (
+    _platforms = scraper.platforms if platforms is None else platforms
+    for platform in _platforms:
+        _products = (
             scraper.get_products(platform=platform).name
             if products is None
             else products
         )
         for origin_iso2 in tqdm(origin_iso2s):
-            for product in products:
+            print(origin_iso2)
+            for product in _products:
                 print(product)
                 df = scraper.get_flows(
                     platform=platform,
