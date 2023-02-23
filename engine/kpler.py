@@ -140,6 +140,25 @@ class KplerScraper:
 
         df = split_to_column(df, split)
         df = df.drop(columns=["split", "Period End Date"])
+
+        # Sometimes we have duplicated values
+        df = (
+            df.groupby(
+                [
+                    "date",
+                    "origin_iso2",
+                    "destination_iso2",
+                    "from_installation",
+                    "to_installation",
+                    "product",
+                    "unit",
+                    "platform",
+                ]
+            )
+            .sum()
+            .reset_index()
+        )
+
         return df
 
     def get_products(self, platform=None):
