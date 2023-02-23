@@ -87,7 +87,7 @@ def test_counter(app):
 
         expected_columns = set(['commodity', 'commodity_group', 'commodity_group_name', 'date',
                                 'destination_iso2', 'destination_country', 'destination_region',
-                                'value_tonne', 'value_eur', 'value_usd'])
+                                'pricing_scenario_name', 'pricing_scenario', 'value_tonne', 'value_eur', 'value_usd'])
         assert set(data_df.columns) == expected_columns
 
         params = {"format": "json", "aggregate_by": "destination_country,month", "date_from":"2022-02-24"}
