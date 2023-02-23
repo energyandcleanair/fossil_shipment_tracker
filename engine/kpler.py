@@ -1,4 +1,7 @@
 import datetime as dt
+import time
+import requests
+
 import country_converter as coco
 from base.env import get_env
 from base.utils import to_datetime, to_list
@@ -54,6 +57,14 @@ class KplerScraper:
     def get_installation(self, origin_iso2, product):
         return
 
+    def get_flows_raw(self, params, platform):
+        try:
+            df = self.flows_clients[platform].get(**params)
+        except requests.exceptions.ChunkedEncodingError:
+            time.sleep(3)
+            df = self.flows_clients[platform].get(**params)
+        return df
+
     def get_flows(
         self,
         platform,
@@ -95,7 +106,7 @@ class KplerScraper:
 
         # remove None values
         params = {k: v for k, v in params.items() if v is not None}
-        df = self.flows_clients[platform].get(**params)
+        df = self.get_flows_raw(params, platform)
 
         # Ideally no NULL otherwise the unique constraints won't work
         # This should work from Postgres 15 onwards
@@ -192,11 +203,15 @@ def fill_products():
     return
 
 
-def update_flows(date_from=None, date_to=None, origin_iso2s=["RU"]):
+def update_flows(date_from=None, date_to=None, products=None, origin_iso2s=["RU"]):
     scraper = KplerScraper()
 
     for platform in scraper.platforms:
-        products = scraper.get_products(platform=platform).name
+        products = (
+            scraper.get_products(platform=platform).name
+            if products is None
+            else products
+        )
         for origin_iso2 in tqdm(origin_iso2s):
             for product in products:
                 print(product)
