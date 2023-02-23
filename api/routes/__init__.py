@@ -20,7 +20,7 @@ routes_api.add_namespace(ns_charts)
 routes_api.add_namespace(ns_flaring)
 routes_api.add_namespace(ns_alerts)
 
-
+from .template import *
 from .ship import *
 from .port import *
 from .voyage import *
@@ -36,5 +36,6 @@ from .entsogflow import *
 from .commodity import *
 from .alert import *
 from .flaring import *
+from .kpler import *
 
 from .charts import *

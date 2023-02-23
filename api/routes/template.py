@@ -1,29 +1,23 @@
-import datetime as dt
 import pandas as pd
 import json
 import numpy as np
 import re
 
-from routes import routes_api
+from . import routes_api
 from flask_restx import inputs
 
-import base
-from base.models import Generation, Country
-from base.db_connect import session_power as session
+from base.db import session
 from base.encoder import JsonEncoder
-from base.utils import to_list, to_datetime, intersection
+from base.utils import to_list, to_datetime
 from base.logger import logger
 
 from http import HTTPStatus
 from flask import Response
 from flask_restx import Resource, reqparse
-import sqlalchemy as sa
-from sqlalchemy import func, case
 from abc import abstractmethod
 
 
 class TemplateResource(Resource):
-
     parser = reqparse.RequestParser()
 
     # Query processing
@@ -31,7 +25,7 @@ class TemplateResource(Resource):
         "aggregate_by",
         type=str,
         action="split",
-        default=["source", "data_source", "country", "date"],
+        default=None,
         help="which variables to aggregate by. Could be any of source,date,country,year",
     )
     parser.add_argument(
@@ -50,11 +44,7 @@ class TemplateResource(Resource):
         default=None,
     )
     parser.add_argument(
-        "pivot_value",
-        type=str,
-        help="pivoted value. Default: value_mwh.",
-        required=False,
-        default="value_mwh",
+        "pivot_value", type=str, help="pivoted value", required=False, default="value"
     )
     parser.add_argument(
         "pivot_fill_value",
@@ -133,7 +123,6 @@ class TemplateResource(Resource):
         return query
 
     def aggregate(self, query, params=None):
-
         aggregate_by = params.get("aggregate_by")
 
         if aggregate_by and "" in aggregate_by:
@@ -171,7 +160,6 @@ class TemplateResource(Resource):
         return result
 
     def get_from_params(self, params):
-
         aggregate_by = params.get("aggregate_by")
         format = params.get("format", "json")
         nest_in_data = params.get("nest_in_data")
@@ -202,9 +190,9 @@ class TemplateResource(Resource):
             )
 
         # Sort by date first
-        date_cols = intersection(self.date_cols, result.columns)
-        if date_cols:
-            result = result.sort_values(date_cols)
+        # date_cols = intersection(self.date_cols, result.columns)
+        # if date_cols:
+        #     result = result.sort_values(date_cols)
 
         # Rolling average
         result = self.roll_average(
@@ -212,7 +200,7 @@ class TemplateResource(Resource):
         )
 
         # Spread currencies
-        result = self.spread_currencies(result=result)
+        # result = self.spread_currencies(result=result)
 
         # Sort results
         result = self.sort_result(
@@ -249,12 +237,10 @@ class TemplateResource(Resource):
         return response
 
     def roll_average(self, result, aggregate_by, rolling_days):
-
         remove_date = False
         date_column = "date"
 
         if rolling_days is not None:
-
             if not "date" in result.columns:
                 # Special case: if we did aggregate by date_without_year and year
                 # Then we need to add date again, do the rolling average
@@ -316,9 +302,7 @@ class TemplateResource(Resource):
         return result
 
     def pivot_result(self, result, pivot_by, pivot_value, pivot_fill_value=0):
-
         if pivot_by:
-
             pivot_by_dependencies = [
                 d for x in to_list(pivot_by) for d in self.pivot_dependencies.get(x, [])
             ]
@@ -342,7 +326,6 @@ class TemplateResource(Resource):
         return result
 
     def build_response(self, result, format, nest_in_data, aggregate_by, download):
-
         result.replace({np.nan: None}, inplace=True)
 
         if format == "csv":
@@ -395,10 +378,7 @@ class TemplateResource(Resource):
                 sorting_groupers = ["destination_country"]
 
             if aggregate_by:
-
-                dependencies = {
-                    "source_raw": ["source"],
-                }
+                dependencies = {"source_raw": ["source"]}
 
                 aggregate_by_dependencies = [
                     d for x in to_list(aggregate_by) for d in dependencies.get(x, [])
@@ -426,7 +406,6 @@ class TemplateResource(Resource):
         return result
 
     def limit_result(self, result, limit, aggregate_by, sort_by, limit_by):
-
         if not limit:
             return result
 
