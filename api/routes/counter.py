@@ -12,7 +12,7 @@ from sqlalchemy import func
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 from sqlalchemy import case
-
+from operator import attrgetter
 
 import base
 from . import routes_api
@@ -24,9 +24,49 @@ from base.utils import to_datetime, to_list, intersect, df_to_json
 from api import postcompute
 from engine.commodity import get_subquery as get_commodity_subquery
 
-
 @routes_api.route("/v0/counter", strict_slashes=False)
 class RussiaCounterResource(Resource):
+
+    @staticmethod
+    def get_aggregateby_cols(subquery=None):
+
+        aggregate_cols_dict = {
+            "currency": ["currency"],
+            "pricing_scenario": [
+                "pricing_scenario",
+                "pricing_scenario_name",
+            ],
+            "date": ["date"],
+            "month": ["date"],
+            "year": ["date"],
+            "commodity": [
+                "commodity",
+                "commodity_group",
+                "commodity_group_name",
+            ],
+            "commodity_group": [
+                "commodity_group",
+                "commodity_group_name",
+            ],
+            "destination_iso2": [
+                "destination_iso2",
+                "destination_country",
+                "destination_region",
+            ],
+            "destination_country": [
+                "destination_iso2",
+                "destination_country",
+                "destination_region",
+            ],
+            "destination_region": ["destination_region"],
+        }
+
+        if subquery is not None:
+            return {k: to_list(attrgetter(*v)(subquery.columns), convert_tuple=True) for k, v in
+                    aggregate_cols_dict.items()}
+
+        return aggregate_cols_dict
+
     parser = reqparse.RequestParser()
     parser.add_argument(
         "cumulate",
@@ -47,7 +87,7 @@ class RussiaCounterResource(Resource):
         type=str,
         action="split",
         default=None,
-        help="which variables to aggregate by. Could be any of commodity, type, destination_region, date",
+        help="which variables to aggregate by. Can be one of {}.".format(", ".join(get_aggregateby_cols.__func__().keys())),
     )
     parser.add_argument(
         "rolling_days",
@@ -541,6 +581,11 @@ class RussiaCounterResource(Resource):
             func.sum(subquery.c.value_currency).label("value_currency"),
         ]
 
+        optional_calculated_cols = {
+            "month": [func.date_trunc("month", subquery.c.date).label("month")],
+            "year": [func.date_trunc("year", subquery.c.date).label("year")],
+        }
+
         # Adding must have grouping columns
         must_group_by = ["currency", "pricing_scenario"]
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
@@ -548,37 +593,10 @@ class RussiaCounterResource(Resource):
             aggregate_by.remove("")
 
         # Aggregating
-        aggregateby_cols_dict = {
-            "currency": [subquery.c.currency],
-            "pricing_scenario": [
-                subquery.c.pricing_scenario,
-                subquery.c.pricing_scenario_name,
-            ],
-            "date": [subquery.c.date],
-            "month": [func.date_trunc("month", subquery.c.date).label("month")],
-            "year": [func.date_trunc("year", subquery.c.date).label("year")],
-            "commodity": [
-                subquery.c.commodity,
-                subquery.c.commodity_group,
-                subquery.c.commodity_group_name,
-            ],
-            "commodity_group": [
-                subquery.c.commodity_group,
-                subquery.c.commodity_group_name,
-            ],
-            "destination_iso2": [
-                subquery.c.destination_iso2,
-                subquery.c.destination_country,
-                subquery.c.destination_region,
-            ],
-            "destination_country": [
-                subquery.c.destination_iso2,
-                subquery.c.destination_country,
-                subquery.c.destination_region,
-            ],
-            "destination_region": [subquery.c.destination_region],
-            # 'type': [subquery.c.type]
-        }
+        aggregateby_cols_dict = self.get_aggregateby_cols(subquery)
+
+        # Update functional aggregate by options
+        aggregateby_cols_dict.update(optional_calculated_cols)
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):
             logger.warning(
@@ -653,9 +671,9 @@ class RussiaCounterResource(Resource):
                     x
                     for x in aggregate_by
                     if not x in aggregate_by_dependencies
-                    and not x in ["date", "month", "year", "currency"]
-                    and not x in by
-                    and x in result.columns
+                       and not x in ["date", "month", "year", "currency"]
+                       and not x in by
+                       and x in result.columns
                 ]
 
             sorted = (
@@ -706,8 +724,8 @@ class RussiaCounterResource(Resource):
                 x
                 for x in result.columns
                 if not x.startswith("value")
-                and x not in to_list(pivot_by)
-                and x not in pivot_by_dependencies
+                   and x not in to_list(pivot_by)
+                   and x not in pivot_by_dependencies
             ]
 
             result["variable"] = pivot_value
@@ -738,8 +756,8 @@ class RussiaCounterResource(Resource):
                 x
                 for x in aggregate_by
                 if not x.startswith("commodity")
-                and not x in ["date", "month", "year"]
-                and x in result.columns
+                   and not x in ["date", "month", "year"]
+                   and x in result.columns
             ]
 
         sort_by = sort_by or "value_eur"

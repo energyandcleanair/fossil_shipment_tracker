@@ -184,10 +184,11 @@ def latlon_to_point(lat, lon, wkt=True):
         return None
 
 
-def to_list(d):
+def to_list(d, convert_tuple=False):
     if d is None:
         return []
-
+    if convert_tuple and isinstance(d, tuple):
+        return list(d)
     if not isinstance(d, list):
         return [d]
     else:
