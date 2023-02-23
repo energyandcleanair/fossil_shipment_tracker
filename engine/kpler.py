@@ -125,9 +125,12 @@ class KplerScraper:
 
         def split_to_column(df, split):
             if split == FlowsSplit.DestinationCountries:
-                df["destination_iso2"] = self.cc.pandas_convert(
-                    series=df.split, to="ISO2", not_found=UNKNOWN_COUNTRY
-                )
+                if df.split.unique() == ["Total"]:
+                    df["destination_iso2"] = UNKNOWN_COUNTRY
+                else:
+                    df["destination_iso2"] = self.cc.pandas_convert(
+                        series=df.split, to="ISO2", not_found=UNKNOWN_COUNTRY
+                    )
             elif split == FlowsSplit.Products:
                 df["product"] = df["split"]
             return df
