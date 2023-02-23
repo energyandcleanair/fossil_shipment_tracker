@@ -23,15 +23,40 @@ KPLER_TOTAL = "Total"
 
 class KplerScraper:
     def __init__(self):
-        self.config = Configuration(
-            Platform.Liquids, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
-        )
+        self.platforms = ["liquids", "lng", "dry"]
+
+        self.configs = {
+            "liquids": Configuration(
+                Platform.Liquids, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
+            ),
+            "lng": Configuration(
+                Platform.LNG, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
+            ),
+            "dry": Configuration(
+                Platform.Dry, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
+            ),
+        }
+
+        self.flows_clients = {
+            "liquids": Flows(self.configs["liquids"]),
+            "lng": Flows(self.configs["lng"]),
+            "dry": Flows(self.configs["dry"]),
+        }
+
+        self.products_clients = {
+            "liquids": Products(self.configs["liquids"]),
+            "lng": Products(self.configs["lng"]),
+            "dry": Products(self.configs["dry"]),
+        }
+
         self.cc = coco.CountryConverter()
-        self.flows_client = Flows(self.config)
-        self.products_client = Products(self.config)
+
+    def get_installation(self, origin_iso2, product):
+        return
 
     def get_flows(
         self,
+        platform,
         origin_iso2=None,
         destination_iso2=None,
         product=None,
@@ -70,7 +95,7 @@ class KplerScraper:
 
         # remove None values
         params = {k: v for k, v in params.items() if v is not None}
-        df = self.flows_client.get(**params)
+        df = self.flows_clients[platform].get(**params)
 
         # Ideally no NULL otherwise the unique constraints won't work
         # This should work from Postgres 15 onwards
@@ -111,9 +136,17 @@ class KplerScraper:
         df = df.drop(columns=["split", "Period End Date"])
         return df
 
-    def get_products(self):
-        df = self.products_client.get(
-            columns=["id", "family_name", "group_name", "product_name"]
+    def get_products(self, platform=None):
+        clients = (
+            self.products_clients.values()
+            if platform is None
+            else [self.products_clients[platform]]
+        )
+        df = pd.concat(
+            [
+                client.get(columns=["id", "family_name", "group_name", "product_name"])
+                for client in clients
+            ]
         )
         df = df.rename(
             columns={
@@ -135,24 +168,26 @@ def fill_products():
     return
 
 
-def update_flows(date_from=None, origin_iso2s=["RU"]):
+def update_flows(date_from=None, date_to=None, origin_iso2s=["RU"]):
     scraper = KplerScraper()
 
-    # First a scraping without installation
-    products = scraper.get_products().name
-    for origin_iso2 in origin_iso2s:
-        for product in tqdm(products):
-            print(product)
-            df = scraper.get_flows(
-                origin_iso2=origin_iso2,
-                date_from=date_from,
-                product=product,
-                split=FlowsSplit.DestinationCountries,
-            )
-            try:
-                df.to_sql(
-                    DB_TABLE_KPLER_FLOW, con=engine, if_exists="append", index=False
+    for platform in scraper.platforms:
+        products = scraper.get_products(platform=platform).name
+        for origin_iso2 in tqdm(origin_iso2s):
+            for product in products:
+                print(product)
+                df = scraper.get_flows(
+                    platform=platform,
+                    origin_iso2=origin_iso2,
+                    date_from=date_from,
+                    date_to=date_to,
+                    product=product,
+                    split=FlowsSplit.DestinationCountries,
                 )
-            except sa.exc.IntegrityError:
-                logger.info("Cannot copy. Upserting instead")
-                upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
+                try:
+                    df.to_sql(
+                        DB_TABLE_KPLER_FLOW, con=engine, if_exists="append", index=False
+                    )
+                except sa.exc.IntegrityError:
+                    logger.info("Cannot copy. Upserting instead")
+                    upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")

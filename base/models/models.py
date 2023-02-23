@@ -1042,7 +1042,7 @@ class KplerProduct(Base):
 
 
 class KplerFlow(Base):
-    id = Column(BigInteger, unique=True, primary_key=True)
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
 
     origin_iso2 = Column(String)
     destination_iso2 = Column(String)
