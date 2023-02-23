@@ -107,6 +107,7 @@ class KplerScraper:
         df["to_installation"] = to_installation if to_installation else KPLER_TOTAL
         df["product"] = product if product else KPLER_TOTAL
         df["unit"] = unit.value
+        df["platform"] = platform
         df = df.rename(columns={"Date": "date"})
         df = df.melt(
             id_vars=[
@@ -117,6 +118,7 @@ class KplerScraper:
                 "to_installation",
                 "product",
                 "unit",
+                "platform",
                 "Period End Date",
             ],
             var_name="split",
@@ -125,7 +127,8 @@ class KplerScraper:
 
         def split_to_column(df, split):
             if split == FlowsSplit.DestinationCountries:
-                if df.split.unique() == ["Total"]:
+                # if df.split only contains "Total"
+                if set(df.split) == {"Total"}:
                     df["destination_iso2"] = UNKNOWN_COUNTRY
                 else:
                     df["destination_iso2"] = self.cc.pandas_convert(
@@ -140,17 +143,16 @@ class KplerScraper:
         return df
 
     def get_products(self, platform=None):
-        clients = (
-            self.products_clients.values()
-            if platform is None
-            else [self.products_clients[platform]]
-        )
-        df = pd.concat(
-            [
-                client.get(columns=["id", "family_name", "group_name", "product_name"])
-                for client in clients
-            ]
-        )
+        platforms = self.platforms if platform is None else [platform]
+
+        def get_platform_products(platform):
+            products = self.products_clients[platform].get(
+                columns=["id", "family_name", "group_name", "product_name"]
+            )
+            products["platform"] = platform
+            return products
+
+        df = pd.concat([get_platform_products(platform) for platform in platforms])
         df = df.rename(
             columns={
                 "Id (Product)": "id",
@@ -159,7 +161,7 @@ class KplerScraper:
                 "Product": "name",
             }
         )
-        df = df[["name", "family", "group"]].drop_duplicates()
+        df = df[["name", "family", "group", "platform"]].drop_duplicates()
         df = df[~pd.isna(df.name)]
         return df
 

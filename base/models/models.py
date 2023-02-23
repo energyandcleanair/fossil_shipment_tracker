@@ -1035,6 +1035,7 @@ class Flaring(Base):
 
 class KplerProduct(Base):
     name = Column(String, primary_key=True)
+    platform = Column(String, primary_key=True)
     group = Column(String)
     family = Column(String)
 
@@ -1052,11 +1053,8 @@ class KplerFlow(Base):
 
     date = Column(Date, nullable=False)
     unit = Column(String, nullable=False)
-    product = Column(
-        String,
-        ForeignKey(DB_TABLE_KPLER_PRODUCT + ".name", ondelete="CASCADE"),
-        nullable=False,
-    )
+    product = Column(String, nullable=False)
+    platform = Column(String, nullable=False)
 
     value = Column(Numeric, nullable=False)
 
