@@ -12,3 +12,6 @@ repos:
     rev: 22.10.0
     hooks:
     -   id: black
+        args:
+            - --line-length=100
+            - --include_trailing_comma=false
