@@ -40,6 +40,13 @@ def check():
         logger_slack.error("Failed integrity: counter, voyage and pricing")
         raise
 
+    try:
+        logger_slack.info("Checking integrity: insurer data")
+        test_insurer()
+    except AssertionError:
+        logger_slack.error("Failed integrity: insurer data")
+        raise
+
 
 def test_shipment_portcall_integrity():
     # check that shipments exist with some expected/hardcoded portcalls
