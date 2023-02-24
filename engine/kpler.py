@@ -67,7 +67,7 @@ class KplerScraper:
             product=product,
         )
         installations = list(flows.from_installation.unique())
-        installations = [x for x in installations if x != "unknown"]
+        installations = [x for x in installations if x.lower() != "unknown"]
         return installations
 
     def get_flows_raw(self, params, platform):
