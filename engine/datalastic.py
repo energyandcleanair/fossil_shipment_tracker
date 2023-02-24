@@ -295,7 +295,7 @@ class Datalastic:
         positions = [Position(**{
             "geometry": latlon_to_point(lat=x["lat"], lon=x["lon"]),
             "ship_imo": imo,
-            "navigation_status": x["navigation_status"],
+            "navigation_status": x["navigation_status"] if "navigation_status" in x else None,
             "speed": x["speed"],
             "date_utc": dt.datetime.strptime(x["last_position_UTC"], "%Y-%m-%dT%H:%M:%SZ"),
             "destination_name": x["destination"]
