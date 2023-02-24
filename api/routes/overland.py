@@ -516,6 +516,7 @@ class PipelineFlowResource(Resource):
                 .reset_index()
             )
 
+        result["date"] = result.date.dt.date
         return result
 
     def spread_currencies(self, result):
