@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from unidecode import unidecode
 
 from kpler.sdk.configuration import Configuration
-from kpler.sdk import Platform
+from kpler.sdk import Platform, exceptions
 from kpler.sdk.resources.flows import Flows
 from kpler.sdk.resources.products import Products
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
@@ -72,11 +72,16 @@ class KplerScraper:
         return installations
 
     def get_flows_raw(self, params, platform):
+
         try:
-            df = self.flows_clients[platform].get(**params)
-        except requests.exceptions.ChunkedEncodingError:
-            time.sleep(3)
-            df = self.flows_clients[platform].get(**params)
+            try:
+                df = self.flows_clients[platform].get(**params)
+            except requests.exceptions.ChunkedEncodingError:
+                time.sleep(3)
+                df = self.flows_clients[platform].get(**params)
+        except exceptions.HttpError as e:
+            logger.error(f"Kpler API error: {e}")
+            return None
         return df
 
     def get_flows(
@@ -117,6 +122,8 @@ class KplerScraper:
         # remove None values
         params = {k: v for k, v in params.items() if v is not None}
         df = self.get_flows_raw(params, platform)
+        if df is None:
+            return None
 
         # Ideally no NULL otherwise the unique constraints won't work
         # This should work from Postgres 15 onwards
@@ -251,13 +258,14 @@ def update_flows(
                         from_installation=installation,
                         split=FlowsSplit.DestinationCountries,
                     )
-                    try:
-                        df.to_sql(
-                            DB_TABLE_KPLER_FLOW,
-                            con=engine,
-                            if_exists="append",
-                            index=False,
-                        )
-                    except sa.exc.IntegrityError:
-                        logger.info("Cannot copy. Upserting instead")
-                        upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
+                    if df:
+                        try:
+                            df.to_sql(
+                                DB_TABLE_KPLER_FLOW,
+                                con=engine,
+                                if_exists="append",
+                                index=False,
+                            )
+                        except sa.exc.IntegrityError:
+                            logger.info("Cannot copy. Upserting instead")
+                            upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
