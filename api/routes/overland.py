@@ -22,7 +22,7 @@ from base.utils import to_list, to_datetime, to_bool
 from base.logger import logger
 from base import PRICING_DEFAULT
 
-from . import commodity
+from .commodity import get_subquery as get_commodity_subquery, get_ids as get_commodity_ids
 
 
 @routes_api.route(
@@ -52,7 +52,7 @@ class PipelineFlowResource(Resource):
     parser.add_argument(
         "commodity",
         help="commodity(ies) of interest. Default: returns all of them. Options: %s"
-        % (",".join(commodity.get_ids(transport=[base.PIPELINE, base.RAIL_ROAD]))),
+        % (",".join(get_commodity_ids(transport=[base.PIPELINE, base.RAIL_ROAD]))),
         default=None,
         action="split",
         required=False,
@@ -225,7 +225,7 @@ class PipelineFlowResource(Resource):
 
         value_currency_field = (value_eur_field * Currency.per_eur).label("value_currency")
 
-        commodity_subquery = commodity.get_subquery(
+        commodity_subquery = get_commodity_subquery(
             session=session, grouping_name=commodity_grouping
         )
 
