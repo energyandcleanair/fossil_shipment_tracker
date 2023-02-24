@@ -20,6 +20,7 @@ from kpler.sdk import Platform
 from kpler.sdk.resources.flows import Flows
 from kpler.sdk.resources.products import Products
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+from kpler.sdk.resources.installations import Installations
 
 KPLER_TOTAL = "Total"
 
@@ -52,10 +53,25 @@ class KplerScraper:
             "dry": Products(self.configs["dry"]),
         }
 
+        # self.installations_clients = {
+        #     # "liquids": Installations(self.configs["liquids"]),
+        #     "lng": Installations(self.configs["lng"]),
+        #     # "dry": Installations(self.configs["dry"]),
+        # }
+
         self.cc = coco.CountryConverter()
 
-    def get_installation(self, origin_iso2, product):
-        return
+    def get_installations(self, origin_iso2, platform, product=None):
+        # We collect flows split by installation
+        # and get unique values
+        flows = self.get_flows(
+            origin_iso2=origin_iso2,
+            platform=platform,
+            split=FlowsSplit.OriginInstallations,
+            product=product,
+        )
+        installations = list(flows.from_installation.unique())
+        return installations
 
     def get_flows_raw(self, params, platform):
         try:
@@ -89,7 +105,7 @@ class KplerScraper:
         )
 
         params = {
-            "from_zones": [origin_country],
+            "from_zones": [origin_country] if not from_installation else None,
             "to_zones": [destination_country] if destination_country else None,
             "products": product,
             "from_installations": from_installation,
@@ -147,6 +163,8 @@ class KplerScraper:
                     )
             elif split == FlowsSplit.Products:
                 df["product"] = df["split"]
+            elif split == FlowsSplit.OriginInstallations:
+                df["from_installation"] = df["split"]
             return df
 
         df = split_to_column(df, split)
@@ -204,7 +222,12 @@ def fill_products():
 
 
 def update_flows(
-    date_from=None, date_to=None, platforms=None, products=None, origin_iso2s=["RU"]
+    date_from=None,
+    date_to=None,
+    platforms=None,
+    products=None,
+    origin_iso2s=["RU"],
+    split_from_installation=True,
 ):
     scraper = KplerScraper()
 
@@ -219,18 +242,33 @@ def update_flows(
             print(origin_iso2)
             for product in _products:
                 print(product)
-                df = scraper.get_flows(
-                    platform=platform,
-                    origin_iso2=origin_iso2,
-                    date_from=date_from,
-                    date_to=date_to,
-                    product=product,
-                    split=FlowsSplit.DestinationCountries,
-                )
-                try:
-                    df.to_sql(
-                        DB_TABLE_KPLER_FLOW, con=engine, if_exists="append", index=False
+
+                if split_from_installation:
+                    installations = scraper.get_installations(
+                        platform=platform, origin_iso2=origin_iso2, product=product
                     )
-                except sa.exc.IntegrityError:
-                    logger.info("Cannot copy. Upserting instead")
-                    upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
+                    # And add an aggregated version
+                    installations = installations + [None]
+                else:
+                    installations = [None]
+
+                for installation in installations:
+                    df = scraper.get_flows(
+                        platform=platform,
+                        origin_iso2=origin_iso2,
+                        date_from=date_from,
+                        date_to=date_to,
+                        product=product,
+                        from_installation=installation,
+                        split=FlowsSplit.DestinationCountries,
+                    )
+                    try:
+                        df.to_sql(
+                            DB_TABLE_KPLER_FLOW,
+                            con=engine,
+                            if_exists="append",
+                            index=False,
+                        )
+                    except sa.exc.IntegrityError:
+                        logger.info("Cannot copy. Upserting instead")
+                        upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")

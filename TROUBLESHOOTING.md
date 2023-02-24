@@ -8,10 +8,11 @@ Various commands that turned out useful in setting up environment on a Mac.
  brew install postgis
 ```
 
+GRPC
 ```
-export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-pip install grpcio
+pip uninstall grpcio
+export GRPC_PYTHON_LDFLAGS=" -framework CoreFoundation"
+pip install grpcio --no-binary :all:
 ```
 
 ```
@@ -22,4 +23,14 @@ DYLD_LIBRARY_PATH=/opt/homebrew/opt/geos/lib/
 ```commandline
 pip uninstall grpcio
 conda install grpcio
+```
+
+## Libraries
+
+### Library not loaded: '@rpath/libssl.3.dylib'
+
+```commandline
+brew unlink openssl && brew link openssl --force
+sudo ln -s /opt/homebrew/opt/openssl@3/lib/libssl.3.dylib /usr/local/lib/libssl.3.dylib
+sudo ln -s /opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib /usr/local/lib/libcrypto.3.dylib
 ```
