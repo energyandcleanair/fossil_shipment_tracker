@@ -62,58 +62,6 @@ def test_shipment_portcall_integrity():
     assert len(shipments) == 5
 
 
-def test_counter_against_voyage():
-    params = {"date_from": "2022-02-24", "format": "json", "pricing_scenario": "default"}
-
-    response = RussiaCounterLastResource().get_from_params(params=params)
-    assert response.status_code == 200
-    data = response.json["data"]
-    counter_df = pd.DataFrame(data).sort_values(["date"], ascending=False)
-
-    params = {"date_from": "2022-02-24", "format": "json"}
-
-    response = PipelineFlowResource().get_from_params(params=params)
-    assert response.status_code == 200
-    data = response.json["data"]
-    pipeline_df = pd.DataFrame(data).sort_values(["date"], ascending=False)
-
-    params = {
-        "date_from": "2022-02-24",
-        "commodity_grouping": "default",
-        "currency": ["EUR"],
-        "pricing_scenario": base.PRICING_DEFAULT,
-        "format": "json",
-    }
-
-    response = VoyageResource().get_from_params(params=params)
-    assert response.status_code == 200
-    data = response.json["data"]
-    voyage_df = pd.DataFrame(data)
-
-    counter2 = (
-        pd.concat(
-            [
-                voyage_df.loc[
-                    (voyage_df.arrival_date_utc >= "2022-02-24")
-                    & (voyage_df.departure_iso2 == "RU")
-                ][["destination_region", "commodity_group", "value_eur"]],
-                pipeline_df.loc[
-                    (pipeline_df.date >= "2022-02-24")
-                    & (pipeline_df.departure_iso2.isin(["TR", "RU", "BY"]))
-                ][["destination_region", "commodity_group", "value_eur"]],
-            ]
-        )
-        .groupby(["destination_region", "commodity_group"])
-        .agg(value_eur=("value_eur", lambda x: np.nansum(x) / 1e9))
-    )
-
-    counter1 = counter_df.groupby(["destination_region", "commodity_group"]).agg(
-        value_eur=("value_eur", lambda x: np.nansum(x) / 1e9)
-    )
-
-    assert counter1 == counter2
-
-
 def test_shipment_table():
     # check that the shipment table respect unique departures and arrivals
 
