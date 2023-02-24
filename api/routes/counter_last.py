@@ -22,7 +22,7 @@ from base.db import session
 from base.models import Country, PriceScenario
 from base.models import Counter
 from base.utils import to_datetime, to_list, intersect
-from engine.commodity import get_subquery as get_commodity_subquery
+from routes.commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route("/v0/counter_last", strict_slashes=False)
@@ -184,9 +184,7 @@ class RussiaCounterLastResource(Resource):
         )
 
         if destination_region:
-            query = query.filter(
-                destination_region_field.in_(to_list(destination_region))
-            )
+            query = query.filter(destination_region_field.in_(to_list(destination_region)))
 
         if destination_iso2:
             query = query.filter(Counter.destination_iso2 == destination_iso2)
@@ -198,9 +196,7 @@ class RussiaCounterLastResource(Resource):
             query = query.filter(Counter.date <= str(to_datetime(date_to)))
 
         if pricing_scenario is not None:
-            query = query.filter(
-                Counter.pricing_scenario.in_(to_list(pricing_scenario))
-            )
+            query = query.filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
         # Important to force this
         # so that future flows (e.g. fixed pipeline) aren't included
@@ -216,9 +212,7 @@ class RussiaCounterLastResource(Resource):
         group_by_total = ["pricing_scenario", "pricing_scenario_name"]
         index_total = [x for x in counter_last.index.names if x not in group_by_total]
         total = (
-            counter_last.groupby(group_by_total, dropna=False)
-            .sum(numeric_only=True)
-            .reset_index()
+            counter_last.groupby(group_by_total, dropna=False).sum(numeric_only=True).reset_index()
         )
         total[index_total] = "total"
         total["date"] = counter_last.date.unique()
@@ -246,9 +240,7 @@ class RussiaCounterLastResource(Resource):
             return Response(
                 response=counter_last.to_csv(index=False),
                 mimetype="text/csv",
-                headers={
-                    "Content-disposition": "attachment; filename=counter_last.csv"
-                },
+                headers={"Content-disposition": "attachment; filename=counter_last.csv"},
             )
 
         if format == "json":
@@ -262,8 +254,7 @@ class RussiaCounterLastResource(Resource):
 
     def get_last(self, counter):
         groupby_cols = list(
-            set(counter.select_dtypes(exclude=np.number).columns.tolist())
-            - set(["date"])
+            set(counter.select_dtypes(exclude=np.number).columns.tolist()) - set(["date"])
         )
         counter_last = (
             counter.sort_values(["date"])
@@ -287,10 +278,9 @@ class RussiaCounterLastResource(Resource):
             # cut 2 last days and take the 7-day mean
             # but only on last ten days to avoid old shipments (like US)
             means = (
-                x.loc[
-                    x.index
-                    >= dt.datetime.today() - dt.timedelta(days=shift_days + n_days + 1)
-                ][["value_tonne", "value_eur"]]
+                x.loc[x.index >= dt.datetime.today() - dt.timedelta(days=shift_days + n_days + 1)][
+                    ["value_tonne", "value_eur"]
+                ]
                 .shift(shift_days)
                 .tail(n_days)
                 .mean()
@@ -305,9 +295,7 @@ class RussiaCounterLastResource(Resource):
             .groupby(groupby_cols)
             .apply(resample_and_fill)
             .reset_index()
-            .rename(
-                columns={"value_tonne": "tonne_per_day", "value_eur": "eur_per_day"}
-            )
+            .rename(columns={"value_tonne": "tonne_per_day", "value_eur": "eur_per_day"})
             .drop(["date"], axis=1)
             .drop_duplicates()
         )
@@ -330,9 +318,7 @@ class RussiaCounterLastResource(Resource):
                 ~counter_last_merged.commodity_group.isna()
             ]
 
-        counter_last_merged = counter_last_merged.groupby(groupby_cols).sum(
-            numeric_only=True
-        )
+        counter_last_merged = counter_last_merged.groupby(groupby_cols).sum(numeric_only=True)
         counter_last_merged["date"] = now
         return counter_last_merged
 
@@ -413,15 +399,12 @@ class RussiaCounterLastResource(Resource):
             ) / counter_last.eur_per_day.sum()
             return counter_last
 
-        if (
-            counter_last[counter_last.destination_region == "EU"].total_eur.sum()
-            > 100e9
-        ):
+        if counter_last[counter_last.destination_region == "EU"].total_eur.sum() > 100e9:
             idx_eu = counter_last.destination_region == "EU"
             if counter_last[idx_eu].eur_per_day.sum() == 0:
-                counter_last[idx_eu & (counter_last.commodity == "crude_oil")][
-                    "eur_per_day"
-                ] = (13000 * 24 * 3600)
+                counter_last[idx_eu & (counter_last.commodity == "crude_oil")]["eur_per_day"] = (
+                    13000 * 24 * 3600
+                )
             return counter_last
 
         # TODO REMOVE

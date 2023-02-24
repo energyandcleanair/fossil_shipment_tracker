@@ -21,7 +21,7 @@ from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
 from base.logger import logger
 from base import PRICING_DEFAULT
-from engine.commodity import get_subquery as get_commodity_subquery
+from routes.commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route("/v0/entsogflow", strict_slashes=False)
@@ -177,15 +177,11 @@ class EntsogFlowResource(Resource):
         if aggregate_by and "" in aggregate_by:
             aggregate_by.remove("")
 
-        value_eur_field = (EntsogFlow.value_tonne * Price.eur_per_tonne).label(
-            "value_eur"
-        )
+        value_eur_field = (EntsogFlow.value_tonne * Price.eur_per_tonne).label("value_eur")
 
         pricing_scenario_field = (Price.scenario).label("pricing_scenario")
 
-        value_currency_field = (value_eur_field * Currency.per_eur).label(
-            "value_currency"
-        )
+        value_currency_field = (value_eur_field * Currency.per_eur).label("value_currency")
 
         commodity_subquery = get_commodity_subquery(
             session=session, grouping_name=commodity_grouping
@@ -200,15 +196,11 @@ class EntsogFlowResource(Resource):
         commodity_origin_iso2_field = case(
             [
                 (
-                    sa.and_(
-                        DepartureCountry.iso2 == "TR", DestinationCountry.iso2 == "GR"
-                    ),
+                    sa.and_(DepartureCountry.iso2 == "TR", DestinationCountry.iso2 == "GR"),
                     "AZ",
                 ),  # Already done in entsog.py # Kipoi
                 (
-                    sa.and_(
-                        DepartureCountry.iso2 == "TR", DestinationCountry.iso2 != "GR"
-                    ),
+                    sa.and_(DepartureCountry.iso2 == "TR", DestinationCountry.iso2 != "GR"),
                     "RU",
                 ),
                 (DepartureCountry.iso2.in_(["BY", "MD", "UA"]), "RU"),
@@ -233,9 +225,7 @@ class EntsogFlowResource(Resource):
                 CommodityOriginCountry.region.label("commodity_origin_region"),
                 commodity_destination_iso2_field,
                 CommodityDestinationCountry.name.label("commodity_destination_country"),
-                CommodityDestinationCountry.region.label(
-                    "commodity_destination_region"
-                ),
+                CommodityDestinationCountry.region.label("commodity_destination_region"),
                 EntsogFlow.date,
                 EntsogFlow.departure_iso2,
                 DepartureCountry.name.label("departure_country"),
@@ -263,17 +253,14 @@ class EntsogFlowResource(Resource):
                 CommodityDestinationCountry,
                 CommodityDestinationCountry.iso2 == commodity_destination_iso2_field,
             )
-            .outerjoin(
-                commodity_subquery, EntsogFlow.commodity == commodity_subquery.c.id
-            )
+            .outerjoin(commodity_subquery, EntsogFlow.commodity == commodity_subquery.c.id)
             .outerjoin(
                 Price,
                 sa.and_(
                     Price.date == EntsogFlow.date,
                     Price.commodity == commodity_subquery.c.pricing_commodity,
                     sa.or_(
-                        commodity_destination_iso2_field
-                        == any_(Price.destination_iso2s),
+                        commodity_destination_iso2_field == any_(Price.destination_iso2s),
                         Price.destination_iso2s == sa.null(),
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
@@ -325,9 +312,7 @@ class EntsogFlowResource(Resource):
             flows_rich = flows_rich.filter(EntsogFlow.date <= to_datetime(date_to))
 
         if departure_iso2 is not None:
-            flows_rich = flows_rich.filter(
-                EntsogFlow.departure_iso2.in_(to_list(departure_iso2))
-            )
+            flows_rich = flows_rich.filter(EntsogFlow.departure_iso2.in_(to_list(departure_iso2)))
 
         if destination_iso2 is not None:
             flows_rich = flows_rich.filter(
@@ -346,9 +331,7 @@ class EntsogFlowResource(Resource):
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
 
         if pricing_scenario is not None:
-            flows_rich = flows_rich.filter(
-                Price.scenario.in_(to_list(pricing_scenario))
-            )
+            flows_rich = flows_rich.filter(Price.scenario.in_(to_list(pricing_scenario)))
 
         # Aggregate
         query = self.aggregate(query=flows_rich, aggregate_by=aggregate_by)
@@ -471,13 +454,9 @@ class EntsogFlowResource(Resource):
             max_date = result[date_col].max()  # change your date here
             daterange = pd.date_range(min_date, max_date).rename(date_col)
 
-            result[date_col] = result[date_col].dt.floor(
-                "D"
-            )  # Should have been done already
+            result[date_col] = result[date_col].dt.floor("D")  # Should have been done already
             result = (
-                result.groupby(
-                    [x for x in result.columns if x not in date_cols + value_cols]
-                )
+                result.groupby([x for x in result.columns if x not in date_cols + value_cols])
                 .apply(
                     lambda x: x.set_index(date_col)
                     .resample("D")
@@ -498,9 +477,7 @@ class EntsogFlowResource(Resource):
 
         result["currency"] = "value_" + result.currency.str.lower()
         index_cols = [
-            x
-            for x in result.columns
-            if x not in ["currency", "value_currency", "value_eur"]
+            x for x in result.columns if x not in ["currency", "value_currency", "value_eur"]
         ]
 
         result = (
@@ -534,13 +511,9 @@ class EntsogFlowResource(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         return Response(
             response="Unknown format. Should be either csv or json",

@@ -1,4 +1,3 @@
-import os
 import pytest
 
 
@@ -7,5 +6,6 @@ import pytest
 
 @pytest.fixture
 def app():
-    from app import app
+    from api.app import app
+
     return app

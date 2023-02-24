@@ -21,8 +21,8 @@ from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime, to_bool
 from base.logger import logger
 from base import PRICING_DEFAULT
-from engine import commodity
-from engine.commodity import get_subquery as get_commodity_subquery
+
+from routes import commodity
 
 
 @routes_api.route(
@@ -225,7 +225,7 @@ class PipelineFlowResource(Resource):
 
         value_currency_field = (value_eur_field * Currency.per_eur).label("value_currency")
 
-        commodity_subquery = get_commodity_subquery(
+        commodity_subquery = commodity.get_subquery(
             session=session, grouping_name=commodity_grouping
         )
 

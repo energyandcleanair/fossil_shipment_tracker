@@ -9,35 +9,42 @@ from base.env import get_env
 import numpy as np
 import psycopg2
 from psycopg2.extensions import register_adapter, AsIs
+
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 
 
-environment = get_env('ENVIRONMENT', 'test').lower() # development, production, test
+environment = get_env("ENVIRONMENT", "test").lower()  # development, production, test
 connections = {
-    'test': get_env('DB_URL_TEST', default=None),
-    'development': get_env('DB_URL_DEVELOPMENT', default=None),
-    'production': get_env('DB_URL_PRODUCTION', default=None)
+    "test": get_env("DB_URL_TEST", default=None),
+    "development": get_env("DB_URL_DEVELOPMENT", default=None),
+    "production": get_env("DB_URL_PRODUCTION", default=None),
 }
+
+
 connection = connections.get(environment)
+
 if connection is None:
     logger.warning("Database connection string not specified")
 
+engine = None
+try:
+    engine = create_engine(
+        connection,
+        convert_unicode=True,
+        pool_size=5,
+        max_overflow=2,
+        pool_pre_ping=True,
+        pool_timeout=30,
+        pool_recycle=1800,
+    )
+except Exception as e:
+    logger.error("Could not connect to database: %s" % e)
 
-engine = create_engine(connection,
-                       convert_unicode=True,
-                       pool_size=5,
-                       max_overflow=2,
-                       pool_pre_ping=True,
-                       pool_timeout=30,
-                       pool_recycle=1800
-                       )
-
-session = scoped_session(sessionmaker(autocommit=False,
-                                      autoflush=False,
-                                      bind=engine))
+session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 
 Base = declarative_base()
 Base.query = session.query_property()
+
 
 def check_if_table_exists(table, create_table=False):
     """
@@ -62,6 +69,7 @@ def check_if_table_exists(table, create_table=False):
     else:
         return table_exists
 
+
 def init_db(drop_first=False):
     if drop_first:
         if environment == "test":
@@ -77,5 +85,5 @@ meta = None
 
 # For old counter data
 from pymongo import MongoClient
-import pymongo
+
 mongo_client = MongoClient(get_env("CREA_MONGODB_URL"))

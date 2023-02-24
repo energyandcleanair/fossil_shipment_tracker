@@ -53,7 +53,7 @@ from base import PRICING_DEFAULT
 from base.utils import update_geometry_from_wkb
 from base.env import get_env
 import base
-from engine.commodity import get_subquery as get_commodity_subquery
+from routes.commodity import get_subquery as get_commodity_subquery
 from sqlalchemy.sql import extract
 
 

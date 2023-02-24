@@ -16,14 +16,12 @@ from sqlalchemy import case
 
 import base
 from . import routes_api
-from api.routes.template import TemplateResource
+from routes.template import TemplateResource
 from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session
 from base.models import KplerFlow, KplerProduct
 from base.utils import to_datetime, to_list, intersect, df_to_json
-from api import postcompute
-from engine.commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route("/v0/kpler_flow", strict_slashes=False, doc=False)
@@ -50,13 +48,9 @@ class KplerFlowResource(TemplateResource):
         required=False,
     )
 
-    parser.add_argument(
-        "date_to", type=str, help="End date", default=None, required=False
-    )
+    parser.add_argument("date_to", type=str, help="End date", default=None, required=False)
 
-    parser.add_argument(
-        "product", help="Product", required=False, action="split", default=None
-    )
+    parser.add_argument("product", help="Product", required=False, action="split", default=None)
 
     must_group_by = ["unit"]
     date_cols = ["date"]
@@ -96,9 +90,7 @@ class KplerFlowResource(TemplateResource):
             query = query.filter(KplerFlow.origin_iso2.in_(to_list(origin_iso2)))
 
         if destination_iso2:
-            query = query.filter(
-                KplerFlow.destination_iso2.in_(to_list(destination_iso2))
-            )
+            query = query.filter(KplerFlow.destination_iso2.in_(to_list(destination_iso2)))
 
         if product:
             query = query.filter(KplerProduct.name.in_(to_list(product)))

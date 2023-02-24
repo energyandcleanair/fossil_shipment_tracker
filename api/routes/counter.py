@@ -21,12 +21,12 @@ from base.logger import logger
 from base.db import session
 from base.models import Counter, Commodity, Country, Currency, PriceScenario
 from base.utils import to_datetime, to_list, intersect, df_to_json
-from api import postcompute
-from engine.commodity import get_subquery as get_commodity_subquery
+import postcompute
+from routes.commodity import get_subquery as get_commodity_subquery
+
 
 @routes_api.route("/v0/counter", strict_slashes=False)
 class RussiaCounterResource(Resource):
-
     @staticmethod
     def get_aggregateby_cols(subquery=None):
 
@@ -62,8 +62,10 @@ class RussiaCounterResource(Resource):
         }
 
         if subquery is not None:
-            return {k: to_list(attrgetter(*v)(subquery.columns), convert_tuple=True) for k, v in
-                    aggregate_cols_dict.items()}
+            return {
+                k: to_list(attrgetter(*v)(subquery.columns), convert_tuple=True)
+                for k, v in aggregate_cols_dict.items()
+            }
 
         return aggregate_cols_dict
 
@@ -87,7 +89,9 @@ class RussiaCounterResource(Resource):
         type=str,
         action="split",
         default=None,
-        help="which variables to aggregate by. Can be one of {}.".format(", ".join(get_aggregateby_cols.__func__().keys())),
+        help="which variables to aggregate by. Can be one of {}.".format(
+            ", ".join(get_aggregateby_cols.__func__().keys())
+        ),
     )
     parser.add_argument(
         "rolling_days",
@@ -313,9 +317,7 @@ class RussiaCounterResource(Resource):
             else_=Country.region,
         ).label("destination_region")
 
-        value_currency_field = (Counter.value_eur * Currency.per_eur).label(
-            "value_currency"
-        )
+        value_currency_field = (Counter.value_eur * Currency.per_eur).label("value_currency")
 
         commodity_subquery = get_commodity_subquery(
             session=session, grouping_name=commodity_grouping
@@ -345,32 +347,22 @@ class RussiaCounterResource(Resource):
         )
 
         if pricing_scenario:
-            query = query.filter(
-                Counter.pricing_scenario.in_(to_list(pricing_scenario))
-            )
+            query = query.filter(Counter.pricing_scenario.in_(to_list(pricing_scenario)))
 
         if destination_iso2:
-            query = query.filter(
-                Counter.destination_iso2.in_(to_list(destination_iso2))
-            )
+            query = query.filter(Counter.destination_iso2.in_(to_list(destination_iso2)))
 
         if destination_region:
-            query = query.filter(
-                destination_region_field.in_(to_list(destination_region))
-            )
+            query = query.filter(destination_region_field.in_(to_list(destination_region)))
 
         if destination_region_not:
-            query = query.filter(
-                destination_region_field.notin_(to_list(destination_region_not))
-            )
+            query = query.filter(destination_region_field.notin_(to_list(destination_region_not)))
 
         if commodity:
             query = query.filter(commodity_subquery.c.id.in_(to_list(commodity)))
 
         if commodity_group:
-            query = query.filter(
-                commodity_subquery.c.group.in_(to_list(commodity_group))
-            )
+            query = query.filter(commodity_subquery.c.group.in_(to_list(commodity_group)))
 
         if currency is not None:
             query = query.filter(Currency.currency.in_(to_list(currency)))
@@ -386,9 +378,7 @@ class RussiaCounterResource(Resource):
 
         # Resample
         if "date" in counter:
-            daterange = pd.date_range(min(counter.date), max(counter.date)).rename(
-                "date"
-            )
+            daterange = pd.date_range(min(counter.date), max(counter.date)).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor(
                 "D"
             )  # Should have been done already
@@ -485,9 +475,7 @@ class RussiaCounterResource(Resource):
         counter = self.spread_currencies(result=counter)
 
         # Sort results
-        counter = self.sort_result(
-            result=counter, sort_by=sort_by, aggregate_by=aggregate_by
-        )
+        counter = self.sort_result(result=counter, sort_by=sort_by, aggregate_by=aggregate_by)
 
         # Keep only n records
         counter = self.limit_result(
@@ -500,13 +488,9 @@ class RussiaCounterResource(Resource):
         )
 
         def add_total_commodity(data):
-            groupby_cols = [
-                c for c in data.columns if not re.match("commodity|value", c)
-            ]
+            groupby_cols = [c for c in data.columns if not re.match("commodity|value", c)]
             value_cols = [c for c in data.columns if re.match("value", c)]
-            data_global = (
-                data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
-            )
+            data_global = data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
 
             data_global["commodity_group"] = "Total"
             data_global["commodity"] = "Total"
@@ -515,13 +499,9 @@ class RussiaCounterResource(Resource):
             return data
 
         def add_total_region(data):
-            groupby_cols = [
-                c for c in data.columns if not re.match("destination|value", c)
-            ]
+            groupby_cols = [c for c in data.columns if not re.match("destination|value", c)]
             value_cols = [c for c in data.columns if re.match("value", c)]
-            data_global = (
-                data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
-            )
+            data_global = data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
 
             data_global["destination_region"] = "Total"
 
@@ -534,14 +514,10 @@ class RussiaCounterResource(Resource):
         if include_total_commodity:
             counter = add_total_commodity(counter)
             if commodity:
-                counter = counter[
-                    counter.commodity.isin(to_list(commodity) + ["Total"])
-                ]
+                counter = counter[counter.commodity.isin(to_list(commodity) + ["Total"])]
 
         # Pivot
-        counter = self.pivot_result(
-            result=counter, pivot_by=pivot_by, pivot_value=pivot_value
-        )
+        counter = self.pivot_result(result=counter, pivot_by=pivot_by, pivot_value=pivot_value)
 
         # Pivot
         counter = self.sort_columns(result=counter, columns_order=columns_order)
@@ -618,9 +594,7 @@ class RussiaCounterResource(Resource):
 
         result["currency"] = "value_" + result.currency.str.lower()
         index_cols = [
-            x
-            for x in result.columns
-            if x not in ["currency", "value_currency", "value_eur"]
+            x for x in result.columns if x not in ["currency", "value_currency", "value_eur"]
         ]
 
         result = (
@@ -671,9 +645,9 @@ class RussiaCounterResource(Resource):
                     x
                     for x in aggregate_by
                     if not x in aggregate_by_dependencies
-                       and not x in ["date", "month", "year", "currency"]
-                       and not x in by
-                       and x in result.columns
+                    and not x in ["date", "month", "year", "currency"]
+                    and not x in by
+                    and x in result.columns
                 ]
 
             sorted = (
@@ -697,9 +671,7 @@ class RussiaCounterResource(Resource):
         if len(pivot_values) > 1:
             return pd.concat(
                 [
-                    self.pivot_result(
-                        result=result.copy(), pivot_by=pivot_by, pivot_value=x
-                    )
+                    self.pivot_result(result=result.copy(), pivot_by=pivot_by, pivot_value=x)
                     for x in pivot_values
                 ]
             )
@@ -717,15 +689,13 @@ class RussiaCounterResource(Resource):
         }
 
         if pivot_by:
-            pivot_by_dependencies = [
-                d for x in to_list(pivot_by) for d in dependencies.get(x, [])
-            ]
+            pivot_by_dependencies = [d for x in to_list(pivot_by) for d in dependencies.get(x, [])]
             index = [
                 x
                 for x in result.columns
                 if not x.startswith("value")
-                   and x not in to_list(pivot_by)
-                   and x not in pivot_by_dependencies
+                and x not in to_list(pivot_by)
+                and x not in pivot_by_dependencies
             ]
 
             result["variable"] = pivot_value
@@ -756,8 +726,8 @@ class RussiaCounterResource(Resource):
                 x
                 for x in aggregate_by
                 if not x.startswith("commodity")
-                   and not x in ["date", "month", "year"]
-                   and x in result.columns
+                and not x in ["date", "month", "year"]
+                and x in result.columns
             ]
 
         sort_by = sort_by or "value_eur"

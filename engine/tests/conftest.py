@@ -8,13 +8,14 @@ from base.db import init_db
 
 @pytest.fixture
 def app():
-    from app import app
+    from api.app import app
+
     return app
 
 
 @pytest.fixture
 def test_db_empty():
-    assert os.environ.get('ENVIRONMENT') == "test"
+    assert os.environ.get("ENVIRONMENT") == "test"
 
     # Erase all content and create tables
     init_db(drop_first=True)
@@ -22,7 +23,7 @@ def test_db_empty():
 
 @pytest.fixture
 def test_db():
-    assert os.environ.get('ENVIRONMENT') == "test"
+    assert os.environ.get("ENVIRONMENT") == "test"
 
     # Erase all content and create tables
     init_db(drop_first=False)

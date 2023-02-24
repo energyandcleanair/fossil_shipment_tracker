@@ -1,13 +1,10 @@
-import sys
-
 import sqlalchemy as sa
 import pandas as pd
 import numpy as np
 
 import base
-from base.db import session, check_if_table_exists
+from base.db import session
 from base.models import (
-    Trajectory,
     ShipmentWithSTS,
     Shipment,
     ShipmentArrivalBerth,
@@ -16,12 +13,11 @@ from base.models import (
     Arrival,
 )
 from api.tests import test_counter
-from app import app
-from base.logger import logger, logger_slack
+from api.app import app
+from base.logger import logger_slack
 from api.routes.voyage import VoyageResource
 from api.routes.overland import PipelineFlowResource
 from api.routes.counter_last import RussiaCounterLastResource
-from api.routes.counter import RussiaCounterResource
 
 
 def check():
@@ -33,9 +29,7 @@ def check():
         test_portcall_relationship()
         test_berths()
     except AssertionError:
-        logger_slack.error(
-            "Failed integrity: shipment, portcall and berth relationship."
-        )
+        logger_slack.error("Failed integrity: shipment, portcall and berth relationship.")
         raise
 
     try:
@@ -69,11 +63,7 @@ def test_shipment_portcall_integrity():
 
 
 def test_counter_against_voyage():
-    params = {
-        "date_from": "2022-02-24",
-        "format": "json",
-        "pricing_scenario": "default",
-    }
+    params = {"date_from": "2022-02-24", "format": "json", "pricing_scenario": "default"}
 
     response = RussiaCounterLastResource().get_from_params(params=params)
     assert response.status_code == 200
@@ -139,9 +129,7 @@ def test_shipment_table():
         [s.shipment_id for s in shipments.all()],
     )
 
-    assert len(arrivals) == len(set(arrivals)) and len(departures) == len(
-        set(departures)
-    )
+    assert len(arrivals) == len(set(arrivals)) and len(departures) == len(set(departures))
 
     # check that no departure/arrival is references in STS shipments and non-STS shipments
 
@@ -195,14 +183,8 @@ def test_portcall_relationship():
     )
 
     departure_portcall_ids, arrival_portcall_ids = [
-        d.departure_portcall_id
-        for d in non_sts_shipments
-        if d.departure_portcall_id is not None
-    ], [
-        a.arrival_portcall_id
-        for a in non_sts_shipments
-        if a.arrival_portcall_id is not None
-    ]
+        d.departure_portcall_id for d in non_sts_shipments if d.departure_portcall_id is not None
+    ], [a.arrival_portcall_id for a in non_sts_shipments if a.arrival_portcall_id is not None]
 
     assert len(departure_portcall_ids) == len(set(departure_portcall_ids)) and len(
         arrival_portcall_ids
@@ -219,18 +201,12 @@ def test_portcall_relationship():
     )
 
     departure_portcall_ids_sts, arrival_portcall_ids_sts = [
-        d.departure_portcall_id
-        for d in sts_shipments
-        if d.departure_portcall_id is not None
-    ], [
-        a.arrival_portcall_id
-        for a in sts_shipments
-        if a.arrival_portcall_id is not None
-    ]
+        d.departure_portcall_id for d in sts_shipments if d.departure_portcall_id is not None
+    ], [a.arrival_portcall_id for a in sts_shipments if a.arrival_portcall_id is not None]
 
-    assert not len(
-        set(departure_portcall_ids_sts) & set(departure_portcall_ids)
-    ) and not len(set(arrival_portcall_ids_sts) & set(arrival_portcall_ids))
+    assert not len(set(departure_portcall_ids_sts) & set(departure_portcall_ids)) and not len(
+        set(arrival_portcall_ids_sts) & set(arrival_portcall_ids)
+    )
 
 
 def test_insurer():
@@ -263,7 +239,8 @@ def test_insurer():
          WHERE  ( k.date_from < u.date_from
                    OR k.date_from IS NULL )
                 AND ( k.updated_on > u.updated_on )
-                AND u.updated_on - u.date_from < '7 days')
+                AND u.updated_on - u.date_from < '21 days'
+            )
         SELECT *
         FROM   problematic;
     """

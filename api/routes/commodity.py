@@ -7,6 +7,8 @@ from flask_restx import Resource, reqparse, inputs
 from base.models import Commodity
 from base.encoder import JsonEncoder
 from base.db import session
+from base import COMMODITY_GROUPING_DEFAULT
+from base.utils import to_list
 from . import routes_api
 
 
@@ -52,10 +54,41 @@ class CommodityResource(Resource):
                     {"data": commodities_df.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    commodities_df.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(commodities_df.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
+
+
+def get_subquery(session, grouping_name=None):
+    """
+    Returns a Commodity model for sql alchemy,
+    using either default grouping or the specified alternative one
+    :param alternative_grouping:
+    :return:
+    """
+    if not grouping_name or grouping_name == COMMODITY_GROUPING_DEFAULT:
+        return session.query(
+            Commodity.id,
+            Commodity.transport,
+            Commodity.name,
+            Commodity.pricing_commodity,
+            Commodity.group,
+            Commodity.group_name,
+        ).subquery()
+    else:
+        return session.query(
+            Commodity.id,
+            Commodity.transport,
+            Commodity.name,
+            Commodity.pricing_commodity,
+            Commodity.alternative_groups[grouping_name].label("group"),
+            Commodity.alternative_groups[grouping_name].label("group_name"),
+        ).subquery()
+
+
+def get_ids(transport=None):
+    query = session.query(Commodity.id)
+    if transport:
+        query = query.filter(Commodity.transport.in_(to_list(transport)))
+
+    return [x[0] for x in query.all()]
