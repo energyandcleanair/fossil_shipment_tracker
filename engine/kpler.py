@@ -219,6 +219,7 @@ def update_flows(
     products=None,
     origin_iso2s=["RU"],
     split_from_installation=True,
+    add_total_installation=True,
 ):
     scraper = KplerScraper()
 
@@ -234,8 +235,8 @@ def update_flows(
                     installations = scraper.get_installations(
                         platform=platform, origin_iso2=origin_iso2, product=product
                     )
-                    # And add an aggregated version
-                    installations = installations + [None]
+                    if add_total_installation:
+                        installations = installations + [None]
                 else:
                     installations = [None]
 
