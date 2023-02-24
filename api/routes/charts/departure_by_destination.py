@@ -75,9 +75,7 @@ class ChartDepartureDestination(Resource):
         help="which variables to aggregate by. Could be any of commodity, type, destination_region, date",
     )
 
-    parser.add_argument(
-        "language", type=str, help="en or ua", default="en", required=False
-    )
+    parser.add_argument("language", type=str, help="en or ua", default="en", required=False)
     parser.add_argument(
         "postcompute",
         type=str,
@@ -191,10 +189,7 @@ class ChartDepartureDestination(Resource):
                 n = int(country_grouping.replace("top_", ""))
                 top_n = (
                     data[
-                        (
-                            data.departure_date
-                            >= max(data.departure_date) - dt.timedelta(days=30)
-                        )
+                        (data.departure_date >= max(data.departure_date) - dt.timedelta(days=30))
                         & ~data.destination_iso2.isin(exclude_countries)
                         & (data.destination_region != "Unknown")
                     ]
@@ -220,9 +215,7 @@ class ChartDepartureDestination(Resource):
                 )
 
                 # Keep for orders
-                data.loc[
-                    data.destination_iso2 == base.FOR_ORDERS, "region"
-                ] = "For orders"
+                data.loc[data.destination_iso2 == base.FOR_ORDERS, "region"] = "For orders"
 
             else:
                 data["region"] = data.destination_region
@@ -293,13 +286,9 @@ class ChartDepartureDestination(Resource):
             return data
 
         def add_total(data):
-            groupby_cols = [
-                c for c in data.columns if not re.match("commodity|value", c)
-            ]
+            groupby_cols = [c for c in data.columns if not re.match("commodity|value", c)]
             value_cols = [c for c in data.columns if re.match("value", c)]
-            data_global = (
-                data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
-            )
+            data_global = data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
 
             data_global["commodity_group"] = "Total"
             data_global["commodity"] = "Total"
@@ -315,9 +304,7 @@ class ChartDepartureDestination(Resource):
                 if c not in ["commodity", "commodity_name"] and not re.match("value", c)
             ]
             value_cols = [c for c in data.columns if re.match("value", c)]
-            data = (
-                data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
-            )
+            data = data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
             return data
 
         # Get overland
@@ -325,9 +312,7 @@ class ChartDepartureDestination(Resource):
         if response_overland.status_code == 200:
             data_overland = pd.DataFrame(response_overland.json["data"])
             data_overland.rename(columns={"date": "departure_date"}, inplace=True)
-            data_overland["departure_date"] = pd.to_datetime(
-                data_overland.departure_date
-            )
+            data_overland["departure_date"] = pd.to_datetime(data_overland.departure_date)
         else:
             # Happens when no overland commodity selected
             data_overland = None
@@ -368,6 +353,7 @@ class ChartDepartureDestination(Resource):
             data_voyage = None
 
         data = pd.concat([data_overland, data_voyage])
+        data["departure_date"] = pd.to_datetime(data["departure_date"]).dt.date
         if add_total_commodity:
             data = add_total(data)
             if commodity:
@@ -379,9 +365,7 @@ class ChartDepartureDestination(Resource):
         data = self.postcompute(data, params=params)
         data = translate(data=data, language=language)
 
-        return self.build_response(
-            result=data, format=format, nest_in_data=nest_in_data
-        )
+        return self.build_response(result=data, format=format, nest_in_data=nest_in_data)
 
     def postcompute(self, result, params=None):
         postcompute_fn = postcompute.get_postcompute_fn(params.get("postcompute"))
@@ -408,13 +392,9 @@ class ChartDepartureDestination(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         return Response(
             response="Unknown format. Should be either csv or json",

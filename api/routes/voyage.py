@@ -570,9 +570,7 @@ class VoyageResource(Resource):
                 (
                     # India: forcing to Oil products when crude oil
                     # After comparing with Kpler
-                    sa.and_(
-                        Ship.commodity.in_([base.CRUDE_OIL]), DeparturePort.iso2 == "IN"
-                    ),
+                    sa.and_(Ship.commodity.in_([base.CRUDE_OIL]), DeparturePort.iso2 == "IN"),
                     "oil_products",
                 ),
                 (
@@ -615,9 +613,7 @@ class VoyageResource(Resource):
                 Arrival.event_id.label("arrival_event_id"),
                 func.coalesce(
                     ArrivalShip.dwt,
-                    func.avg(ArrivalShip.dwt).over(
-                        partition_by=ShipmentWithSTS.departure_id
-                    ),
+                    func.avg(ArrivalShip.dwt).over(partition_by=ShipmentWithSTS.departure_id),
                 ).label("dwt_average"),
                 func.sum(ArrivalShip.dwt)
                 .over(partition_by=ShipmentWithSTS.departure_id)
@@ -643,10 +639,7 @@ class VoyageResource(Resource):
                     ArrivalShip.dwt
                     / func.sum(
                         DepartureShip.dwt
-                        * (
-                            shipment_sts_weights.c.dwt_average
-                            / shipment_sts_weights.c.dwt_total
-                        )
+                        * (shipment_sts_weights.c.dwt_average / shipment_sts_weights.c.dwt_total)
                     ).over(partition_by=Arrival.portcall_id),
                 ).label("arrival_weight"),
             )
@@ -680,8 +673,7 @@ class VoyageResource(Resource):
                     [
                         (
                             shipment_sts_weights.c.dwt_average != sa.null(),
-                            shipment_sts_weights.c.dwt_average
-                            / shipment_sts_weights.c.dwt_total,
+                            shipment_sts_weights.c.dwt_average / shipment_sts_weights.c.dwt_total,
                         )
                     ],
                     else_=1.0,
@@ -697,13 +689,10 @@ class VoyageResource(Resource):
             .join(Departure, Departure.id == ShipmentWithSTS.departure_id)
             .outerjoin(Arrival, Arrival.id == ShipmentWithSTS.arrival_id)
             .outerjoin(Event, Event.id == Arrival.event_id)
-            .outerjoin(
-                shipment_sts_weights, shipment_sts_weights.c.id == ShipmentWithSTS.id
-            )
+            .outerjoin(shipment_sts_weights, shipment_sts_weights.c.id == ShipmentWithSTS.id)
             .outerjoin(
                 shipment_sts_arrival_weights,
-                shipment_sts_arrival_weights.c.shipment_departure_id
-                == ShipmentWithSTS.id,
+                shipment_sts_arrival_weights.c.shipment_departure_id == ShipmentWithSTS.id,
             )
             .outerjoin(ArrivalShip, ArrivalShip.imo == shipment_sts_weights.c.imo)
             .filter(Departure.event_id == sa.null())
@@ -726,9 +715,7 @@ class VoyageResource(Resource):
             .join(Ship, Ship.imo == Departure.ship_imo)
         )
 
-        shipments_combined = shipments_non_sts.union_all(
-            shipments_sts_with_arrival
-        ).subquery()
+        shipments_combined = shipments_non_sts.union_all(shipments_sts_with_arrival).subquery()
 
         def add_companies(shipments_combined, buffer_days=14):
             # Add Owner
@@ -741,8 +728,7 @@ class VoyageResource(Resource):
                     ShipOwner,
                     sa.and_(
                         sa.or_(
-                            ShipOwner.date_from
-                            <= shipments_combined.c.departure_date_utc
+                            ShipOwner.date_from <= shipments_combined.c.departure_date_utc
                             # Adding a buffer because in many instances
                             # we collected insurance company after the shipment had been detected
                             # TODO IMPROVE
@@ -770,8 +756,7 @@ class VoyageResource(Resource):
                     ShipManager,
                     sa.and_(
                         sa.or_(
-                            ShipManager.date_from
-                            <= shipments_combined.c.departure_date_utc
+                            ShipManager.date_from <= shipments_combined.c.departure_date_utc
                             # Adding a buffer because in many instances
                             # we collected insurance company after the shipment had been detected
                             # TODO IMPROVE
@@ -799,8 +784,7 @@ class VoyageResource(Resource):
                     ShipInsurer,
                     sa.and_(
                         sa.or_(
-                            ShipInsurer.date_from
-                            <= shipments_combined.c.departure_date_utc,
+                            ShipInsurer.date_from <= shipments_combined.c.departure_date_utc,
                             # Adding a buffer because in many instances
                             # we collected insurance company after the shipment had been detected
                             # TODO IMPROVE
@@ -832,13 +816,13 @@ class VoyageResource(Resource):
         # Technically, we could pivot long -> wide
         # but since we know there's a single ship per shipment
         # a rename will be faster
-        value_tonne_field = case(
-            [(Ship.unit == "tonne", Ship.quantity)], else_=Ship.dwt
-        ).label("value_tonne")
+        value_tonne_field = case([(Ship.unit == "tonne", Ship.quantity)], else_=Ship.dwt).label(
+            "value_tonne"
+        )
 
-        value_m3_field = case(
-            [(Ship.unit == "m3", Ship.quantity)], else_=sa.null()
-        ).label("value_m3")
+        value_m3_field = case([(Ship.unit == "m3", Ship.quantity)], else_=sa.null()).label(
+            "value_m3"
+        )
 
         # for now we will clauclate this in the main query so we can apply weights - we can clean this up all into one
         # value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
@@ -878,9 +862,7 @@ class VoyageResource(Resource):
                     ArrivalPort.iso2,
                 ),
             ],
-            else_=func.coalesce(
-                ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2
-            ),
+            else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2),
         ).label("commodity_destination_iso2")
 
         destination_iso2_field = case(
@@ -890,9 +872,7 @@ class VoyageResource(Resource):
                     ArrivalPort.iso2,
                 )
             ],
-            else_=func.coalesce(
-                ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2
-            ),
+            else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2),
         ).label("destination_iso2")
 
         commodity_subquery = get_commodity_subquery(
@@ -919,9 +899,7 @@ class VoyageResource(Resource):
                 CommodityOriginCountry.region.label("commodity_origin_region"),
                 commodity_destination_iso2_field,
                 CommodityDestinationCountry.name.label("commodity_destination_country"),
-                CommodityDestinationCountry.region.label(
-                    "commodity_destination_region"
-                ),
+                CommodityDestinationCountry.region.label("commodity_destination_region"),
                 # Departure
                 Departure.date_utc.label("departure_date_utc"),
                 DeparturePort.unlocode.label("departure_unlocode"),
@@ -944,15 +922,9 @@ class VoyageResource(Resource):
                 destination_iso2_field,
                 DestinationCountry.name.label("destination_country"),
                 DestinationCountry.region.label("destination_region"),
-                shipments_combined.c.shipment_destination_names.label(
-                    "destination_names"
-                ),
-                shipments_combined.c.shipment_destination_dates.label(
-                    "destination_dates"
-                ),
-                shipments_combined.c.shipment_destination_iso2s.label(
-                    "destination_iso2s"
-                ),
+                shipments_combined.c.shipment_destination_names.label("destination_names"),
+                shipments_combined.c.shipment_destination_dates.label("destination_dates"),
+                shipments_combined.c.shipment_destination_iso2s.label("destination_iso2s"),
                 Ship.name.label("ship_names"),
                 Ship.name[func.array_length(Ship.name, 1)].label("ship_name"),
                 Ship.imo.label("ship_imo"),
@@ -1043,9 +1015,7 @@ class VoyageResource(Resource):
                 ShipmentArrivalBerth,
                 shipments_combined.c.shipment_id == ShipmentArrivalBerth.shipment_id,
             )
-            .outerjoin(
-                DepartureBerth, DepartureBerth.id == ShipmentDepartureBerth.berth_id
-            )
+            .outerjoin(DepartureBerth, DepartureBerth.id == ShipmentDepartureBerth.berth_id)
             .outerjoin(ArrivalBerth, ArrivalBerth.id == ShipmentArrivalBerth.berth_id)
             .outerjoin(
                 NextDeparturePortcall,
@@ -1053,8 +1023,7 @@ class VoyageResource(Resource):
             )
             .outerjoin(
                 ShipmentArrivalLocationSTS,
-                shipments_combined.c.shipment_id
-                == ShipmentArrivalLocationSTS.shipment_id,
+                shipments_combined.c.shipment_id == ShipmentArrivalLocationSTS.shipment_id,
             )
             .outerjoin(
                 ArrivalSTSLocation,
@@ -1062,8 +1031,7 @@ class VoyageResource(Resource):
             )
             .outerjoin(
                 ShipmentDepartureLocationSTS,
-                shipments_combined.c.shipment_id
-                == ShipmentDepartureLocationSTS.shipment_id,
+                shipments_combined.c.shipment_id == ShipmentDepartureLocationSTS.shipment_id,
             )
             .outerjoin(
                 DepartureSTSLocation,
@@ -1083,16 +1051,12 @@ class VoyageResource(Resource):
                 CommodityDestinationCountry,
                 CommodityDestinationCountry.iso2 == commodity_destination_iso2_field,
             )
-            .outerjoin(
-                DestinationCountry, DestinationCountry.iso2 == destination_iso2_field
-            )
+            .outerjoin(DestinationCountry, DestinationCountry.iso2 == destination_iso2_field)
             .outerjoin(
                 ShipOwnerCompany,
                 shipments_combined.c.ship_owner_company_id == ShipOwnerCompany.id,
             )
-            .outerjoin(
-                ShipOwnerCountry, ShipOwnerCompany.country_iso2 == ShipOwnerCountry.iso2
-            )
+            .outerjoin(ShipOwnerCountry, ShipOwnerCompany.country_iso2 == ShipOwnerCountry.iso2)
             .outerjoin(
                 ShipManagerCompany,
                 shipments_combined.c.ship_manager_company_id == ShipManagerCompany.id,
@@ -1143,18 +1107,14 @@ class VoyageResource(Resource):
                     ),
                     sa.or_(
                         # Use GIN index, or try to ~
-                        Price.ship_insurer_iso2s.contains(
-                            array([ShipInsurerCountry.iso2])
-                        ),
+                        Price.ship_insurer_iso2s.contains(array([ShipInsurerCountry.iso2])),
                         # ShipInsurerCountry.iso2 == any_(Price.ship_insurer_iso2s),
                         # Price.ship_insurer_iso2s == sa.null(),
                         Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                 ),
             )
-            .outerjoin(
-                Currency, Currency.date == func.date_trunc("day", Departure.date_utc)
-            )
+            .outerjoin(Currency, Currency.date == func.date_trunc("day", Departure.date_utc))
             .outerjoin(PriceScenario, PriceScenario.id == Price.scenario)
             .join(DepartureCountry, departure_iso2_field == DepartureCountry.iso2)
             .outerjoin(ArrivalCountry, ArrivalPort.iso2 == ArrivalCountry.iso2)
@@ -1180,17 +1140,13 @@ class VoyageResource(Resource):
         )
 
         if id is not None:
-            shipments_rich = shipments_rich.filter(
-                shipments_combined.c.shipment_id.in_(id)
-            )
+            shipments_rich = shipments_rich.filter(shipments_combined.c.shipment_id.in_(id))
 
         if ship_imo is not None:
             shipments_rich = shipments_rich.filter(Ship.imo.in_(to_list(ship_imo)))
 
         if commodity is not None:
-            shipments_rich = shipments_rich.filter(
-                commodity_field.in_(to_list(commodity))
-            )
+            shipments_rich = shipments_rich.filter(commodity_field.in_(to_list(commodity)))
 
         if status is not None:
             shipments_rich = shipments_rich.filter(
@@ -1198,14 +1154,10 @@ class VoyageResource(Resource):
             )
 
         if is_sts is not None:
-            shipments_rich = shipments_rich.filter(
-                shipments_combined.c.is_sts == is_sts
-            )
+            shipments_rich = shipments_rich.filter(shipments_combined.c.is_sts == is_sts)
 
         if pricing_scenario is not None:
-            shipments_rich = shipments_rich.filter(
-                Price.scenario.in_(to_list(pricing_scenario))
-            )
+            shipments_rich = shipments_rich.filter(Price.scenario.in_(to_list(pricing_scenario)))
 
         if date_from is not None:
             shipments_rich = shipments_rich.filter(
@@ -1269,14 +1221,10 @@ class VoyageResource(Resource):
             )
 
         if departure_iso2 is not None:
-            shipments_rich = shipments_rich.filter(
-                DeparturePort.iso2.in_(to_list(departure_iso2))
-            )
+            shipments_rich = shipments_rich.filter(DeparturePort.iso2.in_(to_list(departure_iso2)))
 
         if departure_port_id is not None:
-            shipments_rich = shipments_rich.filter(
-                DeparturePort.id.in_(to_list(departure_port_id))
-            )
+            shipments_rich = shipments_rich.filter(DeparturePort.id.in_(to_list(departure_port_id)))
 
         if departure_berth_id is not None:
             shipments_rich = shipments_rich.filter(
@@ -1305,9 +1253,7 @@ class VoyageResource(Resource):
 
         if commodity_destination_iso2 is not None:
             shipments_rich = shipments_rich.filter(
-                CommodityDestinationCountry.iso2.in_(
-                    to_list(commodity_destination_iso2)
-                )
+                CommodityDestinationCountry.iso2.in_(to_list(commodity_destination_iso2))
             )
 
         if commodity_destination_iso2_not is not None:
@@ -1324,9 +1270,7 @@ class VoyageResource(Resource):
 
         if commodity_destination_region is not None:
             shipments_rich = shipments_rich.filter(
-                CommodityDestinationCountry.region.in_(
-                    to_list(commodity_destination_region)
-                )
+                CommodityDestinationCountry.region.in_(to_list(commodity_destination_region))
             )
 
         if ship_owner_iso2 is not None:
@@ -1360,9 +1304,7 @@ class VoyageResource(Resource):
             )
 
         if currency is not None:
-            shipments_rich = shipments_rich.filter(
-                Currency.currency.in_(to_list(currency))
-            )
+            shipments_rich = shipments_rich.filter(Currency.currency.in_(to_list(currency)))
 
         # Aggregate
         query = self.aggregate(query=shipments_rich, aggregate_by=aggregate_by)
@@ -1397,9 +1339,7 @@ class VoyageResource(Resource):
         )
 
         # Pivot
-        result = self.pivot_result(
-            result=result, pivot_by=pivot_by, pivot_value=pivot_value
-        )
+        result = self.pivot_result(result=result, pivot_by=pivot_by, pivot_value=pivot_value)
 
         # Select, rename
         result = self.select(result, select=select)
@@ -1478,49 +1418,29 @@ class VoyageResource(Resource):
             "status": [subquery.c.status],
             "is_sts": [subquery.c.is_sts],
             # we can aggregate by the date of the STS event
-            "event_date": [
-                func.date_trunc("day", subquery.c.event_date_utc).label("event_date")
-            ],
+            "event_date": [func.date_trunc("day", subquery.c.event_date_utc).label("event_date")],
             "event_month": [
                 func.date_trunc("month", subquery.c.event_date_utc).label("event_month")
             ],
-            "event_year": [
-                func.date_trunc("year", subquery.c.event_date_utc).label("event_year")
-            ],
-            "date": [
-                func.date_trunc("day", subquery.c.departure_date_utc).label(
-                    "departure_date"
-                )
-            ],
+            "event_year": [func.date_trunc("year", subquery.c.event_date_utc).label("event_year")],
+            "date": [func.date_trunc("day", subquery.c.departure_date_utc).label("departure_date")],
             "month": [
-                func.date_trunc("month", subquery.c.departure_date_utc).label(
-                    "departure_month"
-                )
+                func.date_trunc("month", subquery.c.departure_date_utc).label("departure_month")
             ],
             "year": [
-                func.date_trunc("year", subquery.c.departure_date_utc).label(
-                    "departure_year"
-                )
+                func.date_trunc("year", subquery.c.departure_date_utc).label("departure_year")
             ],
             "departure_date": [
-                func.date_trunc("day", subquery.c.departure_date_utc).label(
-                    "departure_date"
-                )
+                func.date_trunc("day", subquery.c.departure_date_utc).label("departure_date")
             ],
             "departure_month": [
-                func.date_trunc("month", subquery.c.departure_date_utc).label(
-                    "departure_month"
-                )
+                func.date_trunc("month", subquery.c.departure_date_utc).label("departure_month")
             ],
             "departure_year": [
-                func.date_trunc("year", subquery.c.departure_date_utc).label(
-                    "departure_year"
-                )
+                func.date_trunc("year", subquery.c.departure_date_utc).label("departure_year")
             ],
             "arrival_date": [
-                func.date_trunc("day", subquery.c.arrival_date_utc).label(
-                    "arrival_date"
-                )
+                func.date_trunc("day", subquery.c.arrival_date_utc).label("arrival_date")
             ],
             "arrival_detected_date": [
                 func.date_trunc("day", subquery.c.arrival_detected_date_utc).label(
@@ -1528,14 +1448,10 @@ class VoyageResource(Resource):
                 )
             ],
             "arrival_month": [
-                func.date_trunc("month", subquery.c.arrival_date_utc).label(
-                    "arrival_month"
-                )
+                func.date_trunc("month", subquery.c.arrival_date_utc).label("arrival_month")
             ],
             "arrival_year": [
-                func.date_trunc("year", subquery.c.arrival_date_utc).label(
-                    "arrival_year"
-                )
+                func.date_trunc("year", subquery.c.arrival_date_utc).label("arrival_year")
             ],
             "departure_port": [
                 subquery.c.departure_port_name,
@@ -1690,6 +1606,7 @@ class VoyageResource(Resource):
                     .replace({np.nan: None})
                 )
 
+                result[date_column] = pd.to_datetime(result[date_column]).dt.date
         return result
 
     def pivot_result(self, result, pivot_by, pivot_value):
@@ -1716,9 +1633,7 @@ class VoyageResource(Resource):
         }
 
         if pivot_by:
-            pivot_by_dependencies = [
-                d for x in to_list(pivot_by) for d in dependencies.get(x, [])
-            ]
+            pivot_by_dependencies = [d for x in to_list(pivot_by) for d in dependencies.get(x, [])]
             index = [
                 x
                 for x in result.columns
@@ -1764,9 +1679,7 @@ class VoyageResource(Resource):
                 result[col] = result[col].apply(lambda x: tuple(x) if x else x)
 
         index_cols = [
-            x
-            for x in result.columns
-            if x not in ["currency", "value_currency", "value_eur"]
+            x for x in result.columns if x not in ["currency", "value_currency", "value_eur"]
         ]
         # result[index_cols] = result[index_cols].replace({np.nan: na_str})
         # result[index_cols] = result[index_cols].replace({None: na_str})
@@ -1781,9 +1694,7 @@ class VoyageResource(Resource):
         # Recreate lists
         for col in list_cols:
             if col in result.columns:
-                result[col] = result[col].apply(
-                    lambda x: list(x) if x and not pd.isna(x) else x
-                )
+                result[col] = result[col].apply(lambda x: list(x) if x and not pd.isna(x) else x)
 
         # Quick sanity check
         len_after = len(result)
@@ -1930,9 +1841,7 @@ class VoyageResource(Resource):
             trajectories_df = pd.read_sql(trajectories.statement, session.bind)
 
             if routed_trajectory:
-                trajectories_df[
-                    "geometry"
-                ] = trajectories_df.geometry_routed.combine_first(
+                trajectories_df["geometry"] = trajectories_df.geometry_routed.combine_first(
                     trajectories_df.geometry
                 )
 
@@ -1940,9 +1849,7 @@ class VoyageResource(Resource):
             trajectories_df = update_geometry_from_wkb(trajectories_df)
 
             result_gdf = gpd.GeoDataFrame(
-                trajectories_df[["shipment_id", "geometry"]].rename(
-                    columns={"shipment_id": "id"}
-                ),
+                trajectories_df[["shipment_id", "geometry"]].rename(columns={"shipment_id": "id"}),
                 geometry="geometry",
             ).merge(result)
 
@@ -1955,9 +1862,7 @@ class VoyageResource(Resource):
                     resp_content = result_geojson
 
                 if download:
-                    headers = {
-                        "Content-disposition": "attachment; filename=voyages.geojson"
-                    }
+                    headers = {"Content-disposition": "attachment; filename=voyages.geojson"}
                 else:
                     headers = {}
 
@@ -1976,9 +1881,7 @@ class VoyageResource(Resource):
                 file_kml = io.BytesIO()
 
                 result_gdf.to_file(file_kml, driver="KML")
-                headers = {
-                    "Content-disposition": "attachment; filename=trajectories.kml"
-                }
+                headers = {"Content-disposition": "attachment; filename=trajectories.kml"}
                 file_kml.seek(0)
                 return Response(
                     response=file_kml,
