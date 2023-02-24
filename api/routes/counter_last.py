@@ -22,7 +22,7 @@ from base.db import session
 from base.models import Country, PriceScenario
 from base.models import Counter
 from base.utils import to_datetime, to_list, intersect
-from routes.commodity import get_subquery as get_commodity_subquery
+from .commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route("/v0/counter_last", strict_slashes=False)

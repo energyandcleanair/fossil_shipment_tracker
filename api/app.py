@@ -5,9 +5,13 @@ from werkzeug.exceptions import HTTPException
 from flask import Flask, request
 from flask import jsonify
 from flask_cors import CORS
-from routes import routes
 from flask import Response
 from flask_mail import Mail, Message
+
+try:
+    from .routes import routes
+except ImportError:
+    from routes import routes
 
 from base.env import get_env
 

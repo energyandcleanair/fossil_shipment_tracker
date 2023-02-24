@@ -1,28 +1,21 @@
-import json
 import pandas as pd
 import numpy as np
-import datetime as dt
 import re
-import pytz
 import datetime as dt
 from flask import Response
 from flask_restx import Resource, reqparse, inputs
-import pymongo
 from sqlalchemy import func
 import sqlalchemy as sa
-from sqlalchemy.orm import aliased
 from sqlalchemy import case
 from operator import attrgetter
 
-import base
-from . import routes_api
+from . import routes_api, postcompute
 from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session
-from base.models import Counter, Commodity, Country, Currency, PriceScenario
+from base.models import Counter, Country, Currency, PriceScenario
 from base.utils import to_datetime, to_list, intersect, df_to_json
-import postcompute
-from routes.commodity import get_subquery as get_commodity_subquery
+from .commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route("/v0/counter", strict_slashes=False)

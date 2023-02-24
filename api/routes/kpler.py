@@ -16,7 +16,7 @@ from sqlalchemy import case
 
 import base
 from . import routes_api
-from routes.template import TemplateResource
+from .template import TemplateResource
 from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session

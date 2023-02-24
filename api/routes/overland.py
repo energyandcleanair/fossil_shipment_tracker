@@ -22,7 +22,7 @@ from base.utils import to_list, to_datetime, to_bool
 from base.logger import logger
 from base import PRICING_DEFAULT
 
-from routes import commodity
+from . import commodity
 
 
 @routes_api.route(

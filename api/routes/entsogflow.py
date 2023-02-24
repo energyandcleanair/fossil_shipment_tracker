@@ -21,7 +21,7 @@ from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
 from base.logger import logger
 from base import PRICING_DEFAULT
-from routes.commodity import get_subquery as get_commodity_subquery
+from .commodity import get_subquery as get_commodity_subquery
 
 
 @routes_api.route("/v0/entsogflow", strict_slashes=False)
