@@ -33,12 +33,8 @@ class KplerScraper:
             "liquids": Configuration(
                 Platform.Liquids, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
             ),
-            "lng": Configuration(
-                Platform.LNG, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
-            ),
-            "dry": Configuration(
-                Platform.Dry, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
-            ),
+            "lng": Configuration(Platform.LNG, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")),
+            "dry": Configuration(Platform.Dry, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")),
         }
 
         self.flows_clients = {
@@ -71,6 +67,7 @@ class KplerScraper:
             product=product,
         )
         installations = list(flows.from_installation.unique())
+        installations = [x for x in installations if x != "unknown"]
         return installations
 
     def get_flows_raw(self, params, platform):
@@ -95,13 +92,9 @@ class KplerScraper:
         date_from=dt.datetime.now() - dt.timedelta(days=365),
         date_to=dt.datetime.now(),
     ):
-        origin_country = (
-            unidecode(self.cc.convert(origin_iso2, to="name")) if origin_iso2 else None
-        )
+        origin_country = unidecode(self.cc.convert(origin_iso2, to="name")) if origin_iso2 else None
         destination_country = (
-            unidecode(self.cc.convert(destination_iso2, to="name"))
-            if destination_iso2
-            else None
+            unidecode(self.cc.convert(destination_iso2, to="name")) if destination_iso2 else None
         )
 
         params = {
@@ -128,9 +121,7 @@ class KplerScraper:
         # This should work from Postgres 15 onwards
         df["origin_iso2"] = origin_iso2 if origin_iso2 else KPLER_TOTAL
         df["destination_iso2"] = destination_iso2 if destination_iso2 else KPLER_TOTAL
-        df["from_installation"] = (
-            from_installation if from_installation else KPLER_TOTAL
-        )
+        df["from_installation"] = from_installation if from_installation else KPLER_TOTAL
         df["to_installation"] = to_installation if to_installation else KPLER_TOTAL
         df["product"] = product if product else KPLER_TOTAL
         df["unit"] = unit.value
@@ -233,11 +224,7 @@ def update_flows(
 
     _platforms = scraper.platforms if platforms is None else platforms
     for platform in _platforms:
-        _products = (
-            scraper.get_products(platform=platform).name
-            if products is None
-            else products
-        )
+        _products = scraper.get_products(platform=platform).name if products is None else products
         for origin_iso2 in tqdm(origin_iso2s):
             print(origin_iso2)
             for product in _products:
