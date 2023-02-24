@@ -1,37 +1,12 @@
-import base
 from base.db import session, check_if_table_exists
 from base.models import STSLocation, ShipmentArrivalLocationSTS, ShipmentDepartureLocationSTS, ShipmentWithSTS
 from engine.sts import fill, generate_geojson, detect_sts_departure_location, detect_sts_arrival_location
-from engine import shipment, arrival, sts, position, departure, company
+from engine import shipment, arrival, sts
 from engine.marinetraffic import Marinetraffic
 from engine.mtevents import back_fill_ship_position
 import datetime as dt
-import callbased
 
 
-def test_company():
-    company.update()
-
-def test_callbased():
-    callbased.update_arrivals(
-        date_from='2021-01-01',
-        ship_imo='9179945',
-        commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.OIL_OR_CHEMICAL]
-    )
-
-def test_departure():
-    departure.add()
-def test_get_missing():
-    #for country in ['HK', 'TR', 'CN', 'SG', 'IN', 'EG', 'AE', 'MY']:
-    for country in ['HK']:
-        position.get_missing_berths(export_file="missing_berhs_"+country+".kml",
-                                    date_from='2021-01-01',
-                                    sample=None,
-                                    exclude_positions_in_berth=True,
-                                    exclude_shipments_in_berth=True,
-                                    arrival_iso2=country,
-                                    cluster_m=300,
-                                    commodity=[base.CRUDE_OIL, base.OIL_OR_CHEMICAL, base.OIL_PRODUCTS])
 def test_find_multistage_sts():
     sts.check_multi_stage_sts()
 
