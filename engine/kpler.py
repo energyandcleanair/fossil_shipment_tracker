@@ -258,7 +258,7 @@ def update_flows(
                         from_installation=installation,
                         split=FlowsSplit.DestinationCountries,
                     )
-                    if df:
+                    if df is not None:
                         try:
                             df.to_sql(
                                 DB_TABLE_KPLER_FLOW,
