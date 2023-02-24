@@ -221,13 +221,9 @@ class PipelineFlowResource(Resource):
         if aggregate_by and "" in aggregate_by:
             aggregate_by.remove("")
 
-        value_eur_field = (PipelineFlow.value_tonne * Price.eur_per_tonne).label(
-            "value_eur"
-        )
+        value_eur_field = (PipelineFlow.value_tonne * Price.eur_per_tonne).label("value_eur")
 
-        value_currency_field = (value_eur_field * Currency.per_eur).label(
-            "value_currency"
-        )
+        value_currency_field = (value_eur_field * Currency.per_eur).label("value_currency")
 
         commodity_subquery = get_commodity_subquery(
             session=session, grouping_name=commodity_grouping
@@ -246,9 +242,7 @@ class PipelineFlowResource(Resource):
         #      ],
         #     else_=DepartureCountry.iso2
         # ).label('commodity_origin_iso2')
-        commodity_origin_iso2_field = DepartureCountry.iso2.label(
-            "commodity_origin_iso2"
-        )
+        commodity_origin_iso2_field = DepartureCountry.iso2.label("commodity_origin_iso2")
 
         commodity_destination_iso2_field = DestinationCountry.iso2.label(
             "commodity_destination_iso2"
@@ -267,9 +261,7 @@ class PipelineFlowResource(Resource):
                 CommodityOriginCountry.region.label("commodity_origin_region"),
                 commodity_destination_iso2_field,
                 CommodityDestinationCountry.name.label("commodity_destination_country"),
-                CommodityDestinationCountry.region.label(
-                    "commodity_destination_region"
-                ),
+                CommodityDestinationCountry.region.label("commodity_destination_region"),
                 PipelineFlow.date,
                 PipelineFlow.departure_iso2,
                 DepartureCountry.name.label("departure_country"),
@@ -285,9 +277,7 @@ class PipelineFlowResource(Resource):
                 Price.scenario.label("pricing_scenario"),
                 PriceScenario.name.label("pricing_scenario_name"),
             )
-            .join(
-                DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2
-            )
+            .join(DepartureCountry, DepartureCountry.iso2 == PipelineFlow.departure_iso2)
             .outerjoin(
                 DestinationCountry,
                 PipelineFlow.destination_iso2 == DestinationCountry.iso2,
@@ -300,17 +290,14 @@ class PipelineFlowResource(Resource):
                 CommodityDestinationCountry,
                 CommodityDestinationCountry.iso2 == commodity_destination_iso2_field,
             )
-            .outerjoin(
-                commodity_subquery, PipelineFlow.commodity == commodity_subquery.c.id
-            )
+            .outerjoin(commodity_subquery, PipelineFlow.commodity == commodity_subquery.c.id)
             .outerjoin(
                 Price,
                 sa.and_(
                     Price.date == PipelineFlow.date,
                     Price.commodity == commodity_subquery.c.pricing_commodity,
                     sa.or_(
-                        commodity_destination_iso2_field
-                        == any_(Price.destination_iso2s),
+                        commodity_destination_iso2_field == any_(Price.destination_iso2s),
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                     Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
@@ -342,9 +329,7 @@ class PipelineFlowResource(Resource):
             flows_rich = flows_rich.filter(PipelineFlow.id.in_(to_list(id)))
 
         if commodity is not None:
-            flows_rich = flows_rich.filter(
-                PipelineFlow.commodity.in_(to_list(commodity))
-            )
+            flows_rich = flows_rich.filter(PipelineFlow.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
             flows_rich = flows_rich.filter(PipelineFlow.date >= to_datetime(date_from))
@@ -358,9 +343,7 @@ class PipelineFlowResource(Resource):
             )
 
         if departure_iso2 is not None:
-            flows_rich = flows_rich.filter(
-                PipelineFlow.departure_iso2.in_(to_list(departure_iso2))
-            )
+            flows_rich = flows_rich.filter(PipelineFlow.departure_iso2.in_(to_list(departure_iso2)))
 
         if destination_iso2 is not None:
             flows_rich = flows_rich.filter(
@@ -376,9 +359,7 @@ class PipelineFlowResource(Resource):
             flows_rich = flows_rich.filter(Currency.currency.in_(to_list(currency)))
 
         if pricing_scenario is not None:
-            flows_rich = flows_rich.filter(
-                Price.scenario.in_(to_list(pricing_scenario))
-            )
+            flows_rich = flows_rich.filter(Price.scenario.in_(to_list(pricing_scenario)))
 
         if not keep_zeros:
             flows_rich = flows_rich.filter(
@@ -387,9 +368,7 @@ class PipelineFlowResource(Resource):
                         PipelineFlow.value_tonne != sa.null(),
                         PipelineFlow.value_tonne != 0,
                     ),
-                    sa.and_(
-                        PipelineFlow.value_m3 != sa.null(), PipelineFlow.value_m3 != 0
-                    ),
+                    sa.and_(PipelineFlow.value_m3 != sa.null(), PipelineFlow.value_m3 != 0),
                 )
             )
 
@@ -516,22 +495,19 @@ class PipelineFlowResource(Resource):
             max_date = result[date_column].max()  # change your date here
             daterange = pd.date_range(min_date, max_date).rename(date_column)
 
-            result[date_column] = result[date_column].dt.floor(
-                "D"
-            )  # Should have been done already
+            result[date_column] = result[date_column].dt.floor("D")  # Should have been done already
             result = (
                 result.groupby(
                     [
                         x
                         for x in result.columns
-                        if x not in [date_column, "ship_dwt"]
-                        and not x.startswith("value_")
+                        if x not in [date_column, "ship_dwt"] and not x.startswith("value_")
                     ]
                 )
                 .apply(
                     lambda x: x.set_index(date_column)
                     .resample("D")
-                    .sum(numeric_only=True)
+                    .sum()
                     .reindex(daterange)
                     .fillna(0)
                     .rolling(rolling_days, min_periods=rolling_days)
@@ -548,9 +524,7 @@ class PipelineFlowResource(Resource):
 
         result["currency"] = "value_" + result.currency.str.lower()
         index_cols = [
-            x
-            for x in result.columns
-            if x not in ["currency", "value_currency", "value_eur"]
+            x for x in result.columns if x not in ["currency", "value_currency", "value_eur"]
         ]
 
         result = (
@@ -574,9 +548,7 @@ class PipelineFlowResource(Resource):
             return Response(
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
-                headers={
-                    "Content-disposition": "attachment; filename=pipelineflows.csv"
-                },
+                headers={"Content-disposition": "attachment; filename=pipelineflows.csv"},
             )
 
         if format == "json":
@@ -585,13 +557,9 @@ class PipelineFlowResource(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         return Response(
             response="Unknown format. Should be either csv or json",
