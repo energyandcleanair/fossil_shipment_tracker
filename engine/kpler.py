@@ -233,6 +233,7 @@ def update_flows(
     origin_iso2s=["RU"],
     split_from_installation=True,
     add_total_installation=True,
+    ignore_if_copy_failed=False,
 ):
     scraper = KplerScraper()
 
@@ -272,5 +273,8 @@ def update_flows(
                                 index=False,
                             )
                         except sa.exc.IntegrityError:
-                            logger.info("Cannot copy. Upserting instead")
-                            upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
+                            if ignore_if_copy_failed:
+                                logger.info("Some rows already exist. Skipping")
+                            else:
+                                logger.info("Some rows already exist. Upserting instead")
+                                upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
