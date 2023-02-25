@@ -70,9 +70,7 @@ class ChartDepartureOwnership(Resource):
         default=30,
     )
 
-    parser.add_argument(
-        "language", type=str, help="en or ua", default="en", required=False
-    )
+    parser.add_argument("language", type=str, help="en or ua", default="en", required=False)
 
     parser.add_argument("group_eug7_insurernorwary", type=inputs.boolean, default=True)
 
@@ -143,11 +141,9 @@ class ChartDepartureOwnership(Resource):
 
         response = VoyageResource().get_from_params(params)
         data = pd.DataFrame(response.json["data"])
-        data["departure_date"] = pd.to_datetime(data.departure_date)
+        data["departure_date"] = pd.to_datetime(data.departure_date).dt.date
 
-        def recode_eug7(
-            ship_owner_region, ship_owner_iso2, ship_insurer_region, ship_insurer_iso2
-        ):
+        def recode_eug7(ship_owner_region, ship_owner_iso2, ship_insurer_region, ship_insurer_iso2):
             g7 = ["CA", "FR", "DE", "IT", "JP", "GB", "US"]
             res = np.where(
                 (ship_owner_region == "EU")
@@ -188,9 +184,7 @@ class ChartDepartureOwnership(Resource):
             data.replace({base.UNKNOWN: "Unknown"}, inplace=True)
 
         group_by_cols = ["region", "departure_date", "commodity_group_name"] + [
-            x
-            for x in aggregate_by
-            if x not in default_aggregate_by and x in data.columns
+            x for x in aggregate_by if x not in default_aggregate_by and x in data.columns
         ]
         pivot_cols = ["region"]
         index_cols = [x for x in group_by_cols if x not in pivot_cols]
@@ -210,9 +204,7 @@ class ChartDepartureOwnership(Resource):
 
         result = translate(data=result, language=language)
 
-        return self.build_response(
-            result=result, format=format, nest_in_data=nest_in_data
-        )
+        return self.build_response(result=result, format=format, nest_in_data=nest_in_data)
 
     def build_response(self, result, format, nest_in_data):
         result.replace({np.nan: None}, inplace=True)
@@ -222,9 +214,7 @@ class ChartDepartureOwnership(Resource):
             return Response(
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
-                headers={
-                    "Content-disposition": "attachment; filename=departure_by_ownership.csv"
-                },
+                headers={"Content-disposition": "attachment; filename=departure_by_ownership.csv"},
             )
 
         if format == "json":
@@ -233,13 +223,9 @@ class ChartDepartureOwnership(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         return Response(
             response="Unknown format. Should be either csv or json",
