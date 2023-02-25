@@ -82,6 +82,11 @@ class KplerScraper:
         except exceptions.HttpError as e:
             logger.error(f"Kpler API error: {e}")
             return None
+
+        if "Date" not in df.columns:
+            logger.error(f"No date in Kpler data: {params} {df}")
+            return None
+
         return df
 
     def get_flows(
