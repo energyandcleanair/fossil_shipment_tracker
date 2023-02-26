@@ -8,7 +8,7 @@ import datetime as dt
 
 
 def test_find_multistage_sts():
-    sts.check_multi_stage_sts()
+    sts.check_multi_stage_sts(ship_imo='9357638')
 
 def test_find_portcall():
     sts.fill_portcalls_around_sts()
