@@ -179,7 +179,9 @@ def get_and_process_ship_events_between_dates(
         date_bounds = [(date_from, date_to)]
 
     if force_rebuild and between_existing_only and not between_shipments_only:
-        cached_events = Event.query
+        cached_events = session.query(
+            Event
+        ).order_by(Event.date_utc)
 
         if date_from:
             cached_events = cached_events.filter(Event.date_utc > date_from)
