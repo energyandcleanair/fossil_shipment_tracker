@@ -260,6 +260,8 @@ class ChartProductOnWater(Resource):
             )
             return result
 
+        result["date"] = pd.to_datetime(result["date"]).dt.date
+
         result = pivot_data(result, variable=pivot_value)
 
         result = translate(data=result, language=language)
