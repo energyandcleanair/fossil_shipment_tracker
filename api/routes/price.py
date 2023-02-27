@@ -173,7 +173,6 @@ class PortPriceResource(Resource):
 
         unnested_query = (
             session.query(
-                Price.date,
                 Price.commodity,
                 Price.date,
                 Price.scenario,
@@ -208,6 +207,7 @@ class PortPriceResource(Resource):
         price_df = pd.read_sql(query.statement, session.bind)
         price_df.replace({np.nan: None}, inplace=True)
         price_df.sort_values(["date"], inplace=True)
+        price_df["date"] = pd.to_datetime(price_df["date"]).dt.date
 
         if format == "csv":
             return Response(
