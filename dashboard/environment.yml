@@ -1,0 +1,19 @@
+name: russia-dashboard
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8
+  - numpy
+  - matplotlib
+  - plotly
+  - dash[diskcache]
+  - dash-core-components
+  - dash-html-components
+  - dash-bootstrap-components
+  - dash-renderer
+  - pandas
+  - requests
+  - diskcache
+  - pip
+  - pip:
+      - "dash[diskcache]"
