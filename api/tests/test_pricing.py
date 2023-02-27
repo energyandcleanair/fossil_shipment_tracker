@@ -9,14 +9,15 @@ import json
 import sqlalchemy as sa
 from base.models import Position, ShipmentArrivalBerth, Price
 from base.db import session
-from base import PRICING_DEFAULT, PRICING_PRICECAP
+from base import PRICING_DEFAULT
+
+
+PRICING_PRICECAP = "usd40"
 
 
 def test_voyage_pricing(app):
-
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
-
         date_from = "2022-10-01"
         commodities = [base.CRUDE_OIL]
 
@@ -99,7 +100,6 @@ def test_voyage_pricing(app):
         idx_already_compared = []
 
         for match in matches:
-
             price_obtained = data.copy()[
                 [
                     "data_index",
@@ -113,13 +113,9 @@ def test_voyage_pricing(app):
                     "eur_per_tonne",
                 ]
             ]
-            price_obtained = price_obtained[
-                ~price_obtained.data_index.isin(idx_already_compared)
-            ]
+            price_obtained = price_obtained[~price_obtained.data_index.isin(idx_already_compared)]
             match += ["commodity", "date"]
-            price_obtained[
-                "departure_port_id"
-            ] = price_obtained.departure_port_id.astype("Int64")
+            price_obtained["departure_port_id"] = price_obtained.departure_port_id.astype("Int64")
 
             price_comparison = price_obtained.merge(
                 price_given, on=match, suffixes=["_obtained", "_given"], how="inner"
@@ -148,7 +144,6 @@ def test_voyage_pricing(app):
 
 
 def test_price_cap(app):
-
     with app.test_client() as test_client:
         date_from = "2022-12-01"
         commodities = [base.CRUDE_OIL]
@@ -175,15 +170,9 @@ def test_price_cap(app):
         data = data[data.departure_date_utc >= "2022-12-01"]
         data = data[data.departure_date_utc <= "2022-12-31"]
         # There is some discrepancy in exchange rate, hence the 1.1
-        data[
-            data.ship_owner_region == "EU"
-        ].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
-        data[
-            data.ship_manager_region == "EU"
-        ].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
-        data[
-            data.ship_insurer_region == "EU"
-        ].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
+        data[data.ship_owner_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
+        data[data.ship_manager_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
+        data[data.ship_insurer_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
 
         data = data[data.arrival_date_utc >= "2022-12-01"]
         # Check that those not covered aren't affected
@@ -240,12 +229,8 @@ def test_price_cap(app):
         )
 
         price_obtained = data
-        price_obtained["date"] = pd.to_datetime(
-            price_obtained.departure_date_utc
-        ).dt.date
-        price_obtained["eur_per_tonne"] = (
-            price_obtained.value_eur / price_obtained.value_tonne
-        )
+        price_obtained["date"] = pd.to_datetime(price_obtained.departure_date_utc).dt.date
+        price_obtained["eur_per_tonne"] = price_obtained.value_eur / price_obtained.value_tonne
         price_obtained = price_obtained[
             [
                 "ship_owner_iso2",
@@ -277,21 +262,14 @@ def test_price_cap(app):
         data = response.json["data"]
         assert len(data) > 0
         both_df = pd.DataFrame(data)
-        assert (
-            default_sum
-            == both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum()
-        )
-        assert (
-            capped_sum
-            == both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
-        )
+        assert default_sum == both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum()
+        assert capped_sum == both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
 
 
 def test_coal_pricing(app):
     # Trying to figure out why numbers are different
 
     with app.test_client() as test_client:
-
         # Default and cap pricing should be similar before 2022-07-01
         params = {
             "format": "json",
@@ -309,13 +287,6 @@ def test_coal_pricing(app):
         data = response.json["data"]
         assert len(data) > 0
         both_df = pd.DataFrame(data)
-        default_sum = both_df[
-            both_df.pricing_scenario == PRICING_DEFAULT
-        ].value_eur.sum()
-        capped_sum = both_df[
-            both_df.pricing_scenario == PRICING_PRICECAP
-        ].value_eur.sum()
+        default_sum = both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum()
+        capped_sum = both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
         assert default_sum == capped_sum
-
-        both_df.columns
-        a = both_df.sort_values("departure_date_utc")

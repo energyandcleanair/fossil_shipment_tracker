@@ -1,17 +1,6 @@
 import requests
 import urllib
-import geopandas as gpd
-import io
 import pandas as pd
-import base
-import json
-import numpy as np
-import datetime as dt
-
-from base.models import Position, ShipmentArrivalBerth
-from base.db import session
-from base.utils import to_datetime
-from base import PRICING_DEFAULT, PRICING_PRICECAP
 
 
 def test_kpler(app):

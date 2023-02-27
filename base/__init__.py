@@ -93,7 +93,6 @@ IMO_BASE_URL = "https://gisis.imo.org/public/ships/default.aspx"
 
 # PRICING SCENARIO
 PRICING_DEFAULT = "default"
-PRICING_PRICECAP = "pricecap"
 
 # INSURER
 UNKNOWN_INSURER = "unknown"

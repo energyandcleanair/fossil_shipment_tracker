@@ -35,6 +35,20 @@ def test_get_flow():
     assert flows_kozmino.origin_iso2.unique() == ["RU"]
 
 
+def test_get_flow_brute():
+    scraper = KplerScraper()
+    flows = scraper.get_flows(
+        platform="liquids",
+        origin_iso2="RU",
+        destination_iso2="DE",
+        date_from="2022-03-01",
+        date_to="2022-03-31",
+        split=FlowsSplit.Products,
+        use_brute_force=True,
+    )
+    assert len(flows) > 0
+
+
 def test_get_installations():
     scraper = KplerScraper()
     # products = scraper.get_products()
@@ -42,8 +56,6 @@ def test_get_installations():
     platforms = scraper.platforms
     for iso2 in iso2s:
         for platform in platforms:
-            installations = scraper.get_installations(
-                origin_iso2=iso2, platform=platform
-            )
+            installations = scraper.get_installations(origin_iso2=iso2, platform=platform)
             assert installations is not None
             assert len(installations) > 0

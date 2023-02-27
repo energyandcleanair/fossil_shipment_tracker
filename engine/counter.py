@@ -8,7 +8,7 @@ from base.models import Counter, Port, Country, Berth, Commodity
 from base.models import DB_TABLE_COUNTER
 from base.utils import to_datetime
 from base.logger import logger_slack
-from base import PRICING_DEFAULT, PRICING_PRICECAP
+from base import PRICING_DEFAULT
 from base.db_utils import upsert
 
 try:
@@ -46,9 +46,7 @@ def update(date_from="2021-01-01"):
         "pricing_scenario": None,
         "bypass_maintenance": True,
     }
-    pipelineflows_resp = PipelineFlowResource().get_from_params(
-        params=params_pipelineflows
-    )
+    pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
     pipelineflows = json.loads(pipelineflows_resp.response[0])
     pipelineflows = pd.DataFrame(pipelineflows)
 
@@ -102,9 +100,7 @@ def update(date_from="2021-01-01"):
             "pricing_scenario",
         ]
     ]
-    result["date"] = pd.to_datetime(result["date"]).dt.floor(
-        "D"
-    )  # Should have been done already
+    result["date"] = pd.to_datetime(result["date"]).dt.floor("D")  # Should have been done already
     result = (
         result.groupby(
             [
@@ -150,12 +146,8 @@ def update(date_from="2021-01-01"):
             % (global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9)
         )
 
-        result.drop(
-            ["commodity_destination_region", "commodity_group"], axis=1, inplace=True
-        )
-        result.rename(
-            columns={"commodity_destination_iso2": "destination_iso2"}, inplace=True
-        )
+        result.drop(["commodity_destination_region", "commodity_group"], axis=1, inplace=True)
+        result.rename(columns={"commodity_destination_iso2": "destination_iso2"}, inplace=True)
 
         if True:
             # Erase and replace everything
@@ -166,7 +158,7 @@ def update(date_from="2021-01-01"):
         else:
             # For manual purposes
             upsert(
-                df=result[result.pricing_scenario == PRICING_PRICECAP],
+                df=result[result.pricing_scenario == PRICING_DEFAULT],
                 table=DB_TABLE_COUNTER,
                 constraint_name="unique_counter",
             )
@@ -287,12 +279,8 @@ def sanity_check(result):
     global_old = comparison.old_eur.sum()
     global_new = comparison.new_eur.sum()
 
-    eu_old = comparison.loc[
-        comparison.commodity_destination_region == "EU"
-    ].old_eur.sum()
-    eu_new = comparison.loc[
-        comparison.commodity_destination_region == "EU"
-    ].new_eur.sum()
+    eu_old = comparison.loc[comparison.commodity_destination_region == "EU"].old_eur.sum()
+    eu_new = comparison.loc[comparison.commodity_destination_region == "EU"].new_eur.sum()
 
     return ok, global_new, global_old, eu_new, eu_old
 
@@ -341,9 +329,7 @@ def resume_pipeline_oil_eu(
         & (result.commodity == "pipeline_oil")
         & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
         ["value_eur", "value_tonne"],
-    ] *= min(
-        1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days)
-    )
+    ] *= min(1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days))
 
     return result
 
@@ -367,9 +353,7 @@ def resume_eu_shipments(
         & (result.commodity.isin(["lng", "crude_oil", "oil_products"]))
         & (pd.to_datetime(result.date) >= pd.to_datetime(date_break)),
         ["value_eur", "value_tonne"],
-    ] *= min(
-        1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days)
-    )
+    ] *= min(1, max(0, (dt.date.today() - date_start_resuming).seconds / 3600 / 24 / n_days))
 
     return result
 
@@ -399,16 +383,10 @@ def add_estimates(result):
 
     # TODO Get previous estimate
     result_estimated = (
-        result.groupby(["commodity", "destination_region"])
-        .apply(resample_and_fill)
-        .reset_index()
+        result.groupby(["commodity", "destination_region"]).apply(resample_and_fill).reset_index()
     )
 
-    m = pd.merge(
-        result[["commodity", "date"]], result_estimated, how="outer", indicator=True
-    )
+    m = pd.merge(result[["commodity", "date"]], result_estimated, how="outer", indicator=True)
     result_to_upload = m[m["_merge"] == "right_only"].drop("_merge", axis=1)
     result_to_upload["type"] = base.COUNTER_ESTIMATED
-    result_to_upload.to_sql(
-        DB_TABLE_COUNTER, con=engine, if_exists="append", index=False
-    )
+    result_to_upload.to_sql(DB_TABLE_COUNTER, con=engine, if_exists="append", index=False)
