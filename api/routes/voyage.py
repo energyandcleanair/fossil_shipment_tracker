@@ -50,7 +50,7 @@ from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime, to_bool
 from base.logger import logger
 from base import PRICING_DEFAULT
-from base.utils import update_geometry_from_wkb
+from base.utils import update_geometry_from_wkb, read_json
 from base.env import get_env
 import base
 from .commodity import get_subquery as get_commodity_subquery
@@ -411,6 +411,13 @@ class VoyageResource(Resource):
         action="split",
         default=None,
     )
+    parser.add_argument(
+        "select_set",
+        type=str,
+        help="Pre-determined set of columns to return. Default: all columns. Other options are: light",
+        required=False,
+        default=None,
+    )
 
     @routes_api.expect(parser)
     def get(self):
@@ -484,7 +491,6 @@ class VoyageResource(Resource):
         limit_by = params.get("limit_by")
         pivot_by = params.get("pivot_by")
         pivot_value = params.get("pivot_value")
-        select = params.get("select")
 
         # Add the default date_from if none has been specified
         date_filters = [
@@ -1342,7 +1348,7 @@ class VoyageResource(Resource):
         result = self.pivot_result(result=result, pivot_by=pivot_by, pivot_value=pivot_value)
 
         # Select, rename
-        result = self.select(result, select=select)
+        result = self.select(result, params=params)
 
         response = self.build_response(
             result=result,
@@ -1702,22 +1708,34 @@ class VoyageResource(Resource):
 
         return result
 
-    def select(self, result, select):
-        if not select:
+    def select(self, result, params):
+        select = params.get("select")
+        select_set = params.get("select_set")
+
+        if not select and not select_set:
             return result
 
         names = []
         variables = []
 
-        for s in to_list(select):
-            m = re.match("(.*)\\((.*)\\)", s)
-            if m:
-                names.append(m[1])
-                variables.append(m[2])
-            else:
-                # No asc(.*) or desc(.*)
-                names.append(s)
-                variables.append(s)
+        if select:
+            for s in to_list(select):
+                m = re.match("(.*)\\((.*)\\)", s)
+                if m and m[2] in result.columns:
+                    names.append(m[1])
+                    variables.append(m[2])
+                elif s in result.columns:
+                    # No asc(.*) or desc(.*)
+                    names.append(s)
+                    variables.append(s)
+
+        if select_set:
+            # read assets/presets/voyages.json
+            presets = read_json("assets/presets/voyages.json")
+            columns = presets.get("select_set", {}).get(select_set, [])
+            columns = [x for x in columns if x not in variables and x in result.columns]
+            variables += columns
+            names += columns
 
         result = result[variables]
         result.columns = names
