@@ -12,6 +12,7 @@ from dash.exceptions import PreventUpdate
 
 from server import app, background_callback_manager, cache
 from counter import layout as counter_layout
+from voyages import layout as voyages_layout
 
 SIDEBAR_STYLE = {
     "position": "fixed",
@@ -42,14 +43,14 @@ LAYOUT_STYLE = {
 
 sidebar = html.Div(
     [
-        html.H2("Sidebar", className="display-4"),
+        html.H2("Russia Fossil Tracker", className="display-4"),
         html.Hr(),
-        html.P("A simple sidebar layout with navigation links", className="lead"),
+        # html.P("A simple sidebar layout with navigation links", className="lead"),
         dbc.Nav(
             [
-                dbc.NavLink("Home", href="/", active="exact"),
-                dbc.NavLink("Page 1", href="/page-1", active="exact"),
-                dbc.NavLink("Page 2", href="/page-2", active="exact"),
+                dbc.NavLink("Counter", href="/", active="exact"),
+                dbc.NavLink("Shipments", href="/shipments", active="exact"),
+                # dbc.NavLink("Page 2", href="/page-2", active="exact"),
             ],
             vertical=True,
             pills=True,
@@ -63,6 +64,7 @@ shared = [
     dcc.Interval(id="interval-component", interval=5000, n_intervals=0),  # in milliseconds
     dcc.Store(id="counter"),
     dcc.Store(id="counter-rolled"),
+    dcc.Store(id="voyages"),
     html.Div(id="dummy_div"),
 ]
 app.layout = dbc.Container(
@@ -75,12 +77,10 @@ app.layout = dbc.Container(
 
 @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
 def render_page_content(pathname):
-    if pathname == "/":
+    if pathname == "/" or pathname == "/counter":
         return counter_layout
-    elif pathname == "/page-1":
-        return html.P("This is the content of page 1. Yay!")
-    elif pathname == "/page-2":
-        return html.P("Oh cool, this is page 2!")
+    elif pathname == "/shipments":
+        return voyages_layout
     # If the user tries to reach a different page, return a 404 message
     return html.Div(
         [
@@ -96,27 +96,46 @@ def render_page_content(pathname):
 @dash.callback(
     output=Output("counter", "data"),
     inputs=[Input("interval-component", "n_intervals")],
-    # running=[
-    #     (Output("area-chart", "disabled"), True, False),
-    # ],
     background=True,
     manager=background_callback_manager,
 )
-def load_data(n):
+def load_counter(n):
     if n == 0:
-        cached_data = cache.get("data")
+        cached_data = cache.get("counter")
         if cached_data is not None:
             return cached_data
 
         print("=== loading data ===")
         storage_options = {"User-Agent": "Mozilla/5.0"}
         url = "https://api.russiafossiltracker.com/v0/counter?date_from=2022-01-01&format=csv"
-        df = pd.read_csv("counter.csv")
+        counter = pd.read_csv("counter.csv")
         # df = pd.read_csv(url, storage_options=storage_options)
         # df.to_csv('counter.csv')
         print("=== loading data done ===")
-        data = df.to_json(date_format="iso", orient="split")
-        cache.set("data", data)
+        data = counter.to_json(date_format="iso", orient="split")
+        cache.set("counter", data)
+        return data
+    else:
+        raise PreventUpdate
+
+
+@dash.callback(
+    output=Output("voyages", "data"),
+    inputs=[Input("interval-component", "n_intervals")],
+    background=True,
+    manager=background_callback_manager,
+)
+def load_voyages(n):
+    if n == 0:
+        cached_data = cache.get("voyages")
+        if cached_data is not None:
+            return cached_data
+
+        print("=== loading voyages ===")
+        storage_options = {"User-Agent": "Mozilla/5.0"}
+        voyages = pd.read_csv("voyages.csv")
+        data = voyages.to_json(date_format="iso", orient="split")
+        cache.set("voyages", data)
         return data
     else:
         raise PreventUpdate
