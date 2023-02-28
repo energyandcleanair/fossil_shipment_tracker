@@ -26,7 +26,6 @@ from .commodity import get_subquery as get_commodity_subquery
 
 @routes_api.route("/v0/entsogflow", strict_slashes=False)
 class EntsogFlowResource(Resource):
-
     parser = reqparse.RequestParser()
 
     # Query content
@@ -354,6 +353,9 @@ class EntsogFlowResource(Resource):
         # Spread currencies
         result = self.spread_currencies(result=result)
 
+        if "date" in result.columns:
+            result["date"] = pd.to_datetime(result["date"]).dt.date
+
         response = self.build_response(
             result=result,
             format=format,
@@ -445,7 +447,6 @@ class EntsogFlowResource(Resource):
         return query
 
     def roll_average(self, result, aggregate_by, rolling_days):
-
         if rolling_days is not None:
             date_col = "date"
             date_cols = ["date", "month", "year"]
@@ -494,7 +495,6 @@ class EntsogFlowResource(Resource):
         return result
 
     def build_response(self, result, format, nest_in_data, aggregate_by, download):
-
         result.replace({np.nan: None}, inplace=True)
 
         # If bulk and departure berth is coal, replace commodity with coal
