@@ -1,6 +1,7 @@
 import datetime as dt
 import time
 import requests
+import json
 
 import country_converter as coco
 from base.env import get_env
@@ -57,6 +58,10 @@ class KplerScraper:
 
         self.cc = coco.CountryConverter()
 
+        # Brute-force infos
+        self.products_brute = {}
+        self.zones_brute = {}
+
     def get_installations(self, origin_iso2, platform, product=None):
         # We collect flows split by installation
         # and get unique values
@@ -72,7 +77,6 @@ class KplerScraper:
         return installations
 
     def get_flows_raw(self, params, platform):
-
         try:
             try:
                 df = self.flows_clients[platform].get(**params)
@@ -89,6 +93,140 @@ class KplerScraper:
 
         return df
 
+    def get_zones_brute(self, platform):
+        if self.zones_brute.get(platform) is not None:
+            return self.zones_brute[platform]
+
+        # token = get_env("KPLER_TOKEN_BRUTE")
+        # url = {
+        #     "dry": "https://dry.kpler.com/api/zones",
+        #     "liquids": "https://terminal.kpler.com/api/zones",
+        # }.get(platform)
+        # headers = {"Authorization": f"Bearer {token}"}
+        # r = requests.get(url, headers=headers)
+        # data = pd.DataFrame(r.json())
+        # data.to_csv(f"assets/kpler/{platform}_zones.csv", index=False)
+        data = pd.read_csv(f"assets/kpler/{platform}_zones.csv")
+        self.zones_brute[platform] = data
+        return data
+
+    def get_products_brute(self, platform):
+        if self.products_brute.get(platform) is not None:
+            return self.products_brute[platform]
+
+        # token = get_env("KPLER_TOKEN_BRUTE")
+        # url = {
+        #     "dry": "https://dry.kpler.com/api/products",
+        #     "liquids": "https://terminal.kpler.com/api/products",
+        # }.get(platform)
+        # headers = {"Authorization": f"Basic {token}"}
+        # r = requests.get(url, headers=headers)
+        # data = pd.DataFrame(r.json())
+        # data.to_csv(f"assets/kpler/{platform}_products.csv", index=False)
+        data = pd.read_csv(f"assets/kpler/{platform}_products.csv")
+        self.products_brute[platform] = data
+        return data
+
+    def get_flows_raw_brute(
+        self,
+        origin_iso2,
+        destination_iso2,
+        from_installation,
+        to_installation,
+        product,
+        date_from,
+        date_to,
+        split,
+        platform,
+    ):
+        """
+        This one uses the token from the web interface,
+        and another payload, that allows us to go back further than 1 year
+        :param params:
+        :param platform:
+        :return:
+        """
+        products = self.get_products_brute(platform=platform)
+        zones = self.get_zones_brute(platform=platform)
+
+        # Get zone dict
+        def get_zone_dict(iso2, installation):
+            if installation is None:
+                name = self.cc.convert(iso2, to="name_short")
+                if iso2 == "RU":
+                    name = "Russian Federation"
+                type = "country"
+            else:
+                name = from_installation
+                type = "port"
+
+            id = zones[(zones["name"] == name) & (zones["type"] == type)]["id"].values[0]
+            return {"id": int(id), "resourceType": "zone"}
+
+        params_raw = {
+            "cumulative": False,
+            # "filters": {"product": [1334]},
+            "flowDirection": "export",
+            # "fromLocations": [{"id": 451, "resourceType": "zone"}],
+            "granularity": "days",
+            "interIntra": "interintra",
+            "onlyRealized": True,
+            "view": "kpler",
+            "withBetaVessels": False,
+            "withForecasted": True,
+            "withGrades": False,
+            "withIncompleteTrades": True,
+            "withIntraCountry": False,
+            "vesselClassifications": [],
+            "withFreightView": False,
+            "withProductEstimation": False,
+            "splitOn": split.name,
+            "startDate": to_datetime(date_from).strftime("%Y-%m-%d"),
+            "endDate": to_datetime(date_to).strftime("%Y-%m-%d"),
+            "numberOfSplits": 1000,
+        }
+
+        if product is not None:
+            params_raw["filters"] = {
+                "product": [products[products["Name"] == product]["id"].values[0]]
+            }
+
+        if from_installation is not None or origin_iso2 is not None:
+            params_raw["fromLocations"] = [get_zone_dict(origin_iso2, from_installation)]
+
+        if to_installation is not None or destination_iso2 is not None:
+            params_raw["toLocations"] = [get_zone_dict(destination_iso2, to_installation)]
+
+        unit = "t"
+        token = get_env("KPLER_TOKEN_BRUTE")
+        url = {
+            "dry": "https://dry.kpler.com/api/flows",
+            "liquids": "https://terminal.kpler.com/api/flows",
+        }.get(platform)
+        headers = {"Authorization": f"Basic {token}"}
+        r = requests.post(url, json=params_raw, headers=headers)
+
+        # read content to dataframe
+        data = r.json()["series"]
+        dfs = []
+        for x in data:
+            df = pd.concat(
+                [pd.DataFrame(y["splitValues"]) for y in x["datasets"]], ignore_index=True
+            )
+            df = pd.concat([df.drop(["values"], axis=1), df["values"].apply(pd.Series)], axis=1)
+            df["date"] = x["date"]
+            df.drop(["id"], axis=1, inplace=True)
+            dfs += [df]
+            # Add total
+            df_total = pd.DataFrame([y["values"] for y in x["datasets"]])
+            df_total["date"] = x["date"]
+            df_total["name"] = KPLER_TOTAL
+            dfs += [df_total]
+
+        df = pd.concat(dfs, ignore_index=True)
+        df["unit"] = unit
+        return df
+
     def get_flows(
         self,
         platform,
@@ -102,6 +240,7 @@ class KplerScraper:
         unit=FlowsMeasurementUnit.T,
         date_from=dt.datetime.now() - dt.timedelta(days=365),
         date_to=dt.datetime.now(),
+        use_brute_force=False,
     ):
         origin_country = unidecode(self.cc.convert(origin_iso2, to="name")) if origin_iso2 else None
         destination_country = (
@@ -126,7 +265,20 @@ class KplerScraper:
 
         # remove None values
         params = {k: v for k, v in params.items() if v is not None}
-        df = self.get_flows_raw(params, platform)
+        if use_brute_force:
+            df = self.get_flows_raw_brute(
+                origin_iso2=origin_iso2,
+                from_installation=from_installation,
+                destination_iso2=destination_iso2,
+                to_installation=to_installation,
+                split=split,
+                product=product,
+                date_from=date_from,
+                date_to=date_to,
+                platform=platform,
+            )
+        else:
+            df = self.get_flows_raw(params, platform)
         if df is None:
             return None
 
