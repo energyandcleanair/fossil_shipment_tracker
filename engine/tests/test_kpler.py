@@ -1,7 +1,7 @@
 import datetime as dt
 from base.models import PortCall
 
-from engine.kpler import KplerScraper, FlowsSplit, FlowsMeasurementUnit
+from engine.kpler_scraper import KplerScraper, FlowsSplit, FlowsMeasurementUnit
 
 
 def test_get_flow():
