@@ -161,6 +161,7 @@ class RussiaCounterLastResource(Resource):
                 Country.name.label("destination_country"),
                 destination_region_field,
                 Counter.date,
+                Counter.updated_on,
                 # func.sum(Counter.value_tonne).label("value_tonne"),
                 # func.sum(Counter.value_eur).label("value_eur"),
                 Counter.value_tonne,
@@ -207,7 +208,6 @@ class RussiaCounterLastResource(Resource):
 
         counter = pd.read_sql(query.statement, session.bind)
         counter_last = self.get_last(counter=counter)
-
         # Add total
         group_by_total = ["pricing_scenario", "pricing_scenario_name"]
         index_total = [x for x in counter_last.index.names if x not in group_by_total]
@@ -216,7 +216,7 @@ class RussiaCounterLastResource(Resource):
         )
         total[index_total] = "total"
         total["date"] = counter_last.date.unique()
-
+        total["updated_on"] = pd.to_datetime(counter.updated_on.max()).date()
         counter_last = pd.concat([counter_last.reset_index(), total])
 
         # counter_last['date'] = dt.datetime.utcnow()
@@ -254,7 +254,8 @@ class RussiaCounterLastResource(Resource):
 
     def get_last(self, counter):
         groupby_cols = list(
-            set(counter.select_dtypes(exclude=np.number).columns.tolist()) - set(["date"])
+            set(counter.select_dtypes(exclude=np.number).columns.tolist())
+            - set(["date", "updated_on"])
         )
         counter_last = (
             counter.sort_values(["date"])
@@ -262,6 +263,7 @@ class RussiaCounterLastResource(Resource):
             .agg(
                 total_tonne=pd.NamedAgg(column="value_tonne", aggfunc=np.sum),
                 total_eur=pd.NamedAgg(column="value_eur", aggfunc=np.sum),
+                updated_on=pd.NamedAgg(column="updated_on", aggfunc=np.max),
                 date=pd.NamedAgg(column="date", aggfunc="last"),
             )
             .reset_index()
@@ -320,6 +322,7 @@ class RussiaCounterLastResource(Resource):
 
         counter_last_merged = counter_last_merged.groupby(groupby_cols).sum(numeric_only=True)
         counter_last_merged["date"] = now
+        counter_last_merged["updated_on"] = max(counter_last.updated_on)
         return counter_last_merged
 
     def aggregate(self, query, aggregate_by):
@@ -334,6 +337,7 @@ class RussiaCounterLastResource(Resource):
         value_cols = [
             func.sum(subquery.c.value_tonne).label("value_tonne"),
             func.sum(subquery.c.value_eur).label("value_eur"),
+            func.max(subquery.c.updated_on).label("updated_on"),
         ]
 
         # Adding must have grouping columns
