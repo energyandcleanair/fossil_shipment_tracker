@@ -41,7 +41,7 @@ class Equasis:
         return next_credentials
 
     def _get_all_credentials(self):
-        emails = ["rutankers+%d@protonmail.com" % (x) for x in range(1, 13)]
+        emails = ["rutankers+%d@protonmail.com" % (x) for x in range(1, 20)]
         password = get_env("EQUASIS_PASSWORD")
         return [{"username": x, "password": password} for x in emails]
 
@@ -66,9 +66,7 @@ class Equasis:
                 formats = ["%d/%m/%Y", "%Y-%m-%d"]
                 for format in formats:
                     try:
-                        result = dt.datetime.strptime(
-                            p.replace("Inception at ", ""), format
-                        )
+                        result = dt.datetime.strptime(p.replace("Inception at ", ""), format)
                         return result.date()
                     except ValueError:
                         continue
@@ -162,9 +160,7 @@ class Equasis:
         if management_div:
             management_raw = self._find_management(management_div)
             try:
-                manager_info = next(
-                    x for x in management_raw if x["role"] == "ISM Manager"
-                )
+                manager_info = next(x for x in management_raw if x["role"] == "ISM Manager")
                 ship_data["manager"] = {
                     "name": manager_info.get("company"),
                     "imo": manager_info.get("imo"),  # IMO of company
@@ -175,9 +171,7 @@ class Equasis:
                 pass
 
             try:
-                owner_info = next(
-                    x for x in management_raw if x["role"] == "Registered owner"
-                )
+                owner_info = next(x for x in management_raw if x["role"] == "Registered owner")
                 ship_data["owner"] = {
                     "name": owner_info.get("company"),
                     "imo": owner_info.get("imo"),  # IMO of company
@@ -236,9 +230,7 @@ class Equasis:
             "h3", text=lambda x: x.startswith("Company") if x else False
         )
         if company_h3:
-            table = company_h3.find_parent(
-                "div", attrs={"class": "container-fluid"}
-            ).find("table")
+            table = company_h3.find_parent("div", attrs={"class": "container-fluid"}).find("table")
             # Extract the column headers from the table
             column_headers = [th.text.strip() for th in table.find_all("th")]
 
@@ -258,9 +250,7 @@ class Equasis:
         if management_div:
             management_raw = self._find_management(management_div)
             try:
-                manager_info = next(
-                    x for x in management_raw if x["role"] == "ISM Manager"
-                )
+                manager_info = next(x for x in management_raw if x["role"] == "ISM Manager")
                 ship_data["manager"] = {
                     "name": manager_info.get("company"),
                     "imo": manager_info.get("imo"),  # IMO of company
@@ -271,9 +261,7 @@ class Equasis:
                 pass
 
             try:
-                owner_info = next(
-                    x for x in management_raw if x["role"] == "Registered owner"
-                )
+                owner_info = next(x for x in management_raw if x["role"] == "Registered owner")
                 ship_data["owner"] = {
                     "name": owner_info.get("company"),
                     "imo": owner_info.get("imo"),  # IMO of company
