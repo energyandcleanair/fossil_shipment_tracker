@@ -289,3 +289,8 @@ def to_bool(v):
         return v
     else:
         return str(v).lower() in ("yes", "true", "t", "1")
+
+
+def read_json(path):
+    with open(path) as f:
+        return json.load(f)
