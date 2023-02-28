@@ -1,4 +1,4 @@
-name: russia-api-conda
+name: russia-api
 channels:
   - conda-forge
 dependencies:
