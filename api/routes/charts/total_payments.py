@@ -18,6 +18,14 @@ class ChartTotalPayments(Resource):
     parser = reqparse.RequestParser()
 
     parser.add_argument(
+        "date_to",
+        type=str,
+        help="start date for counter data (format 2020-01-15)",
+        default=-5,
+        required=False,
+    )
+
+    parser.add_argument(
         "limit",
         type=int,
         help="how many result records do you want (default: keeps all)",
