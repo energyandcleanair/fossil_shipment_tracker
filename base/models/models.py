@@ -171,15 +171,11 @@ class ShipmentArrivalLocationSTS(Base):
     shipment_id = Column(BigInteger, unique=True)
     sts_location_id = Column(
         String,
-        ForeignKey(
-            DB_TABLE_STS_LOCATIONS + ".id", onupdate="CASCADE", ondelete="CASCADE"
-        ),
+        ForeignKey(DB_TABLE_STS_LOCATIONS + ".id", onupdate="CASCADE", ondelete="CASCADE"),
     )
 
     # Optional
-    event_id = Column(
-        BigInteger, ForeignKey(DB_TABLE_EVENT + ".id", onupdate="CASCADE")
-    )
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + ".id", onupdate="CASCADE"))
     method_id = Column(String)
 
     __tablename__ = DB_TABLE_STSARRIVALLOCATION
@@ -199,15 +195,11 @@ class ShipmentDepartureLocationSTS(Base):
     shipment_id = Column(BigInteger, unique=True)
     sts_location_id = Column(
         String,
-        ForeignKey(
-            DB_TABLE_STS_LOCATIONS + ".id", onupdate="CASCADE", ondelete="CASCADE"
-        ),
+        ForeignKey(DB_TABLE_STS_LOCATIONS + ".id", onupdate="CASCADE", ondelete="CASCADE"),
     )
 
     # Optional
-    event_id = Column(
-        BigInteger, ForeignKey(DB_TABLE_EVENT + ".id", onupdate="CASCADE")
-    )
+    event_id = Column(BigInteger, ForeignKey(DB_TABLE_EVENT + ".id", onupdate="CASCADE"))
     method_id = Column(String)
 
     __tablename__ = DB_TABLE_STSDEPARTURELOCATION
@@ -244,16 +236,12 @@ class ShipmentDepartureBerth(Base):
     )
 
     # Optional
-    position_id = Column(
-        BigInteger, ForeignKey(DB_TABLE_POSITION + ".id", onupdate="CASCADE")
-    )
+    position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + ".id", onupdate="CASCADE"))
     method_id = Column(String)
 
     __tablename__ = DB_TABLE_SHIPMENTDEPARTUREBERTH
     __table_args__ = (
-        UniqueConstraint(
-            "shipment_id", "berth_id", name="unique_shipmentdepartureberth"
-        ),
+        UniqueConstraint("shipment_id", "berth_id", name="unique_shipmentdepartureberth"),
     )
 
 
@@ -270,9 +258,7 @@ class ShipmentArrivalBerth(Base):
     )
 
     # Optional
-    position_id = Column(
-        BigInteger, ForeignKey(DB_TABLE_POSITION + ".id", onupdate="CASCADE")
-    )
+    position_id = Column(BigInteger, ForeignKey(DB_TABLE_POSITION + ".id", onupdate="CASCADE"))
     method_id = Column(String)
 
     __tablename__ = DB_TABLE_SHIPMENTARRIVALBERTH
@@ -299,9 +285,7 @@ class Departure(Base):
 
     __tablename__ = DB_TABLE_DEPARTURE
 
-    __table_args__ = (
-        UniqueConstraint("port_id", "ship_imo", "date_utc", name="unique_departure"),
-    )
+    __table_args__ = (UniqueConstraint("port_id", "ship_imo", "date_utc", name="unique_departure"),)
 
 
 class Arrival(Base):
@@ -321,9 +305,7 @@ class Arrival(Base):
         unique=True,
     )
 
-    portcall_id = Column(
-        BigInteger, ForeignKey(DB_TABLE_PORTCALL + ".id"), unique=False
-    )
+    portcall_id = Column(BigInteger, ForeignKey(DB_TABLE_PORTCALL + ".id"), unique=False)
 
     # We add next departure to have a detected date
     nextdeparture_portcall_id = Column(
@@ -416,9 +398,7 @@ class ShipInsurer(Base):
     ship_imo = Column(
         String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"), nullable=False
     )
-    date_from = Column(
-        DateTime(timezone=False)
-    )  # Most likely null, not indicated by Equasis
+    date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
     company_id = Column(
         BigInteger,
@@ -431,9 +411,7 @@ class ShipInsurer(Base):
     __tablename__ = DB_TABLE_SHIP_INSURER
     __table_args__ = (
         Index("idx_ship_insurer_ship_imo", "ship_imo"),
-        UniqueConstraint(
-            "ship_imo", "company_raw_name", "date_from", name="unique_ship_insurer"
-        ),
+        UniqueConstraint("ship_imo", "company_raw_name", "date_from", name="unique_ship_insurer"),
     )
 
 
@@ -443,9 +421,7 @@ class ShipOwner(Base):
     ship_imo = Column(
         String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"), nullable=False
     )
-    date_from = Column(
-        DateTime(timezone=False)
-    )  # Most likely null, not indicated by Equasis
+    date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
     company_id = Column(
         BigInteger,
@@ -457,9 +433,7 @@ class ShipOwner(Base):
     __tablename__ = DB_TABLE_SHIP_OWNER
     __table_args__ = (
         Index("idx_ship_owner_ship_imo", "ship_imo"),
-        UniqueConstraint(
-            "ship_imo", "company_raw_name", "date_from", name="unique_ship_owner"
-        ),
+        UniqueConstraint("ship_imo", "company_raw_name", "date_from", name="unique_ship_owner"),
     )
 
 
@@ -469,9 +443,7 @@ class ShipManager(Base):
     ship_imo = Column(
         String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"), nullable=False
     )
-    date_from = Column(
-        DateTime(timezone=False)
-    )  # Most likely null, not indicated by Equasis
+    date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
     company_id = Column(
         BigInteger,
@@ -482,9 +454,7 @@ class ShipManager(Base):
 
     __tablename__ = DB_TABLE_SHIP_MANAGER
     __table_args__ = (
-        UniqueConstraint(
-            "ship_imo", "company_raw_name", "date_from", name="unique_ship_manager"
-        ),
+        UniqueConstraint("ship_imo", "company_raw_name", "date_from", name="unique_ship_manager"),
     )
 
 
@@ -498,9 +468,7 @@ class Position(Base):
     navigation_status = Column(String)
     speed = Column(Numeric)
     destination_name = Column(String)
-    destination_port_id = Column(
-        BigInteger, ForeignKey(DB_TABLE_PORT + ".id", onupdate="CASCADE")
-    )
+    destination_port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + ".id", onupdate="CASCADE"))
 
     __tablename__ = DB_TABLE_POSITION
     __table_args__ = (
@@ -530,9 +498,7 @@ class Trajectory(Base):
     shipment_id = Column(BigInteger, unique=True)
     geometry = Column(Geometry("MULTILINESTRING", srid=4326))
     geometry_routed = Column(Geometry("MULTILINESTRING", srid=4326))
-    routing_date = Column(
-        DateTime(timezone=False)
-    )  # time where geometry_routed was built
+    routing_date = Column(DateTime(timezone=False))  # time where geometry_routed was built
 
     __tablename__ = DB_TABLE_TRAJECTORY
     __table_args__ = (Index("idx_trajectory_shipment", "shipment_id"),)
@@ -540,9 +506,7 @@ class Trajectory(Base):
 
 class PortCall(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    ship_mmsi = Column(
-        String
-    )  # , ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
+    ship_mmsi = Column(String)  # , ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"))
     date_utc = Column(
         DateTime(timezone=False)
@@ -551,19 +515,13 @@ class PortCall(Base):
 
     port_id = Column(BigInteger, ForeignKey(DB_TABLE_PORT + ".id", onupdate="CASCADE"))
 
-    load_status = Column(
-        String
-    )  # (0 : N/A, 1 : In Ballast, 2 : Partially Laden, 3 : Fully Laden)
+    load_status = Column(String)  # (0 : N/A, 1 : In Ballast, 2 : Partially Laden, 3 : Fully Laden)
     move_type = Column(String)  # "1": "departure", "0":"arrival"
-    port_operation = Column(
-        String
-    )  # (0: N / A, 1: load, 2: discharge, 3: both, 4: none)
+    port_operation = Column(String)  # (0: N / A, 1: load, 2: discharge, 3: both, 4: none)
     draught = Column(Numeric)
 
     # Optional
-    terminal_id = Column(
-        String, ForeignKey(DB_TABLE_TERMINAL + ".id", onupdate="CASCADE")
-    )
+    terminal_id = Column(String, ForeignKey(DB_TABLE_TERMINAL + ".id", onupdate="CASCADE"))
     berth_id = Column(String, ForeignKey(DB_TABLE_BERTH + ".id", onupdate="CASCADE"))
 
     # To store the whole repsonse in case we missed something
@@ -638,9 +596,7 @@ class MTVoyageInfo(Base):
     }"""
 
     id = Column(BigInteger, autoincrement=True, primary_key=True)
-    ship_mmsi = Column(
-        String
-    )  # , ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
+    ship_mmsi = Column(String)  # , ForeignKey(DB_TABLE_SHIP + '.mmsi', onupdate="CASCADE"))
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"))
     queried_date_utc = Column(
         DateTime(timezone=False)
@@ -683,16 +639,10 @@ class Price(Base):
         CheckConstraint("eur_per_tonne >= 0", name="price_positive"),
         Index("idx_price_commodity", "commodity"),
         Index("idx_price_date", "date"),
-        Index(
-            "idx_price_destination_iso2s", "destination_iso2s", postgresql_using="gin"
-        ),
-        Index(
-            "idx_price_departure_port_ids", "departure_port_ids", postgresql_using="gin"
-        ),
+        Index("idx_price_destination_iso2s", "destination_iso2s", postgresql_using="gin"),
+        Index("idx_price_departure_port_ids", "departure_port_ids", postgresql_using="gin"),
         Index("idx_price_ship_owner_iso2s", "ship_owner_iso2s", postgresql_using="gin"),
-        Index(
-            "idx_price_ship_insurer_iso2s", "ship_insurer_iso2s", postgresql_using="gin"
-        ),
+        Index("idx_price_ship_insurer_iso2s", "ship_insurer_iso2s", postgresql_using="gin"),
         # To add in SqlAlchemy format
         # CREATE INDEX idx_price_departure_port_ids_is_null ON price ((departure_port_ids=ARRAY[NULL]::bigint[]));
     )
@@ -793,6 +743,7 @@ class Counter(Base):
     value_tonne = Column(Numeric)
     value_eur = Column(Numeric)
     pricing_scenario = Column(String)
+    updated_on = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     __tablename__ = DB_TABLE_COUNTER
     __table_args__ = (
@@ -821,9 +772,7 @@ class EndpointCache(Base):
     )
 
     __tablename__ = DB_TABLE_ENDPOINTCACHE
-    __table_args__ = (
-        UniqueConstraint("endpoint", "params", name="unique_endpointcache"),
-    )
+    __table_args__ = (UniqueConstraint("endpoint", "params", name="unique_endpointcache"),)
 
 
 class Commodity(Base):
@@ -859,9 +808,7 @@ class Currency(Base):
     date = Column(Date)
     currency = Column(String)
     per_eur = Column(Numeric)  # All currencies
-    estimated = Column(
-        Boolean
-    )  # Whether it is actual value or estimated (useful when API is down)
+    estimated = Column(Boolean)  # Whether it is actual value or estimated (useful when API is down)
 
     __table_args__ = (UniqueConstraint("date", "currency", name="unique_currency"),)
     __tablename__ = DB_TABLE_CURRENCY
@@ -883,23 +830,17 @@ class Event(Base):
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"))
     ship_closest_position = Column(Geometry("POINT", srid=4326))
     interacting_ship_name = Column(String)
-    interacting_ship_imo = Column(
-        String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE")
-    )
+    interacting_ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"))
     interacting_ship_closest_position = Column(Geometry("POINT", srid=4326))
     interacting_ship_details = Column(JSONB)  # details about ship from datalastic query
     date_utc = Column(DateTime(timezone=False))
     created_at = Column(DateTime(timezone=False), default=dt.datetime.utcnow)
-    type_id = Column(
-        String, ForeignKey(DB_TABLE_MTEVENT_TYPE + ".id", onupdate="CASCADE")
-    )
+    type_id = Column(String, ForeignKey(DB_TABLE_MTEVENT_TYPE + ".id", onupdate="CASCADE"))
     content = Column(JSONB)
     source = Column(String, default="marinetraffic")
 
     __table_args__ = (
-        UniqueConstraint(
-            "ship_imo", "interacting_ship_imo", "date_utc", name="unique_event"
-        ),
+        UniqueConstraint("ship_imo", "interacting_ship_imo", "date_utc", name="unique_event"),
     )
     __tablename__ = DB_TABLE_EVENT
 
@@ -1026,9 +967,7 @@ class Flaring(Base):
     buffer_km = Column(Numeric)
 
     __table_args__ = (
-        UniqueConstraint(
-            "facility_id", "date", "buffer_km", "unit", name="unique_flaring"
-        ),
+        UniqueConstraint("facility_id", "date", "buffer_km", "unit", name="unique_flaring"),
     )
     __tablename__ = DB_TABLE_FLARING
 
