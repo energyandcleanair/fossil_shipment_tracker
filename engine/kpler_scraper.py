@@ -50,17 +50,15 @@ class KplerScraper:
             "dry": Products(self.configs["dry"]),
         }
 
-        # self.installations_clients = {
-        #     # "liquids": Installations(self.configs["liquids"]),
-        #     "lng": Installations(self.configs["lng"]),
-        #     # "dry": Installations(self.configs["dry"]),
-        # }
-
         self.cc = coco.CountryConverter()
+
+        # To cache products
+        self.products = {}
 
         # Brute-force infos
         self.products_brute = {}
         self.zones_brute = {}
+        self.installations_brute = {}
 
     def get_installations(self, origin_iso2, platform, product=None):
         # We collect flows split by installation
@@ -76,175 +74,23 @@ class KplerScraper:
         installations = [x for x in installations if x.lower() != "total"]
         return installations
 
-    def get_flows_raw(self, params, platform):
-        try:
-            try:
-                df = self.flows_clients[platform].get(**params)
-            except requests.exceptions.ChunkedEncodingError:
-                time.sleep(3)
-                df = self.flows_clients[platform].get(**params)
-        except exceptions.HttpError as e:
-            logger.error(f"Kpler API error: {e}")
-            return None
-
-        if "Date" not in df.columns:
-            logger.error(f"No date in Kpler data: {params} {df}")
-            return None
-
-        return df
-
-    def get_zones_brute(self, platform):
-        if self.zones_brute.get(platform) is not None:
-            return self.zones_brute[platform]
-
-        # token = get_env("KPLER_TOKEN_BRUTE")
-        # url = {
-        #     "dry": "https://dry.kpler.com/api/zones",
-        #     "liquids": "https://terminal.kpler.com/api/zones",
-        # }.get(platform)
-        # headers = {"Authorization": f"Bearer {token}"}
-        # r = requests.get(url, headers=headers)
-        # data = pd.DataFrame(r.json())
-        # data.to_csv(f"assets/kpler/{platform}_zones.csv", index=False)
-        data = pd.read_csv(f"assets/kpler/{platform}_zones.csv")
-        self.zones_brute[platform] = data
-        return data
-
-    def get_products_brute(self, platform):
-        if self.products_brute.get(platform) is not None:
-            return self.products_brute[platform]
-
-        # token = get_env("KPLER_TOKEN_BRUTE")
-        # url = {
-        #     "dry": "https://dry.kpler.com/api/products",
-        #     "liquids": "https://terminal.kpler.com/api/products",
-        # }.get(platform)
-        # headers = {"Authorization": f"Basic {token}"}
-        # r = requests.get(url, headers=headers)
-        # data = pd.DataFrame(r.json())
-        # data.to_csv(f"assets/kpler/{platform}_products.csv", index=False)
-        data = pd.read_csv(f"assets/kpler/{platform}_products.csv")
-        self.products_brute[platform] = data
-        return data
-
-    def get_flows_raw_brute(
-        self,
-        origin_iso2,
-        destination_iso2,
-        from_installation,
-        to_installation,
-        product,
-        date_from,
-        date_to,
-        split,
-        platform,
-    ):
-        """
-        This one uses the token from the web interface,
-        and another payload, that allows us to go back further than 1 year
-        :param params:
-        :param platform:
-        :return:
-        """
-        products = self.get_products_brute(platform=platform)
-        zones = self.get_zones_brute(platform=platform)
-
-        # Get zone dict
-        def get_zone_dict(iso2, installation):
-            if installation is None:
-                name = self.cc.convert(iso2, to="name_short")
-                if iso2 == "RU":
-                    name = "Russian Federation"
-                type = "country"
-            else:
-                name = from_installation
-                type = "port"
-
-            id = zones[(zones["name"] == name) & (zones["type"] == type)]["id"].values[0]
-            return {"id": int(id), "resourceType": "zone"}
-
-        params_raw = {
-            "cumulative": False,
-            # "filters": {"product": [1334]},
-            "flowDirection": "export",
-            # "fromLocations": [{"id": 451, "resourceType": "zone"}],
-            "granularity": "days",
-            "interIntra": "interintra",
-            "onlyRealized": True,
-            "view": "kpler",
-            "withBetaVessels": False,
-            "withForecasted": True,
-            "withGrades": False,
-            "withIncompleteTrades": True,
-            "withIntraCountry": False,
-            "vesselClassifications": [],
-            "withFreightView": False,
-            "withProductEstimation": False,
-            "splitOn": split.name,
-            "startDate": to_datetime(date_from).strftime("%Y-%m-%d"),
-            "endDate": to_datetime(date_to).strftime("%Y-%m-%d"),
-            "numberOfSplits": 1000,
-        }
-
-        if product is not None:
-            params_raw["filters"] = {
-                "product": [products[products["Name"] == product]["id"].values[0]]
-            }
-
-        if from_installation is not None or origin_iso2 is not None:
-            params_raw["fromLocations"] = [get_zone_dict(origin_iso2, from_installation)]
-
-        if to_installation is not None or destination_iso2 is not None:
-            params_raw["toLocations"] = [get_zone_dict(destination_iso2, to_installation)]
-
-        unit = "t"
-        token = get_env("KPLER_TOKEN_BRUTE")
-        url = {
-            "dry": "https://dry.kpler.com/api/flows",
-            "liquids": "https://terminal.kpler.com/api/flows",
-        }.get(platform)
-        headers = {"Authorization": f"Basic {token}"}
-        r = requests.post(url, json=params_raw, headers=headers)
-
-        # read content to dataframe
-        data = r.json()["series"]
-        dfs = []
-        for x in data:
-            df = pd.concat(
-                [pd.DataFrame(y["splitValues"]) for y in x["datasets"]], ignore_index=True
-            )
-            df = pd.concat([df.drop(["values"], axis=1), df["values"].apply(pd.Series)], axis=1)
-            df["date"] = x["date"]
-            df.drop(["id"], axis=1, inplace=True)
-            dfs += [df]
-            # Add total
-            df_total = pd.DataFrame([y["values"] for y in x["datasets"]])
-            df_total["date"] = x["date"]
-            df_total["name"] = KPLER_TOTAL
-            dfs += [df_total]
-
-        df = pd.concat(dfs, ignore_index=True)
-        df["unit"] = unit
-        return df
-
-    def get_flows(
+    def get_flows_raw(
         self,
         platform,
         origin_iso2=None,
         destination_iso2=None,
-        product=None,
         from_installation=None,
         to_installation=None,
-        split=FlowsSplit.DestinationCountries,
+        product=None,
+        date_from=None,
+        date_to=None,
+        split=None,
         granularity=FlowsPeriod.Daily,
         unit=FlowsMeasurementUnit.T,
-        date_from=dt.datetime.now() - dt.timedelta(days=365),
-        date_to=dt.datetime.now(),
-        use_brute_force=False,
     ):
-        origin_country = unidecode(self.cc.convert(origin_iso2, to="name")) if origin_iso2 else None
+        origin_country = self.cc.convert(origin_iso2, to="name_short") if origin_iso2 else None
         destination_country = (
-            unidecode(self.cc.convert(destination_iso2, to="name")) if destination_iso2 else None
+            self.cc.convert(destination_iso2, to="name_short") if destination_iso2 else None
         )
 
         params = {
@@ -263,22 +109,255 @@ class KplerScraper:
             "with_intra_country": False,
         }
 
-        # remove None values
-        params = {k: v for k, v in params.items() if v is not None}
-        if use_brute_force:
-            df = self.get_flows_raw_brute(
-                origin_iso2=origin_iso2,
-                from_installation=from_installation,
-                destination_iso2=destination_iso2,
-                to_installation=to_installation,
-                split=split,
-                product=product,
-                date_from=date_from,
-                date_to=date_to,
-                platform=platform,
+        try:
+            try:
+                df = self.flows_clients[platform].get(**params)
+            except requests.exceptions.ChunkedEncodingError:
+                time.sleep(3)
+                df = self.flows_clients[platform].get(**params)
+        except exceptions.HttpError as e:
+            logger.error(f"Kpler API error: {e}")
+            return None
+
+        if "Date" not in df.columns:
+            logger.error(f"No date in Kpler data: {params} {df}")
+            return None
+
+        if "Period End Date" in df.columns:
+            df.drop("Period End Date", axis=1, inplace=True)
+
+        df.rename(columns={"Date": "date"}, inplace=True)
+        df = df.melt(id_vars=["date"], var_name="split")
+        df["unit"] = unit.value
+        return df
+
+    def get_installations_brute(self, platform):
+        if self.installations_brute.get(platform) is not None:
+            return self.installations_brute[platform]
+
+        # token = get_env("KPLER_TOKEN_BRUTE")
+        # url = {
+        #     "dry": "https://dry.kpler.com/api/installations",
+        #     "liquids": "https://terminal.kpler.com/api/installations",
+        # }.get(platform)
+        # headers = {"Authorization": f"Bearer {token}"}
+        # r = requests.get(url, headers=headers)
+        # data = pd.DataFrame(r.json())
+        # data.to_csv(f"engine/assets/kpler/{platform}_installations.csv", index=False)
+        try:
+            data = pd.read_csv(f"assets/kpler/{platform}_installations.csv")
+        except FileNotFoundError:
+            data = pd.read_csv(f"engine/assets/kpler/{platform}_installations.csv")
+        self.installations_brute[platform] = data
+        return data
+
+    def get_zones_brute(self, platform):
+        if self.zones_brute.get(platform) is not None:
+            return self.zones_brute[platform]
+
+        # token = get_env("KPLER_TOKEN_BRUTE")
+        # url = {
+        #     "dry": "https://dry.kpler.com/api/zones",
+        #     "liquids": "https://terminal.kpler.com/api/zones",
+        # }.get(platform)
+        # headers = {"Authorization": f"Bearer {token}"}
+        # r = requests.get(url, headers=headers)
+        # data = pd.DataFrame(r.json())
+        # data.to_csv(f"engine/assets/kpler/{platform}_zones.csv", index=False)
+
+        try:
+            data = pd.read_csv(f"assets/kpler/{platform}_zones.csv")
+        except FileNotFoundError:
+            data = pd.read_csv(f"engine/assets/kpler/{platform}_zones.csv")
+        self.zones_brute[platform] = data
+        return data
+
+    def get_products_brute(self, platform):
+        if self.products_brute.get(platform) is not None:
+            return self.products_brute[platform]
+
+        token = get_env("KPLER_TOKEN_BRUTE")
+        url = {
+            "dry": "https://dry.kpler.com/api/products",
+            "liquids": "https://terminal.kpler.com/api/products",
+        }.get(platform)
+        headers = {"Authorization": f"Basic {token}"}
+        r = requests.get(url, params={"type": "commodity"}, headers=headers)
+        data = pd.DataFrame(r.json())
+
+        data_ancestor = data.closestAncestorCommodity.apply(lambda x: pd.Series(x))
+        # data.drop_duplicates(inplace=True)
+        # data.to_csv(f"assets/kpler/{platform}_products.csv", index=False)
+
+        try:
+            data = pd.read_csv(f"assets/kpler/{platform}_products.csv")
+        except FileNotFoundError:
+            data = pd.read_csv(f"engine/assets/kpler/{platform}_products.csv")
+        self.products_brute[platform] = data
+        return data
+
+    def get_flows_raw_brute(
+        self,
+        platform,
+        origin_iso2,
+        destination_iso2,
+        date_from,
+        date_to,
+        split,
+        from_installation=None,
+        to_installation=None,
+        product=None,
+        unit=None,
+        granularity=FlowsPeriod.Daily,
+        include_total=True,
+    ):
+        """
+        This one uses the token from the web interface,
+        and another payload, that allows us to go back further than 1 year
+        :param params:
+        :param platform:
+        :return:
+        """
+        # products = self.get_products_brute(platform=platform)
+        installations = self.get_installations_brute(platform=platform)
+        zones = self.get_zones_brute(platform=platform)
+
+        # Get zone dict
+        def get_installation_dict(iso2, installation):
+            if installation is None:
+                name = self.cc.convert(iso2, to="name_short")
+                if iso2 == "RU":
+                    name = "Russian Federation"
+            else:
+                name = from_installation
+
+            try:
+                id = installations[(installations["name"] == name)]["id"].values[0]
+                type = "installation"
+            except IndexError:
+                id = zones[(zones["name"] == name)]["id"].values[0]
+                type = "zone"
+
+            return {"id": int(id), "resourceType": type}
+
+        params_raw = {
+            "cumulative": False,
+            # "filters": {"product": [1334]},
+            "filters": {"product": []},
+            "flowDirection": "export",
+            # "fromLocations": [{"id": 451, "resourceType": "zone"}],
+            "fromLocations": [],
+            "toLocations": [],
+            "granularity": granularity.value,
+            "interIntra": "interintra",
+            "onlyRealized": True,
+            "view": "kpler",
+            "withBetaVessels": False,
+            "withForecasted": False,
+            "withGrades": False,
+            "withIncompleteTrades": True,
+            "withIntraCountry": False,
+            "vesselClassifications": [],
+            "withFreightView": False,
+            "withProductEstimation": False,
+            "splitOn": split.value,
+            "startDate": to_datetime(date_from).strftime("%Y-%m-%d"),
+            "endDate": to_datetime(date_to).strftime("%Y-%m-%d"),
+            "numberOfSplits": 1000,
+        }
+
+        if product is not None:
+            params_raw["filters"] = {
+                "product": [self.get_product_id(platform=platform, name=product)]
+            }
+
+        if from_installation is not None or origin_iso2 is not None:
+            params_raw["fromLocations"] = [get_installation_dict(origin_iso2, from_installation)]
+
+        if to_installation is not None or destination_iso2 is not None:
+            params_raw["toLocations"] = [get_installation_dict(destination_iso2, to_installation)]
+
+        token = get_env("KPLER_TOKEN_BRUTE")
+        url = {
+            "dry": "https://dry.kpler.com/api/flows",
+            "liquids": "https://terminal.kpler.com/api/flows",
+        }.get(platform)
+        headers = {"Authorization": f"Basic {token}"}
+        r = requests.post(url, json=params_raw, headers=headers)
+
+        # read content to dataframe
+        data = r.json()["series"]
+        dfs = []
+        for x in data:
+            df = pd.concat(
+                [pd.DataFrame(y["splitValues"]) for y in x["datasets"]], ignore_index=True
             )
+            if len(df) > 0:
+                df = pd.concat([df.drop(["values"], axis=1), df["values"].apply(pd.Series)], axis=1)
+                df["date"] = x["date"]
+                df.drop(["id"], axis=1, inplace=True)
+                dfs += [df]
+
+            # Add total
+            if include_total:
+                df_total = pd.DataFrame([y["values"] for y in x["datasets"]])
+                df_total["date"] = x["date"]
+                df_total["name"] = KPLER_TOTAL
+                dfs += [df_total]
+
+        if not dfs:
+            return None
+
+        df = pd.concat(dfs, ignore_index=True)
+        df.rename(columns={"name": "split"}, inplace=True)
+        df = df.melt(id_vars=["date", "split"])
+        df["date"] = pd.to_datetime(df["date"])
+
+        units = {
+            "mass": FlowsMeasurementUnit.T.value,
+            "volume": "m3",
+            "energy": "GJ?",
+        }
+        # Recode variable to unit using the dictionary
+        df["unit"] = df.variable.map(units)
+        df = df[~pd.isna(df.unit)]
+        if unit:
+            df = df[df.unit == unit.value]
+        df.drop(["variable"], axis=1, inplace=True)
+        return df
+
+    def get_flows(
+        self,
+        platform,
+        origin_iso2=None,
+        destination_iso2=None,
+        product=None,
+        from_installation=None,
+        to_installation=None,
+        split=FlowsSplit.DestinationCountries,
+        granularity=FlowsPeriod.Daily,
+        unit=FlowsMeasurementUnit.T,
+        date_from=dt.datetime.now() - dt.timedelta(days=365),
+        date_to=dt.datetime.now(),
+        use_brute_force=False,
+    ):
+        params = {
+            "origin_iso2": origin_iso2,
+            "destination_iso2": destination_iso2,
+            "from_installation": from_installation,
+            "to_installation": to_installation,
+            "product": product,
+            "split": split,
+            "granularity": granularity,
+            "unit": unit,
+            "date_from": date_from,
+            "date_to": date_to,
+        }
+
+        if use_brute_force:
+            df = self.get_flows_raw_brute(platform=platform, **params, include_total=False)
         else:
-            df = self.get_flows_raw(params, platform)
+            df = self.get_flows_raw(platform=platform, **params)
         if df is None:
             return None
 
@@ -292,21 +371,24 @@ class KplerScraper:
         df["unit"] = unit.value
         df["platform"] = platform
         df = df.rename(columns={"Date": "date"})
-        df = df.melt(
-            id_vars=[
-                "date",
-                "origin_iso2",
-                "destination_iso2",
-                "from_installation",
-                "to_installation",
-                "product",
-                "unit",
-                "platform",
-                "Period End Date",
-            ],
-            var_name="split",
-            value_name="value",
-        )
+        # df = df.melt(
+        #     id_vars=[
+        #         x
+        #         for x in [
+        #             "date",
+        #             "origin_iso2",
+        #             "destination_iso2",
+        #             "from_installation",
+        #             "to_installation",
+        #             "product",
+        #             "unit",
+        #             "platform",
+        #         ]
+        #         if x in df.columns
+        #     ],
+        #     var_name="split",
+        #     value_name="value",
+        # )
 
         def split_to_column(df, split):
             if split == FlowsSplit.DestinationCountries:
@@ -324,7 +406,7 @@ class KplerScraper:
             return df
 
         df = split_to_column(df, split)
-        df = df.drop(columns=["split", "Period End Date"])
+        df = df.drop(columns=["split"])
 
         # Sometimes we have duplicated values
         df = (
@@ -350,24 +432,34 @@ class KplerScraper:
         platforms = self.platforms if platform is None else [platform]
 
         def get_platform_products(platform):
-            products = self.products_clients[platform].get(
-                columns=["id", "family_name", "group_name", "product_name"]
-            )
-            products["platform"] = platform
-            return products
+            if self.products.get(platform) is None:
+                columns = ["id", "product_type", "family_name", "group_name", "product_name"]
+                products = self.products_clients[platform].get(columns=columns)
+                products.columns = columns
+                products = products[products.product_type == "commodity"]
+                products["platform"] = platform
+                products.rename(
+                    columns={
+                        "product_type": "type",
+                        "family_name": "family",
+                        "group_name": "group",
+                        "product_name": "name",
+                    },
+                    inplace=True,
+                )
+                self.products[platform] = products
+
+            return self.products.get(platform)
 
         df = pd.concat([get_platform_products(platform) for platform in platforms])
-        df = df.rename(
-            columns={
-                "Id (Product)": "id",
-                "Family": "family",
-                "Group": "group",
-                "Product": "name",
-            }
-        )
-        df = df[["name", "family", "group", "platform"]].drop_duplicates()
+        df = df[["id", "name", "family", "type", "group", "platform"]].drop_duplicates()
         df = df[~pd.isna(df.name)]
         return df
+
+    def get_product_id(self, platform, name):
+        products = self.get_products(platform=platform)
+        product = products[products.name == name]
+        return int(product.id.values[0]) if len(product) == 1 else None
 
 
 def fill_products():
@@ -377,7 +469,7 @@ def fill_products():
     return
 
 
-def update_flows(
+def update(
     date_from=None,
     date_to=None,
     platforms=None,
@@ -386,6 +478,7 @@ def update_flows(
     split_from_installation=True,
     add_total_installation=True,
     ignore_if_copy_failed=False,
+    use_brute_force=False,
 ):
     scraper = KplerScraper()
 
@@ -406,7 +499,7 @@ def update_flows(
                 else:
                     installations = [None]
 
-                for installation in installations:
+                for installation in tqdm(installations):
                     df = scraper.get_flows(
                         platform=platform,
                         origin_iso2=origin_iso2,
@@ -415,6 +508,7 @@ def update_flows(
                         product=product,
                         from_installation=installation,
                         split=FlowsSplit.DestinationCountries,
+                        use_brute_force=use_brute_force,
                     )
                     if df is not None:
                         try:

@@ -1,4 +1,5 @@
 import datetime as dt
+import numpy as np
 from base.models import PortCall
 
 from engine.kpler_scraper import KplerScraper, FlowsSplit, FlowsMeasurementUnit
@@ -36,17 +37,48 @@ def test_get_flow():
 
 
 def test_get_flow_brute():
+    from base.utils import to_datetime
+    from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+
+    params = {
+        "platform": "liquids",
+        "origin_iso2": "RU",
+        "destination_iso2": "CN",
+        "date_from": to_datetime("2022-03-01"),
+        "date_to": to_datetime("2022-03-02"),
+        "split": FlowsSplit.Products,
+        "unit": FlowsMeasurementUnit.T,
+    }
+
     scraper = KplerScraper()
-    flows = scraper.get_flows(
-        platform="liquids",
-        origin_iso2="RU",
-        destination_iso2="DE",
-        date_from="2022-03-01",
-        date_to="2022-03-31",
-        split=FlowsSplit.Products,
-        use_brute_force=True,
-    )
-    assert len(flows) > 0
+    # flows_brute = scraper.get_flows_raw_brute(**params, include_total=False)
+    # flows = scraper.get_flows_raw(**params)
+    # assert flows_brute.reset_index(drop=True).equals(flows.reset_index(drop=True))
+
+    params["destination_iso2"] = None
+    params["split"] = FlowsSplit.DestinationCountries
+    params["product"] = "Crude"
+    flows_brute = scraper.get_flows_raw_brute(**params, include_total=False)
+    flows = scraper.get_flows_raw(**params)
+
+    flows_brute = flows_brute.sort_values("value", ascending=False)
+    flows = flows.sort_values("value", ascending=False)
+    flows = flows[flows.value > 0]
+
+    assert flows_brute.split.reset_index(drop=True).equals(flows.split.reset_index(drop=True))
+    assert all(np.isclose(flows_brute.value, flows.value, rtol=1e-3))
+
+    # Let's see how far it can go
+    params["date_from"] = to_datetime("2013-01-01")
+    params["date_to"] = to_datetime("2013-12-31")
+    flows_brute = scraper.get_flows_raw_brute(**params, include_total=False)
+    assert len(flows_brute.split.unique()) > 20
+
+    flows = scraper.get_flows(**params, use_brute_force=True)
+
+    from engine.kpler_scraper import UNKNOWN_COUNTRY
+
+    assert not all(flows.destination_iso2 == UNKNOWN_COUNTRY)
 
 
 def test_get_installations():

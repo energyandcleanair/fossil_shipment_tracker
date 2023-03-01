@@ -52,11 +52,19 @@ class KplerFlowResource(TemplateResource):
 
     parser.add_argument("product", help="Product", required=False, action="split", default=None)
 
+    parser.add_argument(
+        "platform",
+        type=str,
+        help="platform",
+        default=None,
+        required=False,
+    )
+
     must_group_by = ["unit"]
     date_cols = ["date"]
     value_cols = ["value"]
     pivot_dependencies = {}
-    filename = "kpler_flow.csv"
+    filename = "kpler_flow"
 
     def get_aggregate_cols_dict(self, subquery):
         return {}
@@ -85,6 +93,7 @@ class KplerFlowResource(TemplateResource):
         product = params.get("product")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
+        platform = params.get("platform")
 
         if origin_iso2:
             query = query.filter(KplerFlow.origin_iso2.in_(to_list(origin_iso2)))
@@ -94,6 +103,9 @@ class KplerFlowResource(TemplateResource):
 
         if product:
             query = query.filter(KplerProduct.name.in_(to_list(product)))
+
+        if platform:
+            query = query.filter(KplerProduct.platform.in_(to_list(platform)))
 
         if date_from:
             query = query.filter(KplerFlow.date >= to_datetime(date_from))

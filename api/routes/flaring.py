@@ -19,7 +19,6 @@ from . import routes_api, ns_flaring
 
 @ns_flaring.route("/v0/flaring_facility", strict_slashes=False)
 class FlaringFacilityResource(Resource):
-
     parser = reqparse.RequestParser()
     parser.add_argument(
         "facility_id",
@@ -57,7 +56,6 @@ class FlaringFacilityResource(Resource):
 
     @ns_flaring.expect(parser)
     def get(self):
-
         params = FlaringFacilityResource.parser.parse_args()
         facility_id = params.get("facility_id")
         with_anomaly_index = params.get("with_anomaly_index")
@@ -66,8 +64,7 @@ class FlaringFacilityResource(Resource):
         download = params.get("download")
 
         if with_anomaly_index:
-
-            with open("engine/flaring_anomaly_index.sql", "r") as file:
+            with open("assets/flaring_anomaly_index.sql", "r") as file:
                 sql_content = file.read()
 
             with engine.connect() as con:
@@ -92,9 +89,7 @@ class FlaringFacilityResource(Resource):
                 "geometry",
                 "anomaly_index",
             ]
-            result["geometry"] = result.geometry.apply(
-                lambda x: wkb.loads(bytes(x)) if x else None
-            )
+            result["geometry"] = result.geometry.apply(lambda x: wkb.loads(bytes(x)) if x else None)
             result = result.sort_values("anomaly_index", axis=0, ascending=False)
 
         else:
@@ -112,16 +107,13 @@ class FlaringFacilityResource(Resource):
         return response
 
     def build_response(self, result, format, nest_in_data, download):
-
         result.replace({np.nan: None}, inplace=True)
         if format == "csv":
             result.drop("geometry", axis=1, inplace=True)
             return Response(
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
-                headers={
-                    "Content-disposition": "attachment; filename=flaringfacility.csv"
-                },
+                headers={"Content-disposition": "attachment; filename=flaringfacility.csv"},
             )
 
         if format == "json":
@@ -131,13 +123,9 @@ class FlaringFacilityResource(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         if format == "geojson":
             berths_gdf = gpd.GeoDataFrame(result, geometry="geometry")
@@ -149,9 +137,7 @@ class FlaringFacilityResource(Resource):
                 resp_content = berths_geojson
 
             if download:
-                headers = {
-                    "Content-disposition": "attachment; filename=flaringfacility.geojson"
-                }
+                headers = {"Content-disposition": "attachment; filename=flaringfacility.geojson"}
             else:
                 headers = {}
 
@@ -165,7 +151,6 @@ class FlaringFacilityResource(Resource):
 
 @ns_flaring.route("/v0/flaring", strict_slashes=False)
 class FlaringResource(Resource):
-
     parser = reqparse.RequestParser()
     parser.add_argument(
         "facility_id",
@@ -241,7 +226,6 @@ class FlaringResource(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-
         params = FlaringResource.parser.parse_args()
         facility_id = params.get("facility_id")
         unit = params.get("unit")
@@ -288,7 +272,6 @@ class FlaringResource(Resource):
         return response
 
     def build_response(self, result, format, nest_in_data, download):
-
         result.replace({np.nan: None}, inplace=True)
         if format == "csv":
             return Response(
@@ -303,13 +286,9 @@ class FlaringResource(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         if format == "geojson":
             import geopandas as gpd
@@ -323,9 +302,7 @@ class FlaringResource(Resource):
                 resp_content = berths_geojson
 
             if download:
-                headers = {
-                    "Content-disposition": "attachment; filename=flaring.geojson"
-                }
+                headers = {"Content-disposition": "attachment; filename=flaring.geojson"}
             else:
                 headers = {}
 
@@ -337,7 +314,6 @@ class FlaringResource(Resource):
             )
 
     def roll_average(self, result, rolling_days):
-
         if rolling_days is not None:
             result["date"] = pd.to_datetime(result.date)
             date_column = "date"
@@ -346,16 +322,10 @@ class FlaringResource(Resource):
             max_date = result[date_column].max()
             daterange = pd.date_range(min_date, max_date).rename(date_column)
 
-            result[date_column] = result[date_column].dt.floor(
-                "D"
-            )  # Should have been done already
+            result[date_column] = result[date_column].dt.floor("D")  # Should have been done already
             result = (
                 result.groupby(
-                    [
-                        x
-                        for x in result.columns
-                        if x not in ([date_column] + value_columns)
-                    ]
+                    [x for x in result.columns if x not in ([date_column] + value_columns)]
                 )
                 .apply(
                     lambda x: x.set_index(date_column)
