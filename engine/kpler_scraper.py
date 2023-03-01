@@ -2,6 +2,7 @@ import datetime as dt
 import time
 import requests
 import json
+import os
 
 import country_converter as coco
 from base.env import get_env
@@ -135,19 +136,23 @@ class KplerScraper:
         if self.installations_brute.get(platform) is not None:
             return self.installations_brute[platform]
 
-        # token = get_env("KPLER_TOKEN_BRUTE")
-        # url = {
-        #     "dry": "https://dry.kpler.com/api/installations",
-        #     "liquids": "https://terminal.kpler.com/api/installations",
-        # }.get(platform)
-        # headers = {"Authorization": f"Bearer {token}"}
-        # r = requests.get(url, headers=headers)
-        # data = pd.DataFrame(r.json())
-        # data.to_csv(f"engine/assets/kpler/{platform}_installations.csv", index=False)
-        try:
-            data = pd.read_csv(f"assets/kpler/{platform}_installations.csv")
-        except FileNotFoundError:
-            data = pd.read_csv(f"engine/assets/kpler/{platform}_installations.csv")
+        file = f"assets/kpler/{platform}_installations.csv"
+        if os.path.exists("engine"):
+            file = f"engine/{file}"
+
+        if not os.path.exists(file):
+            token = get_env("KPLER_TOKEN_BRUTE")
+            url = {
+                "dry": "https://dry.kpler.com/api/installations",
+                "liquids": "https://terminal.kpler.com/api/installations",
+            }.get(platform)
+            headers = {"Authorization": f"Bearer {token}"}
+            r = requests.get(url, headers=headers)
+            data = pd.DataFrame(r.json())
+            data.to_csv(file, index=False)
+        else:
+            data = pd.read_csv(file)
+
         self.installations_brute[platform] = data
         return data
 
@@ -155,46 +160,49 @@ class KplerScraper:
         if self.zones_brute.get(platform) is not None:
             return self.zones_brute[platform]
 
-        # token = get_env("KPLER_TOKEN_BRUTE")
-        # url = {
-        #     "dry": "https://dry.kpler.com/api/zones",
-        #     "liquids": "https://terminal.kpler.com/api/zones",
-        # }.get(platform)
-        # headers = {"Authorization": f"Bearer {token}"}
-        # r = requests.get(url, headers=headers)
-        # data = pd.DataFrame(r.json())
-        # data.to_csv(f"engine/assets/kpler/{platform}_zones.csv", index=False)
+        file = f"assets/kpler/{platform}_zones.csv"
+        if os.path.exists("engine"):
+            file = f"engine/{file}"
 
-        try:
-            data = pd.read_csv(f"assets/kpler/{platform}_zones.csv")
-        except FileNotFoundError:
-            data = pd.read_csv(f"engine/assets/kpler/{platform}_zones.csv")
+        if not os.path.exists(file):
+            token = get_env("KPLER_TOKEN_BRUTE")
+            url = {
+                "dry": "https://dry.kpler.com/api/zones",
+                "liquids": "https://terminal.kpler.com/api/zones",
+            }.get(platform)
+            headers = {"Authorization": f"Bearer {token}"}
+            r = requests.get(url, headers=headers)
+            data = pd.DataFrame(r.json())
+            data.to_csv(file, index=False)
+        else:
+            data = pd.read_csv(file)
+
         self.zones_brute[platform] = data
         return data
 
-    def get_products_brute(self, platform):
-        if self.products_brute.get(platform) is not None:
-            return self.products_brute[platform]
-
-        token = get_env("KPLER_TOKEN_BRUTE")
-        url = {
-            "dry": "https://dry.kpler.com/api/products",
-            "liquids": "https://terminal.kpler.com/api/products",
-        }.get(platform)
-        headers = {"Authorization": f"Basic {token}"}
-        r = requests.get(url, params={"type": "commodity"}, headers=headers)
-        data = pd.DataFrame(r.json())
-
-        data_ancestor = data.closestAncestorCommodity.apply(lambda x: pd.Series(x))
-        # data.drop_duplicates(inplace=True)
-        # data.to_csv(f"assets/kpler/{platform}_products.csv", index=False)
-
-        try:
-            data = pd.read_csv(f"assets/kpler/{platform}_products.csv")
-        except FileNotFoundError:
-            data = pd.read_csv(f"engine/assets/kpler/{platform}_products.csv")
-        self.products_brute[platform] = data
-        return data
+    # def get_products_brute(self, platform):
+    #     if self.products_brute.get(platform) is not None:
+    #         return self.products_brute[platform]
+    #
+    #     token = get_env("KPLER_TOKEN_BRUTE")
+    #     url = {
+    #         "dry": "https://dry.kpler.com/api/products",
+    #         "liquids": "https://terminal.kpler.com/api/products",
+    #     }.get(platform)
+    #     headers = {"Authorization": f"Basic {token}"}
+    #     r = requests.get(url, params={"type": "commodity"}, headers=headers)
+    #     data = pd.DataFrame(r.json())
+    #
+    #     data_ancestor = data.closestAncestorCommodity.apply(lambda x: pd.Series(x))
+    #     # data.drop_duplicates(inplace=True)
+    #     # data.to_csv(f"assets/kpler/{platform}_products.csv", index=False)
+    #
+    #     try:
+    #         data = pd.read_csv(f"assets/kpler/{platform}_products.csv")
+    #     except FileNotFoundError:
+    #         data = pd.read_csv(f"engine/assets/kpler/{platform}_products.csv")
+    #     self.products_brute[platform] = data
+    #     return data
 
     def get_flows_raw_brute(
         self,
