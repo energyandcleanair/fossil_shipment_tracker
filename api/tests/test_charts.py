@@ -35,6 +35,29 @@ def test_monthly_payments(app):
         assert set(data_df.columns) >= set(["destination_region", "month", "Oil", "Coal", "Gas"])
 
 
+def test_total_payments(app):
+    with app.test_client() as test_client:
+        params = {}
+        response = test_client.get("/v0/chart/total_payments?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        data_df = pd.DataFrame(data)
+        assert set(data_df.columns) >= set(
+            ["destination_region", "destination_country", "period", "Oil", "Coal", "Gas"]
+        )
+
+        # Testing that EU is included and tops all other regions with China
+        params = {"limit": 2}
+        response = test_client.get("/v0/chart/total_payments?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        data_df = pd.DataFrame(data)
+        assert set(data_df.columns) >= set(
+            ["destination_region", "destination_country", "period", "Oil", "Coal", "Gas"]
+        )
+        assert set(data_df["destination_region"].unique()) == set(["EU", "China"])
+
+
 def test_departure_destination(app):
     with app.test_client() as test_client:
         params = {"country_grouping": "top_5", "language": "ua"}
