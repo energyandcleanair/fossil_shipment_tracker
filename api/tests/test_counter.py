@@ -37,6 +37,7 @@ def test_counter_last(app):
                 "commodity_group",
                 "eur_per_sec",
                 "total_eur",
+                "updated_on",
             ]
         )
         assert set(data_df.columns) >= expected_columns
