@@ -47,12 +47,13 @@ class ChartTotalPayments(Resource):
 
     @routes_api.expect(parser)
     def get(self):
+        params = RussiaCounterResource.parser.parse_args()
         params_chart = ChartTotalPayments.parser.parse_args()
         limit = params_chart.get("limit")
         format = params_chart.get("format")
         nest_in_data = params_chart.get("nest_in_data")
 
-        params = RussiaCounterResource.parser.parse_args()
+        params.update(**params_chart)
         params.update(
             **{
                 "aggregate_by": ["destination_country", "commodity_group", "date"],
@@ -68,12 +69,9 @@ class ChartTotalPayments(Resource):
                 "limit": None,
             }
         )
-        params.update(**params_chart)
-        # We want to aggregate EU so keeping all countries first
-        params["limit"] = None
 
         # Period 1
-        params_chart["date_from"] = "2022-02-24"
+        params["date_from"] = "2022-02-24"
         response = RussiaCounterResource().get_from_params(params)
         data1 = pd.DataFrame(response.json["data"])
         data1[
