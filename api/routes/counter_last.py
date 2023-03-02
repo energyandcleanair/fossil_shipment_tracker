@@ -105,6 +105,7 @@ class RussiaCounterLastResource(Resource):
         params = RussiaCounterLastResource.parser.parse_args()
         response = self.get_from_params(params)
         response.headers["Cache-Control"] = "public"
+        response.cache_control.max_age = 600
         return response
 
     def get_from_params(self, params):
