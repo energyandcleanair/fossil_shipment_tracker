@@ -240,6 +240,8 @@ class KplerScraper:
                 name = unidecode(self.cc.convert(iso2, to="name_short"))
                 if iso2 == "RU":
                     name = "Russian Federation"
+                elif iso2 == "TR":
+                    name = "Turkey"
             else:
                 name = from_installation
 
