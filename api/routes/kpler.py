@@ -98,7 +98,8 @@ class KplerFlowResource(TemplateResource):
         query = (
             session.query(
                 KplerFlow,
-                KplerProduct.platform,
+                KplerProduct.group.label("product_group"),
+                KplerProduct.family.label("product_family"),
                 OriginCountry.name.label("origin_country"),
                 OriginCountry.region.label("origin_region"),
                 DestinationCountry.name.label("destination_country"),
