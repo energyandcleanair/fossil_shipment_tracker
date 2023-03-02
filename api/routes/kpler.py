@@ -20,8 +20,10 @@ from .template import TemplateResource
 from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session
-from base.models import KplerFlow, KplerProduct
+from base.models import KplerFlow, KplerProduct, Country
 from base.utils import to_datetime, to_list, intersect, df_to_json
+
+KPLER_TOTAL = "Total"
 
 
 @routes_api.route("/v0/kpler_flow", strict_slashes=False, doc=False)
@@ -44,13 +46,25 @@ class KplerFlowResource(TemplateResource):
         "date_from",
         type=str,
         help="start date (format 2020-01-15)",
-        default=None,
+        default="2018-01-01",
         required=False,
     )
 
     parser.add_argument("date_to", type=str, help="End date", default=None, required=False)
 
     parser.add_argument("product", help="Product", required=False, action="split", default=None)
+
+    parser.add_argument(
+        "from_installation", help="From installation", required=False, action="split", default=None
+    )
+
+    parser.add_argument(
+        "total_only",
+        type=inputs.boolean,
+        help="Whether to only include total from countries, and not installation by installation",
+        default=True,
+        required=False,
+    )
 
     parser.add_argument(
         "platform",
@@ -78,12 +92,33 @@ class KplerFlowResource(TemplateResource):
         return self.get_from_params(params)
 
     def initial_query(self, params=None):
-        query = session.query(KplerFlow, KplerProduct.platform).outerjoin(
-            KplerProduct,
-            sa.and_(
-                KplerProduct.name == KplerFlow.product,
-                KplerProduct.platform == KplerFlow.platform,
-            ),
+        DestinationCountry = aliased(Country)
+        OriginCountry = aliased(Country)
+
+        query = (
+            session.query(
+                KplerFlow,
+                KplerProduct.platform,
+                OriginCountry.name.label("origin_country"),
+                OriginCountry.region.label("origin_region"),
+                DestinationCountry.name.label("destination_country"),
+                DestinationCountry.region.label("destination_region"),
+            )
+            .outerjoin(
+                OriginCountry,
+                OriginCountry.iso2 == KplerFlow.origin_iso2,
+            )
+            .outerjoin(
+                DestinationCountry,
+                DestinationCountry.iso2 == KplerFlow.destination_iso2,
+            )
+            .outerjoin(
+                KplerProduct,
+                sa.and_(
+                    KplerProduct.name == KplerFlow.product,
+                    KplerProduct.platform == KplerFlow.platform,
+                ),
+            )
         )
         return query
 
@@ -94,6 +129,8 @@ class KplerFlowResource(TemplateResource):
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         platform = params.get("platform")
+        total_only = params.get("total_only")
+        from_installation = params.get("from_installation")
 
         if origin_iso2:
             query = query.filter(KplerFlow.origin_iso2.in_(to_list(origin_iso2)))
@@ -103,6 +140,12 @@ class KplerFlowResource(TemplateResource):
 
         if product:
             query = query.filter(KplerProduct.name.in_(to_list(product)))
+
+        if from_installation:
+            query = query.filter(KplerFlow.from_installation.in_(to_list(from_installation)))
+
+        if total_only:
+            query = query.filter(KplerFlow.from_installation == KPLER_TOTAL)
 
         if platform:
             query = query.filter(KplerProduct.platform.in_(to_list(platform)))
