@@ -20,7 +20,7 @@ from .template import TemplateResource
 from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session
-from base.models import KplerFlow, KplerProduct, Country
+from base.models import KplerFlow, KplerProduct, Country, Price, Currency
 from base.utils import to_datetime, to_list, intersect, df_to_json
 
 KPLER_TOTAL = "Total"
@@ -48,6 +48,22 @@ class KplerFlowResource(TemplateResource):
         help="start date (format 2020-01-15)",
         default="2018-01-01",
         required=False,
+    )
+
+    parser.add_argument(
+        "pricing_scenario",
+        help="Pricing scenario (standard or pricecap)",
+        action="split",
+        default=[PRICING_DEFAULT],
+        required=False,
+    )
+
+    parser.add_argument(
+        "currency",
+        action="split",
+        help="currency(ies) of returned results e.g. EUR,USD,GBP",
+        required=False,
+        default=["EUR", "USD"],
     )
 
     parser.add_argument("date_to", type=str, help="End date", default=None, required=False)
@@ -95,6 +111,12 @@ class KplerFlowResource(TemplateResource):
         DestinationCountry = aliased(Country)
         OriginCountry = aliased(Country)
 
+        value_tonne_field = case([(KplerFlow.unit == "t", KplerFlow.value)], else_=sa.null()).label(
+            "value_tonne"
+        )
+
+        value_eur_field = (value_tonne_field * Price.eur_per_tonne).label("value_eur")
+
         query = (
             session.query(
                 KplerFlow,
@@ -104,6 +126,13 @@ class KplerFlowResource(TemplateResource):
                 OriginCountry.region.label("origin_region"),
                 DestinationCountry.name.label("destination_country"),
                 DestinationCountry.region.label("destination_region"),
+                Price.scenario.label("pricing_scenario"),
+                value_eur_field,
+                Currency.currency,
+                (
+                        value_eur_field
+                        * Currency.per_eur
+                ).label("value_currency")
             )
             .outerjoin(
                 OriginCountry,
@@ -120,6 +149,42 @@ class KplerFlowResource(TemplateResource):
                     KplerProduct.platform == KplerFlow.platform,
                 ),
             )
+            .outerjoin(
+                Price,
+                sa.and_(
+                    Price.date == func.date_trunc("day", KplerFlow.date),
+                    KplerFlow.destination_iso2 == sa.any_(Price.destination_iso2s),
+                    sa.or_(
+                        sa.and_(
+                            Price.commodity == "crude_oil",
+                            KplerProduct.family.in_(["Dirty"])
+                        ),
+                        sa.and_(
+                            Price.commodity == "oil_products",
+                            KplerProduct.family.in_(["Light Ends", "Middle Distillates"])
+                        ),
+                        sa.and_(
+                            Price.commodity == "lng",
+                            KplerProduct.name.in_(["lng"])
+                        )
+                    )
+                )
+            )
+            .outerjoin(Currency, Currency.date == func.date_trunc("day", KplerFlow.date))
+            .order_by(
+                KplerFlow.id,
+                Price.scenario,
+                Currency.currency,
+                Price.departure_port_ids,
+                Price.destination_iso2s,
+                Price.ship_insurer_iso2s,
+                Price.ship_owner_iso2s,
+            )
+            .distinct(
+                KplerFlow.id,
+                Price.scenario,
+                Currency.currency,
+            )
         )
         return query
 
@@ -132,6 +197,8 @@ class KplerFlowResource(TemplateResource):
         platform = params.get("platform")
         total_only = params.get("total_only")
         from_installation = params.get("from_installation")
+        pricing_scenario = params.get("pricing_scenario")
+        currency = params.get("currency")
 
         if origin_iso2:
             query = query.filter(KplerFlow.origin_iso2.in_(to_list(origin_iso2)))
@@ -156,5 +223,11 @@ class KplerFlowResource(TemplateResource):
 
         if date_to:
             query = query.filter(KplerFlow.date <= to_datetime(date_to))
+
+        if pricing_scenario:
+            query = query.filter(Price.scenario.in_(to_list(pricing_scenario)))
+
+        if currency is not None:
+            query = query.filter(Currency.currency.in_(to_list(currency)))
 
         return query
