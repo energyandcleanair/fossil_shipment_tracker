@@ -149,6 +149,7 @@ class KplerScraper:
             url = {
                 "dry": "https://dry.kpler.com/api/installations",
                 "liquids": "https://terminal.kpler.com/api/installations",
+                "lng": "https://lng.kpler.com/api/installations",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
             r = requests.get(url, headers=headers)
@@ -173,6 +174,7 @@ class KplerScraper:
             url = {
                 "dry": "https://dry.kpler.com/api/zones",
                 "liquids": "https://terminal.kpler.com/api/zones",
+                "lng": "https://lng.kpler.com/api/zones",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
             r = requests.get(url, headers=headers)
@@ -295,6 +297,7 @@ class KplerScraper:
         url = {
             "dry": "https://dry.kpler.com/api/flows",
             "liquids": "https://terminal.kpler.com/api/flows",
+            "lng": "https://lng.kpler.com/api/flows",
         }.get(platform)
         headers = {"Authorization": f"Basic {token}"}
         try:
