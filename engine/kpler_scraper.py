@@ -89,9 +89,13 @@ class KplerScraper:
         granularity=FlowsPeriod.Daily,
         unit=FlowsMeasurementUnit.T,
     ):
-        origin_country = self.cc.convert(origin_iso2, to="name_short") if origin_iso2 else None
+        origin_country = (
+            unidecode(self.cc.convert(origin_iso2, to="name_short")) if origin_iso2 else None
+        )
         destination_country = (
-            self.cc.convert(destination_iso2, to="name_short") if destination_iso2 else None
+            unidecode(self.cc.convert(destination_iso2, to="name_short"))
+            if destination_iso2
+            else None
         )
 
         params = {
@@ -233,7 +237,7 @@ class KplerScraper:
         # Get zone dict
         def get_installation_dict(iso2, installation):
             if installation is None:
-                name = self.cc.convert(iso2, to="name_short")
+                name = unidecode(self.cc.convert(iso2, to="name_short"))
                 if iso2 == "RU":
                     name = "Russian Federation"
             else:
