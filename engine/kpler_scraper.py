@@ -297,7 +297,11 @@ class KplerScraper:
             "liquids": "https://terminal.kpler.com/api/flows",
         }.get(platform)
         headers = {"Authorization": f"Basic {token}"}
-        r = requests.post(url, json=params_raw, headers=headers)
+        try:
+            r = requests.post(url, json=params_raw, headers=headers)
+        except requests.exceptions.ChunkedEncodingError:
+            logger.error(f"Kpler request failed: {params_raw}. Probably empty")
+            return None
 
         # read content to dataframe
         data = r.json()["series"]
