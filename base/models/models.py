@@ -69,6 +69,7 @@ from . import DB_TABLE_FLARING_FACILITY
 
 from . import DB_TABLE_KPLER_PRODUCT
 from . import DB_TABLE_KPLER_FLOW
+from . import DB_TABLE_KPLER_SHIP
 
 
 class Ship(Base):
@@ -1010,3 +1011,24 @@ class KplerFlow(Base):
         ),
     )
     __tablename__ = DB_TABLE_KPLER_FLOW
+
+class KplerShip(Base):
+    id = Column(BigInteger, primary_key=True)
+    imo = Column(String)
+    mmsi = Column(ARRAY(String))
+    name = Column(ARRAY(String))
+    type = Column(String)
+    dwt = Column(Numeric)  # in tonnes
+
+    country_iso2 = Column(String)
+    country_name = Column(String)
+    others = Column(JSONB)
+
+    __tablename__ = DB_TABLE_KPLER_SHIP
+    __table_args__ = (
+        UniqueConstraint(
+            "id",
+            name="unique_kpler_vessel",
+        ),
+        Index("idx_ship_imo_kpler", "imo"),
+    )
