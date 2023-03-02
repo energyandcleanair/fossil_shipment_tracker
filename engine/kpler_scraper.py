@@ -8,7 +8,7 @@ import country_converter as coco
 from base.env import get_env
 from base.utils import to_datetime, to_list
 from base import UNKNOWN_COUNTRY
-from base.models import DB_TABLE_KPLER_PRODUCT, DB_TABLE_KPLER_FLOW
+from base.models import DB_TABLE_KPLER_PRODUCT, DB_TABLE_KPLER_FLOW, KplerShip
 from base.db_utils import upsert
 from base.db import session, engine
 from base.logger import logger
@@ -76,18 +76,18 @@ class KplerScraper:
         return installations
 
     def get_flows_raw(
-        self,
-        platform,
-        origin_iso2=None,
-        destination_iso2=None,
-        from_installation=None,
-        to_installation=None,
-        product=None,
-        date_from=None,
-        date_to=None,
-        split=None,
-        granularity=FlowsPeriod.Daily,
-        unit=FlowsMeasurementUnit.T,
+            self,
+            platform,
+            origin_iso2=None,
+            destination_iso2=None,
+            from_installation=None,
+            to_installation=None,
+            product=None,
+            date_from=None,
+            date_to=None,
+            split=None,
+            granularity=FlowsPeriod.Daily,
+            unit=FlowsMeasurementUnit.T,
     ):
         origin_country = (
             unidecode(self.cc.convert(origin_iso2, to="name_short")) if origin_iso2 else None
@@ -210,20 +210,55 @@ class KplerScraper:
     #     self.products_brute[platform] = data
     #     return data
 
+    def get_vessel_raw_brute(
+            self,
+            kpler_vessel_id
+    ):
+        """
+        We use token from web interface to get more detailed ship info with kpler vessel id
+        :param kpler_vessel_id: id of the vessel on kpler side
+        :return:
+        Returns KplerShip object
+        """
+
+        token = get_env("KPLER_TOKEN_BRUTE")
+        url = "https://terminal.kpler.com/api/vessels/{}".format(kpler_vessel_id)
+        headers = {"Authorization": f"Bearer {token}"}
+        try:
+            r = requests.get(url, headers=headers)
+        except requests.exceptions.ChunkedEncodingError:
+            logger.error(f"Kpler request failed: {kpler_vessel_id}.")
+            return None
+
+        response_data = r.json()
+
+        ship_data = {
+            "id": response_data["id"],
+            "mmsi": [response_data["mmsi"]],
+            "imo": response_data["imo"],
+            "name": [response_data.get("name")],
+            "type": response_data.get("statcode")["name"],
+            "dwt": response_data.get("deadWeight"),
+            "country_iso2": response_data.get("flagName"),
+            "others": {"kpler": response_data},
+        }
+
+        return KplerShip(**ship_data)
+
     def get_flows_raw_brute(
-        self,
-        platform,
-        origin_iso2,
-        destination_iso2,
-        date_from,
-        date_to,
-        split,
-        from_installation=None,
-        to_installation=None,
-        product=None,
-        unit=None,
-        granularity=FlowsPeriod.Daily,
-        include_total=True,
+            self,
+            platform,
+            origin_iso2,
+            destination_iso2,
+            date_from,
+            date_to,
+            split,
+            from_installation=None,
+            to_installation=None,
+            product=None,
+            unit=None,
+            granularity=FlowsPeriod.Daily,
+            include_total=True,
     ):
         """
         This one uses the token from the web interface,
@@ -348,19 +383,19 @@ class KplerScraper:
         return df
 
     def get_flows(
-        self,
-        platform,
-        origin_iso2=None,
-        destination_iso2=None,
-        product=None,
-        from_installation=None,
-        to_installation=None,
-        split=FlowsSplit.DestinationCountries,
-        granularity=FlowsPeriod.Daily,
-        unit=FlowsMeasurementUnit.T,
-        date_from=dt.datetime.now() - dt.timedelta(days=365),
-        date_to=dt.datetime.now(),
-        use_brute_force=False,
+            self,
+            platform,
+            origin_iso2=None,
+            destination_iso2=None,
+            product=None,
+            from_installation=None,
+            to_installation=None,
+            split=FlowsSplit.DestinationCountries,
+            granularity=FlowsPeriod.Daily,
+            unit=FlowsMeasurementUnit.T,
+            date_from=dt.datetime.now() - dt.timedelta(days=365),
+            date_to=dt.datetime.now(),
+            use_brute_force=False,
     ):
         params = {
             "origin_iso2": origin_iso2,
@@ -392,6 +427,7 @@ class KplerScraper:
         df["unit"] = unit.value
         df["platform"] = platform
         df = df.rename(columns={"Date": "date"})
+
         # df = df.melt(
         #     id_vars=[
         #         x
@@ -491,15 +527,15 @@ def fill_products():
 
 
 def update(
-    date_from=None,
-    date_to=None,
-    platforms=None,
-    products=None,
-    origin_iso2s=["RU"],
-    split_from_installation=True,
-    add_total_installation=True,
-    ignore_if_copy_failed=False,
-    use_brute_force=False,
+        date_from=None,
+        date_to=None,
+        platforms=None,
+        products=None,
+        origin_iso2s=["RU"],
+        split_from_installation=True,
+        add_total_installation=True,
+        ignore_if_copy_failed=False,
+        use_brute_force=False,
 ):
     scraper = KplerScraper()
 
