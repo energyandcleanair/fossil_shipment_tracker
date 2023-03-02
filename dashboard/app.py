@@ -1,3 +1,5 @@
+import os.path
+
 import pandas as pd
 import plotly.express as px
 import dash
@@ -61,7 +63,7 @@ sidebar = html.Div(
 
 content = html.Div(id="page-content", style=CONTENT_STYLE)
 shared = [
-    dcc.Interval(id="interval-component", interval=5000, n_intervals=0),  # in milliseconds
+    dcc.Interval(id="interval-component", interval=500000, n_intervals=0),  # in milliseconds
     dcc.Store(id="counter"),
     dcc.Store(id="counter-rolled"),
     dcc.Store(id="voyages"),
@@ -100,17 +102,25 @@ def render_page_content(pathname):
     manager=background_callback_manager,
 )
 def load_counter(n):
+    # TODO Lohit: this is using a local cache
+    # Wanting to use a redis cache
+    # Like shown here:https://dash.plotly.com/background-callback-caching
+    # Should probably use Google Cloud Memorystrore
     if n == 0:
         cached_data = cache.get("counter")
         if cached_data is not None:
             return cached_data
 
         print("=== loading data ===")
-        storage_options = {"User-Agent": "Mozilla/5.0"}
-        url = "https://api.russiafossiltracker.com/v0/counter?date_from=2022-01-01&format=csv"
-        counter = pd.read_csv("counter.csv")
-        # df = pd.read_csv(url, storage_options=storage_options)
-        # df.to_csv('counter.csv')
+        file = "counter.csv"
+        if not os.path.exists(file):
+            storage_options = {"User-Agent": "Mozilla/5.0"}
+            url = "https://api.russiafossiltracker.com/v0/counter?date_from=2022-01-01&format=csv"
+            counter = pd.read_csv(url, storage_options=storage_options)
+            counter.to_csv(file, index=False)
+        else:
+            counter = pd.read_csv("counter.csv")
+
         print("=== loading data done ===")
         data = counter.to_json(date_format="iso", orient="split")
         cache.set("counter", data)
@@ -127,13 +137,24 @@ def load_counter(n):
 )
 def load_voyages(n):
     if n == 0:
+        # TODO Lohit: this is using a local cache
+        # Wanting to use a redis cache
+        # Like shown here:https://dash.plotly.com/background-callback-caching
+        # Should probably use Google Cloud Memorystrore
         cached_data = cache.get("voyages")
         if cached_data is not None:
             return cached_data
 
         print("=== loading voyages ===")
-        storage_options = {"User-Agent": "Mozilla/5.0"}
-        voyages = pd.read_csv("voyages.csv")
+        file = "voyages.csv"
+        if not os.path.exists(file):
+            storage_options = {"User-Agent": "Mozilla/5.0"}
+            url = "https://api.russiafossiltracker.com/v0/voyage?date_from=2022-01-01&format=csv&select_set=light"
+            voyages = pd.read_csv(url, storage_options=storage_options)
+            voyages.to_csv(file, index=False)
+        else:
+            voyages = pd.read_csv("voyages.csv")
+
         data = voyages.to_json(date_format="iso", orient="split")
         cache.set("voyages", data)
         return data
