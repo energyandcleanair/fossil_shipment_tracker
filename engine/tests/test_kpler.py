@@ -2,7 +2,9 @@ import datetime as dt
 import numpy as np
 from base.models import PortCall
 
-from engine.kpler_scraper import KplerScraper, FlowsSplit, FlowsMeasurementUnit
+from base.db import session, engine
+
+from engine.kpler_scraper import KplerScraper, FlowsSplit, FlowsMeasurementUnit, KplerShip
 
 
 def test_get_flow():
@@ -91,3 +93,14 @@ def test_get_installations():
             installations = scraper.get_installations(origin_iso2=iso2, platform=platform)
             assert installations is not None
             assert len(installations) > 0
+
+
+def test_get_vessel_brute():
+    scraper = KplerScraper()
+
+    vessel_ids, found_vessels = [104208], []
+
+    for vessel_id in vessel_ids:
+        found_vessels.append(scraper.get_vessel_raw_brute(kpler_vessel_id=vessel_id))
+
+    assert len([x for x in found_vessels if x.id in vessel_ids]) == len(vessel_ids)
