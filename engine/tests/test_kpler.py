@@ -1,10 +1,9 @@
 import datetime as dt
 import numpy as np
-from base.models import PortCall
 
 from base.db import session, engine
 
-from engine.kpler_scraper import KplerScraper, FlowsSplit, FlowsMeasurementUnit, KplerShip
+from engine.kpler_scraper import KplerScraper, FlowsSplit
 
 
 def test_get_flow():
