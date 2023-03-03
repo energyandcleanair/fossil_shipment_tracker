@@ -484,7 +484,11 @@ class KplerScraper:
             # forcing check of portcall data to make sure we dont mess up here
             vessels = self.get_vessels_brute(platform=platform)
             vessel_id = voyage.get("vessel")["id"]
-            vessel_imo = vessels.imo[vessels.id.astype(int) == int(vessel_id)].values[0]
+            try:
+                vessel_imo = vessels.imo[vessels.id.astype(int) == int(vessel_id)].values[0]
+            except IndexError:
+                vessel_imo = None
+
             voyage_infos = {
                 "id": voyage.get("id"),
                 "departure_date": dt.datetime.strptime(
