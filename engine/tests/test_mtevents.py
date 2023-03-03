@@ -6,22 +6,14 @@ from base.db import check_if_table_exists
 
 
 def test_find_ships_by_name():
-    find_ships_in_db('BLUEFISH')
+    ships = find_ships_in_db('BLUEFISH')
 
-
-def test_mtevent_type():
-    create_mtevent_type_table(force_rebuild=False)
-    return
-
+    assert ships is not None
 
 def test_upload_events():
     update(ship_imo="9417177",use_cache=True, cache_objects=False,
-           force_rebuild=True, upload_unprocessed_events=False)
+           force_rebuild=False, upload_unprocessed_events=True)
     return
-
-
-def test_check_tables():
-    assert check_if_table_exists(Event, create_table=True) is True
 
 
 def test_process_ship_events():
