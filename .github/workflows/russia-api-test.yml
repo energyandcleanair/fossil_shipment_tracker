@@ -1,4 +1,4 @@
-# Test the integrity of our shipment table on push/pull request
+# Run our tests for api
 name: russia-api-test
 
 on: workflow_dispatch
