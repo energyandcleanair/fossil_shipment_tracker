@@ -527,7 +527,10 @@ def find_ship_imo_locally(ship_name):
         return None
 
 
-def back_fill_ship_position(force_rebuild=True):
+def back_fill_ship_position(
+        force_rebuild=True,
+        event_id=None,
+    ):
     """
     Function to try and find ship positions using both Datalastic and MT for older events
 
@@ -540,6 +543,9 @@ def back_fill_ship_position(force_rebuild=True):
     ) \
         .filter(Event.interacting_ship_imo != sa.null(),
                 Event.ship_closest_position == sa.null())
+
+    if event_id:
+        events = events.filter(Event.id.in_(to_list(event_id)))
 
     mtcalls = session.query(
         MarineTrafficCall.params['imo'].astext.label('ship_imo'),
