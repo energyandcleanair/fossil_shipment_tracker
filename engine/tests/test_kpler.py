@@ -104,3 +104,14 @@ def test_get_vessel_brute():
         found_vessels.append(scraper.get_vessel_raw_brute(kpler_vessel_id=vessel_id))
 
     assert len([x for x in found_vessels if x.id in vessel_ids]) == len(vessel_ids)
+
+
+def test_get_trades_brute():
+    scraper = KplerScraper()
+
+    iso2s = ["RU", "CN", "AE"]
+
+    for iso2 in iso2s:
+        cursor, trades = scraper.get_trades_raw_brute(origin_iso2=iso2, platform="liquids")
+
+    pass
