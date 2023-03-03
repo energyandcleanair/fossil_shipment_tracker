@@ -70,6 +70,7 @@ from . import DB_TABLE_FLARING_FACILITY
 from . import DB_TABLE_KPLER_PRODUCT
 from . import DB_TABLE_KPLER_FLOW
 from . import DB_TABLE_KPLER_SHIP
+from . import DB_TABLE_KPLER_VOYAGE
 
 
 class Ship(Base):
@@ -1032,3 +1033,24 @@ class KplerShip(Base):
         ),
         Index("idx_ship_imo_kpler", "imo"),
     )
+
+class KplerVoyage(Base):
+    id = Column(BigInteger, primary_key=True)
+
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+
+    vessel_id = Column(
+        BigInteger,
+        ForeignKey(DB_TABLE_KPLER_SHIP + ".id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    value = Column(Numeric)
+    unit = Column(String)
+
+    product_id = Column(BigInteger)
+
+    others = Column(JSONB)
+
+    __tablename__ = DB_TABLE_KPLER_VOYAGE
