@@ -404,7 +404,7 @@ class KplerScraper:
             return None
 
         voyages_infos = []
-        for voyage in tqdm(voyages_data):
+        for voyage in voyages_data:
 
             def parse_portcalls(portcalls):
                 """
@@ -892,7 +892,9 @@ def update_trades(
     date_from = date_from or dt.date(2015, 1, 1)
     _platforms = scraper.platforms if platforms is None else platforms
     for platform in _platforms:
+        print(platform)
         for origin_iso2 in tqdm(origin_iso2s):
+            print(origin_iso2)
             cursor_after = None
             while True:
                 cursor_after, trades = scraper.get_trades_raw_brute(
