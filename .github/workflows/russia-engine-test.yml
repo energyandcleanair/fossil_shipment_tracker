@@ -1,4 +1,4 @@
-# Test the integrity of our shipment table on push/pull request
+# Test the integrity of our engine
 name: russia-engine-shipment
 
 on: workflow_dispatch
@@ -27,4 +27,4 @@ jobs:
         echo "${{ secrets.ENV_FILE }}" > .env
     - name: Test with pytest
       run: |
-        pytest -s integrity.py::test_shipment_table
+        pytest -c ./engine/tests/pytest.ini -v
