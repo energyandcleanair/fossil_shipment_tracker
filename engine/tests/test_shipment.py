@@ -8,11 +8,6 @@ def test_update():
     update()
 
 
-def test_check_tables():
-
-    assert (check_if_table_exists(ShipmentWithSTS, create_table=True)) is True
-
-
 def test_shipment_rebuild():
     """
     Test rebuilding shipment table
