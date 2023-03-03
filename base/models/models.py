@@ -69,8 +69,8 @@ from . import DB_TABLE_FLARING_FACILITY
 
 from . import DB_TABLE_KPLER_PRODUCT
 from . import DB_TABLE_KPLER_FLOW
-from . import DB_TABLE_KPLER_SHIP
-from . import DB_TABLE_KPLER_VOYAGE
+from . import DB_TABLE_KPLER_VESSEL
+from . import DB_TABLE_KPLER_TRADE
 
 
 class Ship(Base):
@@ -1013,7 +1013,8 @@ class KplerFlow(Base):
     )
     __tablename__ = DB_TABLE_KPLER_FLOW
 
-class KplerShip(Base):
+
+class KplerVessel(Base):
     id = Column(BigInteger, primary_key=True)
     imo = Column(String)
     mmsi = Column(ARRAY(String))
@@ -1025,32 +1026,34 @@ class KplerShip(Base):
     country_name = Column(String)
     others = Column(JSONB)
 
-    __tablename__ = DB_TABLE_KPLER_SHIP
-    __table_args__ = (
-        UniqueConstraint(
-            "id",
-            name="unique_kpler_vessel",
-        ),
-        Index("idx_ship_imo_kpler", "imo"),
-    )
+    __tablename__ = DB_TABLE_KPLER_VESSEL
+    __table_args__ = (Index("idx_kple_vessel_imo", "imo"),)
 
-class KplerVoyage(Base):
+
+class KplerTrade(Base):
     id = Column(BigInteger, primary_key=True)
+    product_id = Column(Integer, primary_key=True)
+    product_name = Column(String)
 
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
+    departure_date = Column(DateTime, nullable=False)
+    arrival_date = Column(DateTime)
+    status = Column(String)
+    vessel_id = Column(Integer)
+    vessel_imo = Column(String)  # Redundant, but just in case
 
-    vessel_id = Column(
-        BigInteger,
-        ForeignKey(DB_TABLE_KPLER_SHIP + ".id", ondelete="CASCADE"),
-        nullable=False,
-    )
+    departure_zone_id = Column(Integer)
+    departure_zone_name = Column(String)
+    departure_installation_id = Column(Integer)
+    departure_installation_name = Column(String)
 
-    value = Column(Numeric)
-    unit = Column(String)
+    arrival_zone_id = Column(Integer)
+    arrival_zone_name = Column(String)
+    arrival_installation_id = Column(Integer)
+    arrival_installation_name = Column(String)
 
-    product_id = Column(BigInteger)
+    value_tonne = Column(Numeric)
+    value_m3 = Column(String)
 
     others = Column(JSONB)
 
-    __tablename__ = DB_TABLE_KPLER_VOYAGE
+    __tablename__ = DB_TABLE_KPLER_TRADE
