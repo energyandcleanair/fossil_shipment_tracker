@@ -419,8 +419,13 @@ class KplerScraper:
                 discharge_portcalls = [x for x in portcalls if x["operation"] == "DISCHARGE"]
 
                 status = base.UNKNOWN
-                departure_zone_id = load_portcalls[0]["zone"]["id"]
-                departure_zone_name = load_portcalls[0]["zone"]["name"]
+                try:
+                    departure_zone_id = load_portcalls[0]["zone"]["id"]
+                    departure_zone_name = load_portcalls[0]["zone"]["name"]
+                except IndexError:
+                    departure_zone_id = None
+                    departure_zone_name = None
+
                 if load_portcalls[0].get("installation"):
                     departure_installation_id = load_portcalls[0]["installation"]["id"]
                     departure_installation_name = load_portcalls[0]["installation"]["name"]
@@ -436,8 +441,14 @@ class KplerScraper:
                     arrival_installation_name = None
                 elif discharge_portcalls:
                     status = base.COMPLETED
-                    arrival_zone_id = discharge_portcalls[-1]["zone"]["id"]
-                    arrival_zone_name = discharge_portcalls[-1]["zone"]["name"]
+
+                    try:
+                        arrival_zone_id = discharge_portcalls[-1]["zone"]["id"]
+                        arrival_zone_name = discharge_portcalls[-1]["zone"]["name"]
+                    except IndexError:
+                        arrival_zone_id = None
+                        arrival_zone_name = None
+
                     if discharge_portcalls[-1].get("installation"):
                         arrival_installation_id = discharge_portcalls[-1]["installation"]["id"]
                         arrival_installation_name = discharge_portcalls[-1]["installation"]["name"]
