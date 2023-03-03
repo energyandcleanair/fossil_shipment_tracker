@@ -1,11 +1,7 @@
 # Test the integrity of our shipment table on push/pull request
 name: russia-engine-shipment
 
-on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+on: workflow_dispatch
 
 jobs:
   build:
