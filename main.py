@@ -18,6 +18,7 @@ from engine import entsog
 from engine import alert
 from engine import mtevents
 from engine import flaring
+from engine import kpler_scraper
 from callbased import (
     update,
     update_departures,
@@ -39,13 +40,14 @@ def update():
     # backuper.update()
     # currency.update()
     # rscript.update()
+    kpler_scraper.update_trades("2010-01-01", origin_iso2s=["RU"])
     # callbased.update_arrivals(commodities=[base.OIL_OR_CHEMICAL],
     #                           date_from='2022-01-01',
     #                           date_to='2023-01-01',
     #                           departure_port_iso2='MY',
     #                           use_credit_key_if_short=True)
     # callbased.get_queried_ship_hours(ship_imo='3442915')
-    counter.update()
+    # counter.update()
     # company.update_info_from_equasis(commodities=['crude_oil'],
     #                                    last_updated='2023-01-23',
     #                                    departure_date_from='2022-12-01')

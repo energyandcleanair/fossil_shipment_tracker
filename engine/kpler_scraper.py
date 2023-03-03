@@ -5,10 +5,17 @@ import json
 import os
 
 import country_converter as coco
+
+import base
 from base.env import get_env
 from base.utils import to_datetime, to_list
 from base import UNKNOWN_COUNTRY
-from base.models import DB_TABLE_KPLER_PRODUCT, DB_TABLE_KPLER_FLOW, KplerShip
+from base.models import (
+    DB_TABLE_KPLER_PRODUCT,
+    DB_TABLE_KPLER_FLOW,
+    KplerVessel,
+    DB_TABLE_KPLER_TRADE,
+)
 from base.db_utils import upsert
 from base.db import session, engine
 from base.logger import logger
@@ -60,6 +67,7 @@ class KplerScraper:
         self.products_brute = {}
         self.zones_brute = {}
         self.installations_brute = {}
+        self.vessels_brute = {}
 
     def get_installations(self, origin_iso2, platform, product=None):
         # We collect flows split by installation
@@ -76,18 +84,18 @@ class KplerScraper:
         return installations
 
     def get_flows_raw(
-            self,
-            platform,
-            origin_iso2=None,
-            destination_iso2=None,
-            from_installation=None,
-            to_installation=None,
-            product=None,
-            date_from=None,
-            date_to=None,
-            split=None,
-            granularity=FlowsPeriod.Daily,
-            unit=FlowsMeasurementUnit.T,
+        self,
+        platform,
+        origin_iso2=None,
+        destination_iso2=None,
+        from_installation=None,
+        to_installation=None,
+        product=None,
+        date_from=None,
+        date_to=None,
+        split=None,
+        granularity=FlowsPeriod.Daily,
+        unit=FlowsMeasurementUnit.T,
     ):
         origin_country = (
             unidecode(self.cc.convert(origin_iso2, to="name_short")) if origin_iso2 else None
@@ -186,39 +194,46 @@ class KplerScraper:
         self.zones_brute[platform] = data
         return data
 
-    # def get_products_brute(self, platform):
-    #     if self.products_brute.get(platform) is not None:
-    #         return self.products_brute[platform]
-    #
-    #     token = get_env("KPLER_TOKEN_BRUTE")
-    #     url = {
-    #         "dry": "https://dry.kpler.com/api/products",
-    #         "liquids": "https://terminal.kpler.com/api/products",
-    #     }.get(platform)
-    #     headers = {"Authorization": f"Basic {token}"}
-    #     r = requests.get(url, params={"type": "commodity"}, headers=headers)
-    #     data = pd.DataFrame(r.json())
-    #
-    #     data_ancestor = data.closestAncestorCommodity.apply(lambda x: pd.Series(x))
-    #     # data.drop_duplicates(inplace=True)
-    #     # data.to_csv(f"assets/kpler/{platform}_products.csv", index=False)
-    #
-    #     try:
-    #         data = pd.read_csv(f"assets/kpler/{platform}_products.csv")
-    #     except FileNotFoundError:
-    #         data = pd.read_csv(f"engine/assets/kpler/{platform}_products.csv")
-    #     self.products_brute[platform] = data
-    #     return data
+    def get_products_brute(self, platform):
+        if self.products_brute.get(platform) is not None:
+            return self.products_brute[platform]
 
-    def get_vessel_raw_brute(
-            self,
-            kpler_vessel_id
-    ):
+        file = f"assets/kpler/{platform}_products.csv"
+        if os.path.exists("engine"):
+            file = f"engine/{file}"
+
+        if not os.path.exists(file):
+            token = get_env("KPLER_TOKEN_BRUTE")
+            url = {
+                "dry": "https://dry.kpler.com/api/products",
+                "liquids": "https://terminal.kpler.com/api/products",
+                "lng": "https://lng.kpler.com/api/products",
+            }.get(platform)
+            headers = {"Authorization": f"Bearer {token}"}
+            r = requests.get(url, headers=headers)
+            data = pd.DataFrame(r.json())
+            data.to_csv(file, index=False)
+        else:
+            data = pd.read_csv(file)
+
+        self.products_brute[platform] = data
+        return data
+
+    def get_commodities_brute(self, platform):
+        products = self.get_products_brute(platform)
+        products = products[~pd.isna(products.closestAncestorCommodity)]
+        commodities = products.closestAncestorCommodity.apply(
+            lambda x: pd.Series(json.loads(x.replace("'", '"')))
+        )
+        commodities = commodities.drop_duplicates()
+        return commodities
+
+    def get_vessel_raw_brute(self, kpler_vessel_id):
         """
         We use token from web interface to get more detailed ship info with kpler vessel id
         :param kpler_vessel_id: id of the vessel on kpler side
         :return:
-        Returns KplerShip object
+        Returns KplerVessel object
         """
 
         token = get_env("KPLER_TOKEN_BRUTE")
@@ -232,7 +247,7 @@ class KplerScraper:
 
         response_data = r.json()
 
-        ship_data = {
+        vessel_data = {
             "id": response_data["id"],
             "mmsi": [response_data["mmsi"]],
             "imo": response_data["imo"],
@@ -240,21 +255,51 @@ class KplerScraper:
             "type": response_data.get("statcode")["name"],
             "dwt": response_data.get("deadWeight"),
             "country_iso2": response_data.get("flagName"),
-            "others": {"kpler": response_data},
+            "others": json.dumps({"kpler": response_data}),
         }
 
-        return KplerShip(**ship_data)
+        return KplerVessel(**vessel_data)
+
+    def get_vessels_brute(self, platform):
+        """
+        We use token from web interface to get more detailed ship info with kpler vessel id
+        :param kpler_vessel_id: id of the vessel on kpler side
+        :return:
+        Returns KplerShip object
+        """
+        if self.vessels_brute.get(platform) is not None:
+            return self.vessels_brute[platform]
+
+        file = f"assets/kpler/{platform}_vessels.csv"
+        if os.path.exists("engine"):
+            file = f"engine/{file}"
+
+        if not os.path.exists(file):
+            token = get_env("KPLER_TOKEN_BRUTE")
+            url = {
+                "dry": "https://dry.kpler.com/api/vessels",
+                "liquids": "https://terminal.kpler.com/api/vessels",
+                "lng": "https://lng.kpler.com/api/vessels",
+            }.get(platform)
+            headers = {"Authorization": f"Bearer {token}"}
+            r = requests.get(url, headers=headers)
+            data = pd.DataFrame(r.json())
+            data.to_csv(file, index=False)
+        else:
+            data = pd.read_csv(file)
+
+        self.vessels_brute[platform] = data
+        return data
 
     def get_trades_raw_brute(
-            self,
-            platform,
-            installation=None,
-            from_installation=None,
-            origin_iso2=None,
-            cursor_after=None,
-            product=None
+        self,
+        platform,
+        installation=None,
+        from_installation=None,
+        origin_iso2=None,
+        cursor_after=None,
+        product=None,
     ):
-
         # products = self.get_products_brute(platform=platform)
         installations = self.get_installations_brute(platform=platform)
         zones = self.get_zones_brute(platform=platform)
@@ -295,47 +340,51 @@ class KplerScraper:
                     "vesselIds": [],
                     "productIds": [],
                     "forecast": "EXCLUDE",
-                    "freightView": False
+                    "freightView": False,
                 },
-                "sort": {
-                    "sortBy": "START"
-                }
+                "sort": {"sortBy": "START"},
             },
-            "query": """query voyages($size: Int!, $after: String, $where: VoyageFiltersInput!, 
-            $sort: VoyageSortsInput) {\n  voyages(size: $size, cursor: $after, where: $where, sort: $sort) {\n    
-            cursors {\n      after\n      __typename\n    }\n    hasMore\n    items {\n      ...voyage\n      
-            __typename\n    }\n    __typename\n  }\n}\n\nfragment voyage on Voyage {\n  charter {\n    charterer {\n  
-                id\n      name\n      __typename\n    }\n    id\n    spotCharterId\n    __typename\n  }\n  end\n  
-                id\n  portCalls {\n    analystDate\n    berthId\n    billOfLadingCheckedByAnalyst\n    confidence\n   
-                 constraints {\n      providerId\n      __typename\n    }\n    customsBillOfLadingDate\n    
-                 customsEntranceDate\n    customsClearanceDate\n    end\n    eta\n    estimatedBerthArrival\n    
-                 estimatedBerthDeparture\n    flowQuantities {\n      product {\n        ancestorIds\n        api\n   
-                      id\n        name\n        sulfur\n        __typename\n      }\n      flowQuantity: quantity {\n 
-                             energy\n        mass\n        volume\n        volume_gas: volumeGas\n        
-                             __typename\n      }\n      __typename\n    }\n    forecasted\n    forecastedTree {\n     
-                              confidence\n      installation {\n        id\n        name\n        __typename\n      
-                              }\n      zone {\n        id\n        name\n        __typename\n      }\n      
-                              __typename\n    }\n    id\n    installation {\n      id\n      name\n      __typename\n 
-                                 }\n    isGhost\n    operation\n    reexport\n    start\n    source\n    shipToShip\n 
-                                    shipToShipInfo {\n      id\n      vessel {\n        id\n        name\n        
-                                    __typename\n      }\n      __typename\n    }\n    zone {\n      id\n      name\n  
-                                        type\n      __typename\n    }\n    __typename\n  }\n  start\n  vessel {\n    
-                                        capacity {\n      energy\n      mass\n      volume\n      volume_gas: 
-                                        volumeGas\n      __typename\n    }\n    id\n    name\n    __typename\n  }\n  
-                                        __typename\n}\n"""
+            "query": """query voyages($size: Int!, $after: String, $where: VoyageFiltersInput!,
+            $sort: VoyageSortsInput) {\n  voyages(size: $size, cursor: $after, where: $where, sort: $sort) {\n
+            cursors {\n      after\n      __typename\n    }\n    hasMore\n    items {\n      ...voyage\n
+            __typename\n    }\n    __typename\n  }\n}\n\nfragment voyage on Voyage {\n  charter {\n    charterer {\n
+                id\n      name\n      __typename\n    }\n    id\n    spotCharterId\n    __typename\n  }\n  end\n
+                id\n  portCalls {\n    analystDate\n    berthId\n    billOfLadingCheckedByAnalyst\n    confidence\n
+                 constraints {\n      providerId\n      __typename\n    }\n    customsBillOfLadingDate\n
+                 customsEntranceDate\n    customsClearanceDate\n    end\n    eta\n    estimatedBerthArrival\n
+                 estimatedBerthDeparture\n    flowQuantities {\n      product {\n        ancestorIds\n        api\n
+                      id\n        name\n        sulfur\n        __typename\n      }\n      flowQuantity: quantity {\n
+                             energy\n        mass\n        volume\n        volume_gas: volumeGas\n
+                             __typename\n      }\n      __typename\n    }\n    forecasted\n    forecastedTree {\n
+                              confidence\n      installation {\n        id\n        name\n        __typename\n
+                              }\n      zone {\n        id\n        name\n        __typename\n      }\n
+                              __typename\n    }\n    id\n    installation {\n      id\n      name\n      __typename\n
+                                 }\n    isGhost\n    operation\n    reexport\n    start\n    source\n    shipToShip\n
+                                    shipToShipInfo {\n      id\n      vessel {\n        id\n        name\n
+                                    __typename\n      }\n      __typename\n    }\n    zone {\n      id\n      name\n
+                                        type\n      __typename\n    }\n    __typename\n  }\n  start\n  vessel {\n
+                                        capacity {\n      energy\n      mass\n      volume\n      volume_gas:
+                                        volumeGas\n      __typename\n    }\n    id\n    name\n    __typename\n  }\n
+                                        __typename\n}\n""",
         }
 
         if cursor_after:
             params_raw["variables"]["after"] = cursor_after
 
         if product is not None:
-            params_raw["variables"]["where"]["productIds"] = [self.get_product_id(platform=platform, name=product)]
+            params_raw["variables"]["where"]["productIds"] = [
+                self.get_product_id(platform=platform, name=product)
+            ]
 
         if from_installation is not None or origin_iso2 is not None:
-            params_raw["variables"]["where"]["fromLocations"] = [get_installation_dict(origin_iso2, from_installation)]
+            params_raw["variables"]["where"]["fromLocations"] = [
+                get_installation_dict(origin_iso2, from_installation)
+            ]
 
         if installation:
-            params_raw["variables"]["where"]["locations"] = [get_installation_dict(origin_iso2, installation)]
+            params_raw["variables"]["where"]["locations"] = [
+                get_installation_dict(origin_iso2, installation)
+            ]
 
         token = get_env("KPLER_TOKEN_BRUTE")
         url = "https://terminal.kpler.com/graphql/"
@@ -354,68 +403,127 @@ class KplerScraper:
             logger.error("Missing data. Returning")
             return None
 
-        source = []
-        for voyage in voyages_data:
+        voyages_infos = []
+        for voyage in tqdm(voyages_data):
+
+            def parse_portcalls(portcalls):
+                """
+                Read the portcalls of a single voyage, and return key voyage information
+                i.e. from_installation, to_installation, quantity, unit, product_id, status
+                :param portcalls:
+                :return:
+                """
+                if not portcalls:
+                    raise ValueError("No portcalls found")
+                load_portcalls = [x for x in portcalls if x["operation"] == "LOAD"]
+                discharge_portcalls = [x for x in portcalls if x["operation"] == "DISCHARGE"]
+
+                status = base.UNKNOWN
+                departure_zone_id = load_portcalls[0]["zone"]["id"]
+                departure_zone_name = load_portcalls[0]["zone"]["name"]
+                if load_portcalls[0].get("installation"):
+                    departure_installation_id = load_portcalls[0]["installation"]["id"]
+                    departure_installation_name = load_portcalls[0]["installation"]["name"]
+                else:
+                    departure_installation_id = None
+                    departure_installation_name = None
+
+                if not discharge_portcalls:
+                    status = base.ONGOING
+                    arrival_zone_id = None
+                    arrival_zone_name = None
+                    arrival_installation_id = None
+                    arrival_installation_name = None
+                elif discharge_portcalls:
+                    status = base.COMPLETED
+                    arrival_zone_id = discharge_portcalls[-1]["zone"]["id"]
+                    arrival_zone_name = discharge_portcalls[-1]["zone"]["name"]
+                    if discharge_portcalls[-1].get("installation"):
+                        arrival_installation_id = discharge_portcalls[-1]["installation"]["id"]
+                        arrival_installation_name = discharge_portcalls[-1]["installation"]["name"]
+                    else:
+                        arrival_installation_id = None
+                        arrival_installation_name = None
+
+                # Get quantities info
+                last_portcall = portcalls[-1]
+                flows = last_portcall["flowQuantities"]
+                if not flows:
+                    # Even if not flow, let's store the shipment
+                    products = [{}]
+                    quantities = [{}]
+                else:
+                    products = [x["product"] for x in flows]
+                    quantities = [x["flowQuantity"] for x in flows]
+
+                def abs_or_none(x):
+                    if x is None:
+                        return None
+                    return abs(x)
+
+                result = [
+                    {
+                        "departure_zone_id": departure_zone_id,
+                        "departure_zone_name": departure_zone_name,
+                        "departure_installation_id": departure_installation_id,
+                        "departure_installation_name": departure_installation_name,
+                        "arrival_zone_id": arrival_zone_id,
+                        "arrival_zone_name": arrival_zone_name,
+                        "arrival_installation_id": arrival_installation_id,
+                        "arrival_installation_name": arrival_installation_name,
+                        "status": status,
+                        "product_id": products[i].get("id"),
+                        "product_name": products[i].get("name"),
+                        "value_tonne": abs_or_none(quantities[i].get("mass")),
+                        "value_m3": abs_or_none(quantities[i].get("volume")),
+                    }
+                    for i in range(len(products))
+                ]
+                return result
 
             # forcing check of portcall data to make sure we dont mess up here
-            try:
-                final_portcall = voyage.get("portCalls")[-1]
-            except KeyError:
-                final_portcall = None
+            vessels = self.get_vessels_brute(platform=platform)
+            vessel_id = voyage.get("vessel")["id"]
+            vessel_imo = vessels.imo[vessels.id.astype(int) == int(vessel_id)].values[0]
+            voyage_infos = {
+                "id": voyage.get("id"),
+                "departure_date": dt.datetime.strptime(
+                    voyage.get("start"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                ),
+                "arrival_date": dt.datetime.strptime(voyage.get("end"), "%Y-%m-%dT%H:%M:%S.%fZ"),
+                "vessel_id": vessel_id,
+                "vessel_imo": str(vessel_imo),  # redundant, but just in case
+                "others": {"kpler": voyage},
+            }
 
-            source.append(
-                [
-                    voyage.get("id"),
-                    voyage.get("start"),
-                    voyage.get("end"),
-                    voyage.get("vessel")["id"],
-                    # quantity
-                    final_portcall.get("flowQuantities")[-1]["flowQuantity"].get("mass") if len(final_portcall.get("flowQuantities")) > 0 else None,
-                    # unit
-                    FlowsMeasurementUnit.T.value if len(final_portcall.get("flowQuantities")) > 0 else None,
-                    # product id
-                    final_portcall.get("flowQuantities")[-1]["product"].get("id") if len(final_portcall.get("flowQuantities")) > 0 else None,
-                    # whole jsonb
-                    voyage,
-                    # try and get destination installation from last portcall, note this could be unfinished/predicted (?)
-                    # note this will return a dictionary in the format {id: x, name: x, _-typename: x} eg:
-                    # {'id': '9857', 'name': 'Temryuk Port', '__typename': 'Installation'}
-                    final_portcall.get("installation")["id"] if final_portcall.get("installation") else None
-                ]
-            )
+            portcall_infos = parse_portcalls(voyage.get("portCalls"))
 
-        voyages_df = pd.DataFrame(source)
-        voyages_df.columns = [
-            "id",
-            "start_date",
-            "end_date",
-            "vessel_id",
-            "value",
-            "unit",
-            "product_id",
-            "others",
-            "installation_dictionary"
-        ]
+            # One voyage can have several flows
+            def update_and_return(x, y):
+                x_copy = x.copy()
+                x_copy.update(y)
+                return x_copy
 
-        # the final portcall quantity can be a negative value when offloading, we need to explore this
-        voyages_df["value"] = voyages_df["value"].abs()
+            voyage_infos = [update_and_return(x, voyage_infos) for x in portcall_infos]
+            voyages_infos.extend(voyage_infos)
 
+        voyages_df = pd.DataFrame(voyages_infos)
         return cursor, voyages_df
 
     def get_flows_raw_brute(
-            self,
-            platform,
-            origin_iso2,
-            destination_iso2,
-            date_from,
-            date_to,
-            split,
-            from_installation=None,
-            to_installation=None,
-            product=None,
-            unit=None,
-            granularity=FlowsPeriod.Daily,
-            include_total=True,
+        self,
+        platform,
+        origin_iso2,
+        destination_iso2,
+        date_from,
+        date_to,
+        split,
+        from_installation=None,
+        to_installation=None,
+        product=None,
+        unit=None,
+        granularity=FlowsPeriod.Daily,
+        include_total=True,
     ):
         """
         This one uses the token from the web interface,
@@ -540,19 +648,19 @@ class KplerScraper:
         return df
 
     def get_flows(
-            self,
-            platform,
-            origin_iso2=None,
-            destination_iso2=None,
-            product=None,
-            from_installation=None,
-            to_installation=None,
-            split=FlowsSplit.DestinationCountries,
-            granularity=FlowsPeriod.Daily,
-            unit=FlowsMeasurementUnit.T,
-            date_from=dt.datetime.now() - dt.timedelta(days=365),
-            date_to=dt.datetime.now(),
-            use_brute_force=False,
+        self,
+        platform,
+        origin_iso2=None,
+        destination_iso2=None,
+        product=None,
+        from_installation=None,
+        to_installation=None,
+        split=FlowsSplit.DestinationCountries,
+        granularity=FlowsPeriod.Daily,
+        unit=FlowsMeasurementUnit.T,
+        date_from=dt.datetime.now() - dt.timedelta(days=365),
+        date_to=dt.datetime.now(),
+        use_brute_force=False,
     ):
         params = {
             "origin_iso2": origin_iso2,
@@ -683,16 +791,16 @@ def fill_products():
     return
 
 
-def update(
-        date_from=None,
-        date_to=None,
-        platforms=None,
-        products=None,
-        origin_iso2s=["RU"],
-        split_from_installation=True,
-        add_total_installation=True,
-        ignore_if_copy_failed=False,
-        use_brute_force=False,
+def update_flows(
+    date_from=None,
+    date_to=None,
+    platforms=None,
+    products=None,
+    origin_iso2s=["RU"],
+    split_from_installation=True,
+    add_total_installation=True,
+    ignore_if_copy_failed=False,
+    use_brute_force=False,
 ):
     scraper = KplerScraper()
 
@@ -738,3 +846,48 @@ def update(
                             else:
                                 logger.info("Some rows already exist. Upserting instead")
                                 upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
+
+
+def upload_trades(trades, ignore_if_copy_failed=False):
+    if trades is not None:
+        try:
+            trades["others"] = trades.others.apply(json.dumps)
+            trades = trades[~pd.isnull(trades.product_id)]
+            trades.to_sql(
+                DB_TABLE_KPLER_TRADE,
+                con=engine,
+                if_exists="append",
+                index=False,
+            )
+        except sa.exc.IntegrityError:
+            if ignore_if_copy_failed:
+                logger.info("Some rows already exist. Skipping")
+            else:
+                logger.info("Some rows already exist. Upserting instead")
+                upsert(trades, DB_TABLE_KPLER_TRADE, "kpler_trade_pkey")
+
+
+def update_trades(
+    date_from=None,
+    platforms=None,
+    origin_iso2s=["RU"],
+    ignore_if_copy_failed=False,
+):
+    scraper = KplerScraper()
+    date_from = date_from or dt.date(2015, 1, 1)
+    _platforms = scraper.platforms if platforms is None else platforms
+    for platform in _platforms:
+        for origin_iso2 in tqdm(origin_iso2s):
+            cursor_after = None
+            while True:
+                cursor_after, trades = scraper.get_trades_raw_brute(
+                    platform=platform, origin_iso2=origin_iso2, cursor_after=cursor_after
+                )
+                upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
+                print(trades.departure_date.min())
+                if (
+                    cursor_after is None
+                    or len(trades) == 0
+                    or trades.departure_date.min() < to_datetime(date_from)
+                ):
+                    break
