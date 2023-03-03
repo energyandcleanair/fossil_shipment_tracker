@@ -21,7 +21,9 @@ def test_find_ship():
     ship2 = Datalastic.find_ship(name="YANG MEI HU", fuzzy=True, return_closest=True)
     ship3 = Datalastic.find_ship(name="YANG MEI HU", fuzzy=True, return_closest=False)
 
-    assert ship1.name == ship2.name == ship3.name
+    assert ship1 and ship2 and ship3
+
+    assert ship1[0].name == ship2[0].name == ship3[0].name
 
 def test_query_position():
     # This will cost few credits each time...
