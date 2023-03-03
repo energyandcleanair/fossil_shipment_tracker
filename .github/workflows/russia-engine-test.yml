@@ -1,5 +1,5 @@
 # Test the integrity of our engine
-name: russia-engine-shipment
+name: russia-engine-test
 
 on: workflow_dispatch
 
