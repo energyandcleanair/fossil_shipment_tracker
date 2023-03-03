@@ -245,6 +245,163 @@ class KplerScraper:
 
         return KplerShip(**ship_data)
 
+    def get_trades_raw_brute(
+            self,
+            platform,
+            installation=None,
+            from_installation=None,
+            origin_iso2=None,
+            cursor_after=None,
+            product=None
+    ):
+
+        # products = self.get_products_brute(platform=platform)
+        installations = self.get_installations_brute(platform=platform)
+        zones = self.get_zones_brute(platform=platform)
+
+        if installation and from_installation:
+            logger.error("Please choose either installation or from_installation, not both.")
+            return None
+
+        # Get zone dict
+        def get_installation_dict(iso2, installation):
+            if installation is None:
+                name = unidecode(self.cc.convert(iso2, to="name_short"))
+                if iso2 == "RU":
+                    name = "Russian Federation"
+                elif iso2 == "TR":
+                    name = "Turkey"
+            else:
+                name = from_installation
+
+            try:
+                id = installations[(installations["name"] == name)]["id"].values[0]
+                type = "installation"
+            except IndexError:
+                id = zones[(zones["name"] == name)]["id"].values[0]
+                type = "ZONE"
+
+            return {"id": int(id), "type": type}
+
+        params_raw = {
+            "operationName": "voyages",
+            "variables": {
+                "after": None,
+                "size": 1000,
+                "where": {
+                    "locations": [],
+                    "fromLocations": [],
+                    "toLocations": [],
+                    "vesselIds": [],
+                    "productIds": [],
+                    "forecast": "EXCLUDE",
+                    "freightView": False
+                },
+                "sort": {
+                    "sortBy": "START"
+                }
+            },
+            "query": """query voyages($size: Int!, $after: String, $where: VoyageFiltersInput!, 
+            $sort: VoyageSortsInput) {\n  voyages(size: $size, cursor: $after, where: $where, sort: $sort) {\n    
+            cursors {\n      after\n      __typename\n    }\n    hasMore\n    items {\n      ...voyage\n      
+            __typename\n    }\n    __typename\n  }\n}\n\nfragment voyage on Voyage {\n  charter {\n    charterer {\n  
+                id\n      name\n      __typename\n    }\n    id\n    spotCharterId\n    __typename\n  }\n  end\n  
+                id\n  portCalls {\n    analystDate\n    berthId\n    billOfLadingCheckedByAnalyst\n    confidence\n   
+                 constraints {\n      providerId\n      __typename\n    }\n    customsBillOfLadingDate\n    
+                 customsEntranceDate\n    customsClearanceDate\n    end\n    eta\n    estimatedBerthArrival\n    
+                 estimatedBerthDeparture\n    flowQuantities {\n      product {\n        ancestorIds\n        api\n   
+                      id\n        name\n        sulfur\n        __typename\n      }\n      flowQuantity: quantity {\n 
+                             energy\n        mass\n        volume\n        volume_gas: volumeGas\n        
+                             __typename\n      }\n      __typename\n    }\n    forecasted\n    forecastedTree {\n     
+                              confidence\n      installation {\n        id\n        name\n        __typename\n      
+                              }\n      zone {\n        id\n        name\n        __typename\n      }\n      
+                              __typename\n    }\n    id\n    installation {\n      id\n      name\n      __typename\n 
+                                 }\n    isGhost\n    operation\n    reexport\n    start\n    source\n    shipToShip\n 
+                                    shipToShipInfo {\n      id\n      vessel {\n        id\n        name\n        
+                                    __typename\n      }\n      __typename\n    }\n    zone {\n      id\n      name\n  
+                                        type\n      __typename\n    }\n    __typename\n  }\n  start\n  vessel {\n    
+                                        capacity {\n      energy\n      mass\n      volume\n      volume_gas: 
+                                        volumeGas\n      __typename\n    }\n    id\n    name\n    __typename\n  }\n  
+                                        __typename\n}\n"""
+        }
+
+        if cursor_after:
+            params_raw["variables"]["after"] = cursor_after
+
+        if product is not None:
+            params_raw["variables"]["where"]["productIds"] = [self.get_product_id(platform=platform, name=product)]
+
+        if from_installation is not None or origin_iso2 is not None:
+            params_raw["variables"]["where"]["fromLocations"] = [get_installation_dict(origin_iso2, from_installation)]
+
+        if installation:
+            params_raw["variables"]["where"]["locations"] = [get_installation_dict(origin_iso2, installation)]
+
+        token = get_env("KPLER_TOKEN_BRUTE")
+        url = "https://terminal.kpler.com/graphql/"
+        headers = {"Authorization": f"Bearer {token}"}
+        try:
+            r = requests.post(url, json=params_raw, headers=headers)
+        except requests.exceptions.ChunkedEncodingError:
+            logger.error(f"Kpler request failed: {params_raw}. Probably empty")
+            return None
+
+        response_data = r.json()["data"]["voyages"]
+
+        try:
+            cursor, voyages_data = response_data["cursors"]["after"], response_data["items"]
+        except KeyError:
+            logger.error("Missing data. Returning")
+            return None
+
+        source = []
+        for voyage in voyages_data:
+
+            # forcing check of portcall data to make sure we dont mess up here
+            try:
+                final_portcall = voyage.get("portCalls")[-1]
+            except KeyError:
+                final_portcall = None
+
+            source.append(
+                [
+                    voyage.get("id"),
+                    voyage.get("start"),
+                    voyage.get("end"),
+                    voyage.get("vessel")["id"],
+                    # quantity
+                    final_portcall.get("flowQuantities")[-1]["flowQuantity"].get("mass") if len(final_portcall.get("flowQuantities")) > 0 else None,
+                    # unit
+                    FlowsMeasurementUnit.T.value if len(final_portcall.get("flowQuantities")) > 0 else None,
+                    # product id
+                    final_portcall.get("flowQuantities")[-1]["product"].get("id") if len(final_portcall.get("flowQuantities")) > 0 else None,
+                    # whole jsonb
+                    voyage,
+                    # try and get destination installation from last portcall, note this could be unfinished/predicted (?)
+                    # note this will return a dictionary in the format {id: x, name: x, _-typename: x} eg:
+                    # {'id': '9857', 'name': 'Temryuk Port', '__typename': 'Installation'}
+                    final_portcall.get("installation")["id"] if final_portcall.get("installation") else None
+                ]
+            )
+
+        voyages_df = pd.DataFrame(source)
+        voyages_df.columns = [
+            "id",
+            "start_date",
+            "end_date",
+            "vessel_id",
+            "value",
+            "unit",
+            "product_id",
+            "others",
+            "installation_dictionary"
+        ]
+
+        # the final portcall quantity can be a negative value when offloading, we need to explore this
+        voyages_df["value"] = voyages_df["value"].abs()
+
+        return cursor, voyages_df
+
     def get_flows_raw_brute(
             self,
             platform,
