@@ -46,90 +46,72 @@ layout = html.Div(
             [
                 dbc.Col(
                     [
-                        # Add an integer input for rolling_days
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Rolling days:"),
-                                dbc.Input(id="rolling-days", type="number", value=14),
+                        # dbc.InputGroupText("Rolling days:"),
+                        dbc.Label("Rolling days:", size="sm"),
+                        dbc.Input(id="rolling-days", type="number", value=14, size="sm"),
+                    ],
+                    className="md-2",
+                ),
+                dbc.Col(
+                    [
+                        dbc.Label("Colour by:", size="sm"),
+                        dbc.Select(
+                            id="colour-by",
+                            options=[
+                                {"label": "Region", "value": "destination_region"},
+                                {
+                                    "label": "Commodity group",
+                                    "value": "commodity_group_name",
+                                },
                             ],
-                        )
-                    ],
-                    className="md-2",
-                ),
-                dbc.Col(
-                    [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Colour by:"),
-                                dbc.Select(
-                                    id="colour-by",
-                                    options=[
-                                        {"label": "Region", "value": "destination_region"},
-                                        {
-                                            "label": "Commodity group",
-                                            "value": "commodity_group_name",
-                                        },
-                                    ],
-                                    value="destination_region",
-                                ),
-                            ]
-                        )
+                            value="destination_region",
+                            size="sm",
+                        ),
                     ],
                     className="md-3",
                 ),
                 dbc.Col(
                     [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Unit:"),
-                                dbc.Select(
-                                    id="unit",
-                                    options=[
-                                        {"label": v["label"], "value": k} for k, v in units.items()
-                                    ],
-                                    value=list(units.keys())[0],
-                                ),
-                            ]
-                        )
+                        dbc.Label("Unit:", size="sm"),
+                        dbc.Select(
+                            id="unit",
+                            options=[{"label": v["label"], "value": k} for k, v in units.items()],
+                            value=list(units.keys())[0],
+                            size="sm",
+                        ),
                     ],
                     className="md-2",
                 ),
                 dbc.Col(
                     [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Facet by:"),
-                                dbc.Select(
-                                    id="facet",
-                                    options=[
-                                        {"label": "-", "value": FACET_NONE},
-                                        {"label": "Region", "value": "destination_region"},
-                                        {"label": "Country", "value": "destination_country"},
-                                        {
-                                            "label": "Commodity group",
-                                            "value": "commodity_group_name",
-                                        },
-                                    ],
-                                    value=FACET_NONE,
-                                ),
-                            ]
-                        )
+                        dbc.Label("Facet by:", size="sm"),
+                        dbc.Select(
+                            id="facet",
+                            options=[
+                                {"label": "-", "value": FACET_NONE},
+                                {"label": "Region", "value": "destination_region"},
+                                {"label": "Country", "value": "destination_country"},
+                                {
+                                    "label": "Commodity group",
+                                    "value": "commodity_group_name",
+                                },
+                            ],
+                            value=FACET_NONE,
+                            size="sm",
+                        ),
                     ],
                     className="md-3",
                 ),
                 dbc.Col(
                     [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Country:"),
-                                dcc.Dropdown(
-                                    id="destination-country",
-                                    multi=True,
-                                    value=COUNTRY_GLOBAL,
-                                    style={"min-width": "150px"},
-                                ),
-                            ]
-                        )
+                        dbc.Label("Country:", size="sm"),
+                        dcc.Dropdown(
+                            id="destination-country",
+                            multi=True,
+                            value=COUNTRY_GLOBAL,
+                            style={"min-width": "150px"},
+                            maxHeight=300,
+                        ),
                     ],
                     className="md-3",
                 ),

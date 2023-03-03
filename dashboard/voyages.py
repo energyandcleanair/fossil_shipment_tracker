@@ -46,132 +46,103 @@ layout = html.Div(
             [
                 dbc.Col(
                     [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Departure:"),
-                                dcc.Dropdown(
-                                    id="voyages-departure-country",
-                                    multi=False,
-                                    value="Russia",
-                                    style={"min-width": "150px"},
-                                ),
-                            ]
-                        )
+                        dbc.Label("Departure:", size="sm"),
+                        dcc.Dropdown(
+                            id="voyages-departure-country",
+                            multi=False,
+                            value="Russia",
+                            style={"min-width": "150px"},
+                        ),
                     ],
                     className="md-3",
                 ),
                 dbc.Col(
                     [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Destination:"),
-                                dcc.Dropdown(
-                                    id="voyages-destination-country",
-                                    multi=True,
-                                    value=COUNTRY_GLOBAL,
-                                    style={"min-width": "150px"},
-                                ),
-                            ]
-                        )
+                        dbc.Label("Destination:", size="sm"),
+                        dcc.Dropdown(
+                            id="voyages-destination-country",
+                            multi=True,
+                            value=COUNTRY_GLOBAL,
+                            style={"min-width": "150px"},
+                        ),
                     ],
                     className="md-3",
                 ),
                 dbc.Col(
                     [
-                        # Add an integer input for rolling_days
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Status:"),
-                                dcc.Dropdown(
-                                    id="voyages-status",
-                                    multi=True,
-                                    options=[
-                                        {"label": "Completed", "value": "completed"},
-                                        {"label": "Ongoing", "value": "ongoing"},
-                                    ],
-                                    value=["completed", "ongoing"],
-                                ),
+                        dbc.Label("Status:", size="sm"),
+                        dcc.Dropdown(
+                            id="voyages-status",
+                            multi=True,
+                            options=[
+                                {"label": "Completed", "value": "completed"},
+                                {"label": "Ongoing", "value": "ongoing"},
                             ],
-                            className="md-2",
-                        )
-                    ]
-                ),
-                dbc.Col(
-                    [
-                        # Add an integer input for rolling_days
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Rolling days:"),
-                                dbc.Input(id="voyages-rolling-days", type="number", value=14),
-                            ],
-                        )
+                            value=["completed", "ongoing"],
+                        ),
                     ],
                     className="md-2",
                 ),
                 dbc.Col(
                     [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Colour by:"),
-                                dbc.Select(
-                                    id="voyages-colour-by",
-                                    options=[
-                                        {"label": "Region", "value": "destination_region"},
-                                        {
-                                            "label": "Commodity group",
-                                            "value": "commodity_group_name",
-                                        },
-                                    ],
-                                    value="destination_region",
-                                ),
-                            ]
-                        )
-                    ],
-                    className="md-3",
-                ),
-                dbc.Col(
-                    [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Unit:"),
-                                dbc.Select(
-                                    id="voyages-unit",
-                                    options=[
-                                        {"label": v["label"], "value": k} for k, v in units.items()
-                                    ],
-                                    value=list(units.keys())[0],
-                                ),
-                            ]
-                        )
+                        dbc.Label("Rolling days:"),
+                        dbc.Input(id="voyages-rolling-days", type="number", value=14),
                     ],
                     className="md-2",
                 ),
                 dbc.Col(
                     [
-                        dbc.InputGroup(
-                            [
-                                dbc.InputGroupText("Facet by:"),
-                                dbc.Select(
-                                    id="voyages-facet",
-                                    options=[
-                                        {"label": "-", "value": FACET_NONE},
-                                        {
-                                            "label": "Region",
-                                            "value": "commodity_destination_region",
-                                        },
-                                        {
-                                            "label": "Country",
-                                            "value": "commodity_destination_country",
-                                        },
-                                        {
-                                            "label": "Commodity group",
-                                            "value": "commodity_group_name",
-                                        },
-                                    ],
-                                    value=FACET_NONE,
-                                ),
-                            ]
-                        )
+                        dbc.Label("Colour by:", size="sm"),
+                        dbc.Select(
+                            id="voyages-colour-by",
+                            options=[
+                                {"label": "Region", "value": "destination_region"},
+                                {
+                                    "label": "Commodity group",
+                                    "value": "commodity_group_name",
+                                },
+                            ],
+                            value="destination_region",
+                            size="sm",
+                        ),
+                    ],
+                    className="md-3",
+                ),
+                dbc.Col(
+                    [
+                        dbc.Label("Unit:", size="sm"),
+                        dbc.Select(
+                            id="voyages-unit",
+                            options=[{"label": v["label"], "value": k} for k, v in units.items()],
+                            value=list(units.keys())[0],
+                            size="sm",
+                        ),
+                    ],
+                    className="md-2",
+                ),
+                dbc.Col(
+                    [
+                        dbc.Label("Facet by:", size="sm"),
+                        dbc.Select(
+                            id="voyages-facet",
+                            options=[
+                                {"label": "-", "value": FACET_NONE},
+                                {
+                                    "label": "Region",
+                                    "value": "commodity_destination_region",
+                                },
+                                {
+                                    "label": "Country",
+                                    "value": "commodity_destination_country",
+                                },
+                                {
+                                    "label": "Commodity group",
+                                    "value": "commodity_group_name",
+                                },
+                            ],
+                            value=FACET_NONE,
+                            size="sm",
+                        ),
                     ],
                     className="md-3",
                 ),
