@@ -427,7 +427,7 @@ class KplerScraper:
                     departure_zone_id = None
                     departure_zone_name = None
 
-                if load_portcalls is not None and load_portcalls[0].get("installation"):
+                if load_portcalls and load_portcalls[0].get("installation"):
                     departure_installation_id = load_portcalls[0]["installation"]["id"]
                     departure_installation_name = load_portcalls[0]["installation"]["name"]
                 else:
