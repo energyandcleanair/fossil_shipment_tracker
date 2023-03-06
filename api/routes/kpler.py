@@ -161,7 +161,10 @@ class KplerFlowResource(TemplateResource):
                         ),
                         sa.and_(
                             Price.commodity == "oil_products",
-                            KplerProduct.family.in_(["Light Ends", "Middle Distillates"])
+                            sa.or_(
+                                KplerProduct.group.in_(["Fuel Oils"]),
+                                KplerProduct.family.in_(["Light Ends", "Middle Distillates"])
+                            )
                         ),
                         sa.and_(
                             Price.commodity == "lng",
