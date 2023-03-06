@@ -45,7 +45,7 @@ LAYOUT_STYLE = {
 
 sidebar = html.Div(
     [
-        html.H2("Russia Fossil Tracker", className="display-4"),
+        html.H3("Russia Fossil Tracker"),
         html.Hr(),
         # html.P("A simple sidebar layout with navigation links", className="lead"),
         dbc.Nav(
