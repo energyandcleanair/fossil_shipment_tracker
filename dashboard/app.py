@@ -16,6 +16,7 @@ from server import app, background_callback_manager, cache
 from counter import layout as counter_layout
 from voyages import layout as voyages_layout
 
+
 SIDEBAR_STYLE = {
     "position": "fixed",
     "top": 0,
@@ -63,7 +64,7 @@ sidebar = html.Div(
 
 content = html.Div(id="page-content", style=CONTENT_STYLE)
 shared = [
-    dcc.Interval(id="interval-component", interval=500000, n_intervals=0),  # in milliseconds
+    dcc.Interval(id="interval-component", interval=1000, n_intervals=1),  # in milliseconds
     dcc.Store(id="counter"),
     dcc.Store(id="counter-rolled"),
     dcc.Store(id="voyages"),
@@ -75,6 +76,8 @@ app.layout = dbc.Container(
     fluid=True,
     # die ganze app steckt in einem flex container; flex richtung ist column (standard); die row mit dem hauptinhalt bekommt flew grow
 )
+# Expose server
+server = app.server
 
 
 @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
@@ -107,8 +110,10 @@ def load_counter(n):
     # Like shown here:https://dash.plotly.com/background-callback-caching
     # Should probably use Google Cloud Memorystrore
     if n == 0:
+        print("=== loading counter ===")
         cached_data = cache.get("counter")
         if cached_data is not None:
+            print("found cache: rows = %d" % (len(cached_data)))
             return cached_data
 
         print("=== loading data ===")

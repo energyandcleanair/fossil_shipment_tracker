@@ -22,3 +22,6 @@ app = dash.Dash(
     background_callback_manager=background_callback_manager,
     suppress_callback_exceptions=True,
 )
+
+# Expose the server variable
+server = app.server
