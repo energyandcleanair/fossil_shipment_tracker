@@ -16,7 +16,6 @@ from sqlalchemy import UniqueConstraint, CheckConstraint, ForeignKey, Index, fun
 from geoalchemy2 import Geometry
 import datetime as dt
 
-
 import base
 from base.db import Base
 from base.logger import logger
@@ -71,6 +70,8 @@ from . import DB_TABLE_KPLER_PRODUCT
 from . import DB_TABLE_KPLER_FLOW
 from . import DB_TABLE_KPLER_VESSEL
 from . import DB_TABLE_KPLER_TRADE
+from . import DB_TABLE_KPLER_INSTALLATION
+from . import DB_TABLE_KPLER_ZONE
 
 
 class Ship(Base):
@@ -1057,3 +1058,25 @@ class KplerTrade(Base):
     others = Column(JSONB)
 
     __tablename__ = DB_TABLE_KPLER_TRADE
+
+
+class KplerZone(Base):
+    id = Column(BigInteger, primary_key=True)
+    name = Column(String)
+    isPort = Column(Boolean)
+    isSupplyDemand = Column(Boolean)
+    # geo = Column(Geometry("POINT", srid=4326))
+    continent = Column(JSONB)
+    export = Column(JSONB)
+    parentZones = Column(JSONB)
+    range = Column(Numeric)
+    subcontinent = Column(JSONB)
+    # shape = Column(Geometry("GEOMETRY", srid=4326))
+    type = Column(String)
+    import_info = Column(JSONB)
+    isStorageSelected = Column(Boolean)
+    fullname = Column(String)
+    platform = Column(String)
+
+    __tablename__ = DB_TABLE_KPLER_ZONE
+    __table_args__ = (UniqueConstraint("id", name="unique_kpler_zone"),)
