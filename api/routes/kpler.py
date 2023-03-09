@@ -129,10 +129,7 @@ class KplerFlowResource(TemplateResource):
                 Price.scenario.label("pricing_scenario"),
                 value_eur_field,
                 Currency.currency,
-                (
-                        value_eur_field
-                        * Currency.per_eur
-                ).label("value_currency")
+                (value_eur_field * Currency.per_eur).label("value_currency"),
             )
             .outerjoin(
                 OriginCountry,
@@ -153,25 +150,22 @@ class KplerFlowResource(TemplateResource):
                 Price,
                 sa.and_(
                     Price.date == func.date_trunc("day", KplerFlow.date),
-                    KplerFlow.destination_iso2 == sa.any_(Price.destination_iso2s),
                     sa.or_(
-                        sa.and_(
-                            Price.commodity == "crude_oil",
-                            KplerProduct.family.in_(["Dirty"])
-                        ),
+                        KplerFlow.destination_iso2 == sa.any_(Price.destination_iso2s),
+                        Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    ),
+                    sa.or_(
+                        sa.and_(Price.commodity == "crude_oil", KplerProduct.family.in_(["Dirty"])),
                         sa.and_(
                             Price.commodity == "oil_products",
                             sa.or_(
                                 KplerProduct.group.in_(["Fuel Oils"]),
-                                KplerProduct.family.in_(["Light Ends", "Middle Distillates"])
-                            )
+                                KplerProduct.family.in_(["Light Ends", "Middle Distillates"]),
+                            ),
                         ),
-                        sa.and_(
-                            Price.commodity == "lng",
-                            KplerProduct.name.in_(["lng"])
-                        )
-                    )
-                )
+                        sa.and_(Price.commodity == "lng", KplerProduct.name.in_(["lng"])),
+                    ),
+                ),
             )
             .outerjoin(Currency, Currency.date == func.date_trunc("day", KplerFlow.date))
             .order_by(
