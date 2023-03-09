@@ -857,7 +857,7 @@ def update_flows(
                     if add_total_installation:
                         dfs.append(df)
 
-                    if split_to_installation:
+                    if split_to_installation and df is not None:
                         destination_iso2s = df.destination_iso2.unique()
                         for destination_iso2 in destination_iso2s:
                             df = scraper.get_flows(
@@ -873,22 +873,22 @@ def update_flows(
                             )
                             dfs.append(df)
 
-                    df = pd.concat(dfs)
-
-                    if df is not None:
-                        try:
-                            df.to_sql(
-                                DB_TABLE_KPLER_FLOW,
-                                con=engine,
-                                if_exists="append",
-                                index=False,
-                            )
-                        except sa.exc.IntegrityError:
-                            if ignore_if_copy_failed:
-                                logger.info("Some rows already exist. Skipping")
-                            else:
-                                logger.info("Some rows already exist. Upserting instead")
-                                upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
+                    if dfs:
+                        df = pd.concat(dfs)
+                        if len(df) > 0:
+                            try:
+                                df.to_sql(
+                                    DB_TABLE_KPLER_FLOW,
+                                    con=engine,
+                                    if_exists="append",
+                                    index=False,
+                                )
+                            except sa.exc.IntegrityError:
+                                if ignore_if_copy_failed:
+                                    logger.info("Some rows already exist. Skipping")
+                                else:
+                                    logger.info("Some rows already exist. Upserting instead")
+                                    upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
 
 
 def upload_trades(trades, ignore_if_copy_failed=False):
