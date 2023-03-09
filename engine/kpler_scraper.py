@@ -567,6 +567,8 @@ class KplerScraper:
                     name = "Turkey"
                 elif iso2 == "CI":
                     name = "Ivory Coast"
+                elif iso2 == "BN":
+                    name = "Brunei"
             else:
                 name = from_installation
 
@@ -947,3 +949,10 @@ def update_trades(
                     or trades.departure_date.min() < to_datetime(date_from)
                 ):
                     break
+
+
+def update_zones(platforms=None):
+    scraper = KplerScraper()
+    platforms = scraper.platforms if platforms is None else platforms
+    for platform in platforms:
+        zones = scraper.get_zones(platform=platform)
