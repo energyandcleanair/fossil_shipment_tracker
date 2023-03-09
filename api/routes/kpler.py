@@ -75,10 +75,10 @@ class KplerFlowResource(TemplateResource):
     )
 
     parser.add_argument(
-        "total_only",
+        "by_installation",
         type=inputs.boolean,
-        help="Whether to only include total from countries, and not installation by installation",
-        default=True,
+        help="Whether to get flows by installation (i.e. refinery/port) or by country",
+        default=False,
         required=False,
     )
 
@@ -192,7 +192,7 @@ class KplerFlowResource(TemplateResource):
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         platform = params.get("platform")
-        total_only = params.get("total_only")
+        by_installation = params.get("by_installation")
         from_installation = params.get("from_installation")
         pricing_scenario = params.get("pricing_scenario")
         currency = params.get("currency")
@@ -209,8 +209,13 @@ class KplerFlowResource(TemplateResource):
         if from_installation:
             query = query.filter(KplerFlow.from_installation.in_(to_list(from_installation)))
 
-        if total_only:
+        if by_installation:
+            query = query.filter(KplerFlow.from_installation != KPLER_TOTAL)
+        else:
             query = query.filter(KplerFlow.from_installation == KPLER_TOTAL)
+
+        # To be fixed like from_installation once we have full data
+        query = query.filter(KplerFlow.to_installation == KPLER_TOTAL)
 
         if platform:
             query = query.filter(KplerProduct.platform.in_(to_list(platform)))
