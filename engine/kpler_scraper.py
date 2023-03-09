@@ -860,18 +860,19 @@ def update_flows(
                     if split_to_installation and df is not None:
                         destination_iso2s = df.destination_iso2.unique()
                         for destination_iso2 in destination_iso2s:
-                            df = scraper.get_flows(
-                                platform=platform,
-                                origin_iso2=origin_iso2,
-                                destination_iso2=destination_iso2,
-                                date_from=date_from,
-                                date_to=date_to,
-                                product=product,
-                                from_installation=from_installation,
-                                split=FlowsSplit.DestinationInstallations,
-                                use_brute_force=use_brute_force,
-                            )
-                            dfs.append(df)
+                            if destination_iso2 != UNKNOWN_COUNTRY:
+                                df = scraper.get_flows(
+                                    platform=platform,
+                                    origin_iso2=origin_iso2,
+                                    destination_iso2=destination_iso2,
+                                    date_from=date_from,
+                                    date_to=date_to,
+                                    product=product,
+                                    from_installation=from_installation,
+                                    split=FlowsSplit.DestinationInstallations,
+                                    use_brute_force=use_brute_force,
+                                )
+                                dfs.append(df)
 
                     if dfs:
                         df = pd.concat(dfs)
