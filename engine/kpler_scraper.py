@@ -741,6 +741,8 @@ class KplerScraper:
                 df["product"] = df["split"]
             elif split == FlowsSplit.OriginInstallations:
                 df["from_installation"] = df["split"]
+            elif split == FlowsSplit.DestinationInstallations:
+                df["to_installation"] = df["split"]
             return df
 
         df = split_to_column(df, split)
@@ -814,6 +816,7 @@ def update_flows(
     products=None,
     origin_iso2s=["RU"],
     split_from_installation=True,
+    split_to_installation=True,
     add_total_installation=True,
     ignore_if_copy_failed=False,
     use_brute_force=False,
@@ -829,25 +832,49 @@ def update_flows(
                 print(product)
 
                 if split_from_installation:
-                    installations = scraper.get_installations(
+                    from_installations = scraper.get_installations(
                         platform=platform, origin_iso2=origin_iso2, product=product
                     )
                     if add_total_installation:
-                        installations = installations + [None]
+                        from_installations = from_installations + [None]
                 else:
-                    installations = [None]
+                    from_installations = [None]
 
-                for installation in tqdm(installations):
+                for from_installation in tqdm(from_installations):
+                    dfs = []
+                    # Get flows by destination country
                     df = scraper.get_flows(
                         platform=platform,
                         origin_iso2=origin_iso2,
                         date_from=date_from,
                         date_to=date_to,
                         product=product,
-                        from_installation=installation,
+                        from_installation=from_installation,
                         split=FlowsSplit.DestinationCountries,
                         use_brute_force=use_brute_force,
                     )
+
+                    if add_total_installation:
+                        dfs.append(df)
+
+                    if split_to_installation:
+                        destination_iso2s = df.destination_iso2.unique()
+                        for destination_iso2 in destination_iso2s:
+                            df = scraper.get_flows(
+                                platform=platform,
+                                origin_iso2=origin_iso2,
+                                destination_iso2=destination_iso2,
+                                date_from=date_from,
+                                date_to=date_to,
+                                product=product,
+                                from_installation=from_installation,
+                                split=FlowsSplit.DestinationInstallations,
+                                use_brute_force=use_brute_force,
+                            )
+                            dfs.append(df)
+
+                    df = pd.concat(dfs)
+
                     if df is not None:
                         try:
                             df.to_sql(
