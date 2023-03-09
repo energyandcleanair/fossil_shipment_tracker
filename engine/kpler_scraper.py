@@ -1,6 +1,7 @@
 import datetime as dt
 import time
 import requests
+from requests.adapters import HTTPAdapter, Retry
 import json
 import os
 
@@ -68,6 +69,10 @@ class KplerScraper:
         self.zones_brute = {}
         self.installations_brute = {}
         self.vessels_brute = {}
+
+        self.session = requests.Session()
+        retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
     def get_installations(self, origin_iso2, platform, product=None):
         # We collect flows split by installation
@@ -160,7 +165,7 @@ class KplerScraper:
                 "lng": "https://lng.kpler.com/api/installations",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
-            r = requests.get(url, headers=headers)
+            r = self.session.get(url, headers=headers)
             data = pd.DataFrame(r.json())
             data.to_csv(file, index=False)
         else:
@@ -185,7 +190,7 @@ class KplerScraper:
                 "lng": "https://lng.kpler.com/api/zones",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
-            r = requests.get(url, headers=headers)
+            r = self.session.get(url, headers=headers)
             data = pd.DataFrame(r.json())
             data.to_csv(file, index=False)
         else:
@@ -210,7 +215,7 @@ class KplerScraper:
                 "lng": "https://lng.kpler.com/api/products",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
-            r = requests.get(url, headers=headers)
+            r = self.session.get(url, headers=headers)
             data = pd.DataFrame(r.json())
             data.to_csv(file, index=False)
         else:
@@ -240,7 +245,7 @@ class KplerScraper:
         url = "https://terminal.kpler.com/api/vessels/{}".format(kpler_vessel_id)
         headers = {"Authorization": f"Bearer {token}"}
         try:
-            r = requests.get(url, headers=headers)
+            r = self.session.get(url, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
             logger.error(f"Kpler request failed: {kpler_vessel_id}.")
             return None
@@ -282,7 +287,7 @@ class KplerScraper:
                 "lng": "https://lng.kpler.com/api/vessels",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
-            r = requests.get(url, headers=headers)
+            r = self.session.get(url, headers=headers)
             data = pd.DataFrame(r.json())
             data.to_csv(file, index=False)
         else:
