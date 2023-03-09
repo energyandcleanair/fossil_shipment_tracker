@@ -560,6 +560,8 @@ class KplerScraper:
                     name = "Russian Federation"
                 elif iso2 == "TR":
                     name = "Turkey"
+                elif iso2 == "CI":
+                    name = "Ivory Coast"
             else:
                 name = from_installation
 
@@ -567,8 +569,11 @@ class KplerScraper:
                 id = installations[(installations["name"] == name)]["id"].values[0]
                 type = "installation"
             except IndexError:
-                id = zones[(zones["name"] == name)]["id"].values[0]
-                type = "zone"
+                try:
+                    id = zones[(zones["name"] == name)]["id"].values[0]
+                    type = "zone"
+                except IndexError:
+                    raise ValueError(f"Cannot find installation or zone for {name}")
 
             return {"id": int(id), "resourceType": type}
 
