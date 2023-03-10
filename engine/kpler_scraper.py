@@ -93,6 +93,7 @@ class KplerScraper:
         platform,
         origin_iso2=None,
         destination_iso2=None,
+        destination_country=None,
         from_installation=None,
         to_installation=None,
         product=None,
@@ -105,11 +106,9 @@ class KplerScraper:
         origin_country = (
             unidecode(self.cc.convert(origin_iso2, to="name_short")) if origin_iso2 else None
         )
-        destination_country = (
-            unidecode(self.cc.convert(destination_iso2, to="name_short"))
-            if destination_iso2
-            else None
-        )
+
+        if destination_iso2 is not None and destination_country is None:
+            destination_country = unidecode(self.cc.convert(destination_iso2, to="name_short"))
 
         params = {
             "from_zones": [origin_country] if not from_installation else None,
@@ -536,6 +535,7 @@ class KplerScraper:
         platform,
         origin_iso2,
         destination_iso2,
+        destination_country,
         date_from,
         date_to,
         split,
@@ -569,8 +569,10 @@ class KplerScraper:
                     name = "Ivory Coast"
                 elif iso2 == "BN":
                     name = "Brunei"
+                elif iso2 == "CD":
+                    name = "Democratic Republic of the Congo"
             else:
-                name = from_installation
+                name = installation
 
             try:
                 id = installations[(installations["name"] == name)]["id"].values[0]
@@ -616,10 +618,19 @@ class KplerScraper:
             }
 
         if from_installation is not None or origin_iso2 is not None:
-            params_raw["fromLocations"] = [get_installation_dict(origin_iso2, from_installation)]
+            params_raw["fromLocations"] = [
+                get_installation_dict(iso2=origin_iso2, installation=from_installation)
+            ]
 
         if to_installation is not None or destination_iso2 is not None:
-            params_raw["toLocations"] = [get_installation_dict(destination_iso2, to_installation)]
+            params_raw["toLocations"] = [
+                get_installation_dict(iso2=destination_iso2, installation=to_installation)
+            ]
+
+        if destination_country is not None:
+            params_raw["toLocations"] = [
+                get_installation_dict(iso2=None, installation=destination_country)
+            ]
 
         token = get_env("KPLER_TOKEN_BRUTE")
         url = {
@@ -680,6 +691,7 @@ class KplerScraper:
         platform,
         origin_iso2=None,
         destination_iso2=None,
+        destination_country=None,
         product=None,
         from_installation=None,
         to_installation=None,
@@ -693,6 +705,7 @@ class KplerScraper:
         params = {
             "origin_iso2": origin_iso2,
             "destination_iso2": destination_iso2,
+            "destination_country": destination_country,
             "from_installation": from_installation,
             "to_installation": to_installation,
             "product": product,
@@ -710,10 +723,17 @@ class KplerScraper:
         if df is None:
             return None
 
+        if destination_iso2 is None and destination_country is not None:
+            destination_iso2 = self.cc.convert(destination_country, to="ISO2")
+
+        if destination_iso2 is not None and destination_country is None:
+            destination_country = self.cc.convert(destination_iso2, to="name_short")
+
         # Ideally no NULL otherwise the unique constraints won't work
         # This should work from Postgres 15 onwards
         df["origin_iso2"] = origin_iso2 if origin_iso2 else KPLER_TOTAL
         df["destination_iso2"] = destination_iso2 if destination_iso2 else KPLER_TOTAL
+        df["destination_country"] = destination_country if destination_country else KPLER_TOTAL
         df["from_installation"] = from_installation if from_installation else KPLER_TOTAL
         df["to_installation"] = to_installation if to_installation else KPLER_TOTAL
         df["product"] = product if product else KPLER_TOTAL
@@ -745,10 +765,13 @@ class KplerScraper:
                 # if df.split only contains "Total"
                 if set(df.split) == {"Total"}:
                     df["destination_iso2"] = UNKNOWN_COUNTRY
+                    df["destination_country"] = UNKNOWN_COUNTRY
+
                 else:
                     df["destination_iso2"] = self.cc.pandas_convert(
                         series=df.split, to="ISO2", not_found=UNKNOWN_COUNTRY
                     )
+                    df["destination_country"] = df["split"]
             elif split == FlowsSplit.Products:
                 df["product"] = df["split"]
             elif split == FlowsSplit.OriginInstallations:
@@ -767,12 +790,14 @@ class KplerScraper:
                     "date",
                     "origin_iso2",
                     "destination_iso2",
+                    "destination_country",
                     "from_installation",
                     "to_installation",
                     "product",
                     "unit",
                     "platform",
-                ]
+                ],
+                dropna=False,
             )
             .sum()
             .reset_index()
@@ -870,13 +895,13 @@ def update_flows(
                         dfs.append(df)
 
                     if split_to_installation and df is not None:
-                        destination_iso2s = df.destination_iso2.unique()
-                        for destination_iso2 in destination_iso2s:
-                            if destination_iso2 != UNKNOWN_COUNTRY:
+                        destination_countries = df.destination_country.unique()
+                        for destination_country in destination_countries:
+                            if destination_country != UNKNOWN_COUNTRY:
                                 df = scraper.get_flows(
                                     platform=platform,
                                     origin_iso2=origin_iso2,
-                                    destination_iso2=destination_iso2,
+                                    destination_country=destination_country,
                                     date_from=date_from,
                                     date_to=date_to,
                                     product=product,
@@ -888,6 +913,7 @@ def update_flows(
 
                     if dfs:
                         df = pd.concat(dfs)
+                        df.drop(columns=["destination_country"], inplace=True)
                         if len(df) > 0:
                             try:
                                 df.to_sql(
@@ -955,4 +981,13 @@ def update_zones(platforms=None):
     scraper = KplerScraper()
     platforms = scraper.platforms if platforms is None else platforms
     for platform in platforms:
-        zones = scraper.get_zones(platform=platform)
+        zones = scraper.get_zones_brute(platform=platform)
+        parent_zones = zones.parentZones
+        import ast
+
+        import_installation = pd.concat(
+            [pd.DataFrame(ast.literal_eval(x).get("installations")) for x in zones["import"]]
+        )
+        export_installation = pd.concat(
+            [pd.DataFrame(ast.literal_eval(x).get("installations")) for x in zones["export"]]
+        )
