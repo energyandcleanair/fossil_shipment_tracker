@@ -138,11 +138,11 @@ class KplerScraper:
                 time.sleep(3)
                 df = self.flows_clients[platform].get(**params)
         except exceptions.HttpError as e:
-            logger.error(f"Kpler API error: {e}")
+            logger.warning(f"Kpler API error: {e}")
             return None
 
         if "Date" not in df.columns:
-            logger.error(f"No date in Kpler data: {params} {df}")
+            logger.warning(f"No date in Kpler data: {params} {df}")
             return None
 
         if "Period End Date" in df.columns:
@@ -260,6 +260,10 @@ class KplerScraper:
         return commodities
 
     def get_zone_dict(self, platform, iso2=None, id=None, name=None):
+
+        if id is not None and int(id) == 0:
+            return None
+
         if iso2 is not None and id is None and name is None:
             name = unidecode(self.cc.convert(iso2, to="name_short"))
             if iso2 == "RU":
@@ -269,12 +273,22 @@ class KplerScraper:
 
         try:
             installations = self.get_installations_brute(platform=platform)
-            id = installations[(installations["name"] == name)]["id"].values[0]
+            if id is not None:
+                id = installations[(installations["id"] == int(id))]["id"].values[0]
+            elif name is not None:
+                id = installations[(installations["name"] == name)]["id"].values[0]
             type = "installation"
         except IndexError:
-            zones = self.get_zones_brute(platform=platform)
-            id = zones[(zones["name"] == name)]["id"].values[0]
-            type = "zone"
+            try:
+                zones = self.get_zones_brute(platform=platform)
+                if id is not None:
+                    id = zones[(zones["id"] == int(id))]["id"].values[0]
+                elif name is not None:
+                    id = zones[(zones["name"] == name)]["id"].values[0]
+                type = "zone"
+            except IndexError:
+                logger.warning(f"Zone not found: {platform} {iso2} {id} {name}")
+                return None
 
         return {"id": int(id), "resourceType": type}
 
@@ -316,7 +330,7 @@ class KplerScraper:
         try:
             r = self.session.get(url, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
-            logger.error(f"Kpler request failed: {kpler_vessel_id}.")
+            logger.warning(f"Kpler request failed: {kpler_vessel_id}.")
             return None
 
         response_data = r.json()
@@ -379,7 +393,7 @@ class KplerScraper:
         zones = self.get_zones_brute(platform=platform)
 
         if installation and from_installation:
-            logger.error("Please choose either installation or from_installation, not both.")
+            logger.warning("Please choose either installation or from_installation, not both.")
             return None
 
         # Get zone dict
@@ -448,7 +462,7 @@ class KplerScraper:
         try:
             r = requests.post(url, json=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
-            logger.error(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
             return None
 
         response_data = r.json()["data"]["voyages"]
@@ -456,7 +470,7 @@ class KplerScraper:
         try:
             cursor, voyages_data = response_data["cursors"]["after"], response_data["items"]
         except KeyError:
-            logger.error("Missing data. Returning")
+            logger.warning("Missing data. Returning")
             return None
 
         voyages_infos = []
@@ -601,9 +615,8 @@ class KplerScraper:
         :param platform:
         :return:
         """
-        # products = self.get_products_brute(platform=platform)
-        installations = self.get_installations_brute(platform=platform)
-        zones = self.get_zones_brute(platform=platform)
+        if from_zone and from_zone.get("name") == "Unknown":
+            return None
 
         # Get zone dict
         # def get_installation_dict(iso2, installation):
@@ -640,7 +653,11 @@ class KplerScraper:
             "filters": {"product": []},
             "flowDirection": "export",
             # "fromLocations": [{"id": 451, "resourceType": "zone"}],
-            "fromLocations": [from_zone],
+            "fromLocations": [
+                self.get_zone_dict(
+                    id=from_zone.get("id"), name=from_zone.get("name"), platform=platform
+                )
+            ],
             "toLocations": [],
             "granularity": granularity.value,
             "interIntra": "interintra",
@@ -674,14 +691,14 @@ class KplerScraper:
         try:
             r = self.session.post(url, json=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
-            logger.error(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
             return None
 
         # read content to dataframe
         try:
             data = r.json()["series"]
         except requests.exceptions.JSONDecodeError:
-            logger.error(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
             return None
 
         dfs = []
