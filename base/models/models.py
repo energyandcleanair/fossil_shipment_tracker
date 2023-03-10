@@ -1015,6 +1015,42 @@ class KplerFlow(Base):
     __tablename__ = DB_TABLE_KPLER_FLOW
 
 
+class KplerFlow2(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+
+    from_iso2 = Column(String)
+    to_iso2 = Column(String)
+
+    from_zone_id = Column(String, nullable=False)
+    from_zone_name = Column(String)
+    from_split = Column(String, nullable=False)
+
+    to_zone_id = Column(String, nullable=False)
+    to_zone_name = Column(String)
+    to_split = Column(String, nullable=False)
+
+    date = Column(Date, nullable=False)
+    unit = Column(String, nullable=False)
+    product = Column(String, nullable=False)
+    platform = Column(String, nullable=False)
+
+    value = Column(Numeric, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "from_zone_id",
+            "to_zone_id",
+            "date",
+            "unit",
+            "product",
+            "to_split",
+            "from_split",
+            name="unique_kpler_flow2",
+        ),
+    )
+    __tablename__ = DB_TABLE_KPLER_FLOW + "2"
+
+
 class KplerVessel(Base):
     id = Column(BigInteger, primary_key=True)
     imo = Column(String)
@@ -1080,3 +1116,44 @@ class KplerZone(Base):
 
     __tablename__ = DB_TABLE_KPLER_ZONE
     __table_args__ = (UniqueConstraint("id", name="unique_kpler_zone"),)
+
+
+# class KplerInstallation(Base):
+#     """
+#     Index(['name', 'shortType', 'resourceType', 'country', 'id', 'status',
+#        'lngStorageCapacity', 'beta', 'type', 'technicalDetails', 'typeDetail',
+#        'port', 'isStorageSelected', 'fullname', 'nominalAnnualCapacity',
+#        'lngStorageQuantity'],
+#     """
+#     id = Column(BigInteger, primary_key=True)
+#     name = Column(String)
+#     short_type = Column(String)
+#     resource_type = Column(String)
+#     country = Column(String)
+#     status = Column(String)
+#     lng_storage_capacity = Column(Numeric)
+#     beta = Column(Numeric)
+#     type = Column(String)
+#     technical_details = Column(JSONB)
+#     type_detail = Column(String)
+#     port = Column(String)
+#     is_storage_selected = Column(Boolean)
+#     fullname = Column(String)
+#
+#
+#     isSupplyDemand = Column(Boolean)
+#     # geo = Column(Geometry("POINT", srid=4326))
+#     continent = Column(JSONB)
+#     export = Column(JSONB)
+#     parentZones = Column(JSONB)
+#     range = Column(Numeric)
+#     subcontinent = Column(JSONB)
+#     # shape = Column(Geometry("GEOMETRY", srid=4326))
+#     type = Column(String)
+#     import_info = Column(JSONB)
+#     isStorageSelected = Column(Boolean)
+#     fullname = Column(String)
+#     platform = Column(String)
+#
+#     __tablename__ = DB_TABLE_KPLER_ZONE
+#     __table_args__ = (UniqueConstraint("id", name="unique_kpler_zone"),)

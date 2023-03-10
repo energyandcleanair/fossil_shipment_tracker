@@ -4,6 +4,7 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 import json
 import os
+import ast
 
 import country_converter as coco
 
@@ -31,6 +32,7 @@ from kpler.sdk.resources.flows import Flows
 from kpler.sdk.resources.products import Products
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 from kpler.sdk.resources.installations import Installations
+from .misc import get_split_name
 
 KPLER_TOTAL = "Total"
 
@@ -70,17 +72,20 @@ class KplerScraper:
         self.installations_brute = {}
         self.vessels_brute = {}
 
+        # Processed
+        self.zones_countries = {}
+
         self.session = requests.Session()
         retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
-    def get_installations(self, origin_iso2, platform, product=None):
+    def get_installations(self, origin_iso2, platform, split, product=None):
         # We collect flows split by installation
         # and get unique values
         flows = self.get_flows(
             origin_iso2=origin_iso2,
             platform=platform,
-            split=FlowsSplit.OriginInstallations,
+            split=split,
             product=product,
         )
         installations = list(flows.from_installation.unique())
@@ -198,6 +203,28 @@ class KplerScraper:
         self.zones_brute[platform] = data
         return data
 
+    def get_zones_countries(self, platform):
+        if self.zones_countries.get(platform) is not None:
+            return self.zones_countries[platform]
+
+        def parent_zones_to_zones_df(parent_zones):
+            try:
+                dicts = ast.literal_eval(parent_zones)
+                df = pd.DataFrame([x for x in dicts if x.get("resourceType") == "zone"])
+                country = next((x.get("name") for x in dicts if x.get("type") == "country"), None)
+                df["country"] = country
+                df["iso2"] = self.cc.convert(country, to="ISO2")
+                return df
+            except TypeError:
+                return pd.DataFrame()
+
+        zones = self.get_zones_brute(platform=platform)
+        zones_with_country = pd.concat([parent_zones_to_zones_df(x) for x in zones.parentZones])
+        zones_with_country = zones_with_country[["id", "name", "country", "iso2"]].drop_duplicates()
+
+        self.zones_countries[platform] = zones_with_country
+        return zones_with_country
+
     def get_products_brute(self, platform):
         if self.products_brute.get(platform) is not None:
             return self.products_brute[platform]
@@ -231,6 +258,49 @@ class KplerScraper:
         )
         commodities = commodities.drop_duplicates()
         return commodities
+
+    def get_zone_dict(self, platform, iso2=None, id=None, name=None):
+        if iso2 is not None and id is None and name is None:
+            name = unidecode(self.cc.convert(iso2, to="name_short"))
+            if iso2 == "RU":
+                name = "Russian Federation"
+            elif iso2 == "TR":
+                name = "Turkey"
+
+        try:
+            installations = self.get_installations_brute(platform=platform)
+            id = installations[(installations["name"] == name)]["id"].values[0]
+            type = "installation"
+        except IndexError:
+            zones = self.get_zones_brute(platform=platform)
+            id = zones[(zones["name"] == name)]["id"].values[0]
+            type = "zone"
+
+        return {"id": int(id), "resourceType": type}
+
+    def get_zone_name(self, platform, id):
+        installations = self.get_installations_brute(platform=platform)
+        id = int(id)
+        try:
+            name = installations[(installations["id"] == id)]["name"].values[0]
+        except IndexError:
+            try:
+                zones = self.get_zones_brute(platform=platform)
+                name = zones[(zones["id"] == id)]["name"].values[0]
+            except IndexError:
+                try:
+                    zones_countries = self.get_zones_countries(platform=platform)
+                    name = zones_countries[(zones_countries["id"] == id)]["name"].values[0]
+                except IndexError:
+                    name = UNKNOWN_COUNTRY
+        return name
+
+    def get_zone_iso2(self, platform, id):
+        zones_countries = self.get_zones_countries(platform=platform)
+        try:
+            return zones_countries[(zones_countries["id"] == id)]["iso2"].values[0]
+        except IndexError:
+            return None
 
     def get_vessel_raw_brute(self, kpler_vessel_id):
         """
@@ -313,24 +383,6 @@ class KplerScraper:
             return None
 
         # Get zone dict
-        def get_installation_dict(iso2, installation):
-            if installation is None:
-                name = unidecode(self.cc.convert(iso2, to="name_short"))
-                if iso2 == "RU":
-                    name = "Russian Federation"
-                elif iso2 == "TR":
-                    name = "Turkey"
-            else:
-                name = from_installation
-
-            try:
-                id = installations[(installations["name"] == name)]["id"].values[0]
-                type = "installation"
-            except IndexError:
-                id = zones[(zones["name"] == name)]["id"].values[0]
-                type = "ZONE"
-
-            return {"id": int(id), "type": type}
 
         params_raw = {
             "operationName": "voyages",
@@ -533,14 +585,10 @@ class KplerScraper:
     def get_flows_raw_brute(
         self,
         platform,
-        origin_iso2,
-        destination_iso2,
-        destination_country,
         date_from,
         date_to,
         split,
-        from_installation=None,
-        to_installation=None,
+        from_zone=None,
         product=None,
         unit=None,
         granularity=FlowsPeriod.Daily,
@@ -558,33 +606,33 @@ class KplerScraper:
         zones = self.get_zones_brute(platform=platform)
 
         # Get zone dict
-        def get_installation_dict(iso2, installation):
-            if installation is None:
-                name = unidecode(self.cc.convert(iso2, to="name_short"))
-                if iso2 == "RU":
-                    name = "Russian Federation"
-                elif iso2 == "TR":
-                    name = "Turkey"
-                elif iso2 == "CI":
-                    name = "Ivory Coast"
-                elif iso2 == "BN":
-                    name = "Brunei"
-                elif iso2 == "CD":
-                    name = "Democratic Republic of the Congo"
-            else:
-                name = installation
-
-            try:
-                id = installations[(installations["name"] == name)]["id"].values[0]
-                type = "installation"
-            except IndexError:
-                try:
-                    id = zones[(zones["name"] == name)]["id"].values[0]
-                    type = "zone"
-                except IndexError:
-                    raise ValueError(f"Cannot find installation or zone for {name}")
-
-            return {"id": int(id), "resourceType": type}
+        # def get_installation_dict(iso2, installation):
+        #     if installation is None:
+        #         name = unidecode(self.cc.convert(iso2, to="name_short"))
+        #         if iso2 == "RU":
+        #             name = "Russian Federation"
+        #         elif iso2 == "TR":
+        #             name = "Turkey"
+        #         elif iso2 == "CI":
+        #             name = "Ivory Coast"
+        #         elif iso2 == "BN":
+        #             name = "Brunei"
+        #         elif iso2 == "CD":
+        #             name = "Democratic Republic of the Congo"
+        #     else:
+        #         name = installation
+        #
+        #     try:
+        #         id = installations[(installations["name"] == name)]["id"].values[0]
+        #         type = "installation"
+        #     except IndexError:
+        #         try:
+        #             id = zones[(zones["name"] == name)]["id"].values[0]
+        #             type = "zone"
+        #         except IndexError:
+        #             raise ValueError(f"Cannot find installation or zone for {name}")
+        #
+        #     return {"id": int(id), "resourceType": type}
 
         params_raw = {
             "cumulative": False,
@@ -592,7 +640,7 @@ class KplerScraper:
             "filters": {"product": []},
             "flowDirection": "export",
             # "fromLocations": [{"id": 451, "resourceType": "zone"}],
-            "fromLocations": [],
+            "fromLocations": [from_zone],
             "toLocations": [],
             "granularity": granularity.value,
             "interIntra": "interintra",
@@ -609,28 +657,12 @@ class KplerScraper:
             "splitOn": split.value,
             "startDate": to_datetime(date_from).strftime("%Y-%m-%d"),
             "endDate": to_datetime(date_to).strftime("%Y-%m-%d"),
-            "numberOfSplits": 1000,
         }
 
         if product is not None:
             params_raw["filters"] = {
                 "product": [self.get_product_id(platform=platform, name=product)]
             }
-
-        if from_installation is not None or origin_iso2 is not None:
-            params_raw["fromLocations"] = [
-                get_installation_dict(iso2=origin_iso2, installation=from_installation)
-            ]
-
-        if to_installation is not None or destination_iso2 is not None:
-            params_raw["toLocations"] = [
-                get_installation_dict(iso2=destination_iso2, installation=to_installation)
-            ]
-
-        if destination_country is not None:
-            params_raw["toLocations"] = [
-                get_installation_dict(iso2=None, installation=destination_country)
-            ]
 
         token = get_env("KPLER_TOKEN_BRUTE")
         url = {
@@ -655,21 +687,25 @@ class KplerScraper:
             if len(df) > 0:
                 df = pd.concat([df.drop(["values"], axis=1), df["values"].apply(pd.Series)], axis=1)
                 df["date"] = x["date"]
-                df.drop(["id"], axis=1, inplace=True)
                 dfs += [df]
 
             # Add total
-            if include_total:
-                df_total = pd.DataFrame([y["values"] for y in x["datasets"]])
-                df_total["date"] = x["date"]
-                df_total["name"] = KPLER_TOTAL
-                dfs += [df_total]
+            # if include_total:
+            #     df_total = pd.DataFrame([y["values"] for y in x["datasets"]])
+            #     df_total["date"] = x["date"]
+            #     df_total["id"] = KPLER_TOTAL
+            #     df_total["name"] = KPLER_TOTAL
+            #     dfs += [df_total]
 
         if not dfs:
             return None
 
         df = pd.concat(dfs, ignore_index=True)
-        df.rename(columns={"name": "split"}, inplace=True)
+        df.rename(columns={"name": "split_name", "id": "split_id"}, inplace=True)
+        df["split"] = df.apply(
+            lambda row: {"id": row["split_id"], "name": row["split_name"]}, axis=1
+        )
+        df.drop(["split_id", "split_name"], axis=1, inplace=True)
         df = df.melt(id_vars=["date", "split"])
         df["date"] = pd.to_datetime(df["date"])
 
@@ -690,12 +726,10 @@ class KplerScraper:
         self,
         platform,
         origin_iso2=None,
-        destination_iso2=None,
-        destination_country=None,
         product=None,
-        from_installation=None,
-        to_installation=None,
-        split=FlowsSplit.DestinationCountries,
+        from_zone=None,
+        from_split=None,
+        to_split=FlowsSplit.DestinationCountries,
         granularity=FlowsPeriod.Daily,
         unit=FlowsMeasurementUnit.T,
         date_from=dt.datetime.now() - dt.timedelta(days=365),
@@ -703,13 +737,9 @@ class KplerScraper:
         use_brute_force=False,
     ):
         params = {
-            "origin_iso2": origin_iso2,
-            "destination_iso2": destination_iso2,
-            "destination_country": destination_country,
-            "from_installation": from_installation,
-            "to_installation": to_installation,
+            "from_zone": from_zone,
             "product": product,
-            "split": split,
+            "split": to_split,
             "granularity": granularity,
             "unit": unit,
             "date_from": date_from,
@@ -723,19 +753,21 @@ class KplerScraper:
         if df is None:
             return None
 
-        if destination_iso2 is None and destination_country is not None:
-            destination_iso2 = self.cc.convert(destination_country, to="ISO2")
-
-        if destination_iso2 is not None and destination_country is None:
-            destination_country = self.cc.convert(destination_iso2, to="name_short")
+        # if destination_iso2 is None and destination_country is not None:
+        #     destination_iso2 = self.cc.convert(destination_country, to="ISO2")
+        #
+        # if destination_iso2 is not None and destination_country is None:
+        #     destination_country = self.cc.convert(destination_iso2, to="name_short")
 
         # Ideally no NULL otherwise the unique constraints won't work
         # This should work from Postgres 15 onwards
-        df["origin_iso2"] = origin_iso2 if origin_iso2 else KPLER_TOTAL
-        df["destination_iso2"] = destination_iso2 if destination_iso2 else KPLER_TOTAL
-        df["destination_country"] = destination_country if destination_country else KPLER_TOTAL
-        df["from_installation"] = from_installation if from_installation else KPLER_TOTAL
-        df["to_installation"] = to_installation if to_installation else KPLER_TOTAL
+        df["from_split"] = get_split_name(from_split)
+        df["to_split"] = get_split_name(to_split)
+        df["from_iso2"] = origin_iso2 if origin_iso2 else KPLER_TOTAL
+
+        # Set df["from_zone"] to a dict {"id":1","name":2}
+        df["from_zone"] = df.apply(lambda x: from_zone, axis=1)
+        df["to_zone"] = None
         df["product"] = product if product else KPLER_TOTAL
         df["unit"] = unit.value
         df["platform"] = platform
@@ -760,48 +792,54 @@ class KplerScraper:
         #     value_name="value",
         # )
 
-        def split_to_column(df, split):
-            if split == FlowsSplit.DestinationCountries:
-                # if df.split only contains "Total"
-                if set(df.split) == {"Total"}:
-                    df["destination_iso2"] = UNKNOWN_COUNTRY
-                    df["destination_country"] = UNKNOWN_COUNTRY
-
-                else:
-                    df["destination_iso2"] = self.cc.pandas_convert(
-                        series=df.split, to="ISO2", not_found=UNKNOWN_COUNTRY
-                    )
-                    df["destination_country"] = df["split"]
-            elif split == FlowsSplit.Products:
+        def split_to_column(df, split_to):
+            if split_to in [
+                FlowsSplit.DestinationCountries,
+                FlowsSplit.DestinationInstallations,
+                FlowsSplit.DestinationPorts,
+            ]:
+                df["to_zone"] = df["split"]
+            elif split_to == FlowsSplit.Products:
                 df["product"] = df["split"]
-            elif split == FlowsSplit.OriginInstallations:
-                df["from_installation"] = df["split"]
-            elif split == FlowsSplit.DestinationInstallations:
-                df["to_installation"] = df["split"]
+
             return df
 
-        df = split_to_column(df, split)
+        df = split_to_column(df, to_split)
         df = df.drop(columns=["split"])
 
-        # Sometimes we have duplicated values
-        df = (
-            df.groupby(
-                [
-                    "date",
-                    "origin_iso2",
-                    "destination_iso2",
-                    "destination_country",
-                    "from_installation",
-                    "to_installation",
-                    "product",
-                    "unit",
-                    "platform",
-                ],
-                dropna=False,
-            )
-            .sum()
-            .reset_index()
+        df["from_zone_id"] = df.from_zone.apply(lambda x: int(x.get("id")))
+        df["to_zone_id"] = df.to_zone.apply(lambda x: int(x.get("id")))
+
+        df["from_zone_name"] = df.from_zone_id.apply(
+            lambda x: self.get_zone_name(platform=platform, id=x)
         )
+        df["to_zone_name"] = df.to_zone_id.apply(
+            lambda x: self.get_zone_name(platform=platform, id=x)
+        )
+        df["to_iso2"] = df.to_zone_id.apply(lambda x: self.get_zone_iso2(platform=platform, id=x))
+
+        df.drop(columns=["from_zone", "to_zone"], inplace=True)
+        # # Sometimes we have duplicated values
+        # df = (
+        #     df.groupby(
+        #         [
+        #             "date",
+        #             "origin_iso2",
+        #             "destination_iso2",
+        #             "destination_country",
+        #             "from_zone",
+        #             "to_zone",
+        #             "from_split",
+        #             "to_split"
+        #             "product",
+        #             "unit",
+        #             "platform",
+        #         ],
+        #         dropna=False,
+        #     )
+        #     .sum()
+        #     .reset_index()
+        # )
 
         return df
 
@@ -844,150 +882,3 @@ def fill_products():
     products = scraper.get_products()
     upsert(products, DB_TABLE_KPLER_PRODUCT, "kpler_product_pkey")
     return
-
-
-def update_flows(
-    date_from=None,
-    date_to=None,
-    platforms=None,
-    products=None,
-    origin_iso2s=["RU"],
-    split_from_installation=True,
-    split_to_installation=True,
-    add_total_installation=True,
-    ignore_if_copy_failed=False,
-    use_brute_force=False,
-):
-    scraper = KplerScraper()
-
-    _platforms = scraper.platforms if platforms is None else platforms
-    for platform in _platforms:
-        _products = scraper.get_products(platform=platform).name if products is None else products
-        for origin_iso2 in tqdm(origin_iso2s):
-            print(origin_iso2)
-            for product in _products:
-                print(product)
-
-                if split_from_installation:
-                    from_installations = scraper.get_installations(
-                        platform=platform, origin_iso2=origin_iso2, product=product
-                    )
-                    if add_total_installation:
-                        from_installations = from_installations + [None]
-                else:
-                    from_installations = [None]
-
-                for from_installation in tqdm(from_installations):
-                    dfs = []
-                    # Get flows by destination country
-                    df = scraper.get_flows(
-                        platform=platform,
-                        origin_iso2=origin_iso2,
-                        date_from=date_from,
-                        date_to=date_to,
-                        product=product,
-                        from_installation=from_installation,
-                        split=FlowsSplit.DestinationCountries,
-                        use_brute_force=use_brute_force,
-                    )
-
-                    if add_total_installation:
-                        dfs.append(df)
-
-                    if split_to_installation and df is not None:
-                        destination_countries = df.destination_country.unique()
-                        for destination_country in destination_countries:
-                            if destination_country != UNKNOWN_COUNTRY:
-                                df = scraper.get_flows(
-                                    platform=platform,
-                                    origin_iso2=origin_iso2,
-                                    destination_country=destination_country,
-                                    date_from=date_from,
-                                    date_to=date_to,
-                                    product=product,
-                                    from_installation=from_installation,
-                                    split=FlowsSplit.DestinationInstallations,
-                                    use_brute_force=use_brute_force,
-                                )
-                                dfs.append(df)
-
-                    if dfs:
-                        df = pd.concat(dfs)
-                        df.drop(columns=["destination_country"], inplace=True)
-                        if len(df) > 0:
-                            try:
-                                df.to_sql(
-                                    DB_TABLE_KPLER_FLOW,
-                                    con=engine,
-                                    if_exists="append",
-                                    index=False,
-                                )
-                            except sa.exc.IntegrityError:
-                                if ignore_if_copy_failed:
-                                    logger.info("Some rows already exist. Skipping")
-                                else:
-                                    logger.info("Some rows already exist. Upserting instead")
-                                    upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
-
-
-def upload_trades(trades, ignore_if_copy_failed=False):
-    if trades is not None:
-        try:
-            trades["others"] = trades.others.apply(json.dumps)
-            trades = trades[~pd.isnull(trades.product_id)]
-            trades.to_sql(
-                DB_TABLE_KPLER_TRADE,
-                con=engine,
-                if_exists="append",
-                index=False,
-            )
-        except sa.exc.IntegrityError:
-            if ignore_if_copy_failed:
-                logger.info("Some rows already exist. Skipping")
-            else:
-                logger.info("Some rows already exist. Upserting instead")
-                upsert(trades, DB_TABLE_KPLER_TRADE, "kpler_trade_pkey")
-
-
-def update_trades(
-    date_from=None,
-    platforms=None,
-    origin_iso2s=["RU"],
-    ignore_if_copy_failed=False,
-):
-    scraper = KplerScraper()
-    date_from = date_from or dt.date(2015, 1, 1)
-    _platforms = scraper.platforms if platforms is None else platforms
-    for platform in _platforms:
-        print(platform)
-        for origin_iso2 in tqdm(origin_iso2s):
-            print(origin_iso2)
-            cursor_after = None
-            while True:
-                cursor_after, trades = scraper.get_trades_raw_brute(
-                    platform=platform, origin_iso2=origin_iso2, cursor_after=cursor_after
-                )
-                upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
-                print(trades.departure_date.min())
-                if (
-                    cursor_after is None
-                    or len(trades) == 0
-                    or trades.departure_date.min() < to_datetime(date_from)
-                ):
-                    break
-
-
-def update_zones(platforms=None):
-    scraper = KplerScraper()
-    platforms = scraper.platforms if platforms is None else platforms
-    for platform in platforms:
-        zones = scraper.get_zones_brute(platform=platform)
-        parent_zones = zones.parentZones
-        import ast
-
-        import_installation = pd.concat(
-            [pd.DataFrame(ast.literal_eval(x).get("installations")) for x in zones["import"]]
-        )
-        export_installation = pd.concat(
-            [pd.DataFrame(ast.literal_eval(x).get("installations")) for x in zones["export"]]
-        )
