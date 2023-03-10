@@ -672,13 +672,18 @@ class KplerScraper:
         }.get(platform)
         headers = {"Authorization": f"Basic {token}"}
         try:
-            r = requests.post(url, json=params_raw, headers=headers)
+            r = self.session.post(url, json=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
             logger.error(f"Kpler request failed: {params_raw}. Probably empty")
             return None
 
         # read content to dataframe
-        data = r.json()["series"]
+        try:
+            data = r.json()["series"]
+        except requests.exceptions.JSONDecodeError:
+            logger.error(f"Kpler request failed: {params_raw}. Probably empty")
+            return None
+
         dfs = []
         for x in data:
             df = pd.concat(
