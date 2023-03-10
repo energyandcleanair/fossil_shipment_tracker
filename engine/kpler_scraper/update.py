@@ -123,7 +123,7 @@ def update_flows(
                                 to_split=to_split,
                                 use_brute_force=use_brute_force,
                             )
-                            # upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                            upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
 
 
 def upload_trades(trades, ignore_if_copy_failed=False):
