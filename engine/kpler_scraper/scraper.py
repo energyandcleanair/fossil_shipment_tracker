@@ -16,6 +16,7 @@ from base.models import (
     DB_TABLE_KPLER_PRODUCT,
     DB_TABLE_KPLER_FLOW,
     KplerVessel,
+    KplerProduct,
     DB_TABLE_KPLER_TRADE,
 )
 from base.db_utils import upsert
@@ -41,25 +42,25 @@ class KplerScraper:
     def __init__(self):
         self.platforms = ["liquids", "lng", "dry"]
 
-        self.configs = {
-            "liquids": Configuration(
-                Platform.Liquids, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
-            ),
-            "lng": Configuration(Platform.LNG, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")),
-            "dry": Configuration(Platform.Dry, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")),
-        }
-
-        self.flows_clients = {
-            "liquids": Flows(self.configs["liquids"]),
-            "lng": Flows(self.configs["lng"]),
-            "dry": Flows(self.configs["dry"]),
-        }
-
-        self.products_clients = {
-            "liquids": Products(self.configs["liquids"]),
-            "lng": Products(self.configs["lng"]),
-            "dry": Products(self.configs["dry"]),
-        }
+        # self.configs = {
+        #     "liquids": Configuration(
+        #         Platform.Liquids, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
+        #     ),
+        #     "lng": Configuration(Platform.LNG, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")),
+        #     "dry": Configuration(Platform.Dry, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")),
+        # }
+        #
+        # self.flows_clients = {
+        #     "liquids": Flows(self.configs["liquids"]),
+        #     "lng": Flows(self.configs["lng"]),
+        #     "dry": Flows(self.configs["dry"]),
+        # }
+        #
+        # self.products_clients = {
+        #     "liquids": Products(self.configs["liquids"]),
+        #     "lng": Products(self.configs["lng"]),
+        #     "dry": Products(self.configs["dry"]),
+        # }
 
         self.cc = coco.CountryConverter()
 
@@ -271,26 +272,26 @@ class KplerScraper:
             elif iso2 == "TR":
                 name = "Turkey"
 
-        try:
-            installations = self.get_installations_brute(platform=platform)
+        found = False
+        types = {
+            "zone": self.get_zones_brute(platform=platform),
+            "installation": self.get_installations_brute(platform=platform),
+        }
+        for type, zones in types.items():
+            matching = zones
             if id is not None:
-                id = installations[(installations["id"] == int(id))]["id"].values[0]
-            elif name is not None:
-                id = installations[(installations["name"] == name)]["id"].values[0]
-            type = "installation"
-        except IndexError:
-            try:
-                zones = self.get_zones_brute(platform=platform)
-                if id is not None:
-                    id = zones[(zones["id"] == int(id))]["id"].values[0]
-                elif name is not None:
-                    id = zones[(zones["name"] == name)]["id"].values[0]
-                type = "zone"
-            except IndexError:
-                logger.warning(f"Zone not found: {platform} {iso2} {id} {name}")
-                return None
+                matching = matching[matching["id"] == int(id)]
+            if name is not None:
+                matching = matching[matching["name"] == name]
+            if len(matching) == 1:
+                found = True
+                break
 
-        return {"id": int(id), "resourceType": type}
+        if not found:
+            logger.warning(f"Zone not found: {platform} {iso2} {id} {name}")
+            return None
+
+        return {"id": int(matching["id"].values[0]), "resourceType": type}
 
     def get_zone_name(self, platform, id):
         installations = self.get_installations_brute(platform=platform)
@@ -311,9 +312,10 @@ class KplerScraper:
 
     def get_zone_iso2(self, platform, id):
         zones_countries = self.get_zones_countries(platform=platform)
-        try:
-            return zones_countries[(zones_countries["id"] == id)]["iso2"].values[0]
-        except IndexError:
+        found = zones_countries[(zones_countries["id"] == id)]["iso2"]
+        if len(found) == 1:
+            return found.values[0]
+        else:
             return None
 
     def get_vessel_raw_brute(self, kpler_vessel_id):
@@ -677,9 +679,15 @@ class KplerScraper:
         }
 
         if product is not None:
-            params_raw["filters"] = {
-                "product": [self.get_product_id(platform=platform, name=product)]
-            }
+            if isinstance(product, dict):
+                params_raw["filters"] = {"product": [int(product.get("id"))]}
+            else:
+                params_raw["filters"] = {
+                    "product": [self.get_product_id(platform=platform, name=product)]
+                }
+        else:
+            default_products = {"liquids": [1400, 1328, 1370]}
+            params_raw["filters"] = {"product": default_products[platform]}
 
         token = get_env("KPLER_TOKEN_BRUTE")
         url = {
@@ -687,7 +695,11 @@ class KplerScraper:
             "liquids": "https://terminal.kpler.com/api/flows",
             "lng": "https://lng.kpler.com/api/flows",
         }.get(platform)
-        headers = {"Authorization": f"Basic {token}"}
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "x-web-application-version": "v21.316.0",
+            "content-type": "application/json",
+        }
         try:
             r = self.session.post(url, json=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
@@ -788,9 +800,19 @@ class KplerScraper:
         df["from_iso2"] = origin_iso2 if origin_iso2 else KPLER_TOTAL
 
         # Set df["from_zone"] to a dict {"id":1","name":2}
+
+        if product is None:
+            product_name = KPLER_TOTAL
+        elif isinstance(product, str):
+            product_name = product
+        elif isinstance(product, dict):
+            product_name = product.get("name")
+        else:
+            raise ValueError(f"Unknown product type: {type(product)}")
+
         df["from_zone"] = df.apply(lambda x: from_zone, axis=1)
         df["to_zone"] = None
-        df["product"] = product if product else KPLER_TOTAL
+        df["product"] = product_name
         df["unit"] = unit.value
         df["platform"] = platform
         df = df.rename(columns={"Date": "date"})
@@ -832,12 +854,15 @@ class KplerScraper:
         df["from_zone_id"] = df.from_zone.apply(lambda x: int(x.get("id")))
         df["to_zone_id"] = df.to_zone.apply(lambda x: int(x.get("id")))
 
-        df["from_zone_name"] = df.from_zone_id.apply(
-            lambda x: self.get_zone_name(platform=platform, id=x)
-        )
-        df["to_zone_name"] = df.to_zone_id.apply(
-            lambda x: self.get_zone_name(platform=platform, id=x)
-        )
+        df["from_zone_name"] = df.from_zone.apply(lambda x: x.get("name"))
+        df["to_zone_name"] = df.to_zone.apply(lambda x: x.get("name"))
+        #
+        # df["from_zone_name"] = df.from_zone_id.apply(
+        #     lambda x: self.get_zone_name(platform=platform, id=x)
+        # )
+        # df["to_zone_name"] = df.to_zone_id.apply(
+        #     lambda x: self.get_zone_name(platform=platform, id=x)
+        # )
         df["to_iso2"] = df.to_zone_id.apply(lambda x: self.get_zone_iso2(platform=platform, id=x))
 
         df.drop(columns=["from_zone", "to_zone"], inplace=True)
@@ -870,26 +895,38 @@ class KplerScraper:
 
         def get_platform_products(platform):
             if self.products.get(platform) is None:
-                columns = ["id", "product_type", "family_name", "group_name", "product_name"]
-                products = self.products_clients[platform].get(columns=columns)
-                products.columns = columns
-                products = products[products.product_type == "commodity"]
-                products["platform"] = platform
-                products.rename(
-                    columns={
-                        "product_type": "type",
-                        "family_name": "family",
-                        "group_name": "group",
-                        "product_name": "name",
-                    },
-                    inplace=True,
+
+                # This yields 17 commodities while we had 20 when using the API
+                # products = self.get_products_brute(platform=platform)
+                # products = products[~pd.isna(products.closestAncestorCommodity)]
+                # products = products[~pd.isna(products.closestAncestorGroup)]
+                # commodities = products.closestAncestorCommodity.apply(lambda x: pd.Series(x))
+                # commodities["group_name"] = products.closestAncestorGroup.apply(lambda x: x.get('name'))
+                # commodities["family_name"] = products.closestAncestorFamily.apply(lambda x: x.get('name'))
+                # commodities["belongs_to_platform"] = products.ancestors.apply(lambda x: any([y.get('name').lower() == platform and y.get('type') == 'family' for y in x]))
+                # commodities = commodities[commodities.belongs_to_platform]
+                # commodities = commodities.drop_duplicates()
+                # commodities["platform"] = platform
+                # commodities.rename(
+                #     columns={
+                #         "family_name": "family",
+                #         "group_name": "group",
+                #     },
+                #     inplace=True,
+                # )
+                # columns = ["id", "name", "type", "family", "group"]
+                # self.products[platform] = commodities[columns]
+                products = pd.read_sql(
+                    KplerProduct.query.filter(KplerProduct.platform == platform).statement,
+                    session.bind,
                 )
                 self.products[platform] = products
 
             return self.products.get(platform)
 
         df = pd.concat([get_platform_products(platform) for platform in platforms])
-        df = df[["id", "name", "family", "type", "group", "platform"]].drop_duplicates()
+        # df = df[["id", "name", "family", "type", "group", "platform"]].drop_duplicates()
+        df = df[["name", "family", "group", "platform"]].drop_duplicates()
         df = df[~pd.isna(df.name)]
         return df
 
