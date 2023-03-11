@@ -154,6 +154,9 @@ class KplerFlowResource(TemplateResource):
                         KplerFlow.destination_iso2 == sa.any_(Price.destination_iso2s),
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
+                    Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
+                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     sa.or_(
                         sa.and_(Price.commodity == "crude_oil", KplerProduct.family.in_(["Dirty"])),
                         sa.and_(
@@ -172,10 +175,10 @@ class KplerFlowResource(TemplateResource):
                 KplerFlow.id,
                 Price.scenario,
                 Currency.currency,
-                Price.departure_port_ids,
+                # Price.departure_port_ids,
                 Price.destination_iso2s,
-                Price.ship_insurer_iso2s,
-                Price.ship_owner_iso2s,
+                # Price.ship_insurer_iso2s,
+                # Price.ship_owner_iso2s,
             )
             .distinct(
                 KplerFlow.id,

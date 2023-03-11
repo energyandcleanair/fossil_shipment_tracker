@@ -144,8 +144,7 @@ class TemplateResource(Resource):
 
         if any([x not in agg_cols_dict for x in aggregate_by]):
             logger.warning(
-                "aggregate_by can only be a selection of %s"
-                % (",".join(agg_cols_dict.keys()))
+                "aggregate_by can only be a selection of %s" % (",".join(agg_cols_dict.keys()))
             )
             aggregate_by = [x for x in aggregate_by if x in agg_cols_dict]
 
@@ -200,12 +199,10 @@ class TemplateResource(Resource):
         )
 
         # Spread currencies
-        # result = self.spread_currencies(result=result)
+        result = self.spread_currencies(result=result)
 
         # Sort results
-        result = self.sort_result(
-            result=result, sort_by=sort_by, aggregate_by=aggregate_by
-        )
+        result = self.sort_result(result=result, sort_by=sort_by, aggregate_by=aggregate_by)
 
         # Keep only n records
         result = self.limit_result(
@@ -245,10 +242,7 @@ class TemplateResource(Resource):
                 # Special case: if we did aggregate by date_without_year and year
                 # Then we need to add date again, do the rolling average
                 # and remove date
-                if (
-                    len(intersection(["date_without_year", "year"], result.columns))
-                    == 2
-                ):
+                if len(intersection(["date_without_year", "year"], result.columns)) == 2:
                     year = result.year.astype(str)
                     month_day = result.date_without_year.dt.strftime("%m%d")
                     result[date_column] = pd.to_datetime(
@@ -264,16 +258,10 @@ class TemplateResource(Resource):
             max_date = result["date"].max()  # change your date here
             daterange = pd.date_range(min_date, max_date).rename("date")
 
-            result["date"] = result["date"].dt.floor(
-                "D"
-            )  # Should have been done already
+            result["date"] = result["date"].dt.floor("D")  # Should have been done already
             result_rolled = (
                 result.groupby(
-                    [
-                        x
-                        for x in result.columns
-                        if x not in (self.date_cols + self.value_cols)
-                    ]
+                    [x for x in result.columns if x not in (self.date_cols + self.value_cols)]
                 )[[date_column] + self.value_cols]
                 .apply(
                     lambda x: x.set_index("date")
@@ -332,10 +320,7 @@ class TemplateResource(Resource):
             return Response(
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
-                headers={
-                    "Content-disposition": "attachment; filename=%s.csv"
-                    % (self.filename,)
-                },
+                headers={"Content-disposition": "attachment; filename=%s.csv" % (self.filename,)},
             )
 
         if format == "json":
@@ -344,13 +329,9 @@ class TemplateResource(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         return Response(
             response="Unknown format. Should be either csv or json",
@@ -388,8 +369,7 @@ class TemplateResource(Resource):
                     x
                     for x in aggregate_by
                     if not x in aggregate_by_dependencies
-                    and not x
-                    in ["date", "month", "year", "currency", "date_without_year"]
+                    and not x in ["date", "month", "year", "currency", "date_without_year"]
                     and x in result.columns
                 ]
 
@@ -455,23 +435,21 @@ class TemplateResource(Resource):
         result["currency"] = "value_" + result.currency.str.lower()
 
         # Create a hashable version
-        if "destination_names" in result.columns:
-            result["destination_names"] = result["destination_names"].apply(
-                lambda row: sep.join(row) if row else row
-            )
-            result["destination_iso2s"] = result["destination_iso2s"].apply(
-                lambda row: sep.join([str(x) for x in row]) if row else row
-            )
-            result["destination_dates"] = result["destination_dates"].apply(
-                lambda row: sep.join([x.strftime("%Y-%m-%d %H:%M:%S") for x in row])
-                if row
-                else row
-            )
+        # if "destination_names" in result.columns:
+        #     result["destination_names"] = result["destination_names"].apply(
+        #         lambda row: sep.join(row) if row else row
+        #     )
+        #     result["destination_iso2s"] = result["destination_iso2s"].apply(
+        #         lambda row: sep.join([str(x) for x in row]) if row else row
+        #     )
+        #     result["destination_dates"] = result["destination_dates"].apply(
+        #         lambda row: sep.join([x.strftime("%Y-%m-%d %H:%M:%S") for x in row])
+        #         if row
+        #         else row
+        #     )
 
         index_cols = [
-            x
-            for x in result.columns
-            if x not in ["currency", "value_currency", "value_eur"]
+            x for x in result.columns if x not in ["currency", "value_currency", "value_eur"]
         ]
         # result[index_cols] = result[index_cols].replace({np.nan: na_str})
         # result[index_cols] = result[index_cols].replace({None: na_str})
@@ -484,30 +462,30 @@ class TemplateResource(Resource):
         )
 
         # Recreate lists
-        if "destination_names" in result.columns:
-            result.loc[
-                ~result.destination_names.isnull(), "destination_names"
-            ] = result.loc[
-                ~result.destination_names.isnull(), "destination_names"
-            ].apply(
-                lambda row: row.split(sep)
-            )
-
-            result.loc[
-                ~result.destination_iso2s.isnull(), "destination_iso2s"
-            ] = result.loc[
-                ~result.destination_iso2s.isnull(), "destination_iso2s"
-            ].apply(
-                lambda row: row.split(sep)
-            )
-
-            result.loc[
-                ~result.destination_dates.isnull(), "destination_dates"
-            ] = result.loc[
-                ~result.destination_dates.isnull(), "destination_dates"
-            ].apply(
-                lambda row: row.split(sep)
-            )  # We keep it as string
+        # if "destination_names" in result.columns:
+        #     result.loc[
+        #         ~result.destination_names.isnull(), "destination_names"
+        #     ] = result.loc[
+        #         ~result.destination_names.isnull(), "destination_names"
+        #     ].apply(
+        #         lambda row: row.split(sep)
+        #     )
+        #
+        #     result.loc[
+        #         ~result.destination_iso2s.isnull(), "destination_iso2s"
+        #     ] = result.loc[
+        #         ~result.destination_iso2s.isnull(), "destination_iso2s"
+        #     ].apply(
+        #         lambda row: row.split(sep)
+        #     )
+        #
+        #     result.loc[
+        #         ~result.destination_dates.isnull(), "destination_dates"
+        #     ] = result.loc[
+        #         ~result.destination_dates.isnull(), "destination_dates"
+        #     ].apply(
+        #         lambda row: row.split(sep)
+        #     )  # We keep it as string
 
         # Quick sanity check
         len_after = len(result)

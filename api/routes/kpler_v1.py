@@ -150,20 +150,23 @@ class KplerFlowResource(TemplateResource):
                 ToCountry.region.label("destination_region"),
                 KplerFlow2.to_split.label("destination_type"),
                 KplerFlow2.to_zone_name.label("destination_name"),
+                KplerFlow2.date,
+                KplerFlow2.product.label("product"),
                 KplerProduct.group.label("product_group"),
                 KplerProduct.family.label("product_family"),
                 Price.scenario.label("pricing_scenario"),
+                value_tonne_field,
                 value_eur_field,
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
             )
             .outerjoin(
                 FromCountry,
-                FromCountry.iso2 == KplerFlow2.origin_iso2,
+                FromCountry.iso2 == KplerFlow2.from_iso2,
             )
             .outerjoin(
                 ToCountry,
-                ToCountry.iso2 == KplerFlow2.destination_iso2,
+                ToCountry.iso2 == KplerFlow2.to_iso2,
             )
             .outerjoin(
                 KplerProduct,
@@ -175,11 +178,14 @@ class KplerFlowResource(TemplateResource):
             .outerjoin(
                 Price,
                 sa.and_(
-                    Price.date == func.date_trunc("day", KplerFlow2.date),
+                    Price.date == KplerFlow2.date,
                     sa.or_(
                         KplerFlow2.to_iso2 == sa.any_(Price.destination_iso2s),
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
+                    Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
+                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     sa.or_(
                         sa.and_(Price.commodity == "crude_oil", KplerProduct.family.in_(["Dirty"])),
                         sa.and_(
@@ -193,15 +199,15 @@ class KplerFlowResource(TemplateResource):
                     ),
                 ),
             )
-            .outerjoin(Currency, Currency.date == func.date_trunc("day", KplerFlow2.date))
+            .outerjoin(Currency, Currency.date == KplerFlow2.date)
             .order_by(
                 KplerFlow2.id,
                 Price.scenario,
                 Currency.currency,
-                Price.departure_port_ids,
+                # Price.departure_port_ids,
                 Price.destination_iso2s,
-                Price.ship_insurer_iso2s,
-                Price.ship_owner_iso2s,
+                # Price.ship_insurer_iso2s,
+                # Price.ship_owner_iso2s,
             )
             .distinct(
                 KplerFlow2.id,
