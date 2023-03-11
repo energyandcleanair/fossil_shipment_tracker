@@ -37,5 +37,6 @@ from .commodity import *
 from .alert import *
 from .flaring import *
 from .kpler import *
+from .kpler_v1 import *
 
 from .charts import *

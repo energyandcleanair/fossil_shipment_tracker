@@ -43,6 +43,20 @@ def upload_flows(df, ignore_if_copy_failed=False):
                 upsert(df, DB_TABLE_KPLER_FLOW + "2", "unique_kpler_flow2")
 
 
+def get_products(scraper, platform, origin_iso2):
+    df = scraper.get_flows_raw_brute(
+        platform=platform,
+        product=None,
+        date_from="2010-01-01",
+        date_to=dt.date.today(),
+        from_zone=scraper.get_zone_dict(platform=platform, iso2=origin_iso2),
+        split=FlowsSplit.Products,
+        granularity=FlowsPeriod.Annually,
+    )
+    products_unique = list({v["id"]: v for v in df.split}.values())
+    return products_unique
+
+
 def get_from_zones(scraper, platform, product, origin_iso2, split):
 
     if split == FlowsSplit.OriginCountries:
@@ -82,8 +96,8 @@ def update_flows(
     platforms=None,
     products=None,
     origin_iso2s=["RU"],
-    split_from_installation=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
-    split_to_installation=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
+    from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
+    to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     # add_total_installation=True,
     ignore_if_copy_failed=False,
     use_brute_force=False,
@@ -92,13 +106,19 @@ def update_flows(
 
     _platforms = scraper.platforms if platforms is None else platforms
     for platform in _platforms:
-        _products = scraper.get_products(platform=platform).name if products is None else products
+        # _products = scraper.get_products(platform=platform).name if products is None else products
 
         for origin_iso2 in tqdm(origin_iso2s):
 
+            _products = get_products(
+                scraper=scraper,
+                platform=platform,
+                origin_iso2=origin_iso2,
+            )
+
             for product in tqdm(_products):
 
-                for from_split in split_from_installation:
+                for from_split in from_splits:
 
                     from_zones = get_from_zones(
                         scraper=scraper,
@@ -110,7 +130,7 @@ def update_flows(
 
                     for from_zone in from_zones:
 
-                        for to_split in split_to_installation:
+                        for to_split in to_splits:
 
                             df = scraper.get_flows(
                                 platform=platform,
