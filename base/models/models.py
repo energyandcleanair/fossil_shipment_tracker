@@ -1049,6 +1049,7 @@ class KplerFlow2(Base):
         ),
     )
     __tablename__ = DB_TABLE_KPLER_FLOW + "2"
+    __table_args__ = (Index("idx_kpler_flow2_product", "product"),)
 
 
 class KplerVessel(Base):
