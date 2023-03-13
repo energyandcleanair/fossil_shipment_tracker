@@ -134,7 +134,7 @@ def update_flows(
                     split=from_split,
                 )
 
-                for from_zone in from_zones:
+                for from_zone in tqdm(from_zones):
 
                     for to_split in to_splits:
 
