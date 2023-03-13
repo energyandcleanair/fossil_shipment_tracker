@@ -29,9 +29,25 @@ class ChartDepartureOwnership(Resource):
     parser.add_argument(
         "date_to",
         type=str,
-        help="start date for counter data (format 2020-01-15)",
+        help="end date for counter data (format 2020-01-15)",
         default=-3,
         required=False,
+    )
+
+    parser.add_argument(
+        "commodity_origin_iso2",
+        action="split",
+        help="iso2(s) of commodity origin",
+        required=False,
+        default=["RU"],
+    )
+
+    parser.add_argument(
+        "commodity_destination_iso2",
+        help="What new destination country code(s) e.g. IT,IN",
+        action="split",
+        required=False,
+        default=None,
     )
 
     parser.add_argument(
@@ -112,6 +128,8 @@ class ChartDepartureOwnership(Resource):
         language = params_chart.get("language")
         group_eug7_insurernorwary = params_chart.get("group_eug7_insurernorwary")
         departure_port_area = params.get("departure_port_area")
+        commodity_origin_iso2 = params.get("commodity_origin_iso2")
+        commodity_destination_iso2 = params.get("commodity_destination_iso2")
 
         default_aggregate_by = [
             "ship_owner_country",
@@ -126,8 +144,9 @@ class ChartDepartureOwnership(Resource):
                 # 'pivot_by': ['destination_region'],
                 # 'pivot_value': 'value_tonne',
                 "use_eu": True,
-                "commodity_origin_iso2": "RU",
-                "commodity_destination_iso2_not": "RU",
+                "commodity_origin_iso2": commodity_origin_iso2,
+                "commodity_destination_iso2_not": commodity_origin_iso2,
+                "commodity_destination_iso2": commodity_destination_iso2,
                 # 'date_from': '2022-01-01',
                 "pricing_scenario": [base.PRICING_DEFAULT],
                 "departure_port_area": departure_port_area,
