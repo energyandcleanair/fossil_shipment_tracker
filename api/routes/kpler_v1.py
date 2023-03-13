@@ -61,8 +61,8 @@ class KplerFlowResource(TemplateResource):
     parser.add_argument(
         "date_from",
         type=str,
-        help="start date (format 2020-01-15)",
-        default="2018-01-01",
+        help="start date (format 2020-01-01)",
+        default="2020-01-01",
         required=False,
     )
 
