@@ -127,9 +127,9 @@ class ChartDepartureOwnership(Resource):
         nest_in_data = params_chart.get("nest_in_data")
         language = params_chart.get("language")
         group_eug7_insurernorwary = params_chart.get("group_eug7_insurernorwary")
-        departure_port_area = params.get("departure_port_area")
-        commodity_origin_iso2 = params.get("commodity_origin_iso2")
-        commodity_destination_iso2 = params.get("commodity_destination_iso2")
+        departure_port_area = params_chart.get("departure_port_area")
+        commodity_origin_iso2 = params_chart.get("commodity_origin_iso2")
+        commodity_destination_iso2 = params_chart.get("commodity_destination_iso2")
 
         default_aggregate_by = [
             "ship_owner_country",
