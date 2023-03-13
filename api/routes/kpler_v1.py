@@ -110,10 +110,14 @@ class KplerFlowResource(TemplateResource):
         required=False,
     )
 
-    must_group_by = ["unit"]
+    must_group_by = ["unit", "origin_type", "destination_type"]
     date_cols = ["date"]
-    value_cols = ["value"]
-    pivot_dependencies = {}
+    value_cols = ["value_tonne", "value_eur", "value_currency"]
+    pivot_dependencies = {
+        "product": ["product_group", "product_family"],
+        "origin_country": ["origin_iso2", "origin_region"],
+        "destination_country": ["destination_iso2", "destination_region"],
+    }
     filename = "kpler_flow"
 
     def get_aggregate_cols_dict(self, subquery):
@@ -168,7 +172,9 @@ class KplerFlowResource(TemplateResource):
                 ToCountry,
                 ToCountry.iso2 == KplerFlow2.to_iso2,
             )
-            .outerjoin(
+            # Inner join to avoid double counting (we collected both by product and by group)
+            # but this isn't perfect, as sometimes, kpler is using group when not knowing product
+            .join(
                 KplerProduct,
                 sa.and_(
                     KplerProduct.name == KplerFlow2.product,
