@@ -30,7 +30,7 @@ def upload_flows(df, ignore_if_copy_failed=False):
     if len(df) > 0:
         try:
             df.to_sql(
-                DB_TABLE_KPLER_FLOW + "2",
+                DB_TABLE_KPLER_FLOW + "3",
                 con=engine,
                 if_exists="append",
                 index=False,
@@ -40,7 +40,7 @@ def upload_flows(df, ignore_if_copy_failed=False):
                 logger.info("Some rows already exist. Skipping")
             else:
                 logger.info("Some rows already exist. Upserting instead")
-                upsert(df, DB_TABLE_KPLER_FLOW + "2", "unique_kpler_flow2")
+                upsert(df, DB_TABLE_KPLER_FLOW + "3", "unique_kpler_flow2")
 
 
 def get_products(scraper, platform, origin_iso2):
