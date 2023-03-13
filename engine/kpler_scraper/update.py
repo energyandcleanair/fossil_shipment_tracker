@@ -79,15 +79,23 @@ def get_from_zones(scraper, platform, product, origin_iso2, split):
         return zones_unique
 
 
-def get_to_zones(scraper, platform, product, origin_iso2, split):
-    if split == FlowsSplit.DestinationCountries:
-        return [None]
+def get_to_zones(scraper, platform, product, from_zone, split):
 
-    df = scraper.get_flows_raw(
-        platform=platform, product=product, origin_iso2=origin_iso2, split=split
+    df = scraper.get_flows_raw_brute(
+        platform=platform,
+        product=product,
+        date_from="2010-01-01",
+        date_to=dt.date.today(),
+        from_zone=from_zone,
+        split=split,
+        granularity=FlowsPeriod.Annually,
     )
-    zones = df.split.unique()
-    return zones
+    if df is None:
+        return []
+    else:
+        # dict unashable. Use a trick to get unique values
+        zones_unique = list({v["id"]: v for v in df.split}.values())
+        return zones_unique
 
 
 def update_flows(
@@ -116,31 +124,40 @@ def update_flows(
                 origin_iso2=origin_iso2,
             )
 
-            for product in tqdm(_products):
+            for from_split in from_splits:
 
-                for from_split in from_splits:
+                from_zones = get_from_zones(
+                    scraper=scraper,
+                    platform=platform,
+                    product=None,
+                    origin_iso2=origin_iso2,
+                    split=from_split,
+                )
 
-                    from_zones = get_from_zones(
-                        scraper=scraper,
-                        platform=platform,
-                        product=product,
-                        origin_iso2=origin_iso2,
-                        split=from_split,
-                    )
+                for from_zone in from_zones:
 
-                    for from_zone in from_zones:
+                    for to_split in to_splits:
 
-                        for to_split in to_splits:
+                        to_zones = get_to_zones(
+                            scraper=scraper,
+                            platform=platform,
+                            from_zone=from_zone,
+                            split=to_split,
+                            product=None,
+                        )
+
+                        for to_zone in to_zones:
 
                             df = scraper.get_flows(
                                 platform=platform,
                                 origin_iso2=origin_iso2,
                                 date_from=date_from,
                                 date_to=date_to,
-                                product=product,
                                 from_zone=from_zone,
                                 from_split=from_split,
+                                to_zone=to_zone,
                                 to_split=to_split,
+                                split=FlowsSplit.Products,
                                 use_brute_force=use_brute_force,
                             )
                             upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
