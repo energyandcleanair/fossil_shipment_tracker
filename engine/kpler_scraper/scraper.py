@@ -316,7 +316,20 @@ class KplerScraper:
         if len(found) == 1:
             return found.values[0]
         else:
-            return None
+            # Manual values
+            manual_iso2s = {
+                "liquids": {
+                    299: "EG",
+                    943: "AE",
+                    561: "MT",
+                    261: "DJ",
+                    707: "PA",
+                    175: "CV",
+                    343: "GI",
+                }
+            }
+            manual_iso2 = manual_iso2s.get(platform, {}).get(id, None)
+            return manual_iso2
 
     def get_vessel_raw_brute(self, kpler_vessel_id):
         """
@@ -605,6 +618,7 @@ class KplerScraper:
         date_to,
         split,
         from_zone=None,
+        to_zone=None,
         product=None,
         unit=None,
         granularity=FlowsPeriod.Daily,
@@ -677,6 +691,13 @@ class KplerScraper:
             "startDate": to_datetime(date_from).strftime("%Y-%m-%d"),
             "endDate": to_datetime(date_to).strftime("%Y-%m-%d"),
         }
+
+        if to_zone is not None:
+            params_raw["toLocations"] = [
+                self.get_zone_dict(
+                    id=to_zone.get("id"), name=to_zone.get("name"), platform=platform
+                )
+            ]
 
         if product is not None:
             if isinstance(product, dict):
@@ -761,8 +782,10 @@ class KplerScraper:
         platform,
         origin_iso2=None,
         product=None,
+        split=None,
         from_zone=None,
         from_split=None,
+        to_zone=None,
         to_split=FlowsSplit.DestinationCountries,
         granularity=FlowsPeriod.Daily,
         unit=FlowsMeasurementUnit.T,
@@ -772,12 +795,13 @@ class KplerScraper:
     ):
         params = {
             "from_zone": from_zone,
+            "to_zone": to_zone,
             "product": product,
-            "split": to_split,
+            "split": split,
             "granularity": granularity,
             "unit": unit,
             "date_from": date_from,
-            "date_to": date_to,
+            "date_to": date_to or dt.datetime.now(),
         }
 
         if use_brute_force:
@@ -799,8 +823,6 @@ class KplerScraper:
         df["to_split"] = get_split_name(to_split)
         df["from_iso2"] = origin_iso2 if origin_iso2 else KPLER_TOTAL
 
-        # Set df["from_zone"] to a dict {"id":1","name":2}
-
         if product is None:
             product_name = KPLER_TOTAL
         elif isinstance(product, str):
@@ -811,7 +833,7 @@ class KplerScraper:
             raise ValueError(f"Unknown product type: {type(product)}")
 
         df["from_zone"] = df.apply(lambda x: from_zone, axis=1)
-        df["to_zone"] = None
+        df["to_zone"] = df.apply(lambda x: to_zone or {"id": 0, "name": None}, axis=1)
         df["product"] = product_name
         df["unit"] = unit.value
         df["platform"] = platform
@@ -836,19 +858,19 @@ class KplerScraper:
         #     value_name="value",
         # )
 
-        def split_to_column(df, split_to):
-            if split_to in [
+        def split_to_column(df, split):
+            if split in [
                 FlowsSplit.DestinationCountries,
                 FlowsSplit.DestinationInstallations,
                 FlowsSplit.DestinationPorts,
             ]:
                 df["to_zone"] = df["split"]
-            elif split_to == FlowsSplit.Products:
-                df["product"] = df["split"]
+            elif split == FlowsSplit.Products:
+                df["product"] = df["split"].apply(lambda x: x.get("name"))
 
             return df
 
-        df = split_to_column(df, to_split)
+        df = split_to_column(df, split)
         df = df.drop(columns=["split"])
 
         df["from_zone_id"] = df.from_zone.apply(lambda x: int(x.get("id")))

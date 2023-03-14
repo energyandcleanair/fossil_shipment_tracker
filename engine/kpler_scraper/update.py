@@ -30,7 +30,7 @@ def upload_flows(df, ignore_if_copy_failed=False):
     if len(df) > 0:
         try:
             df.to_sql(
-                DB_TABLE_KPLER_FLOW + "2",
+                DB_TABLE_KPLER_FLOW + "3",
                 con=engine,
                 if_exists="append",
                 index=False,
@@ -40,7 +40,7 @@ def upload_flows(df, ignore_if_copy_failed=False):
                 logger.info("Some rows already exist. Skipping")
             else:
                 logger.info("Some rows already exist. Upserting instead")
-                upsert(df, DB_TABLE_KPLER_FLOW + "2", "unique_kpler_flow2")
+                upsert(df, DB_TABLE_KPLER_FLOW + "3", "unique_kpler_flow3")
 
 
 def get_products(scraper, platform, origin_iso2):
@@ -79,15 +79,23 @@ def get_from_zones(scraper, platform, product, origin_iso2, split):
         return zones_unique
 
 
-def get_to_zones(scraper, platform, product, origin_iso2, split):
-    if split == FlowsSplit.DestinationCountries:
-        return [None]
+def get_to_zones(scraper, platform, product, from_zone, split):
 
-    df = scraper.get_flows_raw(
-        platform=platform, product=product, origin_iso2=origin_iso2, split=split
+    df = scraper.get_flows_raw_brute(
+        platform=platform,
+        product=product,
+        date_from="2010-01-01",
+        date_to=dt.date.today(),
+        from_zone=from_zone,
+        split=split,
+        granularity=FlowsPeriod.Annually,
     )
-    zones = df.split.unique()
-    return zones
+    if df is None:
+        return []
+    else:
+        # dict unashable. Use a trick to get unique values
+        zones_unique = list({v["id"]: v for v in df.split}.values())
+        return zones_unique
 
 
 def update_flows(
@@ -100,7 +108,9 @@ def update_flows(
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     # add_total_installation=True,
     ignore_if_copy_failed=False,
-    use_brute_force=False,
+    use_brute_force=True,
+    add_unknown=True,
+    add_unknown_only=False,
 ):
     scraper = KplerScraper()
 
@@ -110,40 +120,79 @@ def update_flows(
 
         for origin_iso2 in tqdm(origin_iso2s):
 
-            _products = get_products(
-                scraper=scraper,
-                platform=platform,
-                origin_iso2=origin_iso2,
-            )
+            for from_split in from_splits:
 
-            for product in tqdm(_products):
+                from_zones = get_from_zones(
+                    scraper=scraper,
+                    platform=platform,
+                    product=None,
+                    origin_iso2=origin_iso2,
+                    split=from_split,
+                )
 
-                for from_split in from_splits:
+                for from_zone in tqdm(from_zones):
 
-                    from_zones = get_from_zones(
-                        scraper=scraper,
-                        platform=platform,
-                        product=product,
-                        origin_iso2=origin_iso2,
-                        split=from_split,
-                    )
+                    for to_split in to_splits:
 
-                    for from_zone in from_zones:
+                        to_zones = get_to_zones(
+                            scraper=scraper,
+                            platform=platform,
+                            from_zone=from_zone,
+                            split=to_split,
+                            product=None,
+                        )
 
-                        for to_split in to_splits:
+                        df_zones = []
+                        for to_zone in tqdm(to_zones):
 
                             df = scraper.get_flows(
                                 platform=platform,
                                 origin_iso2=origin_iso2,
                                 date_from=date_from,
                                 date_to=date_to,
-                                product=product,
                                 from_zone=from_zone,
                                 from_split=from_split,
+                                to_zone=to_zone,
                                 to_split=to_split,
+                                split=FlowsSplit.Products,
                                 use_brute_force=use_brute_force,
                             )
-                            upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                            df_zones.append(df)
+                            if not add_unknown_only:
+                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+
+                        if add_unknown:
+                            # Add an unknown one
+                            total = scraper.get_flows(
+                                platform=platform,
+                                origin_iso2=origin_iso2,
+                                date_from=date_from,
+                                date_to=date_to,
+                                from_zone=from_zone,
+                                from_split=from_split,
+                                to_zone=None,
+                                to_split=to_split,
+                                split=FlowsSplit.Products,
+                                use_brute_force=use_brute_force,
+                            )
+
+                            known_zones = pd.concat(df_zones)
+                            known_zones_total = (
+                                known_zones.groupby(["date", "product"]).value.sum().reset_index()
+                            )
+                            unknown = total.merge(
+                                known_zones_total,
+                                on=["product", "date"],
+                                how="left",
+                                suffixes=("", "_byzone"),
+                            )
+                            unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
+                            unknown["value_unknown"] = unknown["value"] - unknown["value_byzone"]
+                            unknown = unknown[unknown["value_unknown"] > 0]
+                            unknown["to_zone_name"] = UNKNOWN_COUNTRY
+                            unknown["value"] = unknown["value_unknown"]
+                            unknown = unknown[known_zones.columns]
+                            upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
 
 
 def upload_trades(trades, ignore_if_copy_failed=False):

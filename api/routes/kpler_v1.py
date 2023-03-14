@@ -43,7 +43,7 @@ class KplerFlowResource(TemplateResource):
     )
 
     parser.add_argument(
-        "origin_by",
+        "origin_type",
         help="Split origin by either country or port",
         required=False,
         action="split",
@@ -51,7 +51,7 @@ class KplerFlowResource(TemplateResource):
     )
 
     parser.add_argument(
-        "destination_by",
+        "destination_type",
         help="Split destination by either country or port",
         required=False,
         action="split",
@@ -61,8 +61,8 @@ class KplerFlowResource(TemplateResource):
     parser.add_argument(
         "date_from",
         type=str,
-        help="start date (format 2020-01-15)",
-        default="2018-01-01",
+        help="start date (format 2020-01-01)",
+        default="2020-01-01",
         required=False,
     )
 
@@ -85,6 +85,13 @@ class KplerFlowResource(TemplateResource):
     parser.add_argument("date_to", type=str, help="End date", default=None, required=False)
 
     parser.add_argument("product", help="Product", required=False, action="split", default=None)
+    parser.add_argument(
+        "commodity",
+        help="Commodity using CREA's nomenclature: either crude_oil, oil_products, or lng",
+        required=False,
+        action="split",
+        default=None,
+    )
 
     parser.add_argument(
         "from_split",
@@ -110,17 +117,40 @@ class KplerFlowResource(TemplateResource):
         required=False,
     )
 
-    must_group_by = ["unit"]
+    must_group_by = ["origin_type", "destination_type", "currency"]
     date_cols = ["date"]
-    value_cols = ["value"]
-    pivot_dependencies = {}
+    value_cols = ["value_tonne", "value_eur", "value_currency"]
+    pivot_dependencies = {
+        "product": ["product_group", "product_family", "commodity"],
+        "origin_country": ["origin_iso2", "origin_region"],
+        "destination_country": ["destination_iso2", "destination_region"],
+    }
     filename = "kpler_flow"
 
     def get_aggregate_cols_dict(self, subquery):
-        return {}
+        return {
+            "origin_country": [subquery.c.origin_country, subquery.c.origin_region],
+            "origin": [subquery.c.origin_name],
+            "destination_country": [subquery.c.destination_country, subquery.c.destination_region],
+            "destination": [subquery.c.destination_name],
+            "product": [
+                subquery.c.product,
+                subquery.c.product_group,
+                subquery.c.product_family,
+                subquery.c.commodity,
+            ],
+            "origin_type": [subquery.c.origin_type],
+            "destination_type": [subquery.c.destination_type],
+            "currency": [subquery.c.currency],
+            "date": [subquery.c.date],
+        }
 
     def get_agg_value_cols(self, subquery):
-        return []
+        return [
+            func.sum(subquery.c.value_tonne).label("value_tonne"),
+            func.sum(subquery.c.value_eur).label("value_eur"),
+            func.sum(subquery.c.value_currency).label("value_currency"),
+        ]
 
     @routes_api.expect(parser)
     def get(self):
@@ -137,6 +167,20 @@ class KplerFlowResource(TemplateResource):
         ).label("value_tonne")
 
         value_eur_field = (value_tonne_field * Price.eur_per_tonne).label("value_eur")
+        commodity_field = case(
+            [
+                (KplerProduct.family.in_(["Dirty"]), "crude_oil"),
+                (
+                    sa.or_(
+                        KplerProduct.group.in_(["Fuel Oils"]),
+                        KplerProduct.family.in_(["Light Ends", "Middle Distillates"]),
+                    ),
+                    "oil_products",
+                ),
+                (KplerProduct.name.in_(["lng"]), "lng"),
+            ],
+            else_=sa.null(),
+        ).label("commodity")
 
         query = (
             session.query(
@@ -159,6 +203,7 @@ class KplerFlowResource(TemplateResource):
                 value_eur_field,
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
+                commodity_field,
             )
             .outerjoin(
                 FromCountry,
@@ -168,10 +213,15 @@ class KplerFlowResource(TemplateResource):
                 ToCountry,
                 ToCountry.iso2 == KplerFlow2.to_iso2,
             )
+            # join to avoid double counting (we collected both by product and by group)
+            # but this isn't perfect, as sometimes, kpler is using group when not knowing product
             .outerjoin(
                 KplerProduct,
                 sa.and_(
-                    KplerProduct.name == KplerFlow2.product,
+                    sa.or_(
+                        KplerProduct.name == KplerFlow2.product,
+                        KplerProduct.group == KplerFlow2.product,
+                    ),
                     KplerProduct.platform == KplerFlow2.platform,
                 ),
             )
@@ -186,17 +236,7 @@ class KplerFlowResource(TemplateResource):
                     Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    sa.or_(
-                        sa.and_(Price.commodity == "crude_oil", KplerProduct.family.in_(["Dirty"])),
-                        sa.and_(
-                            Price.commodity == "oil_products",
-                            sa.or_(
-                                KplerProduct.group.in_(["Fuel Oils"]),
-                                KplerProduct.family.in_(["Light Ends", "Middle Distillates"]),
-                            ),
-                        ),
-                        sa.and_(Price.commodity == "lng", KplerProduct.name.in_(["lng"])),
-                    ),
+                    Price.commodity == commodity_field,
                 ),
             )
             .outerjoin(Currency, Currency.date == KplerFlow2.date)
@@ -218,11 +258,13 @@ class KplerFlowResource(TemplateResource):
         return query
 
     def filter(self, query, params=None):
+
         origin_iso2 = params.get("origin_iso2")
         destination_iso2 = params.get("destination_iso2")
-        origin_by = params.get("origin_by")
-        destination_by = params.get("destination_by")
+        origin_type = params.get("origin_type")
+        destination_type = params.get("destination_type")
         product = params.get("product")
+        commodity = params.get("commodity")
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         platform = params.get("platform")
@@ -236,13 +278,13 @@ class KplerFlowResource(TemplateResource):
             query = query.filter(KplerFlow2.to_iso2.in_(to_list(destination_iso2)))
 
         if product:
-            query = query.filter(KplerProduct.name.in_(to_list(product)))
+            query = query.filter(KplerFlow2.product.in_(to_list(product)))
 
-        if origin_by:
-            query = query.filter(KplerFlow2.from_split.in_(to_list(origin_by)))
+        if origin_type:
+            query = query.filter(KplerFlow2.from_split.in_(to_list(origin_type)))
 
-        if destination_by:
-            query = query.filter(KplerFlow2.to_split.in_(to_list(destination_by)))
+        if destination_type:
+            query = query.filter(KplerFlow2.to_split.in_(to_list(destination_type)))
 
         if platform:
             query = query.filter(KplerFlow2.platform.in_(to_list(platform)))
@@ -258,5 +300,11 @@ class KplerFlowResource(TemplateResource):
 
         if currency is not None:
             query = query.filter(Currency.currency.in_(to_list(currency)))
+
+        subquery = query.subquery()
+        query = session.query(subquery)
+
+        if commodity:
+            query = query.filter(subquery.c.commodity.in_(to_list(commodity)))
 
         return query

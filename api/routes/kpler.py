@@ -142,8 +142,14 @@ class KplerFlowResource(TemplateResource):
             .outerjoin(
                 KplerProduct,
                 sa.and_(
-                    KplerProduct.name == KplerFlow.product,
                     KplerProduct.platform == KplerFlow.platform,
+                    sa.or_(
+                        KplerProduct.name == KplerFlow.product,
+                        # Sometimes, Kpler only knows the product group
+                        # We join name <> group and relies on the distinct below
+                        # to remove duplicates
+                        KplerProduct.name == KplerFlow.Group,
+                    ),
                 ),
             )
             .outerjoin(
@@ -175,10 +181,7 @@ class KplerFlowResource(TemplateResource):
                 KplerFlow.id,
                 Price.scenario,
                 Currency.currency,
-                # Price.departure_port_ids,
                 Price.destination_iso2s,
-                # Price.ship_insurer_iso2s,
-                # Price.ship_owner_iso2s,
             )
             .distinct(
                 KplerFlow.id,

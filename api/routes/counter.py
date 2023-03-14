@@ -512,7 +512,7 @@ class RussiaCounterResource(Resource):
         # Pivot
         counter = self.pivot_result(result=counter, pivot_by=pivot_by, pivot_value=pivot_value)
 
-        # Pivot
+        # Sort columns
         counter = self.sort_columns(result=counter, columns_order=columns_order)
 
         # Post Compute
