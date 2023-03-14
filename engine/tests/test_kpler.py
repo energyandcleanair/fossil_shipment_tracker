@@ -9,6 +9,7 @@ from engine.kpler_scraper import KplerScraper, FlowsSplit
 def test_get_flow():
     scraper = KplerScraper()
     # products = scraper.get_products()
+
     flows = scraper.get_flows(
         platform="liquids",
         origin_iso2="RU",

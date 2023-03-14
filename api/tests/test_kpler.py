@@ -40,6 +40,7 @@ def test_kpler_v1(app):
             .reset_index()
         )
 
+        assert set(grouped.product.unique()) == set(["Crude", "Diesel"])
         # Russia - Crude - Dec 2022 = 18.7
         ru_crude = grouped[(grouped.origin_iso2 == "RU") & (grouped["product"] == "Crude")]
         assert len(ru_crude) == 4
