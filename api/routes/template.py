@@ -8,7 +8,7 @@ from flask_restx import inputs
 
 from base.db import session
 from base.encoder import JsonEncoder
-from base.utils import to_list, to_datetime
+from base.utils import to_list, to_datetime, intersect
 from base.logger import logger
 
 from http import HTTPStatus
@@ -242,7 +242,7 @@ class TemplateResource(Resource):
                 # Special case: if we did aggregate by date_without_year and year
                 # Then we need to add date again, do the rolling average
                 # and remove date
-                if len(intersection(["date_without_year", "year"], result.columns)) == 2:
+                if len(intersect(["date_without_year", "year"], result.columns)) == 2:
                     year = result.year.astype(str)
                     month_day = result.date_without_year.dt.strftime("%m%d")
                     result[date_column] = pd.to_datetime(
@@ -258,10 +258,13 @@ class TemplateResource(Resource):
             max_date = result["date"].max()  # change your date here
             daterange = pd.date_range(min_date, max_date).rename("date")
 
-            result["date"] = result["date"].dt.floor("D")  # Should have been done already
+            result["date"] = pd.to_datetime(result["date"]).dt.floor(
+                "D"
+            )  # Should have been done already
             result_rolled = (
                 result.groupby(
-                    [x for x in result.columns if x not in (self.date_cols + self.value_cols)]
+                    [x for x in result.columns if x not in (self.date_cols + self.value_cols)],
+                    dropna=False,
                 )[[date_column] + self.value_cols]
                 .apply(
                     lambda x: x.set_index("date")
@@ -278,14 +281,16 @@ class TemplateResource(Resource):
             # Add columns that may have disappeared e.g. date_without_year, year, month
             result = pd.merge(
                 result_rolled,
-                result[intersection(self.date_cols, result.columns)].drop_duplicates(),
+                result[intersect(self.date_cols, result.columns)].drop_duplicates(),
             )
+
+            result["date"] = pd.to_datetime(result["date"])
 
             if remove_date:
                 result = result.drop("date", axis=1)
 
             # Sort by date
-            result = result.sort_values(intersection(self.date_cols, result.columns))
+            result = result.sort_values(intersect(self.date_cols, result.columns))
 
         return result
 
