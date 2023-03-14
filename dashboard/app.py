@@ -13,8 +13,8 @@ from dash import DiskcacheManager, CeleryManager, Input, Output, html
 from dash.exceptions import PreventUpdate
 
 from server import app, background_callback_manager, cache
-from counter import layout as counter_layout
-from voyages import layout as voyages_layout
+from counter import layout as counter_layout, chart_settings as counter_chart_settings
+from voyages import layout as voyages_layout, chart_settings as voyages_chart_settings
 
 
 SIDEBAR_STYLE = {
@@ -48,16 +48,15 @@ sidebar = html.Div(
     [
         html.H3("Russia Fossil Tracker"),
         html.Hr(),
-        # html.P("A simple sidebar layout with navigation links", className="lead"),
         dbc.Nav(
             [
                 dbc.NavLink("Counter", href="/", active="exact"),
                 dbc.NavLink("Shipments", href="/shipments", active="exact"),
-                # dbc.NavLink("Page 2", href="/page-2", active="exact"),
             ],
             vertical=True,
             pills=True,
         ),
+        dbc.Container(html.Div(id="chart-settings")),
     ],
     style=SIDEBAR_STYLE,
 )
@@ -97,71 +96,10 @@ def render_page_content(pathname):
     )
 
 
-# Define the callback function that loads the data from the API
-@dash.callback(
-    output=Output("counter", "data"),
-    inputs=[Input("interval-component", "n_intervals")],
-    background=True,
-    manager=background_callback_manager,
-)
-def load_counter(n):
-    # TODO Lohit: this is using a local cache
-    # Wanting to use a redis cache
-    # Like shown here:https://dash.plotly.com/background-callback-caching
-    # Should probably use Google Cloud Memorystrore
-    if n == 0:
-        print("=== loading counter ===")
-        cached_data = cache.get("counter")
-        if cached_data is not None:
-            print("found cache: rows = %d" % (len(cached_data)))
-            return cached_data
-
-        print("=== loading data ===")
-        file = "counter.csv"
-        if not os.path.exists(file):
-            storage_options = {"User-Agent": "Mozilla/5.0"}
-            url = "https://api.russiafossiltracker.com/v0/counter?date_from=2022-01-01&format=csv"
-            counter = pd.read_csv(url, storage_options=storage_options)
-            counter.to_csv(file, index=False)
-        else:
-            counter = pd.read_csv("counter.csv")
-
-        print("=== loading data done ===")
-        data = counter.to_json(date_format="iso", orient="split")
-        cache.set("counter", data)
-        return data
-    else:
-        raise PreventUpdate
-
-
-@dash.callback(
-    output=Output("voyages", "data"),
-    inputs=[Input("interval-component", "n_intervals")],
-    background=True,
-    manager=background_callback_manager,
-)
-def load_voyages(n):
-    if n == 0:
-        # TODO Lohit: this is using a local cache
-        # Wanting to use a redis cache
-        # Like shown here:https://dash.plotly.com/background-callback-caching
-        # Should probably use Google Cloud Memorystrore
-        cached_data = cache.get("voyages")
-        if cached_data is not None:
-            return cached_data
-
-        print("=== loading voyages ===")
-        file = "voyages.csv"
-        if not os.path.exists(file):
-            storage_options = {"User-Agent": "Mozilla/5.0"}
-            url = "https://api.russiafossiltracker.com/v0/voyage?date_from=2022-01-01&format=csv&select_set=light"
-            voyages = pd.read_csv(url, storage_options=storage_options)
-            voyages.to_csv(file, index=False)
-        else:
-            voyages = pd.read_csv("voyages.csv")
-
-        data = voyages.to_json(date_format="iso", orient="split")
-        cache.set("voyages", data)
-        return data
-    else:
-        raise PreventUpdate
+@app.callback(Output("chart-settings", "children"), [Input("url", "pathname")])
+def render_chart_setting(pathname):
+    if pathname == "/" or pathname == "/counter":
+        return counter_chart_settings
+    elif pathname == "/shipments":
+        return voyages_chart_settings
+    return None
