@@ -142,6 +142,7 @@ class KplerFlowResource(TemplateResource):
             "origin_type": [subquery.c.origin_type],
             "destination_type": [subquery.c.destination_type],
             "currency": [subquery.c.currency],
+            "date": [subquery.c.date],
         }
 
     def get_agg_value_cols(self, subquery):
