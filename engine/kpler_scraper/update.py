@@ -40,7 +40,7 @@ def upload_flows(df, ignore_if_copy_failed=False):
                 logger.info("Some rows already exist. Skipping")
             else:
                 logger.info("Some rows already exist. Upserting instead")
-                upsert(df, DB_TABLE_KPLER_FLOW + "3", "unique_kpler_flow2")
+                upsert(df, DB_TABLE_KPLER_FLOW + "3", "unique_kpler_flow3")
 
 
 def get_products(scraper, platform, origin_iso2):
