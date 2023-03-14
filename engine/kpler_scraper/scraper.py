@@ -316,7 +316,20 @@ class KplerScraper:
         if len(found) == 1:
             return found.values[0]
         else:
-            return None
+            # Manual values
+            manual_iso2s = {
+                "liquids": {
+                    299: "EG",
+                    943: "AE",
+                    561: "MT",
+                    261: "DJ",
+                    707: "PA",
+                    175: "CV",
+                    343: "GI",
+                }
+            }
+            manual_iso2 = manual_iso2s.get(platform, {}).get(id, None)
+            return manual_iso2
 
     def get_vessel_raw_brute(self, kpler_vessel_id):
         """
@@ -788,7 +801,7 @@ class KplerScraper:
             "granularity": granularity,
             "unit": unit,
             "date_from": date_from,
-            "date_to": date_to,
+            "date_to": date_to or dt.datetime.now(),
         }
 
         if use_brute_force:
@@ -820,7 +833,7 @@ class KplerScraper:
             raise ValueError(f"Unknown product type: {type(product)}")
 
         df["from_zone"] = df.apply(lambda x: from_zone, axis=1)
-        df["to_zone"] = df.apply(lambda x: to_zone, axis=1) if to_zone else None
+        df["to_zone"] = df.apply(lambda x: to_zone or {"id": 0, "name": None}, axis=1)
         df["product"] = product_name
         df["unit"] = unit.value
         df["platform"] = platform
