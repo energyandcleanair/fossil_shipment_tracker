@@ -21,6 +21,14 @@ KPLER_TOTAL = "Total"
 class KplerFlowResource(TemplateResource):
     parser = TemplateResource.parser.copy()
 
+    parser.replace_argument(
+        "aggregate_by",
+        type=str,
+        action="split",
+        default=None,
+        help="which variables to aggregate by. Could be any of origin_country,origin,destination_country,destination,product,date,date,country,year",
+    )
+
     parser.add_argument(
         "api_key", help="Key to use the endpoint", required=True, type=str, default=None
     )
@@ -158,6 +166,7 @@ class KplerFlowResource(TemplateResource):
             "destination_type": [subquery.c.destination_type],
             "currency": [subquery.c.currency],
             "date": [subquery.c.date],
+            "commodity": [subquery.c.commodity],
         }
 
     def get_agg_value_cols(self, subquery):
@@ -185,17 +194,23 @@ class KplerFlowResource(TemplateResource):
         value_eur_field = (value_tonne_field * Price.eur_per_tonne).label("value_eur")
         commodity_field = case(
             [
-                (KplerProduct.family.in_(["Dirty"]), "crude_oil"),
                 (
-                    sa.or_(
-                        KplerProduct.group.in_(["Fuel Oils"]),
-                        KplerProduct.family.in_(["Light Ends", "Middle Distillates"]),
+                    sa.and_(KplerProduct.family.in_(["Dirty"]), KplerFlow2.product != "Condensate"),
+                    "crude_oil",
+                ),
+                (
+                    sa.and_(
+                        sa.or_(
+                            KplerProduct.group.in_(["Fuel Oils"]),
+                            KplerProduct.family.in_(["Light Ends", "Middle Distillates"]),
+                        ),
+                        KplerFlow2.product != "Clean Condensate",
                     ),
                     "oil_products",
                 ),
                 (KplerProduct.name.in_(["lng"]), "lng"),
             ],
-            else_=sa.null(),
+            else_="others",
         ).label("commodity")
 
         query = (
