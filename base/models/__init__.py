@@ -59,5 +59,6 @@ DB_TABLE_KPLER_TRADE = "kpler_trade"
 DB_TABLE_KPLER_INSTALLATION = "kpler_installation"
 DB_TABLE_KPLER_ZONE = "kpler_zone"
 
+DB_TABLE_API_KEY = "api_key"
 
 from .models import *
