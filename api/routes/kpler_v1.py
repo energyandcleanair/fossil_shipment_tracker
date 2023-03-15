@@ -1,13 +1,3 @@
-import json
-import pandas as pd
-import numpy as np
-import datetime as dt
-import re
-import pytz
-import datetime as dt
-from flask import Response
-from flask_restx import Resource, reqparse, inputs
-import pymongo
 from sqlalchemy import func
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
@@ -15,6 +5,7 @@ from sqlalchemy import case
 
 
 import base
+from .security import key_required
 from . import routes_api
 from .template import TemplateResource
 from base import PRICING_DEFAULT
@@ -26,9 +17,13 @@ from base.utils import to_datetime, to_list, intersect, df_to_json
 KPLER_TOTAL = "Total"
 
 
-@routes_api.route("/v1/kpler_flow", strict_slashes=False, doc=False)
+@routes_api.route("/v1/kpler_flow", strict_slashes=False)
 class KplerFlowResource(TemplateResource):
     parser = TemplateResource.parser.copy()
+
+    parser.add_argument(
+        "api_key", help="Key to use the endpoint", required=True, type=str, default=None
+    )
 
     parser.add_argument(
         "origin_iso2", help="Origin iso2", required=False, action="split", default=None
@@ -123,15 +118,35 @@ class KplerFlowResource(TemplateResource):
     pivot_dependencies = {
         "product": ["product_group", "product_family", "commodity"],
         "origin_country": ["origin_iso2", "origin_region"],
+        "origin_iso2": ["origin_country", "origin_region"],
         "destination_country": ["destination_iso2", "destination_region"],
+        "destination_iso2": ["destination_country", "destination_region"],
     }
     filename = "kpler_flow"
 
     def get_aggregate_cols_dict(self, subquery):
         return {
-            "origin_country": [subquery.c.origin_country, subquery.c.origin_region],
+            "origin_country": [
+                subquery.c.origin_iso2,
+                subquery.c.origin_country,
+                subquery.c.origin_region,
+            ],
+            "origin_iso2": [
+                subquery.c.origin_iso2,
+                subquery.c.origin_country,
+                subquery.c.origin_region,
+            ],
             "origin": [subquery.c.origin_name],
-            "destination_country": [subquery.c.destination_country, subquery.c.destination_region],
+            "destination_country": [
+                subquery.c.destination_iso2,
+                subquery.c.destination_country,
+                subquery.c.destination_region,
+            ],
+            "destination_iso2": [
+                subquery.c.destination_iso2,
+                subquery.c.destination_country,
+                subquery.c.destination_region,
+            ],
             "destination": [subquery.c.destination_name],
             "product": [
                 subquery.c.product,
@@ -153,6 +168,7 @@ class KplerFlowResource(TemplateResource):
         ]
 
     @routes_api.expect(parser)
+    @key_required
     def get(self):
         params = KplerFlowResource.parser.parse_args()
         return self.get_from_params(params)
@@ -252,6 +268,7 @@ class KplerFlowResource(TemplateResource):
                 Currency.currency,
             )
         )
+
         return query
 
     def filter(self, query, params=None):

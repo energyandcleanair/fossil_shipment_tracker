@@ -73,6 +73,8 @@ from . import DB_TABLE_KPLER_TRADE
 from . import DB_TABLE_KPLER_INSTALLATION
 from . import DB_TABLE_KPLER_ZONE
 
+from . import DB_TABLE_API_KEY
+
 
 class Ship(Base):
     imo = Column(String, primary_key=True)
@@ -1125,42 +1127,11 @@ class KplerZone(Base):
     __table_args__ = (UniqueConstraint("id", name="unique_kpler_zone"),)
 
 
-# class KplerInstallation(Base):
-#     """
-#     Index(['name', 'shortType', 'resourceType', 'country', 'id', 'status',
-#        'lngStorageCapacity', 'beta', 'type', 'technicalDetails', 'typeDetail',
-#        'port', 'isStorageSelected', 'fullname', 'nominalAnnualCapacity',
-#        'lngStorageQuantity'],
-#     """
-#     id = Column(BigInteger, primary_key=True)
-#     name = Column(String)
-#     short_type = Column(String)
-#     resource_type = Column(String)
-#     country = Column(String)
-#     status = Column(String)
-#     lng_storage_capacity = Column(Numeric)
-#     beta = Column(Numeric)
-#     type = Column(String)
-#     technical_details = Column(JSONB)
-#     type_detail = Column(String)
-#     port = Column(String)
-#     is_storage_selected = Column(Boolean)
-#     fullname = Column(String)
-#
-#
-#     isSupplyDemand = Column(Boolean)
-#     # geo = Column(Geometry("POINT", srid=4326))
-#     continent = Column(JSONB)
-#     export = Column(JSONB)
-#     parentZones = Column(JSONB)
-#     range = Column(Numeric)
-#     subcontinent = Column(JSONB)
-#     # shape = Column(Geometry("GEOMETRY", srid=4326))
-#     type = Column(String)
-#     import_info = Column(JSONB)
-#     isStorageSelected = Column(Boolean)
-#     fullname = Column(String)
-#     platform = Column(String)
-#
-#     __tablename__ = DB_TABLE_KPLER_ZONE
-#     __table_args__ = (UniqueConstraint("id", name="unique_kpler_zone"),)
+class ApiKey(Base):
+
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    key = Column(String)
+    user_id = Column(BigInteger)
+    endpoints = Column(ARRAY(String))
+
+    __tablename__ = DB_TABLE_API_KEY
