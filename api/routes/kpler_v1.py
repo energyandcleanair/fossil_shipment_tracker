@@ -244,10 +244,7 @@ class KplerFlowResource(TemplateResource):
                 KplerFlow2.id,
                 Price.scenario,
                 Currency.currency,
-                # Price.departure_port_ids,
                 Price.destination_iso2s,
-                # Price.ship_insurer_iso2s,
-                # Price.ship_owner_iso2s,
             )
             .distinct(
                 KplerFlow2.id,
