@@ -634,34 +634,21 @@ class KplerScraper:
         if from_zone and from_zone.get("name") == "Unknown":
             return None
 
-        # Get zone dict
-        # def get_installation_dict(iso2, installation):
-        #     if installation is None:
-        #         name = unidecode(self.cc.convert(iso2, to="name_short"))
-        #         if iso2 == "RU":
-        #             name = "Russian Federation"
-        #         elif iso2 == "TR":
-        #             name = "Turkey"
-        #         elif iso2 == "CI":
-        #             name = "Ivory Coast"
-        #         elif iso2 == "BN":
-        #             name = "Brunei"
-        #         elif iso2 == "CD":
-        #             name = "Democratic Republic of the Congo"
-        #     else:
-        #         name = installation
-        #
-        #     try:
-        #         id = installations[(installations["name"] == name)]["id"].values[0]
-        #         type = "installation"
-        #     except IndexError:
-        #         try:
-        #             id = zones[(zones["name"] == name)]["id"].values[0]
-        #             type = "zone"
-        #         except IndexError:
-        #             raise ValueError(f"Cannot find installation or zone for {name}")
-        #
-        #     return {"id": int(id), "resourceType": type}
+        from_locations = (
+            [
+                self.get_zone_dict(
+                    id=from_zone.get("id"), name=from_zone.get("name"), platform=platform
+                )
+            ]
+            if from_zone
+            else []
+        )
+
+        to_locations = (
+            [self.get_zone_dict(id=to_zone.get("id"), name=to_zone.get("name"), platform=platform)]
+            if to_zone
+            else []
+        )
 
         params_raw = {
             "cumulative": False,
@@ -669,12 +656,8 @@ class KplerScraper:
             "filters": {"product": []},
             "flowDirection": "export",
             # "fromLocations": [{"id": 451, "resourceType": "zone"}],
-            "fromLocations": [
-                self.get_zone_dict(
-                    id=from_zone.get("id"), name=from_zone.get("name"), platform=platform
-                )
-            ],
-            "toLocations": [],
+            "fromLocations": from_locations,
+            "toLocations": to_locations,
             "granularity": granularity.value,
             "interIntra": "interintra",
             "onlyRealized": True,
@@ -781,6 +764,7 @@ class KplerScraper:
         self,
         platform,
         origin_iso2=None,
+        destination_iso2=None,
         product=None,
         split=None,
         from_zone=None,
@@ -832,7 +816,7 @@ class KplerScraper:
         else:
             raise ValueError(f"Unknown product type: {type(product)}")
 
-        df["from_zone"] = df.apply(lambda x: from_zone, axis=1)
+        df["from_zone"] = df.apply(lambda x: from_zone or {"id": 0, "name": None}, axis=1)
         df["to_zone"] = df.apply(lambda x: to_zone or {"id": 0, "name": None}, axis=1)
         df["product"] = product_name
         df["unit"] = unit.value
@@ -865,6 +849,12 @@ class KplerScraper:
                 FlowsSplit.DestinationPorts,
             ]:
                 df["to_zone"] = df["split"]
+            elif split in [
+                FlowsSplit.OriginCountries,
+                FlowsSplit.OriginInstallations,
+                FlowsSplit.OriginPorts,
+            ]:
+                df["from_zone"] = df["split"]
             elif split == FlowsSplit.Products:
                 df["product"] = df["split"].apply(lambda x: x.get("name"))
 
@@ -886,6 +876,9 @@ class KplerScraper:
         #     lambda x: self.get_zone_name(platform=platform, id=x)
         # )
         df["to_iso2"] = df.to_zone_id.apply(lambda x: self.get_zone_iso2(platform=platform, id=x))
+        df["from_iso2"] = df.from_zone_id.apply(
+            lambda x: self.get_zone_iso2(platform=platform, id=x)
+        )
 
         df.drop(columns=["from_zone", "to_zone"], inplace=True)
         # # Sometimes we have duplicated values
