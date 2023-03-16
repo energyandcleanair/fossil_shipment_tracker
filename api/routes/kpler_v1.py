@@ -11,7 +11,7 @@ from .template import TemplateResource
 from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session
-from base.models import KplerFlow2, KplerProduct, Country, Price, Currency
+from base.models import KplerFlow2, KplerProduct, Country, Price, Currency, Commodity
 from base.utils import to_datetime, to_list, intersect, df_to_json
 
 KPLER_TOTAL = "Total"
@@ -161,6 +161,7 @@ class KplerFlowResource(TemplateResource):
                 subquery.c.product_group,
                 subquery.c.product_family,
                 subquery.c.commodity,
+                subquery.c.commodity_equivalent,
             ],
             "origin_type": [subquery.c.origin_type],
             "destination_type": [subquery.c.destination_type],
@@ -192,7 +193,11 @@ class KplerFlowResource(TemplateResource):
         ).label("value_tonne")
 
         value_eur_field = (value_tonne_field * Price.eur_per_tonne).label("value_eur")
-        commodity_field = case(
+        commodity_id_field = "kpler_" + sa.func.replace(
+            sa.func.replace(sa.func.lower(KplerFlow2.product), " ", "_"), "/", "_"
+        ).label("commodity")
+
+        commodity_equivalent_field = case(
             [
                 (
                     sa.and_(KplerProduct.family.in_(["Dirty"]), KplerFlow2.product != "Condensate"),
@@ -211,7 +216,7 @@ class KplerFlowResource(TemplateResource):
                 (KplerProduct.name.in_(["lng"]), "lng"),
             ],
             else_="others",
-        ).label("commodity")
+        ).label("commodity_equivalent")
 
         query = (
             session.query(
@@ -234,7 +239,8 @@ class KplerFlowResource(TemplateResource):
                 value_eur_field,
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
-                commodity_field,
+                Commodity.name.label("commodity"),
+                commodity_equivalent_field,  # For filtering
             )
             .outerjoin(
                 FromCountry,
@@ -256,6 +262,7 @@ class KplerFlowResource(TemplateResource):
                     KplerProduct.platform == KplerFlow2.platform,
                 ),
             )
+            .outerjoin(Commodity, commodity_id_field == Commodity.id)
             .outerjoin(
                 Price,
                 sa.and_(
@@ -267,7 +274,7 @@ class KplerFlowResource(TemplateResource):
                     Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    Price.commodity == commodity_field,
+                    Price.commodity == Commodity.pricing_commodity,
                 ),
             )
             .outerjoin(Currency, Currency.date == KplerFlow2.date)
@@ -334,6 +341,6 @@ class KplerFlowResource(TemplateResource):
         query = session.query(subquery)
 
         if commodity:
-            query = query.filter(subquery.c.commodity.in_(to_list(commodity)))
+            query = query.filter(subquery.c.commodity_equivalent.in_(to_list(commodity)))
 
         return query
