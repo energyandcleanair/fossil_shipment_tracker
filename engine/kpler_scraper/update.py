@@ -57,9 +57,9 @@ def get_products(scraper, platform, origin_iso2):
     return products_unique
 
 
-def get_from_zones(scraper, platform, product, origin_iso2, split):
+def get_from_zones(scraper, platform, product, origin_iso2, split, to_zone=None):
 
-    if split == FlowsSplit.OriginCountries:
+    if split == FlowsSplit.OriginCountries and origin_iso2 is not None:
         return [scraper.get_zone_dict(platform=platform, iso2=origin_iso2)]
 
     df = scraper.get_flows_raw_brute(
@@ -67,7 +67,10 @@ def get_from_zones(scraper, platform, product, origin_iso2, split):
         product=product,
         date_from="2010-01-01",
         date_to=dt.date.today(),
-        from_zone=scraper.get_zone_dict(platform=platform, iso2=origin_iso2),
+        from_zone=scraper.get_zone_dict(platform=platform, iso2=origin_iso2)
+        if origin_iso2
+        else None,
+        to_zone=to_zone,
         split=split,
         granularity=FlowsPeriod.Annually,
     )
@@ -79,7 +82,7 @@ def get_from_zones(scraper, platform, product, origin_iso2, split):
         return zones_unique
 
 
-def get_to_zones(scraper, platform, product, from_zone, split):
+def get_to_zones(scraper, platform, product, split, from_zone=None, destination_iso2=None):
 
     df = scraper.get_flows_raw_brute(
         platform=platform,
@@ -87,6 +90,7 @@ def get_to_zones(scraper, platform, product, from_zone, split):
         date_from="2010-01-01",
         date_to=dt.date.today(),
         from_zone=from_zone,
+        to_zone=scraper.get_zone_dict(platform=platform, iso2=destination_iso2),
         split=split,
         granularity=FlowsPeriod.Annually,
     )
@@ -104,6 +108,7 @@ def update_flows(
     platforms=None,
     products=None,
     origin_iso2s=["RU"],
+    destination_iso2s=None,
     from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     # add_total_installation=True,
@@ -166,6 +171,103 @@ def update_flows(
                             total = scraper.get_flows(
                                 platform=platform,
                                 origin_iso2=origin_iso2,
+                                date_from=date_from,
+                                date_to=date_to,
+                                from_zone=from_zone,
+                                from_split=from_split,
+                                to_zone=None,
+                                to_split=to_split,
+                                split=FlowsSplit.Products,
+                                use_brute_force=use_brute_force,
+                            )
+
+                            known_zones = pd.concat(df_zones)
+                            known_zones_total = (
+                                known_zones.groupby(["date", "product"]).value.sum().reset_index()
+                            )
+                            unknown = total.merge(
+                                known_zones_total,
+                                on=["product", "date"],
+                                how="left",
+                                suffixes=("", "_byzone"),
+                            )
+                            unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
+                            unknown["value_unknown"] = unknown["value"] - unknown["value_byzone"]
+                            unknown = unknown[unknown["value_unknown"] > 0]
+                            unknown["to_zone_name"] = UNKNOWN_COUNTRY
+                            unknown["value"] = unknown["value_unknown"]
+                            unknown = unknown[known_zones.columns]
+                            upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+
+
+def update_flows_reverse(
+    date_from=None,
+    date_to=None,
+    platforms=None,
+    destination_iso2s=["IN"],
+    from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
+    to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
+    # add_total_installation=True,
+    ignore_if_copy_failed=False,
+    use_brute_force=True,
+    add_unknown=True,
+    add_unknown_only=False,
+):
+    scraper = KplerScraper()
+
+    _platforms = scraper.platforms if platforms is None else platforms
+    for platform in _platforms:
+        # _products = scraper.get_products(platform=platform).name if products is None else products
+
+        for destination_iso2 in tqdm(destination_iso2s):
+
+            for to_split in to_splits:
+
+                to_zones = get_to_zones(
+                    scraper=scraper,
+                    platform=platform,
+                    product=None,
+                    destination_iso2=destination_iso2,
+                    split=to_split,
+                )
+
+                for to_zone in tqdm(to_zones):
+
+                    for from_split in from_splits:
+
+                        from_zones = get_from_zones(
+                            scraper=scraper,
+                            platform=platform,
+                            to_zone=to_zone,
+                            split=from_split,
+                            product=None,
+                            origin_iso2=None,
+                        )
+
+                        df_zones = []
+                        for from_zone in tqdm(from_zones):
+
+                            df = scraper.get_flows(
+                                platform=platform,
+                                destination_iso2=destination_iso2,
+                                date_from=date_from,
+                                date_to=date_to,
+                                from_zone=from_zone,
+                                from_split=from_split,
+                                to_zone=to_zone,
+                                to_split=to_split,
+                                split=FlowsSplit.Products,
+                                use_brute_force=use_brute_force,
+                            )
+                            df_zones.append(df)
+                            if not add_unknown_only:
+                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+
+                        if add_unknown:
+                            # Add an unknown one
+                            total = scraper.get_flows(
+                                platform=platform,
+                                destination_iso2=destination_iso2,
                                 date_from=date_from,
                                 date_to=date_to,
                                 from_zone=from_zone,
