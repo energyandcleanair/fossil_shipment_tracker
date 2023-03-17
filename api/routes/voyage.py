@@ -90,6 +90,13 @@ class VoyageResource(Resource):
         required=False,
     )
     parser.add_argument(
+        "commodity_group",
+        help="commodity group(s) of interest. e.g. oil,gas,coal Default: returns all of them",
+        default=None,
+        action="split",
+        required=False,
+    )
+    parser.add_argument(
         "status",
         help="status of shipments. Could be any or several of completed, ongoing, undetected_arrival. Default: returns all of them",
         default=None,
@@ -439,6 +446,7 @@ class VoyageResource(Resource):
 
         id = params.get("id")
         commodity = params.get("commodity")
+        commodity_group = params.get("commodity_group")
         status = params.get("status")
         is_sts = params.get("is_sts")
 
@@ -591,6 +599,17 @@ class VoyageResource(Resource):
                                 "^dalian|^yangpu|^qingdao|^bohai|^lufeng|^lanqiao|^dongjiakou|^shanghai"
                             )
                         ),
+                    ),
+                    "oil_products",
+                ),
+                (
+                    # Russia: forcing to Oil products when crude oil
+                    # in ports that did not export crude oil in 2022
+                    # according to Kpler
+                    sa.and_(
+                        Ship.commodity.in_([base.CRUDE_OIL]),
+                        DeparturePort.iso2 == "RU",
+                        DeparturePort.name.op("~*")("^Tuapse|^Vysotsk|^Taman"),
                     ),
                     "oil_products",
                 ),
@@ -1153,6 +1172,11 @@ class VoyageResource(Resource):
 
         if commodity is not None:
             shipments_rich = shipments_rich.filter(commodity_field.in_(to_list(commodity)))
+
+        if commodity_group is not None:
+            shipments_rich = shipments_rich.filter(
+                commodity_subquery.c.group.in_(to_list(commodity_group))
+            )
 
         if status is not None:
             shipments_rich = shipments_rich.filter(
