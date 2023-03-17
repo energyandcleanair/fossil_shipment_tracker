@@ -75,9 +75,22 @@ class Marinetraffic:
             cls.wait()
 
         params_string = urllib.parse.urlencode(params)
-        api_result = s.get(
-            Marinetraffic.api_base + method + api_key + "?" + params_string
-        )
+        api_result = s.get(Marinetraffic.api_base + method + api_key + "?" + params_string)
+
+        if api_result.status_code == 429:
+            # Too many requests
+            logger.info("Too many requests, waiting...")
+            cls.wait()
+            return (
+                cls.call(
+                    method,
+                    params,
+                    api_key,
+                    credits_per_record,
+                    save_empty_record=save_empty_record,
+                    wait=wait,
+                ),
+            )
 
         call_log = {
             "method": method,
@@ -89,9 +102,7 @@ class Marinetraffic:
         if api_result.status_code != 200:
             call_log["records"] = 0
             call_log["credits"] = 0
-            call_log["status"] = (
-                str(api_result.status_code) + " - " + str(api_result.content)
-            )
+            call_log["status"] = str(api_result.status_code) + " - " + str(api_result.content)
             result = (None, api_result)
         else:
             result = (api_result.json(), api_result)
@@ -142,9 +153,7 @@ class Marinetraffic:
             if len(response_data) == 1:
                 response_data = response_data[0]
             elif len(response_data) > 1:
-                logger.warning(
-                    "Found more than 1 ship in cache with matching criteria..."
-                )
+                logger.warning("Found more than 1 ship in cache with matching criteria...")
 
                 return None
 
@@ -177,29 +186,21 @@ class Marinetraffic:
                 response_data = response_data.get("DATA")
 
             if not response_data:
-                logger.warning(
-                    "Marinetraffic: Failed to query vessel %s: %s" % (imo, response)
-                )
+                logger.warning("Marinetraffic: Failed to query vessel %s: %s" % (imo, response))
                 return None
 
             if len(response_data) > 1:
                 # We assume only ships higher than base.DWT_MIN have been queried
                 try:
                     response_data = [
-                        x
-                        for x in response_data
-                        if float(x["SUMMER_DWT"]) > base.DWT_MIN
+                        x for x in response_data if float(x["SUMMER_DWT"]) > base.DWT_MIN
                     ]
                     if len(response_data) > 1:
-                        logger.warning(
-                            "Two ships available with this mmsi: %s" % (response_data,)
-                        )
+                        logger.warning("Two ships available with this mmsi: %s" % (response_data,))
                         return None
 
                 except Exception as e:
-                    response_data = [
-                        {"MMSI": mmsi, "IMO": imo, "SHIPID": mt_id, "NAME": None}
-                    ]
+                    response_data = [{"MMSI": mmsi, "IMO": imo, "SHIPID": mt_id, "NAME": None}]
 
             if not response_data:
                 raise ValueError("Empty response")
@@ -243,9 +244,7 @@ class Marinetraffic:
         use_call_based=False,
     ):
         if imo is None and unlocode is None and marinetraffic_port_id is None:
-            raise ValueError(
-                "Need to specify either imo, unlocode or marinetraffic_port_id"
-            )
+            raise ValueError("Need to specify either imo, unlocode or marinetraffic_port_id")
 
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
@@ -293,8 +292,7 @@ class Marinetraffic:
             if not imo or not "_v2" in imo:
                 # TODO deal with these v2 and unknown
                 logger.warning(
-                    "Marinetraffic: Failed to query portcall %s: %s"
-                    % (unlocode, response)
+                    "Marinetraffic: Failed to query portcall %s: %s" % (unlocode, response)
                 )
             return []
 
@@ -314,9 +312,7 @@ class Marinetraffic:
                 .all()
             )
             # Make a dict with IMO:MMSIS
-            imo_mmsi_dict = dict(
-                zip([x[1] for x in mmsi_imo], [x[0] for x in mmsi_imo])
-            )
+            imo_mmsi_dict = dict(zip([x[1] for x in mmsi_imo], [x[0] for x in mmsi_imo]))
 
         if len(response_datas) <= 500:
             response_datas
@@ -351,9 +347,7 @@ class Marinetraffic:
                         if is_same:
                             continue
                         else:
-                            n_imo_ships = Ship.query.filter(
-                                Ship.imo.op("~")(r_imo[0])
-                            ).count()
+                            n_imo_ships = Ship.query.filter(Ship.imo.op("~")(r_imo[0])).count()
                             if n_imo_ships > 0:
                                 r_imo = ["%s_v%d" % (r_imo, n_imo_ships + 1)]
                                 unknown_ship = Ship(
@@ -484,9 +478,7 @@ class Marinetraffic:
     def get_voyage_info(cls, imo, date_from):
         # First look in cache to save query credits
         cached_info = MTVoyageInfo.query.filter(
-            sa.and_(
-                MTVoyageInfo.ship_imo == imo, MTVoyageInfo.queried_date_utc >= date_from
-            )
+            sa.and_(MTVoyageInfo.ship_imo == imo, MTVoyageInfo.queried_date_utc >= date_from)
         ).first()
 
         if cached_info:
@@ -512,9 +504,7 @@ class Marinetraffic:
         )
 
         if response_datas is None:
-            logger.warning(
-                "Marinetraffic: Failed to query voyageforecast %s: %s" % (imo, response)
-            )
+            logger.warning("Marinetraffic: Failed to query voyageforecast %s: %s" % (imo, response))
             return []
 
         if response_datas == []:
@@ -591,13 +581,12 @@ class Marinetraffic:
             params=params,
             credits_per_record=1,
             save_empty_record=True,
-            wait=False
+            wait=False,
         )
 
         if response_datas is None:
             logger.warning(
-                "Marinetraffic: Failed to query position for ship %s: %s"
-                % (imo, response)
+                "Marinetraffic: Failed to query position for ship %s: %s" % (imo, response)
             )
             return []
 
@@ -605,9 +594,7 @@ class Marinetraffic:
             logger.info("Didn't find any vessel positions for imo %s" % (imo,))
             return []
 
-        positions = cls.parse_position_response_data(
-            response_data=response_datas, imo=imo
-        )
+        positions = cls.parse_position_response_data(response_data=response_datas, imo=imo)
 
         for p in positions:
             try:
@@ -623,15 +610,11 @@ class Marinetraffic:
         positions = [
             Position(
                 **{
-                    "geometry": latlon_to_point(
-                        lat=float(x["LAT"]), lon=float(x["LON"])
-                    ),
+                    "geometry": latlon_to_point(lat=float(x["LAT"]), lon=float(x["LON"])),
                     "ship_imo": imo,
                     "navigation_status": x["STATUS"],
                     "speed": float(x["SPEED"]),
-                    "date_utc": dt.datetime.strptime(
-                        x["TIMESTAMP"], "%Y-%m-%dT%H:%M:%S"
-                    ),
+                    "date_utc": dt.datetime.strptime(x["TIMESTAMP"], "%Y-%m-%dT%H:%M:%S"),
                     "destination_name": None,
                 }
             )
@@ -674,9 +657,7 @@ class Marinetraffic:
             date_from = interval[0]
             date_to = interval[1]
 
-            interval_positions = cls.get_positions(
-                imo=imo, date_from=date_from, date_to=date_to
-            )
+            interval_positions = cls.get_positions(imo=imo, date_from=date_from, date_to=date_to)
 
             if interval_positions is not None and interval_positions:
                 # Sort in case we have more than one
@@ -719,14 +700,8 @@ class Marinetraffic:
         if use_cache:
             event_filter = (
                 lambda x: (imo is not None and str(x["IMO"]) == str(imo))
-                and (
-                    dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S")
-                    >= date_from
-                )
-                and (
-                    dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S")
-                    <= date_to
-                )
+                and (dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S") >= date_from)
+                and (dt.datetime.strptime(str(x["TIMESTAMP"]), "%Y-%m-%dT%H:%M:%S") <= date_to)
                 and x["EVENT_ID"] in event_type.split(",")
             )
 
@@ -755,13 +730,11 @@ class Marinetraffic:
                 params=params,
                 credits_per_record=2,
                 save_empty_record=True,
-                wait=False
+                wait=False,
             )
 
             if response_datas is None:
-                logger.warning(
-                    "Marinetraffic: Failed to query events %s: %s" % (imo, response)
-                )
+                logger.warning("Marinetraffic: Failed to query events %s: %s" % (imo, response))
                 return []
 
             for r in response_datas:
