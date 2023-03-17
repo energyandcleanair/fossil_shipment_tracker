@@ -144,7 +144,12 @@ class KplerFlowResource(TemplateResource):
                 subquery.c.origin_country,
                 subquery.c.origin_region,
             ],
-            "origin": [subquery.c.origin_name],
+            "origin": [
+                subquery.c.origin_name,
+                subquery.c.origin_iso2,
+                subquery.c.origin_country,
+                subquery.c.origin_region,
+            ],
             "destination_country": [
                 subquery.c.destination_iso2,
                 subquery.c.destination_country,
