@@ -91,6 +91,14 @@ class ChartDepartureOwnership(Resource):
     parser.add_argument("group_eug7_insurernorwary", type=inputs.boolean, default=True)
 
     parser.add_argument(
+        "metric",
+        type=str,
+        help="value_tonne or count",
+        required=False,
+        default="value_tonne",
+    )
+
+    parser.add_argument(
         "nest_in_data",
         help="Whether to nest the geojson content in a data key.",
         type=inputs.boolean,
@@ -126,6 +134,7 @@ class ChartDepartureOwnership(Resource):
         aggregate_by = params_chart.get("aggregate_by").copy()
         nest_in_data = params_chart.get("nest_in_data")
         language = params_chart.get("language")
+        metric = params_chart.get("metric")
         group_eug7_insurernorwary = params_chart.get("group_eug7_insurernorwary")
         departure_port_area = params_chart.get("departure_port_area")
         commodity_origin_iso2 = params_chart.get("commodity_origin_iso2")
@@ -207,14 +216,15 @@ class ChartDepartureOwnership(Resource):
         ]
         pivot_cols = ["region"]
         index_cols = [x for x in group_by_cols if x not in pivot_cols]
+
         result = (
-            data.groupby(group_by_cols)
-            .value_tonne.sum()
+            data.groupby(group_by_cols)[metric]
+            .sum()
             .reset_index()
             .pivot_table(
                 index=index_cols,
                 columns=pivot_cols,
-                values="value_tonne",
+                values=metric,
                 sort=False,
                 fill_value=0,
             )
