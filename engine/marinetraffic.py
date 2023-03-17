@@ -81,15 +81,13 @@ class Marinetraffic:
             # Too many requests
             logger.info("Too many requests, waiting...")
             cls.wait()
-            return (
-                cls.call(
-                    method,
-                    params,
-                    api_key,
-                    credits_per_record,
-                    save_empty_record=save_empty_record,
-                    wait=wait,
-                ),
+            return cls.call(
+                method,
+                params,
+                api_key,
+                credits_per_record,
+                save_empty_record=save_empty_record,
+                wait=wait,
             )
 
         call_log = {
