@@ -22,14 +22,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    - name: 'Create env file'
+    - name: Create env file
       run: |
         echo "${{ secrets.ENV_FILE }}" > .env
-    - name: Deploy to App Engine
-      id: deploy
-      uses: google-github-actions/deploy-appengine@main
+    - name: Authenticate
+      id: 'auth'
+      uses: 'google-github-actions/auth@v1'
       with:
-        credentials: ${{ secrets.GCP_SA_KEY }}
-        deliverables: ./api/api_development.yaml
-        promote: true
-        flags: '--stop-previous-version'
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+    - name: Set up Cloud SDK
+      uses: 'google-github-actions/setup-gcloud@v1'
+    - name: Deploy to google cloud
+      run: |
+        gcloud app deploy ./api/api_development.yaml --promote --stop-previous-version --project=fossil-shipment-tracker
