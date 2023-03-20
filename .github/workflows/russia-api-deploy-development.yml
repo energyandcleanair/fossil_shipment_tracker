@@ -32,6 +32,10 @@ jobs:
         credentials_json: '${{ secrets.GCP_SA_KEY }}'
     - name: Set up Cloud SDK
       uses: 'google-github-actions/setup-gcloud@v1'
-    - name: Deploy to google cloud
-      run: |
-        gcloud app deploy ./api/api_development.yaml --promote --stop-previous-version --project=fossil-shipment-tracker
+    - name: Deploy to App Engine
+      id: deploy
+      uses: google-github-actions/deploy-appengine@v1
+      with:
+        deliverables: ./api/api_development.yaml
+        promote: true
+        flags: '--stop-previous-version'
