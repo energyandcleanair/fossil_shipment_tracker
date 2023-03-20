@@ -9,23 +9,16 @@ import base
 from base.logger import logger, logger_slack
 from base.db import session
 from base.db_utils import upsert
-from base.models import DB_TABLE_PORTCALL
 from base.utils import to_datetime, to_list, collapse_dates, remove_dates
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
 from engine.datalastic import Datalastic
 
-from base.models import (
-    PortCall,
-    Port,
-    Ship,
-    Event,
-    MarineTrafficCall,
-    Shipment,
-    Departure,
-    Arrival,
-)
+from base.models import PortCall, Port, Ship, Event, MarineTrafficCall, Shipment, Departure, Arrival
+from base.models import DB_TABLE_PORTCALL
+
+from engine.marinetraffic import MOVETYPE_DEPARTURE, MOVETYPE_ARRIVAL
 
 
 def initial_fill(limit=None):
@@ -355,6 +348,18 @@ def get_next_portcall(
             )
         )
 
+        if arrival_or_departure is None:
+            portcall_queries = portcall_queries.filter(
+                ~MarineTrafficCall.params.has_key('movetype')
+            )
+        else:
+            portcall_queries = portcall_queries.filter(
+                MarineTrafficCall.params["movetype"].astext == str({
+                    "departure": MOVETYPE_DEPARTURE,
+                    "arrival": MOVETYPE_ARRIVAL,
+                }[arrival_or_departure])
+            )
+
         if imo is not None:
             portcall_queries = portcall_queries.filter(
                 MarineTrafficCall.params["imo"].astext == imo
@@ -362,7 +367,7 @@ def get_next_portcall(
 
         if unlocode is not None:
             portcall_queries = portcall_queries.filter(
-                Marinetraffic.params["unlocode"].astext == unlocode
+                MarineTrafficCall.params["unlocode"].astext == unlocode
             )
 
         portcall_query_dates = collapse_dates(
