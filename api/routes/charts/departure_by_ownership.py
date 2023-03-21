@@ -68,7 +68,7 @@ class ChartDepartureOwnership(Resource):
     parser.add_argument(
         "status",
         help="status of shipments. Could be any or several of completed, ongoing, undetected_arrival. Default: returns all of them",
-        default=None,
+        default=[base.ONGOING, base.COMPLETED],
         action="split",
         required=False,
     )
