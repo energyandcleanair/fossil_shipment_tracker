@@ -66,6 +66,14 @@ class ChartDepartureOwnership(Resource):
     )
 
     parser.add_argument(
+        "status",
+        help="status of shipments. Could be any or several of completed, ongoing, undetected_arrival. Default: returns all of them",
+        default=None,
+        action="split",
+        required=False,
+    )
+
+    parser.add_argument(
         "aggregate_by",
         type=str,
         action="split",
