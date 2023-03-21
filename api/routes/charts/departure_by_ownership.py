@@ -145,6 +145,7 @@ class ChartDepartureOwnership(Resource):
             "ship_insurer_country",
             "departure_date",
             "commodity_group",
+            "status",
         ]
 
         params.update(**params_chart)
@@ -218,7 +219,7 @@ class ChartDepartureOwnership(Resource):
         index_cols = [x for x in group_by_cols if x not in pivot_cols]
 
         result = (
-            data.groupby(group_by_cols)[metric]
+            data.groupby(group_by_cols, dropna=False)[metric]
             .sum()
             .reset_index()
             .pivot_table(
