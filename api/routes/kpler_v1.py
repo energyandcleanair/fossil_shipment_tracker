@@ -46,6 +46,14 @@ class KplerFlowResource(TemplateResource):
     )
 
     parser.add_argument(
+        "destination_region",
+        help="Destination region",
+        required=False,
+        action="split",
+        default=None,
+    )
+
+    parser.add_argument(
         "origin_type",
         help="Split origin by either country or port",
         required=False,
@@ -302,6 +310,7 @@ class KplerFlowResource(TemplateResource):
 
         origin_iso2 = params.get("origin_iso2")
         destination_iso2 = params.get("destination_iso2")
+        destination_region = params.get("destination_region")
         origin_type = params.get("origin_type")
         destination_type = params.get("destination_type")
         product = params.get("product")
@@ -347,5 +356,8 @@ class KplerFlowResource(TemplateResource):
 
         if commodity:
             query = query.filter(subquery.c.commodity_equivalent.in_(to_list(commodity)))
+
+        if destination_region:
+            query = query.filter(subquery.c.destination_region.in_(to_list(destination_region)))
 
         return query
