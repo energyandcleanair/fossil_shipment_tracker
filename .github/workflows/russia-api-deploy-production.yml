@@ -1,5 +1,5 @@
-# Deploy development
-name: russia-api-deploy-development
+# Deploy production
+name: russia-api-deploy-production
 
 on: workflow_dispatch
 
@@ -36,6 +36,6 @@ jobs:
       id: deploy
       uses: google-github-actions/deploy-appengine@v1
       with:
-        deliverables: ./api/api_development.yaml
+        deliverables: ./api/api_production.yaml
         promote: true
         flags: '--stop-previous-version'
