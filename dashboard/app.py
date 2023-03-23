@@ -14,7 +14,12 @@ from dash.exceptions import PreventUpdate
 
 from server import app, background_callback_manager, cache
 from counter import layout as counter_layout, chart_settings as counter_chart_settings
-from voyages import layout as voyages_layout, chart_settings as voyages_chart_settings
+
+# from voyages import layout as voyages_layout, chart_settings as voyages_chart_settings
+
+import kpler
+from kpler import layout as kpler_layout, chart_settings as kpler_chart_settings
+from kpler import store as kpler_store
 
 
 SIDEBAR_STYLE = {
@@ -22,7 +27,7 @@ SIDEBAR_STYLE = {
     "top": 0,
     "left": 0,
     "bottom": 0,
-    "width": "16rem",
+    "width": "24rem",
     "padding": "2rem 1rem",
     "background-color": "#f8f9fa",
 }
@@ -30,7 +35,7 @@ SIDEBAR_STYLE = {
 # the styles for the main content position it to the right of the sidebar and
 # add some padding.
 CONTENT_STYLE = {
-    "margin-left": "18rem",
+    "margin-left": "24rem",
     "margin-right": "2rem",
     "padding": "2rem 1rem",
     "min-height": "100%",
@@ -51,7 +56,8 @@ sidebar = html.Div(
         dbc.Nav(
             [
                 dbc.NavLink("Counter", href="/", active="exact"),
-                dbc.NavLink("Shipments", href="/shipments", active="exact"),
+                # dbc.NavLink("Shipments", href="/shipments", active="exact"),
+                dbc.NavLink("Kpler", href="/kpler", active="exact"),
             ],
             vertical=True,
             pills=True,
@@ -68,7 +74,8 @@ shared = [
     dcc.Store(id="counter-rolled"),
     dcc.Store(id="voyages"),
     html.Div(id="dummy_div"),
-]
+] + kpler_store
+
 app.layout = dbc.Container(
     [dcc.Location(id="url"), sidebar, content, *shared],
     style=LAYOUT_STYLE,
@@ -85,6 +92,8 @@ def render_page_content(pathname):
         return counter_layout
     elif pathname == "/shipments":
         return voyages_layout
+    elif pathname == "/kpler":
+        return kpler_layout
     # If the user tries to reach a different page, return a 404 message
     return html.Div(
         [
@@ -102,4 +111,6 @@ def render_chart_setting(pathname):
         return counter_chart_settings
     elif pathname == "/shipments":
         return voyages_chart_settings
+    elif pathname == "/kpler":
+        return kpler_chart_settings
     return None

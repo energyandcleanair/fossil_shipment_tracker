@@ -22,3 +22,14 @@ palette = {
     "Oil": "#741b47",
     "Oil products and chemicals": "#741b4760",
 }
+
+
+def to_list(d, convert_tuple=False):
+    if d is None:
+        return []
+    if convert_tuple and isinstance(d, tuple):
+        return list(d)
+    if not isinstance(d, list):
+        return [d]
+    else:
+        return d
