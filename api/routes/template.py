@@ -96,6 +96,14 @@ class TemplateResource(Resource):
         required=False,
         default=None,
     )
+    parser.add_argument(
+        "select",
+        type=str,
+        help="selecting specific columns only, with the possibility to rename e.g. new_name1(var1),var2,var3",
+        required=False,
+        action="split",
+        default=None,
+    )
 
     # MUST BE FILLED
     must_group_by = []
@@ -170,6 +178,7 @@ class TemplateResource(Resource):
         pivot_fill_value = params.get("pivot_fill_value")
         limit = params.get("limit")
         limit_by = params.get("limit_by")
+        select = params.get("select")
 
         # Create db query
         query = self.initial_query(params=params)
@@ -223,6 +232,8 @@ class TemplateResource(Resource):
 
         # Post compute
         result = self.postcompute(result=result, params=params)
+
+        result = self.select(result, select=select)
 
         response = self.build_response(
             result=result,
@@ -316,6 +327,27 @@ class TemplateResource(Resource):
                 fill_value=pivot_fill_value,
             ).reset_index()
 
+        return result
+
+    def select(self, result, select):
+        if not select:
+            return result
+
+        names = []
+        variables = []
+
+        for s in to_list(select):
+            m = re.match("(.*)\\((.*)\\)", s)
+            if m:
+                names.append(m[1])
+                variables.append(m[2])
+            else:
+                # No asc(.*) or desc(.*)
+                names.append(s)
+                variables.append(s)
+
+        result = result[variables]
+        result.columns = names
         return result
 
     def build_response(self, result, format, nest_in_data, aggregate_by, download):
