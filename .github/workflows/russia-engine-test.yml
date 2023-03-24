@@ -3,7 +3,9 @@ name: russia-engine-test
 
 on:
   pull_request:
-    branches: [master]
+    types: [opened, reopened]
+    branches:
+      - master
 
 jobs:
   build:
