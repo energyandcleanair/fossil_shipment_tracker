@@ -33,23 +33,23 @@ chart_settings = html.Div(
                     value="RU",
                     style={"min-width": "150px"},
                 ),
-                # html.Div(
-                #     [
-                #         dbc.Button(
-                #             "Laudromat",
-                #             id="kpler-origin-country-select-laundromat",
-                #             color="primary",
-                #             className="btn-preset",
-                #         ),
-                #         dbc.Button(
-                #             "PCC",
-                #             id="kpler-origin-country-select-pcc",
-                #             color="primary",
-                #             className="btn-preset",
-                #         ),
-                #     ],
-                #     className="btn-preset-group",
-                # ),
+                html.Div(
+                    [
+                        dbc.Button(
+                            "Russia",
+                            id="kpler-origin-country-select-russia",
+                            color="primary",
+                            className="btn-preset",
+                        ),
+                        dbc.Button(
+                            "Laudromat",
+                            id="kpler-origin-country-select-laundromat",
+                            color="primary",
+                            className="btn-preset",
+                        ),
+                    ],
+                    className="btn-preset-group",
+                ),
                 dbc.Label("To:", size="sm"),
                 dcc.Dropdown(
                     id="kpler-destination-country",
@@ -57,6 +57,24 @@ chart_settings = html.Div(
                     multi=True,
                     value=DEFAULT_DESTINATION_COUNTRY,
                     style={"min-width": "150px"},
+                    maxHeight=150,
+                ),
+                html.Div(
+                    [
+                        dbc.Button(
+                            "Laudromat",
+                            id="kpler-destination-country-select-laundromat",
+                            color="primary",
+                            className="btn-preset",
+                        ),
+                        dbc.Button(
+                            "PCC",
+                            id="kpler-destination-country-select-pcc",
+                            color="primary",
+                            className="btn-preset",
+                        ),
+                    ],
+                    className="btn-preset-group",
                 ),
                 dbc.Label("Origin by:", size="sm"),
                 dcc.Dropdown(
@@ -178,7 +196,8 @@ layout = html.Div(
                         ),
                     ]
                 ),
-            ]
+            ],
+            className="mb-1",
         ),
         dbc.Row(
             [

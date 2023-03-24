@@ -33,11 +33,20 @@ units = {
 
 
 countries = {"RU": "Russia", "EG": "Egypt"}
-colour_bys = {"product": "Product", "destination_name": "Destination"}
+colour_bys = {
+    "product": "Product",
+    "product_group": "Product group",
+    "product_family": "Product family",
+    "commodity": "Commodity",
+    "origin_name": "Origin",
+    "destination_name": "Destination",
+}
 from_type = {"country": "Country", "port": "Port"}
 to_type = {"country": "Country", "port": "Port"}
 facet_bys = {
     FACET_NONE: "None",
+    "origin_region": "Origin region",
+    "origin_country": "Origin country",
     "destination_region": "Destination region",
     "destination_country": "Destination country",
     "commodity_equivalent": "Commodity",
@@ -47,6 +56,42 @@ chart_types = {"area": "Area", "line": "Line", "bar": "Bar"}
 
 refreshing = False
 
+# Preset
+laundromat_iso2s = ["EG", "SG", "IN", "CN", "AE"]
+pcc_iso2s = [
+    "AT",
+    "BE",
+    "BG",
+    "HR",
+    "CY",
+    "CZ",
+    "DK",
+    "EE",
+    "FI",
+    "FR",
+    "DE",
+    "GR",
+    "HU",
+    "IE",
+    "IT",
+    "LV",
+    "LT",
+    "LU",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SK",
+    "SI",
+    "ES",
+    "SE",
+    "GB",
+    "US",
+    "CA",
+    "AU",
+    "JP",
+]
 from .layout import *
 from .data import *
 from .update import *

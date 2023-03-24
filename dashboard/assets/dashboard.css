@@ -1,0 +1,30 @@
+body {
+    font-family: sans-serif;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: #35416;
+}
+
+aaa {
+    --contrast: #222222;
+    --contrast-2: #575760;
+    --contrast-3: #b2b2be;
+    --base: #f0f0f0;
+    --base-3: #ffffff;
+    --accent: #35416c;
+    --global-color-7: #8cc9d0;
+    --global-color-8: #cce7eb;
+}
+
+.btn-preset{
+    background: none;
+    border: none;
+    font-size: small;
+}
+
+.btn-preset:focus, .btn-preset:hover{
+    outline: none;
+    box-shadow: none;
+    background: none;
+    color: var(--primary);
+}

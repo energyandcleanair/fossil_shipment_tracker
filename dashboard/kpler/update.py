@@ -8,7 +8,63 @@ from utils import palette
 from . import COUNTRY_GLOBAL
 from . import FACET_NONE
 from . import units
+from . import laundromat_iso2s, pcc_iso2s
 from .utils import roll_average_kpler
+
+
+@app.callback(
+    output=Output("kpler-origin-country", "value", allow_duplicate=True),
+    inputs=[
+        Input("kpler-origin-country-select-laundromat", "n_clicks"),
+    ],
+    allow_duplicate=True,
+    suppress_callback_exceptions=True,
+    prevent_initial_call=True,
+)
+def select_origin_laundromat(n_clicks):
+    return laundromat_iso2s
+
+
+@app.callback(
+    output=Output("kpler-origin-country", "value", allow_duplicate=True),
+    inputs=[
+        Input("kpler-origin-country-select-russia", "n_clicks"),
+    ],
+    allow_duplicate=True,
+    suppress_callback_exceptions=True,
+    prevent_initial_call=True,
+)
+def select_origin_laundromat(n_clicks):
+    return ["RU"]
+
+
+@app.callback(
+    output=Output("kpler-destination-country", "value", allow_duplicate=True),
+    inputs=[
+        Input("kpler-destination-country-select-laundromat", "n_clicks"),
+    ],
+    allow_duplicate=True,
+    suppress_callback_exceptions=True,
+    prevent_initial_call=True,
+)
+def select_origin_laundromat(n_clicks):
+    return laundromat_iso2s
+
+
+@app.callback(
+    output=Output(
+        "kpler-destination-country",
+        "value",
+        allow_duplicate=True,
+    ),
+    inputs=[
+        Input("kpler-destination-country-select-pcc", "n_clicks"),
+    ],
+    suppress_callback_exceptions=True,
+    prevent_initial_call=True,
+)
+def select_origin_pcc(n_clicks):
+    return pcc_iso2s
 
 
 @app.callback(
@@ -98,18 +154,3 @@ def update_chart(json_data, colour_by, unit_id, facet, chart_type):
         yaxis_title=None,
     )
     return fig
-
-
-@app.callback(
-    Output("download-kpler0", "data"),
-    State("kpler0", "data"),
-    Input("btn-download-kpler0", "n_clicks"),
-    prevent_initial_call=True,
-)
-def download_kpler0(data, n):
-    df = pd.DataFrame(data)
-    return dcc.send_data_frame(df.to_csv, "kpler_raw.csv")
-
-
-if __name__ == "__main__":
-    app.run_server(debug=True)

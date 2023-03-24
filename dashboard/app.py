@@ -13,8 +13,8 @@ from dash import DiskcacheManager, CeleryManager, Input, Output, html
 from dash.exceptions import PreventUpdate
 
 from server import app, background_callback_manager, cache
-from counter import layout as counter_layout, chart_settings as counter_chart_settings
 
+# from counter import layout as counter_layout, chart_settings as counter_chart_settings
 # from voyages import layout as voyages_layout, chart_settings as voyages_chart_settings
 
 import kpler
@@ -30,6 +30,7 @@ SIDEBAR_STYLE = {
     "width": "24rem",
     "padding": "2rem 1rem",
     "background-color": "#f8f9fa",
+    "overflow-y": "scroll",
 }
 
 # the styles for the main content position it to the right of the sidebar and
@@ -55,7 +56,7 @@ sidebar = html.Div(
         html.Hr(),
         dbc.Nav(
             [
-                dbc.NavLink("Counter", href="/", active="exact"),
+                # dbc.NavLink("Counter", href="/", active="exact"),
                 # dbc.NavLink("Shipments", href="/shipments", active="exact"),
                 dbc.NavLink("Kpler", href="/kpler", active="exact"),
             ],
@@ -88,11 +89,11 @@ server = app.server
 
 @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
 def render_page_content(pathname):
-    if pathname == "/" or pathname == "/counter":
+    if pathname == "/counter":
         return counter_layout
     elif pathname == "/shipments":
         return voyages_layout
-    elif pathname == "/kpler":
+    elif pathname == "/" or pathname == "/kpler":
         return kpler_layout
     # If the user tries to reach a different page, return a 404 message
     return html.Div(
