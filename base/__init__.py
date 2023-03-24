@@ -1,3 +1,5 @@
+import sqlalchemy as sa
+
 CRUDE_OIL = "crude_oil"
 OIL_PRODUCTS = "oil_products"
 OIL_OR_CHEMICAL = "oil_or_chemical"
@@ -13,13 +15,18 @@ UNKNOWN_COMMODITY = "unknown"
 PIPELINE_GAS = "natural_gas"
 PIPELINE_OIL = "pipeline_oil"
 
+# Transport mode
+SEABORNE = "seaborne"
+PIPELINE = "pipeline"
+RAIL_ROAD = "rail_road"
+
 # MARINE TRAFFIC METHODS
 VESSEL_DATA = "vesselmasterdata/"
 VESSEL_EVENTS = "vesselevents/"
 VESSEL_POSITION = "exportvesseltrack/"
 VESSEL_PORTCALLS = "portcalls/"
 HTTP_OK = "200"
-
+MARINETRAFFIC_LATENCY_HOURS = 12
 
 # LOAD STATUS
 FULLY_LADEN = "fully_laden"
@@ -42,10 +49,13 @@ DWT_MIN = 5000
 AVG_TANKER_SPEED_KMH = 22
 
 FOR_ORDERS = "for_orders"
+UNKNOWN_COUNTRY = "unknown"
 
 QUERY_POSITION_HOURS_AFTER_ARRIVAL = 72
 QUERY_POSITION_HOURS_BEFORE_DEPARTURE = 72
 BERTH_MAX_HOURS_AFTER_DEPARTURE = 24
+MARINETRAFFIC_LATENCY_HOURS = 24
+MARINETRAFFIC_PORTCALL_WINDOW_HOURS = 12
 
 GCV_KWH_PER_M3 = 11.3505
 KG_PER_M3 = 0.717
@@ -83,7 +93,13 @@ IMO_BASE_URL = "https://gisis.imo.org/public/ships/default.aspx"
 
 # PRICING SCENARIO
 PRICING_DEFAULT = "default"
-PRICING_PRICECAP = "pricecap"
 
 # INSURER
 UNKNOWN_INSURER = "unknown"
+
+# COMPANY REFRESHING
+REFRESH_COMPANY_DAYS = 3
+
+# NULL FOR POSTGRES CONSTRAINTS TO WORK
+PRICE_NULLARRAY_CHAR = sa.sql.expression.literal_column("array[NULL::varchar]")
+PRICE_NULLARRAY_INT = sa.sql.expression.literal_column("array[NULL::bigint]")

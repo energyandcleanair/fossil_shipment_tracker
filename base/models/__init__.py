@@ -16,7 +16,7 @@ DB_TABLE_TRAJECTORY = "trajectory"
 DB_TABLE_SHIPMENT = "shipment"
 DB_TABLE_SHIPMENTARRIVALBERTH = "shipmentarrivalberth"
 DB_TABLE_SHIPMENTDEPARTUREBERTH = "shipmentdepartureberth"
-DB_TABLE_PRICE = "price_new"
+DB_TABLE_PRICE = "price"
 DB_TABLE_PRICE_SCENARIO = "price_scenario"
 DB_TABLE_COMMODITY = "commodity"
 DB_TABLE_ENTSOGFLOW = "entsogflow"
@@ -32,7 +32,7 @@ DB_TABLE_STSARRIVALLOCATION = "shipmentarrivallocationsts"
 
 DB_TABLE_PIPELINEFLOW = "pipelineflow"
 DB_TABLE_COUNTER = "counter"
-DB_TABLE_COUNTER100BN = "counter_100bn"
+DB_TABLE_ENDPOINTCACHE = "endpoint_cache"
 
 # Marine Traffic cache
 DB_TABLE_MTVOYAGEINFO = "voyageinfo"
@@ -51,5 +51,14 @@ DB_TABLE_FLARING = "flaring"
 DB_TABLE_FLARING_ANOMALY = "flaring_anomaly"
 DB_TABLE_FLARING_ANOMALY_ALGORITHM = "flaring_anomaly_algorithm"
 
+# Kpler data
+DB_TABLE_KPLER_PRODUCT = "kpler_product"
+DB_TABLE_KPLER_FLOW = "kpler_flow"
+DB_TABLE_KPLER_VESSEL = "kpler_vessel"
+DB_TABLE_KPLER_TRADE = "kpler_trade"
+DB_TABLE_KPLER_INSTALLATION = "kpler_installation"
+DB_TABLE_KPLER_ZONE = "kpler_zone"
+
+DB_TABLE_API_KEY = "api_key"
 
 from .models import *

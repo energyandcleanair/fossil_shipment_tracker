@@ -11,15 +11,15 @@ from flask_restx import Resource, reqparse
 
 import base
 from base.encoder import JsonEncoder
-from base.utils import to_list, df_to_json, to_datetime
-from .. import routes_api
+from base.utils import to_list
+from .. import postcompute
+from .. import routes_api, ns_charts
 from ..voyage import VoyageResource
 from ..overland import PipelineFlowResource
 
 
-@routes_api.route("/v0/chart/departure_by_destination", strict_slashes=False)
+@ns_charts.route("/v0/chart/departure_by_destination", strict_slashes=False)
 class ChartDepartureDestination(Resource):
-
     parser = reqparse.RequestParser()
 
     parser.add_argument(
@@ -75,10 +75,14 @@ class ChartDepartureDestination(Resource):
         help="which variables to aggregate by. Could be any of commodity, type, destination_region, date",
     )
 
+    parser.add_argument("language", type=str, help="en or ua", default="en", required=False)
     parser.add_argument(
-        "language", type=str, help="en or ua", default="en", required=False
+        "postcompute",
+        type=str,
+        help="Post=compute function",
+        required=False,
+        default=None,
     )
-
     parser.add_argument(
         "rolling_days",
         type=int,
@@ -88,8 +92,8 @@ class ChartDepartureDestination(Resource):
     )
     parser.add_argument(
         "pivot_value",
-        type=str,
-        help="pivoted value. Default: value_tonne.",
+        action="split",
+        help="pivoted value(s). Default: value_tonne.",
         required=False,
         default="value_tonne",
     )
@@ -115,7 +119,6 @@ class ChartDepartureDestination(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-
         params = VoyageResource.parser.parse_args()
         params_chart = ChartDepartureDestination.parser.parse_args()
         params_overland = PipelineFlowResource.parser.parse_args()
@@ -151,6 +154,7 @@ class ChartDepartureDestination(Resource):
                 "keep_zeros": True,
                 "format": "json",
                 "nest_in_data": True,
+                "pivot_by": None,
             }
         )
 
@@ -167,6 +171,7 @@ class ChartDepartureDestination(Resource):
                 "keep_zeros": True,
                 "format": "json",
                 "nest_in_data": True,
+                "pivot_by": None,
             }
         )
 
@@ -174,7 +179,6 @@ class ChartDepartureDestination(Resource):
             import re
 
             if re.search("top_[0-9]*", country_grouping):
-
                 # Make EU a country
                 data.loc[data.destination_region == "EU", "destination_country"] = "EU"
                 data.loc[data.destination_region == "EU", "destination_iso2"] = "EU"
@@ -185,10 +189,7 @@ class ChartDepartureDestination(Resource):
                 n = int(country_grouping.replace("top_", ""))
                 top_n = (
                     data[
-                        (
-                            data.departure_date
-                            >= max(data.departure_date) - dt.timedelta(days=30)
-                        )
+                        (data.departure_date >= max(data.departure_date) - dt.timedelta(days=30))
                         & ~data.destination_iso2.isin(exclude_countries)
                         & (data.destination_region != "Unknown")
                     ]
@@ -214,9 +215,7 @@ class ChartDepartureDestination(Resource):
                 )
 
                 # Keep for orders
-                data.loc[
-                    data.destination_iso2 == base.FOR_ORDERS, "region"
-                ] = "For orders"
+                data.loc[data.destination_iso2 == base.FOR_ORDERS, "region"] = "For orders"
 
             else:
                 data["region"] = data.destination_region
@@ -238,21 +237,27 @@ class ChartDepartureDestination(Resource):
 
             return data
 
-        def pivot_data(data, variable):
+        def pivot_data(data, pivot_value):
+            pivot_values = to_list(pivot_value)
+            if len(pivot_values) > 1:
+                return pd.concat(
+                    [pivot_data(data=data.copy(), pivot_value=x) for x in pivot_values]
+                )
+            else:
+                pivot_value = pivot_values[0]
 
-            # Add the variable for transparency sake
-            data["variable"] = variable
+            data["variable"] = pivot_value
             result = (
                 data.groupby(
                     ["region", "departure_date", "commodity_group", "variable"],
                     dropna=False,
-                )[variable]
+                )[pivot_value]
                 .sum()
                 .reset_index()
                 .pivot_table(
                     index=["commodity_group", "departure_date", "variable"],
                     columns=["region"],
-                    values=variable,
+                    values=pivot_value,
                     sort=False,
                     fill_value=0,
                 )
@@ -281,13 +286,9 @@ class ChartDepartureDestination(Resource):
             return data
 
         def add_total(data):
-            groupby_cols = [
-                c for c in data.columns if not re.match("commodity|value", c)
-            ]
+            groupby_cols = [c for c in data.columns if not re.match("commodity|value", c)]
             value_cols = [c for c in data.columns if re.match("value", c)]
-            data_global = (
-                data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
-            )
+            data_global = data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
 
             data_global["commodity_group"] = "Total"
             data_global["commodity"] = "Total"
@@ -303,9 +304,7 @@ class ChartDepartureDestination(Resource):
                 if c not in ["commodity", "commodity_name"] and not re.match("value", c)
             ]
             value_cols = [c for c in data.columns if re.match("value", c)]
-            data = (
-                data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
-            )
+            data = data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
             return data
 
         # Get overland
@@ -313,9 +312,7 @@ class ChartDepartureDestination(Resource):
         if response_overland.status_code == 200:
             data_overland = pd.DataFrame(response_overland.json["data"])
             data_overland.rename(columns={"date": "departure_date"}, inplace=True)
-            data_overland["departure_date"] = pd.to_datetime(
-                data_overland.departure_date
-            )
+            data_overland["departure_date"] = pd.to_datetime(data_overland.departure_date)
         else:
             # Happens when no overland commodity selected
             data_overland = None
@@ -356,6 +353,7 @@ class ChartDepartureDestination(Resource):
             data_voyage = None
 
         data = pd.concat([data_overland, data_voyage])
+        data["departure_date"] = pd.to_datetime(data["departure_date"]).dt.date
         if add_total_commodity:
             data = add_total(data)
             if commodity:
@@ -363,15 +361,19 @@ class ChartDepartureDestination(Resource):
 
         data = group_countries(data, country_grouping)
         data = group_commodities(data)
-        data = pivot_data(data, variable=pivot_value)
+        data = pivot_data(data, pivot_value=pivot_value)
+        data = self.postcompute(data, params=params)
         data = translate(data=data, language=language)
 
-        return self.build_response(
-            result=data, format=format, nest_in_data=nest_in_data
-        )
+        return self.build_response(result=data, format=format, nest_in_data=nest_in_data)
+
+    def postcompute(self, result, params=None):
+        postcompute_fn = postcompute.get_postcompute_fn(params.get("postcompute"))
+        if postcompute_fn:
+            result = postcompute_fn(result, params=params)
+        return result
 
     def build_response(self, result, format, nest_in_data):
-
         result.replace({np.nan: None}, inplace=True)
 
         # If bulk and departure berth is coal, replace commodity with coal
@@ -390,13 +392,9 @@ class ChartDepartureDestination(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         return Response(
             response="Unknown format. Should be either csv or json",

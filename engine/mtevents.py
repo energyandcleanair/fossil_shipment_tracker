@@ -1,31 +1,27 @@
-import datetime
-
 import pandas as pd
 import numpy as np
 import sqlalchemy
 from tqdm import tqdm
 from shapely import wkb
+import datetime as dt
+from sqlalchemy import func
+import sqlalchemy as sa
+import re
 
 import base
 from base.logger import logger, logger_slack
 from base.db import session
 from base.db_utils import upsert
 from base.db import check_if_table_exists
-from base.models import DB_TABLE_MTEVENT_TYPE
 from base.utils import distance_between_points, to_list, to_datetime
 
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
 from engine.ship import fill
 
-import datetime as dt
-
-import re
-
 from base.models import MarineTrafficEventType, Shipment, Departure, Ship, MarineTrafficCall, Port, Event, \
 Arrival, Position
-from sqlalchemy import func
-import sqlalchemy as sa
+from base.models import DB_TABLE_MTEVENT_TYPE
 
 
 def update(
@@ -37,6 +33,7 @@ def update(
                      base.OIL_PRODUCTS,
                      base.OIL_OR_CHEMICAL],
         min_dwt=base.DWT_MIN,
+        only_for_ongoing_shipments=True,
         between_existing_only=False,
         between_shipments_only=False,
         use_cache=False,
@@ -70,6 +67,8 @@ def update(
     if not silent:
         logger_slack.info("=== Updating events for ships ===")
 
+    arrivals = session.query(Arrival.departure_id).distinct()
+
     ships = session.query(
         Departure.ship_imo.distinct().label("ship_imo"),
     ) \
@@ -85,6 +84,8 @@ def update(
         ships = ships.filter(Ship.dwt >= min_dwt)
     if limit:
         ships = ships.limit(limit)
+    if only_for_ongoing_shipments:
+        ships = ships.filter(Departure.id.notin_(arrivals))
 
     processed_ships = []
 
@@ -174,7 +175,9 @@ def get_and_process_ship_events_between_dates(
         date_bounds = [(date_from, date_to)]
 
     if force_rebuild and between_existing_only and not between_shipments_only:
-        cached_events = Event.query
+        cached_events = session.query(
+            Event
+        ).order_by(Event.date_utc)
 
         if date_from:
             cached_events = cached_events.filter(Event.date_utc > date_from)
@@ -216,7 +219,7 @@ def get_and_process_ship_events_between_dates(
                     (shipments.c.arrival_date_utc != sa.null(), shipments.c.arrival_date_utc),
                     (sa.and_(shipments.c.arrival_date_utc == sa.null(),
                              shipments.c.next_departure_date != sa.null()), shipments.c.next_departure_date)
-                ], else_=datetime.date.today()
+                ], else_=dt.date.today()
             ).label('date_to')
         )
 
@@ -239,7 +242,7 @@ def get_and_process_ship_events_between_dates(
             continue
 
         polling_limit_days = 179
-        polling_limit = datetime.timedelta(polling_limit_days)
+        polling_limit = dt.timedelta(polling_limit_days)
 
         for _d in range(0, int(day_delta / polling_limit_days)):
             query_dates.append([query_date_from, query_date_from + polling_limit])
@@ -282,12 +285,12 @@ def get_and_process_ship_events_between_dates(
                 session.add(event)
                 session.commit()
                 if force_rebuild:
-                    print("Found a missing event")
+                    logger.info("Found a missing event")
             except sqlalchemy.exc.IntegrityError as e:
                 if "psycopg2.errors.UniqueViolation" in str(e):
-                    print("Failed to upload event: duplicated event")
+                    logger.info("Failed to upload event: duplicated event")
                 else:
-                    print("Failed to upload event: %s" % (str(e),))
+                    logger.info("Failed to upload event: %s" % (str(e),))
                 session.rollback()
                 continue
 
@@ -354,10 +357,16 @@ def check_distance_between_ships(ship_one_imo, ship_two_imo, event_time, window_
            time_difference
 
 
-def find_ships_in_db(interacting_ship_name):
+def find_ships_in_db(ship_name):
+    """
+    Finds the ship in our database if it meets base criteria based on ship name
+
+    :param ship_name: ship name to try and find in our db
+    :return:
+    """
     ships = session.query(Ship) \
-        .filter(sa.or_(Ship.name.any(interacting_ship_name),
-                       Ship.name.any(func.lower(interacting_ship_name))),
+        .filter(sa.or_(Ship.name.any(ship_name),
+                       Ship.name.any(func.lower(ship_name))),
                 Ship.dwt > base.DWT_MIN,
                 ~Ship.imo.contains('NOTFOUND')).all()
 
@@ -520,7 +529,10 @@ def find_ship_imo_locally(ship_name):
         return None
 
 
-def back_fill_ship_position(force_rebuild=True):
+def back_fill_ship_position(
+        force_rebuild=True,
+        event_id=None,
+    ):
     """
     Function to try and find ship positions using both Datalastic and MT for older events
 
@@ -533,6 +545,9 @@ def back_fill_ship_position(force_rebuild=True):
     ) \
         .filter(Event.interacting_ship_imo != sa.null(),
                 Event.ship_closest_position == sa.null())
+
+    if event_id:
+        events = events.filter(Event.id.in_(to_list(event_id)))
 
     mtcalls = session.query(
         MarineTrafficCall.params['imo'].astext.label('ship_imo'),

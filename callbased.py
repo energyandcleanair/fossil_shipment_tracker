@@ -31,8 +31,8 @@ def update(
     date_to,
     departure_port_iso2,
     commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG],
+    use_credit_key_if_short=False,
 ):
-
     # This call is to update history using the CALL-BASED MARINE TRAFFIC KEY
     # meaning we'll try to maximize number of records captured per call
     # and minimize the number of calls made
@@ -51,6 +51,7 @@ def update(
         date_to=date_to,
         commodities=commodities,
         departure_port_iso2=departure_port_iso2,
+        use_credit_key_if_short=use_credit_key_if_short,
     )
 
 
@@ -61,11 +62,16 @@ def get_queried_port_hours(port_id, date_from=None):
     :param date_from:
     :return:
     """
+
+    if port_id is None:
+        return []
+
     # Get information on calls already made to MT
     queried = session.query(
         MarineTrafficCall.params["portid"].label("port_id"),
         MarineTrafficCall.params["fromdate"].label("date_from"),
         MarineTrafficCall.params["todate"].label("date_to"),
+        MarineTrafficCall.date_utc,  # call date
         MarineTrafficCall.records,
     ).filter(
         MarineTrafficCall.method == "portcalls/",
@@ -73,7 +79,10 @@ def get_queried_port_hours(port_id, date_from=None):
             MarineTrafficCall.params["movetype"] == sa.null(),
             MarineTrafficCall.params["movetype"] == str(MOVETYPE_DEPARTURE),
         ),
-        MarineTrafficCall.status == base.HTTP_OK,
+        sa.or_(
+            MarineTrafficCall.status == base.HTTP_OK,
+            MarineTrafficCall.status.op("~*")("404.*"),
+        ),
         MarineTrafficCall.params["portid"] == '"%s"' % (port_id),
     )
 
@@ -85,6 +94,11 @@ def get_queried_port_hours(port_id, date_from=None):
     if len(queried_df):
         queried_df["date_from"] = pd.to_datetime(queried_df.date_from)
         queried_df["date_to"] = pd.to_datetime(queried_df.date_to)
+        # Capping date_to to account for potential Marine Traffic latency
+        queried_df["date_to_cap"] = pd.to_datetime(queried_df.date_utc) - dt.timedelta(
+            hours=base.MARINETRAFFIC_LATENCY_HOURS
+        )
+        queried_df["date_to"] = queried_df[["date_to", "date_to_cap"]].min(axis=1)
         queried_df["dates"] = queried_df.apply(
             lambda row: pd.date_range(
                 row.date_from.ceil("H"), row.date_to.floor("H"), freq="H"
@@ -111,6 +125,7 @@ def get_queried_ship_hours(ship_imo, date_from=None):
         MarineTrafficCall.params["imo"].label("imo"),
         MarineTrafficCall.params["fromdate"].label("date_from"),
         MarineTrafficCall.params["todate"].label("date_to"),
+        MarineTrafficCall.date_utc,  # call date
         MarineTrafficCall.records,
     ).filter(
         MarineTrafficCall.method == "portcalls/",
@@ -127,6 +142,11 @@ def get_queried_ship_hours(ship_imo, date_from=None):
     if len(queried_df):
         queried_df["date_from"] = pd.to_datetime(queried_df.date_from)
         queried_df["date_to"] = pd.to_datetime(queried_df.date_to)
+        # Capping date_to to account for potential Marine Traffic latency
+        queried_df["date_to_cap"] = pd.to_datetime(queried_df.date_utc) - dt.timedelta(
+            hours=base.MARINETRAFFIC_LATENCY_HOURS
+        )
+        queried_df["date_to"] = queried_df[["date_to", "date_to_cap"]].min(axis=1)
         queried_df["dates"] = queried_df.apply(
             lambda row: pd.date_range(
                 row.date_from.floor("H"), row.date_to.floor("H"), freq="H"
@@ -167,6 +187,7 @@ def get_intervals(
     date_to=None,
     queried_hours=[],
     merge_under_max_days=True,
+    extend=True,
 ):
     """
     Build intervals to auery, based on date_from, date_to, and the hours that have already been queried.
@@ -209,16 +230,39 @@ def get_intervals(
     # Rename the columns to date_from and date_to
     intervals.columns = ["date_from", "date_to"]
 
+    # Split those above MAX_DAYS
+    split_rows = []
+    for _, row in intervals.iterrows():
+        date_diff = row["date_to"] - row["date_from"]
+        if date_diff.days > MAX_DAYS:
+            new_row1 = {
+                "date_from": row["date_from"],
+                "date_to": row["date_from"] + pd.Timedelta(MAX_DAYS, unit="d"),
+            }
+            new_row2 = {
+                "date_from": row["date_from"] + pd.Timedelta(MAX_DAYS, unit="d"),
+                "date_to": row["date_to"],
+            }
+            split_rows.append(new_row1)
+            split_rows.append(new_row2)
+        else:
+            split_rows.append(
+                {"date_from": row["date_from"], "date_to": row["date_to"]}
+            )
+
+    intervals = pd.DataFrame(split_rows, columns=["date_from", "date_to"])
+
     # Merge consecutive intervals if they are within MAX_DAYS
     # Reset the index of the intervals DataFrame
     intervals = intervals.reset_index(drop=True)
+    intervals.sort_values("date_from", inplace=True)
 
     if merge_under_max_days:
         i = 0
         while i < len(intervals) - 1:
-            if intervals.loc[i, "date_to"] >= intervals.loc[
-                i + 1, "date_from"
-            ] - pd.Timedelta(days=MAX_DAYS):
+            if intervals.loc[i + 1, "date_to"] <= intervals.loc[
+                i, "date_from"
+            ] + pd.Timedelta(days=MAX_DAYS):
                 intervals.loc[i, "date_to"] = max(
                     intervals.loc[i, "date_to"], intervals.loc[i + 1, "date_to"]
                 )
@@ -227,33 +271,60 @@ def get_intervals(
             else:
                 i += 1
 
+    if extend and len(intervals) > 0:
+
+        def extend_date_to(row):
+            date_from = pd.to_datetime(row["date_from"])
+            date_to = pd.to_datetime(row["date_to"])
+            now = dt.datetime.now()
+            diff = date_to - date_from
+            if diff < dt.timedelta(days=MAX_DAYS) and diff > dt.timedelta(
+                days=MIN_DAYS
+            ):
+                date_to = min(
+                    date_from + dt.timedelta(days=MAX_DAYS),
+                    now - dt.timedelta(hours=1),
+                )
+                date_to = pd.to_datetime(date_to).floor("H")
+
+            return date_to
+
+        intervals["date_to"] = intervals.apply(extend_date_to, axis=1)
+
     return intervals.to_dict(orient="records")
 
 
-def update_departures(date_from, date_to=None, departure_port_iso2=None):
+def update_departures(
+    date_from, date_to=None, departure_port_iso2=None, departure_port_id=None
+):
     date_from = to_datetime(date_from)
     date_to = to_datetime(date_to) if date_to else dt.datetime.now()
+
     # Otherwise, we would think we queried portcalls that we actually didn't
     assert date_to < dt.datetime.now()
+
     ports = session.query(Port).filter(Port.check_departure)
     if departure_port_iso2:
         ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
 
+    if departure_port_id:
+        ports = ports.filter(Port.id.in_(to_list(departure_port_id)))
+
     ports = ports.all()
 
     for port in tqdm(ports):
-
         port_id = port.unlocode or port.marinetraffic_id
-        queried_hours = get_queried_port_hours(port_id=port_id, date_from=date_from)
+        queried_hours = set(
+            get_queried_port_hours(port_id=port.unlocode, date_from=date_from)
+            + get_queried_port_hours(port_id=port.marinetraffic_id, date_from=date_from)
+        )
         intervals = get_intervals(
-            date_from=date_from, date_to=date_to, queried_hours=queried_hours
+            date_from=date_from, date_to=date_to, queried_hours=list(queried_hours)
         )
         for interval in intervals:
-
             if interval["date_to"] - interval["date_from"] > dt.timedelta(
                 days=MIN_DAYS
             ):
-
                 portcalls = Marinetraffic.get_portcalls_between_dates(
                     arrival_or_departure="departure",
                     unlocode=port.unlocode,
@@ -275,9 +346,26 @@ def update_arrivals(
     commodities,  # Forcing a choice to avoid wasting credits
     date_from,
     date_to=dt.datetime.now(),
+    ship_imo=None,
     departure_port_iso2=None,
     use_credit_key_if_short=False,
 ):
+    """
+    Update arrivals using callbased key for when we want to save credits and collect over long period
+
+    Parameters
+    ----------
+    commodities : commodities to filter for
+    date_from : date from
+    date_to : date to
+    ship_imo : ship imo
+    departure_port_iso2 : port iso2 to filter for
+    use_credit_key_if_short : whether to resort to credit based key if time interval is short
+
+    Returns
+    -------
+
+    """
     date_to = to_datetime(date_to) if date_to else dt.datetime.now()
     # Otherwise, we would think we queried portcalls that we actually didn't
     assert date_to < dt.datetime.now()
@@ -308,6 +396,9 @@ def update_arrivals(
             Port.iso2.in_(to_list(departure_port_iso2))
         )
 
+    if ship_imo:
+        query_departure = query_departure.filter(Ship.imo.in_(to_list(ship_imo)))
+
     # Get departures of interest
     departures = pd.read_sql(query_departure.statement, session.bind)
     departures["next_departure_date"] = (
@@ -323,6 +414,7 @@ def update_arrivals(
         .bfill(axis=1)
         .iloc[:, 0]
     )
+
     departures = departures[~departures.imo.str.contains("NOTFOUND")]
 
     imos = departures.imo.unique()
@@ -332,6 +424,7 @@ def update_arrivals(
         wanted_intervals = ship_departures[["departure_date", "date_to"]].rename(
             columns={"departure_date": "date_from"}
         )
+
         queried_hours = get_queried_ship_hours(
             ship_imo=imo, date_from=wanted_intervals.date_from.min()
         )
@@ -339,11 +432,13 @@ def update_arrivals(
             wanted_intervals=wanted_intervals, queried_hours=queried_hours
         )
 
+        # Only consider those invervals that start before date_to
+        intervals = [x for x in intervals if x["date_from"] < date_to]
+
         for interval in intervals:
             if interval["date_to"] - interval["date_from"] > dt.timedelta(
                 days=MIN_DAYS
             ):
-
                 portcalls = portcall.get_next_portcall(
                     date_from=interval["date_from"],
                     date_to=interval["date_to"],

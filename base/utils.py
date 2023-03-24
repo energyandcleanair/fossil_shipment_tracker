@@ -49,7 +49,6 @@ def remove_dates(base_daterange, dateranges, go_backward=False):
     current_date, valid_dateranges = base_daterange[0], []
 
     for daterange in dateranges:
-
         intersection = daterange_intersection(base_daterange, daterange)
 
         # our remove date does not intersect with base date
@@ -73,7 +72,7 @@ def remove_dates(base_daterange, dateranges, go_backward=False):
 
     # if we switched order, now reverse back to return in correct order
     if go_backward:
-        return [(a,b) for b,a in valid_dateranges]
+        return [(a, b) for b, a in valid_dateranges]
 
     return valid_dateranges
 
@@ -96,7 +95,10 @@ def subtract_daterange_from_other(base_daterange, subtract_daterange):
 
     # base contains all of subtract daterange
     if intersection == base_daterange:
-        return ([(base_daterange[0], subtract_daterange[0]), (subtract_daterange[1], base_daterange[1])])
+        return [
+            (base_daterange[0], subtract_daterange[0]),
+            (subtract_daterange[1], base_daterange[1]),
+        ]
     # our base is fully contained within our subtraction
     if intersection == subtract_daterange:
         return []
@@ -139,7 +141,7 @@ def collapse_dates(date_list, buffer_seconds=120):
     return collapsed
 
 
-def distance_between_points(p1, p2, ellps='WGS84'):
+def distance_between_points(p1, p2, ellps="WGS84"):
     """
     Returns distance in meters between two points; if wkt=False assumed to be shapely Point objects
 
@@ -157,7 +159,6 @@ def distance_between_points(p1, p2, ellps='WGS84'):
     geod = pyproj.Geod(ellps=ellps)
 
     try:
-
         if isinstance(p1, WKBElement):
             p1 = wkb_to_shape(p1)
         else:
@@ -183,10 +184,11 @@ def latlon_to_point(lat, lon, wkt=True):
         return None
 
 
-def to_list(d):
+def to_list(d, convert_tuple=False):
     if d is None:
         return []
-
+    if convert_tuple and isinstance(d, tuple):
+        return list(d)
     if not isinstance(d, list):
         return [d]
     else:
@@ -223,6 +225,7 @@ def to_datetime(d, date_ref=None):
 
 def wkb_to_shape(geom):
     from shapely import wkb
+
     if isinstance(geom, shapely.geometry.base.BaseGeometry):
         return geom
     try:
@@ -278,4 +281,16 @@ def df_to_json(df, nest_in_data=False):
 
 def split(list_, chunk_size):
     for i in range(0, len(list_), chunk_size):
-        yield list_[i:i + chunk_size]
+        yield list_[i : i + chunk_size]
+
+
+def to_bool(v):
+    if isinstance(v, bool):
+        return v
+    else:
+        return str(v).lower() in ("yes", "true", "t", "1")
+
+
+def read_json(path):
+    with open(path) as f:
+        return json.load(f)

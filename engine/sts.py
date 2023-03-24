@@ -37,7 +37,9 @@ def update(date_from='2021-01-01'):
     update_sts_locations()
 
 
-def check_multi_stage_sts(date_from="2022-01-01"):
+def check_multi_stage_sts(
+        date_from="2022-01-01",
+        ship_imo=None):
     """
     This function checks existing sts shipments for further sts performed by the interacting ship to generate
     multistage sts shipments
@@ -59,6 +61,8 @@ def check_multi_stage_sts(date_from="2022-01-01"):
 
     if date_from:
         shipment_sts_departures = shipment_sts_departures.filter(Event.date_utc >= date_from)
+    if ship_imo:
+        shipment_sts_departures = shipment_sts_departures.filter(Departure.ship_imo.in_(to_list(ship_imo)))
 
     shipment_sts_departures = shipment_sts_departures.all()
 
