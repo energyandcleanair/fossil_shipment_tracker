@@ -285,12 +285,12 @@ def get_and_process_ship_events_between_dates(
                 session.add(event)
                 session.commit()
                 if force_rebuild:
-                    print("Found a missing event")
+                    logger.info("Found a missing event")
             except sqlalchemy.exc.IntegrityError as e:
                 if "psycopg2.errors.UniqueViolation" in str(e):
-                    print("Failed to upload event: duplicated event")
+                    logger.info("Failed to upload event: duplicated event")
                 else:
-                    print("Failed to upload event: %s" % (str(e),))
+                    logger.info("Failed to upload event: %s" % (str(e),))
                 session.rollback()
                 continue
 
