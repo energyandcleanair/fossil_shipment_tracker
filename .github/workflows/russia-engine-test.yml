@@ -1,7 +1,9 @@
 # Run our tests for engine
 name: russia-engine-test
 
-on: workflow_dispatch
+on:
+  pull_request:
+    branches: [master]
 
 jobs:
   build:
@@ -13,7 +15,10 @@ jobs:
         python-version: ["3.10"]
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout pull request branch
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
