@@ -38,6 +38,15 @@ from .misc import get_split_name
 KPLER_TOTAL = "Total"
 
 
+### IMPORTANT
+### Certain country names and to_zone_name are still empty after
+### scraping, and have been updated manually in the database
+### Before scraping again, add a constraint or a check that this is not the case
+###
+### Other required fixes:
+### - Singapore has duplicates: zone_id 1109 and 833
+### - Koweit has duplicates:zone_id 110755 and 505
+### Ended up removing 833 and 110755 as having the lowest values
 class KplerScraper:
     def __init__(self):
         self.platforms = ["liquids", "lng", "dry"]
@@ -261,7 +270,6 @@ class KplerScraper:
         return commodities
 
     def get_zone_dict(self, platform, iso2=None, id=None, name=None):
-
         if id is not None and int(id) == 0:
             return None
 
@@ -910,7 +918,6 @@ class KplerScraper:
 
         def get_platform_products(platform):
             if self.products.get(platform) is None:
-
                 # This yields 17 commodities while we had 20 when using the API
                 # products = self.get_products_brute(platform=platform)
                 # products = products[~pd.isna(products.closestAncestorCommodity)]
