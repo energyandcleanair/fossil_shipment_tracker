@@ -1,19 +1,35 @@
+import os
+from decouple import config
 import dash
+import dash_auth
+
 import diskcache
 import dash_bootstrap_components as dbc
 from dash import DiskcacheManager, CeleryManager, Input, Output, html
+from flask_caching import Cache
 
 launch_uid = "RFT"
-cache = diskcache.Cache("./cache")
-background_callback_manager = DiskcacheManager(cache, cache_by=[lambda: launch_uid], expire=6000)
 
 # Create a Dash app
 app = dash.Dash(
     __name__,
     external_stylesheets=[dbc.themes.BOOTSTRAP],
-    background_callback_manager=background_callback_manager,
     suppress_callback_exceptions=True,
 )
 
+# Add basic authentication
+
+VALID_USERNAME_PASSWORD_PAIRS = {config("USERNAME"): config("PASSWORD")}
+
+auth = dash_auth.BasicAuth(app, VALID_USERNAME_PASSWORD_PAIRS)
+
+
 # Expose the server variable
 server = app.server
+CACHE_CONFIG = {
+    # try 'FileSystemCache' if you don't want to setup redis
+    "CACHE_TYPE": "redis",
+    "CACHE_REDIS_URL": config("REDISURL", "redis://localhost:6379"),
+}
+cache = Cache()
+cache.init_app(app.server, config=CACHE_CONFIG)

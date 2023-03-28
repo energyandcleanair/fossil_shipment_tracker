@@ -2,7 +2,7 @@ import pandas as pd
 import plotly.express as px
 from dash import DiskcacheManager, CeleryManager, Input, Output, html, State, dcc
 from dash.exceptions import PreventUpdate
-from server import app, background_callback_manager, cache
+from server import app, cache
 from utils import palette
 
 from . import COUNTRY_GLOBAL

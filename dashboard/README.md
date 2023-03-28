@@ -2,9 +2,6 @@
 ```commandline
 conda env update -f environment.yml --prune
 pip list --format=freeze --exclude=GDAL --exclude=grpcio-status > requirements.txt
-
-# Replace pymongo with pymongo[srv] in requirements.txt
-sed -i '' 's/pymongo==/pymongo[srv]==/g' requirements.txt
 ```
 
 ### Try locally
@@ -14,9 +11,29 @@ docker buildx build -f Dockerfile -t dashboard_local .
 docker run -p 8081:8081 -e PORT=8081 dashboard_local
 ```
 
+
+
+### Create REDIS instance and VPC
+```commandline
+source .env
+gcloud redis instances create $REDIS_INSTANCE_ID --region $REGION --project $PROJECT_ID
+
+gcloud redis instances describe $REDIS_INSTANCE_ID --region $REGION --project $PROJECT_ID
+gcloud redis instances describe $REDIS_INSTANCE_ID --region $REGION --project $PROJECT_ID --format "value(authorizedNetwork)"
+
+gcloud compute networks vpc-access connectors \
+  create $CONNECTOR_NAME \
+  --network default \
+  --region $REGION \
+  --range 10.8.0.0/28 \
+  --project $PROJECT_ID
+
+```
+
 ### Deploy
 ```bash
 source ../.env
+source .env
 docker buildx build -f Dockerfile -t dashboard . --platform linux/amd64
 docker tag dashboard eu.gcr.io/$PROJECT_ID/dashboard:latest
 docker push eu.gcr.io/$PROJECT_ID/dashboard:latest
@@ -29,7 +46,9 @@ gcloud run deploy dashboard \
       --timeout=60 \
       --concurrency=80 \
       --cpu=1 \
-      --memory=1G \
+      --memory=4G \
       --max-instances=10  \
-      --allow-unauthenticated
+      --allow-unauthenticated \
+      --vpc-connector $CONNECTOR_NAME \
+      --set-env-vars REDISHOST=$REDISHOST,REDISPORT=$REDISPORT
 ```

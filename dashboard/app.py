@@ -12,7 +12,7 @@ import dash_bootstrap_components as dbc
 from dash import DiskcacheManager, CeleryManager, Input, Output, html
 from dash.exceptions import PreventUpdate
 
-from server import app, background_callback_manager, cache
+from server import app, cache
 
 # from counter import layout as counter_layout, chart_settings as counter_chart_settings
 # from voyages import layout as voyages_layout, chart_settings as voyages_chart_settings

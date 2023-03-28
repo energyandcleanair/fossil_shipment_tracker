@@ -11,11 +11,14 @@ dependencies:
   - dash-html-components
   - dash-bootstrap-components
   - dash-renderer
+  - dash-auth
   - pandas
   - requests
   - diskcache
   - python-decouple
   - pre-commit
+  - flask-caching
+  - redis
   - pip
   - pip:
       - "dash[diskcache]"
