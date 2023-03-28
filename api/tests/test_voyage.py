@@ -62,11 +62,12 @@ def test_voyage_aggregated(app):
             data_df = pd.DataFrame(data)
 
             expected_columns = set(aggregate_by + ['value_tonne', 'value_m3', 'ship_dwt',
-                                                   'value_eur', 'value_usd', 'count'])
+                                                   'value_eur', 'value_usd', 'count', 'pricing_scenario',
+                                                   'pricing_scenario_name'])
 
 
             if "departure_port" in aggregate_by:
-                expected_columns.update(["departure_port_name", "departure_unlocode", "departure_iso2", "departure_country", "departure_region"])
+                expected_columns.update(["departure_port_name", "departure_port_area", "departure_unlocode", "departure_iso2", "departure_country", "departure_region"])
                 expected_columns.discard("departure_port")
 
             if "departure_country" in aggregate_by:
@@ -79,11 +80,11 @@ def test_voyage_aggregated(app):
                 expected_columns.update(["destination_port_name", "destination_unlocode", "destination_iso2", "destination_country", "destination_region"])
                 expected_columns.discard("destination_port")
 
-            if "commodity" in aggregate_by:
-                expected_columns.update(["commodity_group"])
+            if "commodity_group" in aggregate_by:
+                expected_columns.update(["commodity_group", "commodity_group_name"])
 
-            if aggregate_by:
-                assert set(data_df.columns) == expected_columns
+            if "commodity" in aggregate_by:
+                expected_columns.update(["commodity_group", "commodity_group_name", "commodity_name"])
 
             if "commodity" in aggregate_by:
                 assert set(data_df.commodity.unique()) <= set([base.OIL_PRODUCTS,
@@ -98,6 +99,9 @@ def test_voyage_aggregated(app):
                                                                base.UNKNOWN_COMMODITY,
                                                                base.GENERAL_CARGO
                                                                ])
+
+            if aggregate_by:
+                assert set(data_df.columns) == expected_columns
 
 def test_currency(app):
 
