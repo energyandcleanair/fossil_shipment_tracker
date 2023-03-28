@@ -208,6 +208,7 @@ class RussiaCounterLastResource(Resource):
         query = self.aggregate(query=query, aggregate_by=aggregate_by)
 
         counter = pd.read_sql(query.statement, session.bind)
+        counter['date'] = pd.to_datetime(counter['date'])
         counter_last = self.get_last(counter=counter)
         # Add total
         group_by_total = ["pricing_scenario", "pricing_scenario_name"]
