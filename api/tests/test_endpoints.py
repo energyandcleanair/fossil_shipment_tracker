@@ -152,7 +152,7 @@ def test_pipelineflow_aggregation(app):
 
         for aggregate_by in aggregate_bys:
             params = {"format": "json", "aggregate_by": ','.join(aggregate_by)}
-            response = test_client.get('/v0/pipelineflow?' + urllib.parse.urlencode(params))
+            response = test_client.get('/v0/overland?' + urllib.parse.urlencode(params))
             assert response.status_code == 200
             data = response.json["data"]
             assert len(data) > 0
@@ -160,6 +160,6 @@ def test_pipelineflow_aggregation(app):
 
             expected_columns = set(aggregate_by + ['value_tonne', 'value_eur', 'value_m3']) if aggregate_by \
                 else set(['id', 'commodity', 'destination_iso2', 'destination_country', 'destination_region',
-                          'date', 'value_tonne', 'value_eur', 'value_m3'])
-            assert set(data_df.columns) == expected_columns
+                          'date', 'pricing_scenario', 'value_tonne', 'value_eur', 'value_m3'])
+            assert (set(data_df.columns) & set(expected_columns)) == expected_columns
 

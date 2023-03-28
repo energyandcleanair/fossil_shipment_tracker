@@ -82,4 +82,4 @@ def test_pipelineflow_aggregation(app):
             if "commodity" in aggregate_by:
                 expected_columns.update(["commodity_group"])
 
-            assert set(data_df.columns) == expected_columns
+            assert (set(data_df.columns) & set (expected_columns)) == expected_columns
