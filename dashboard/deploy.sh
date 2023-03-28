@@ -8,7 +8,7 @@ gcloud run deploy dashboard \
       --project=$PROJECT_ID \
       --image=eu.gcr.io/$PROJECT_ID/dashboard:latest \
       --platform=managed \
-      --region=europe-north1 \
+      --region=$REGION \
       --timeout=60 \
       --concurrency=80 \
       --cpu=1 \
@@ -16,4 +16,4 @@ gcloud run deploy dashboard \
       --max-instances=10  \
       --allow-unauthenticated \
       --vpc-connector $CONNECTOR_NAME \
-      --set-env-vars REDISHOST=$REDISHOST,REDISPORT=$REDISPORT
+      --set-env-vars REDISHOST=$REDISHOST,REDISPORT=$REDISPORT,REDISURL=$REDISURL

@@ -44,7 +44,7 @@ gcloud run deploy dashboard \
       --project=$PROJECT_ID \
       --image=eu.gcr.io/$PROJECT_ID/dashboard:latest \
       --platform=managed \
-      --region=europe-north1 \
+      --region=$REGION \
       --timeout=60 \
       --concurrency=80 \
       --cpu=1 \

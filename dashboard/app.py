@@ -112,6 +112,6 @@ def render_chart_setting(pathname):
     #     return counter_chart_settings
     # elif pathname == "/shipments":
     #     return voyages_chart_settings
-    if pathname == "/kpler":
+    if pathname == "/" or pathname == "/kpler":
         return kpler_chart_settings
     return None
