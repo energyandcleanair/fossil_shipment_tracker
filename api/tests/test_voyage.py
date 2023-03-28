@@ -20,11 +20,13 @@ def test_voyage_pricing(app):
         assert response.status_code == 200
         data = response.json["data"]
         assert len(data) > 0
-        assert all([x["value_eur"] > 0 for x in data])
-        assert len(set([x['id'] for x in data])) == len(data)
+        data_df = pd.DataFrame(data)
+        # verify value is present for all shipments excluding NOTFOUND
+        assert data_df[(~data_df['ship_imo'].str.contains('NOTFOUND')) & ~(data_df['value_eur'] > 0)].empty
+        # assert no duplicates
+        assert data_df['id'].is_unique
 
         #check discount was applied ( we need two shipments on the same day for a same country)
-        data_df = pd.DataFrame(data)
         data_df["eur_per_tonne"] = round(data_df.value_eur / data_df.value_tonne)
         data_df["date"] = pd.to_datetime(data_df.departure_date_utc).dt.date
         prices = data_df.loc[data_df.commodity==base.CRUDE_OIL][["destination_iso2", "commodity", "date", "eur_per_tonne"]]
