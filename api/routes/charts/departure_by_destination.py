@@ -204,7 +204,7 @@ class ChartDepartureDestination(Resource):
                 top_n["region"] = top_n.destination_country
                 # Keeping the same for all commodities
                 # Otherwise Flourish will show empty lines
-                # which might make viewer things values are actually 0
+                # which might make viewer think values are actually 0
                 top_n = top_n[["destination_country", "region"]].drop_duplicates()
                 top_n.loc[len(top_n)] = ["Unknown", "Unknown"]
                 top_n = top_n.drop_duplicates()
@@ -267,7 +267,7 @@ class ChartDepartureDestination(Resource):
 
         def translate(data, language):
             if language != "en":
-                file_path = "assets/language/%s.json" % (language)
+                file_path = "api/assets/language/%s.json" % (language)
                 with open(file_path, "r") as file:
                     translate_dict = json.load(file)
 
