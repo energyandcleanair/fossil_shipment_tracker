@@ -489,8 +489,13 @@ class PipelineFlowResource(Resource):
         return query
 
     def roll_average(self, result, aggregate_by, rolling_days):
+
+        date_column = "date"
+
+        if date_column in result.columns:
+            result[date_column] = pd.to_datetime(result[date_column])
+
         if rolling_days is not None:
-            date_column = "date"
             min_date = result[date_column].min()
             max_date = result[date_column].max()  # change your date here
             daterange = pd.date_range(min_date, max_date).rename(date_column)
@@ -516,7 +521,9 @@ class PipelineFlowResource(Resource):
                 .reset_index()
             )
 
-        result["date"] = result.date.dt.date
+        # TODO: inherit template
+        if date_column in result.columns:
+            result[date_column] = result.date.dt.date
         return result
 
     def spread_currencies(self, result):
@@ -538,6 +545,7 @@ class PipelineFlowResource(Resource):
         # Quick sanity check
         len_after = len(result)
         assert len_after == len_before / n_currencies
+        result.replace({np.nan: None}, inplace=True)
 
         return result
 
