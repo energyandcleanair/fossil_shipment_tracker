@@ -19,6 +19,7 @@ dependencies:
   - pre-commit
   - flask-caching
   - redis
+  - gunicorn
   - pip
   - pip:
       - "dash[diskcache]"

@@ -27,7 +27,6 @@ auth = dash_auth.BasicAuth(app, VALID_USERNAME_PASSWORD_PAIRS)
 # Expose the server variable
 server = app.server
 CACHE_CONFIG = {
-    # try 'FileSystemCache' if you don't want to setup redis
     "CACHE_TYPE": "redis",
     "CACHE_REDIS_URL": config("REDISURL", "redis://localhost:6379"),
 }

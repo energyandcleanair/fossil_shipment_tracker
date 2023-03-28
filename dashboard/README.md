@@ -21,12 +21,14 @@ gcloud redis instances create $REDIS_INSTANCE_ID --region $REGION --project $PRO
 gcloud redis instances describe $REDIS_INSTANCE_ID --region $REGION --project $PROJECT_ID
 gcloud redis instances describe $REDIS_INSTANCE_ID --region $REGION --project $PROJECT_ID --format "value(authorizedNetwork)"
 
+# COPY IP TO .env
+
 gcloud compute networks vpc-access connectors \
   create $CONNECTOR_NAME \
   --network default \
   --region $REGION \
-  --range 10.8.0.0/28 \
-  --project $PROJECT_ID
+  --project $PROJECT_ID \
+  --subnet auto
 
 ```
 
@@ -51,4 +53,10 @@ gcloud run deploy dashboard \
       --allow-unauthenticated \
       --vpc-connector $CONNECTOR_NAME \
       --set-env-vars REDISHOST=$REDISHOST,REDISPORT=$REDISPORT
+```
+
+
+Using AppEngine:
+```commandline
+gcloud app deploy app_production.yaml --promote --stop-previous-version --project=fossil-shipment-tracker
 ```

@@ -89,11 +89,11 @@ server = app.server
 
 @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
 def render_page_content(pathname):
-    if pathname == "/counter":
-        return counter_layout
-    elif pathname == "/shipments":
-        return voyages_layout
-    elif pathname == "/" or pathname == "/kpler":
+    # if pathname == "/counter":
+    #     return counter_layout
+    # elif pathname == "/shipments":
+    #     return voyages_layout
+    if pathname == "/" or pathname == "/kpler":
         return kpler_layout
     # If the user tries to reach a different page, return a 404 message
     return html.Div(
@@ -108,10 +108,10 @@ def render_page_content(pathname):
 
 @app.callback(Output("chart-settings", "children"), [Input("url", "pathname")])
 def render_chart_setting(pathname):
-    if pathname == "/" or pathname == "/counter":
-        return counter_chart_settings
-    elif pathname == "/shipments":
-        return voyages_chart_settings
-    elif pathname == "/kpler":
+    # if pathname == "/" or pathname == "/counter":
+    #     return counter_chart_settings
+    # elif pathname == "/shipments":
+    #     return voyages_chart_settings
+    if pathname == "/kpler":
         return kpler_chart_settings
     return None
