@@ -989,37 +989,6 @@ class KplerProduct(Base):
 class KplerFlow(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
 
-    origin_iso2 = Column(String)
-    destination_iso2 = Column(String)
-
-    from_installation = Column(String)
-    to_installation = Column(String)
-
-    date = Column(Date, nullable=False)
-    unit = Column(String, nullable=False)
-    product = Column(String, nullable=False)
-    platform = Column(String, nullable=False)
-
-    value = Column(Numeric, nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint(
-            "origin_iso2",
-            "destination_iso2",
-            "from_installation",
-            "to_installation",
-            "date",
-            "unit",
-            "product",
-            name="unique_kpler_flow",
-        ),
-    )
-    __tablename__ = DB_TABLE_KPLER_FLOW
-
-
-class KplerFlow2(Base):
-    id = Column(BigInteger, autoincrement=True, primary_key=True)
-
     from_iso2 = Column(String)
     to_iso2 = Column(String)
 
