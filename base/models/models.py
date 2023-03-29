@@ -1050,7 +1050,7 @@ class KplerFlow2(Base):
             name="unique_kpler_flow3",
         ),
     )
-    __tablename__ = DB_TABLE_KPLER_FLOW + "3"
+    __tablename__ = DB_TABLE_KPLER_FLOW
     __table_args__ = (
         Index("idx_kpler_flow3_product", "product"),
         Index("idx_kpler_flow3_from_iso2", "from_iso2"),
