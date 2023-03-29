@@ -4,7 +4,7 @@ import urllib
 import pandas as pd
 from sqlalchemy import func
 
-from base.models import KplerFlow2
+from base.models import KplerFlow
 from base.db import session
 from base.env import get_env
 
@@ -35,20 +35,20 @@ def test_kpler_v1_pricing(app):
         # Collect directly from table
         raw_query = (
             session.query(
-                KplerFlow2.from_iso2.label("origin_iso2"),
-                KplerFlow2.product,
-                func.sum(KplerFlow2.value).label("value_tonne"),
+                KplerFlow.from_iso2.label("origin_iso2"),
+                KplerFlow.product,
+                func.sum(KplerFlow.value).label("value_tonne"),
             )
             .filter(
-                KplerFlow2.from_iso2.in_(iso2s),
-                KplerFlow2.product.in_(products),
-                KplerFlow2.date >= "2022-12-01",
-                KplerFlow2.date <= "2022-12-31",
-                KplerFlow2.unit == "t",
-                KplerFlow2.from_split == "country",
-                KplerFlow2.to_split == "country",
+                KplerFlow.from_iso2.in_(iso2s),
+                KplerFlow.product.in_(products),
+                KplerFlow.date >= "2022-12-01",
+                KplerFlow.date <= "2022-12-31",
+                KplerFlow.unit == "t",
+                KplerFlow.from_split == "country",
+                KplerFlow.to_split == "country",
             )
-            .group_by(KplerFlow2.from_iso2, KplerFlow2.product)
+            .group_by(KplerFlow.from_iso2, KplerFlow.product)
         )
         raw = pd.read_sql(raw_query.statement, session.bind)
         assert len(raw) == len(api)
