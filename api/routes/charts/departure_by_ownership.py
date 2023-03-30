@@ -8,6 +8,7 @@ from flask_restx import Resource, reqparse
 
 
 import base
+from base.logger import logger
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from .. import routes_api, ns_charts
@@ -241,6 +242,10 @@ class ChartDepartureOwnership(Resource):
         )
 
         result = translate(data=result, language=language)
+
+        logger.info(
+            "[Departures by ownership] columns returned: %s." % (",".join(result.columns))
+        )
 
         return self.build_response(result=result, format=format, nest_in_data=nest_in_data)
 
