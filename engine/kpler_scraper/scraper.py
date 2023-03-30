@@ -1,6 +1,7 @@
 import datetime as dt
 import time
 import requests
+import urllib3
 from requests.adapters import HTTPAdapter, Retry
 import json
 import os
@@ -714,7 +715,7 @@ class KplerScraper:
         }
         try:
             r = self.session.post(url, json=params_raw, headers=headers)
-        except requests.exceptions.ChunkedEncodingError:
+        except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
             logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
             return None
 
