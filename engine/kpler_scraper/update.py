@@ -30,7 +30,7 @@ def upload_flows(df, ignore_if_copy_failed=False):
     if len(df) > 0:
         try:
             df.to_sql(
-                DB_TABLE_KPLER_FLOW + "3",
+                DB_TABLE_KPLER_FLOW,
                 con=engine,
                 if_exists="append",
                 index=False,
@@ -40,7 +40,7 @@ def upload_flows(df, ignore_if_copy_failed=False):
                 logger.info("Some rows already exist. Skipping")
             else:
                 logger.info("Some rows already exist. Upserting instead")
-                upsert(df, DB_TABLE_KPLER_FLOW + "3", "unique_kpler_flow3")
+                upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow3")
 
 
 def get_products(scraper, platform, origin_iso2):
@@ -82,7 +82,9 @@ def get_from_zones(scraper, platform, product, origin_iso2, split, to_zone=None)
         return zones_unique
 
 
-def get_to_zones(scraper, platform, product, split, from_zone=None, destination_iso2=None):
+def get_to_zones(
+    scraper, platform, product, split, from_zone=None, destination_iso2=None, include_unknown=True
+):
 
     df = scraper.get_flows_raw_brute(
         platform=platform,
@@ -99,6 +101,8 @@ def get_to_zones(scraper, platform, product, split, from_zone=None, destination_
     else:
         # dict unashable. Use a trick to get unique values
         zones_unique = list({v["id"]: v for v in df.split}.values())
+        if not include_unknown:
+            zones_unique = [x for x in zones_unique if x["name"].lower() != UNKNOWN_COUNTRY.lower()]
         return zones_unique
 
 
@@ -229,6 +233,7 @@ def update_flows_reverse(
                     product=None,
                     destination_iso2=destination_iso2,
                     split=to_split,
+                    include_unknown=False,
                 )
 
                 for to_zone in tqdm(to_zones):
@@ -270,9 +275,9 @@ def update_flows_reverse(
                                 destination_iso2=destination_iso2,
                                 date_from=date_from,
                                 date_to=date_to,
-                                from_zone=from_zone,
+                                from_zone=None,
                                 from_split=from_split,
-                                to_zone=None,
+                                to_zone=to_zone,
                                 to_split=to_split,
                                 split=FlowsSplit.Products,
                                 use_brute_force=use_brute_force,
@@ -282,19 +287,24 @@ def update_flows_reverse(
                             known_zones_total = (
                                 known_zones.groupby(["date", "product"]).value.sum().reset_index()
                             )
-                            unknown = total.merge(
-                                known_zones_total,
-                                on=["product", "date"],
-                                how="left",
-                                suffixes=("", "_byzone"),
-                            )
-                            unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
-                            unknown["value_unknown"] = unknown["value"] - unknown["value_byzone"]
-                            unknown = unknown[unknown["value_unknown"] > 0]
-                            unknown["to_zone_name"] = UNKNOWN_COUNTRY
-                            unknown["value"] = unknown["value_unknown"]
-                            unknown = unknown[known_zones.columns]
-                            upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+                            if total is not None:
+                                unknown = total.merge(
+                                    known_zones_total,
+                                    on=["product", "date"],
+                                    how="left",
+                                    suffixes=("", "_byzone"),
+                                )
+                                unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
+                                unknown["value_unknown"] = (
+                                    unknown["value"] - unknown["value_byzone"]
+                                )
+                                unknown = unknown[unknown["value_unknown"] > 0]
+                                unknown["to_zone_name"] = UNKNOWN_COUNTRY
+                                unknown["value"] = unknown["value_unknown"]
+                                unknown = unknown[known_zones.columns]
+                                upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+                            else:
+                                raise ValueError("Total should not be None if we have data by zone")
 
 
 def upload_trades(trades, ignore_if_copy_failed=False):
