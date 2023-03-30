@@ -29,6 +29,7 @@ server = app.server
 CACHE_CONFIG = {
     "CACHE_TYPE": "redis",
     "CACHE_REDIS_URL": config("REDISURL", "redis://localhost:6379"),
+    "CACHE_DEFAULT_TIMEOUT": 60 * 60 * 24,
 }
 cache = Cache()
 cache.init_app(app.server, config=CACHE_CONFIG)
