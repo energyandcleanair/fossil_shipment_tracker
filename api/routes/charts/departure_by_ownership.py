@@ -244,7 +244,7 @@ class ChartDepartureOwnership(Resource):
         result = translate(data=result, language=language)
 
         logger.info(
-            "[Departures by ownership] columns returned: %s." % (",".join(result.columns))
+            "[Departures by ownership] columns returned: %s. Pandas version: %s." % (",".join(result.columns), pd.__version__)
         )
 
         return self.build_response(result=result, format=format, nest_in_data=nest_in_data)
