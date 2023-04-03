@@ -17,7 +17,7 @@ dependencies:
   - proj
   - requests
   - google-cloud-storage
-  - google-cloud-secret-manager
+  - google-cloud-secret-manager=1.0.0
   - geopandas
   - shapely
   - tqdm
