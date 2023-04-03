@@ -72,7 +72,7 @@ def test_departure_destination(app):
         # If this changes, please update column selection in Flourish
         assert data_df.columns[0] == "commodity_group"
         assert data_df.columns[1] == "departure_date"
-        assert len(data_df.columns) == 17
+        assert len(data_df.columns) == 16
 
 
 def test_departure_ownership(app):
