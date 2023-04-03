@@ -206,8 +206,12 @@ class KplerFlowResource(TemplateResource):
         )
 
         value_eur_field = (value_tonne_field * Price.eur_per_tonne).label("value_eur")
-        commodity_id_field = "kpler_" + sa.func.replace(
-            sa.func.replace(sa.func.lower(KplerFlow.product), " ", "_"), "/", "_"
+        commodity_id_field = sa.case(
+            [(KplerFlow.product == "lng", "lng")],
+            else_="kpler_"
+            + sa.func.replace(
+                sa.func.replace(sa.func.lower(KplerFlow.product), " ", "_"), "/", "_"
+            ),
         ).label("commodity")
 
         commodity_equivalent_field = case(
