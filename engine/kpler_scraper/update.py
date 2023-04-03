@@ -128,7 +128,7 @@ def update_flows(
         # _products = scraper.get_products(platform=platform).name if products is None else products
 
         for origin_iso2 in tqdm(origin_iso2s):
-
+            print(origin_iso2)
             for from_split in from_splits:
 
                 from_zones = get_from_zones(
@@ -185,23 +185,30 @@ def update_flows(
                                 use_brute_force=use_brute_force,
                             )
 
-                            known_zones = pd.concat(df_zones)
-                            known_zones_total = (
-                                known_zones.groupby(["date", "product"]).value.sum().reset_index()
-                            )
-                            unknown = total.merge(
-                                known_zones_total,
-                                on=["product", "date"],
-                                how="left",
-                                suffixes=("", "_byzone"),
-                            )
-                            unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
-                            unknown["value_unknown"] = unknown["value"] - unknown["value_byzone"]
-                            unknown = unknown[unknown["value_unknown"] > 0]
-                            unknown["to_zone_name"] = UNKNOWN_COUNTRY
-                            unknown["value"] = unknown["value_unknown"]
-                            unknown = unknown[known_zones.columns]
-                            upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+                            if len(df_zones) == 0:
+                                logger.warning("No flows found for %s", from_zone)
+                            else:
+                                known_zones = pd.concat(df_zones)
+                                known_zones_total = (
+                                    known_zones.groupby(["date", "product"])
+                                    .value.sum()
+                                    .reset_index()
+                                )
+                                unknown = total.merge(
+                                    known_zones_total,
+                                    on=["product", "date"],
+                                    how="left",
+                                    suffixes=("", "_byzone"),
+                                )
+                                unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
+                                unknown["value_unknown"] = (
+                                    unknown["value"] - unknown["value_byzone"]
+                                )
+                                unknown = unknown[unknown["value_unknown"] > 0]
+                                unknown["to_zone_name"] = UNKNOWN_COUNTRY
+                                unknown["value"] = unknown["value_unknown"]
+                                unknown = unknown[known_zones.columns]
+                                upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
 
 
 def update_flows_reverse(

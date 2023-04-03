@@ -699,7 +699,7 @@ class KplerScraper:
                     "product": [self.get_product_id(platform=platform, name=product)]
                 }
         else:
-            default_products = {"liquids": [1400, 1328, 1370]}
+            default_products = {"liquids": [1400, 1328, 1370], "lng": []}
             params_raw["filters"] = {"product": default_products[platform]}
 
         token = get_env("KPLER_TOKEN_BRUTE")
