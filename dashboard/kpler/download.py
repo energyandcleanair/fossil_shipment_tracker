@@ -2,14 +2,10 @@ import pandas as pd
 import plotly.express as px
 from dash import DiskcacheManager, CeleryManager, Input, Output, html, State, dcc
 from dash.exceptions import PreventUpdate
-from server import app, background_callback_manager, cache
+from server import app, cache
 from utils import palette
-
-from . import COUNTRY_GLOBAL
 from . import FACET_NONE
-from . import units
-from . import laundromat_iso2s, pcc_iso2s
-from .utils import roll_average_kpler
+from .data import get_kpler1
 
 
 @app.callback(
@@ -24,11 +20,22 @@ def download_kpler0(data, n):
 
 
 @app.callback(
-    Output("download-kpler2", "data"),
+    Output("download-kpler1", "data"),
+    Input("btn-download-kpler1", "n_clicks"),
     State("kpler0", "data"),
-    Input("btn-download-kpler2", "n_clicks"),
+    State("colour-by", "value"),
+    State("facet", "value"),
+    State("kpler-rolling-days", "value"),
+    # Chart specific
+    State("unit", "value"),
+    State("kpler-chart-type", "value"),
     prevent_initial_call=True,
 )
-def download_kpler0(data, n):
-    df = pd.DataFrame(data)
+def download_kpler1(n, kpler0, colour_by, facet, rolling_days, unit_id, chart_type):
+    if facet == FACET_NONE:
+        facet = None
+    if chart_type == "bar":
+        df = get_kpler1(kpler0, colour_by, facet, 1)
+    else:
+        df = get_kpler1(kpler0, colour_by, facet, rolling_days)
     return dcc.send_data_frame(df.to_csv, "kpler_processed.csv")

@@ -10,6 +10,14 @@ from . import FACET_NONE
 from . import units
 from . import laundromat_iso2s, pcc_iso2s
 from .utils import roll_average_kpler
+from .data import get_kpler1
+
+
+@app.callback(Output("kpler-rolling-days", "disabled"), Input("kpler-chart-type", "value"))
+def update_options(chart_type):
+    if not chart_type:
+        raise PreventUpdate
+    return chart_type in ["bar"]
 
 
 @app.callback(
@@ -70,20 +78,26 @@ def select_origin_pcc(n_clicks):
 @app.callback(
     output=Output("kpler-area-chart", "figure"),
     inputs=[
-        Input("kpler2", "data"),
+        Input("kpler0", "data"),
         Input("colour-by", "value"),
-        Input("unit", "value"),
         Input("facet", "value"),
+        Input("kpler-rolling-days", "value"),
+        # Chart specific
+        Input("unit", "value"),
         Input("kpler-chart-type", "value"),
     ],
     suppress_callback_exceptions=True,
 )
-def update_chart(json_data, colour_by, unit_id, facet, chart_type):
+def update_chart(kpler0, colour_by, facet, rolling_days, unit_id, chart_type):
     if facet == FACET_NONE:
         facet = None
-    if json_data is None:
+    if kpler0 is None:
         raise PreventUpdate
-    df = pd.read_json(json_data, orient="split")
+
+    if chart_type == "bar":
+        df = get_kpler1(kpler0, colour_by, facet, 1)
+    else:
+        df = get_kpler1(kpler0, colour_by, facet, rolling_days)
     unit = units[unit_id]
     value = unit["column"]
     unit_str = unit["label"]
@@ -126,7 +140,7 @@ def update_chart(json_data, colour_by, unit_id, facet, chart_type):
         frequency = "M"
         group_by = [x for x in ["period", colour_by, facet] if x is not None]
         df["period"] = pd.to_datetime(df.date).dt.to_period(frequency).dt.to_timestamp()
-        df = df.groupby(group_by).sum(numeric_only=True).reset_index()
+        df = df.groupby(group_by)[value].sum().reset_index()
         fig = px.bar(
             df,
             x="period",

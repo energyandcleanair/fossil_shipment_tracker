@@ -45,7 +45,7 @@ def update():
     #                            )
     from kpler.sdk import FlowsDirection, FlowsSplit
 
-    kpler_scraper.update_flows_reverse(
+    kpler_scraper.update_flows(
         destination_iso2s=[
             "IQ",
             "SG",
@@ -98,14 +98,14 @@ def update():
             "JP",
         ],
         ignore_if_copy_failed=True,
-        platforms=["liquids"],
+        platforms=["lng"],
         date_from="2013-01-01",
         date_to=dt.date.today(),
         use_brute_force=True,
         add_unknown=True,
         add_unknown_only=False,
         from_splits=[FlowsSplit.OriginCountries],
-        to_splits=[FlowsSplit.DestinationPorts],
+        to_splits=[FlowsSplit.DestinationCountries],
     )
     # callbased.update_arrivals(commodities=[base.OIL_OR_CHEMICAL],
     #                           date_from='2022-01-01',

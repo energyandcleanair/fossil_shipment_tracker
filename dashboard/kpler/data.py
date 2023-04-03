@@ -78,54 +78,42 @@ def load_kpler0(origin_iso2, origin_type, destination_iso2, destination_type, co
         raise PreventUpdate
 
 
+@cache.memoize()
+def get_kpler1(kpler0, colour_by, facet, rolling_days):
+
+    df = pd.DataFrame(kpler0)
+    aggregate_by = list(set(["date"] + [colour_by] + [facet]))
+    aggregate_by = [x for x in aggregate_by if x is not None]
+    value_cols = [x for x in df.columns if x.startswith("value_")]
+    df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
+
+    # Group largest colours together
+    largest = df.groupby(colour_by)[value_cols].sum().nlargest(9, columns=value_cols[0]).index
+    df.loc[~df[colour_by].isin(largest), colour_by] = "Other"
+    df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
+
+    # Remove all first rows of df until the first date with a non-zero value
+    min_date = df.loc[(df[value_cols] > 0).apply(any, axis=1)]["date"].min()
+    df = df[df["date"] >= min_date]
+    df = roll_average_kpler(df, rolling_days)
+    return df
+
+
 @app.callback(
     output=Output("kpler1", "data"),
     inputs=[
         Input("kpler0", "data"),
         Input("colour-by", "value"),
         Input("facet", "value"),
+        Input("kpler-rolling-days", "value"),
     ],
 )
-def load_kpler1(kpler0, colour_by, facet):
+def load_kpler1(kpler0, colour_by, facet, rolling_days):
     if facet == FACET_NONE:
         facet = None
     if kpler0 is None:
         raise PreventUpdate
     logger.info("=== kpler1: reading json ===")
-
-    df = pd.DataFrame(kpler0)
-    logger.info("=== done ===")
-
-    logger.info("=== kpler1: grouping 1 ===")
-    aggregate_by = list(set(["date"] + [colour_by] + [facet]))
-    aggregate_by = [x for x in aggregate_by if x is not None]
-    value_cols = [x for x in df.columns if x.startswith("value_")]
-    df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
-    logger.info("=== done ===")
-
-    # Group largest colours together
-    logger.info("=== kpler1: grouping 2 ===")
-    largest = df.groupby(colour_by)[value_cols].sum().nlargest(9, columns=value_cols[0]).index
-    df.loc[~df[colour_by].isin(largest), colour_by] = "Other"
-    df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
-    logger.info("=== kpler2: done ===")
-
-    # Remove all first rows of df until the first date with a non-zero value
-    min_date = df.loc[(df[value_cols] > 0).apply(any, axis=1)]["date"].min()
-    df = df[df["date"] >= min_date]
-    logger.info("=== kpler1: serialising ===")
-    result = df.to_json(date_format="iso", orient="split")
-    logger.info("=== kpler1: done ===")
+    df = get_kpler1(kpler0, colour_by, facet, rolling_days)
+    result = df.to_dict(orient="split")
     return result
-
-
-@dash.callback(
-    output=Output("kpler2", "data"),
-    inputs=[Input("kpler1", "data"), Input("kpler-rolling-days", "value")],
-)
-def load_kpler1(json_data, rolling_days):
-    if json_data is None:
-        raise PreventUpdate
-    kpler1 = pd.read_json(json_data, orient="split")
-    kpler2 = roll_average_kpler(kpler1, rolling_days)
-    return kpler2.to_json(date_format="iso", orient="split")

@@ -96,3 +96,4 @@ from .layout import *
 from .data import *
 from .update import *
 from .store import store
+from .download import *

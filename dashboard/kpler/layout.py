@@ -120,14 +120,14 @@ chart_settings = html.Div(
                         ),
                         dbc.Button(
                             "Download processed data",
-                            id="btn-download-kpler2",
+                            id="btn-download-kpler1",
                             color="secondary",
                         ),
                     ],
                     className="d-grid gap-2 mt-2",
                 ),
                 dcc.Download(id="download-kpler0"),
-                dcc.Download(id="download-kpler2"),
+                dcc.Download(id="download-kpler1"),
             ]
         )
     ]
