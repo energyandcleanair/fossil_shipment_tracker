@@ -247,6 +247,11 @@ class ChartDepartureOwnership(Resource):
             "[Departures by ownership] columns returned: %s. Pandas version: %s." % (",".join(result.columns), pd.__version__)
         )
 
+        # Drop pricing scenario until we find issue of why it is not present sometimes
+        # TODO remove once fixed
+        if 'pricing_scenario' in result.columns:
+            result.drop('pricing_scenario', axis=1, inplace=True)
+
         return self.build_response(result=result, format=format, nest_in_data=nest_in_data)
 
     def build_response(self, result, format, nest_in_data):
