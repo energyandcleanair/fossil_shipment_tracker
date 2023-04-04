@@ -168,8 +168,8 @@ def update_flows(
                             )
                             if df is not None:
                                 df_zones.append(df)
-                            # if not add_unknown_only:
-                            #     upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                            if not add_unknown_only:
+                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
 
                         if add_unknown:
                             # Add an unknown one
