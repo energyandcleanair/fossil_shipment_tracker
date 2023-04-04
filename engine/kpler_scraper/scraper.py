@@ -337,7 +337,25 @@ class KplerScraper:
                     707: "PA",
                     175: "CV",
                     343: "GI",
-                }
+                },
+                "lng": {
+                    299: "EG",
+                    943: "AE",
+                    561: "MT",
+                    261: "DJ",
+                    707: "PA",
+                    175: "CV",
+                    343: "GI",
+                },
+                "dry": {
+                    299: "EG",
+                    943: "AE",
+                    561: "MT",
+                    261: "DJ",
+                    707: "PA",
+                    175: "CV",
+                    343: "GI",
+                },
             }
             manual_iso2 = manual_iso2s.get(platform, {}).get(id, None)
             return manual_iso2
@@ -358,6 +376,15 @@ class KplerScraper:
                 343: "Gibraltar",
             },
             "lng": {
+                299: "Egypt",
+                943: "United Arab Emirates",
+                561: "Malta",
+                261: "Djibouti",
+                707: "Panama",
+                175: "Cap Verde",
+                343: "Gibraltar",
+            },
+            "dry": {
                 299: "Egypt",
                 943: "United Arab Emirates",
                 561: "Malta",
