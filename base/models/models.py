@@ -1016,16 +1016,16 @@ class KplerFlow(Base):
             "product",
             "to_split",
             "from_split",
-            name="unique_kpler_flow3",
+            name="unique_kpler_flow",
         ),
     )
     __tablename__ = DB_TABLE_KPLER_FLOW
     __table_args__ = (
-        Index("idx_kpler_flow3_product", "product"),
-        Index("idx_kpler_flow3_from_iso2", "from_iso2"),
-        Index("idx_kpler_flow3_from_split", "from_split"),
-        Index("idx_kpler_flow3_to_split", "to_split"),
-        Index("idx_kpler_flow3_date", "date"),
+        Index("idx_kpler_flow_product", "product"),
+        Index("idx_kpler_flow_from_iso2", "from_iso2"),
+        Index("idx_kpler_flow_from_split", "from_split"),
+        Index("idx_kpler_flow_to_split", "to_split"),
+        Index("idx_kpler_flow_date", "date"),
     )
 
 
