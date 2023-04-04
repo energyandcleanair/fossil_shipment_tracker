@@ -363,6 +363,12 @@ class ChartDepartureDestination(Resource):
         data = group_commodities(data)
         data = pivot_data(data, pivot_value=pivot_value)
         data = self.postcompute(data, params=params)
+
+        # Drop pricing scenario until we find issue of why it is not present sometimes
+        # TODO remove once fixed
+        if 'pricing_scenario' in data.columns:
+            data.drop('pricing_scenario', axis=1, inplace=True)
+
         data = translate(data=data, language=language)
 
         return self.build_response(result=data, format=format, nest_in_data=nest_in_data)
