@@ -1007,7 +1007,13 @@ class KplerFlow(Base):
 
     value = Column(Numeric, nullable=False)
 
+    __tablename__ = DB_TABLE_KPLER_FLOW
     __table_args__ = (
+        Index("idx_kpler_flow_product", "product"),
+        Index("idx_kpler_flow_from_iso2", "from_iso2"),
+        Index("idx_kpler_flow_from_split", "from_split"),
+        Index("idx_kpler_flow_to_split", "to_split"),
+        Index("idx_kpler_flow_date", "date"),
         UniqueConstraint(
             "from_zone_id",
             "to_zone_id",
@@ -1018,14 +1024,6 @@ class KplerFlow(Base):
             "from_split",
             name="unique_kpler_flow",
         ),
-    )
-    __tablename__ = DB_TABLE_KPLER_FLOW
-    __table_args__ = (
-        Index("idx_kpler_flow_product", "product"),
-        Index("idx_kpler_flow_from_iso2", "from_iso2"),
-        Index("idx_kpler_flow_from_split", "from_split"),
-        Index("idx_kpler_flow_to_split", "to_split"),
-        Index("idx_kpler_flow_date", "date"),
     )
 
 
