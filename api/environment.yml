@@ -27,6 +27,7 @@ dependencies:
   - Werkzeug=2.0.3
   - protobuf=3.20
   - pip
+  - country_converter
   - pip:
     - slack-logger
     - slack_sdk

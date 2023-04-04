@@ -1,9 +1,10 @@
 import datetime as dt
 import numpy as np
+from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from base.db import session, engine
 
-from engine.kpler_scraper import KplerScraper, FlowsSplit
+from engine.kpler_scraper import KplerScraper
 
 
 def test_get_flow():
@@ -121,3 +122,101 @@ def test_get_trades_brute():
                 break
 
     pass
+
+
+def test_get_flow_cn():
+    from base.utils import to_datetime
+
+    params = {
+        "platform": "liquids",
+        "origin_iso2": "CN",
+        # "destination_iso2": "CN",
+        "product": "Crude/Co",
+        "date_from": to_datetime("2022-03-20"),
+        "date_to": to_datetime("2022-03-24"),
+        "split": FlowsSplit.DestinationCountries,
+        "unit": FlowsMeasurementUnit.T,
+        "use_brute_force": True,
+    }
+
+    scraper = KplerScraper()
+    flows = scraper.get_flows(**params)
+    assert all(flows.from_iso2 == "CN")
+    crude = flows[flows["product"] == "Crude/Co"]
+
+    manual_values = {
+        "MY": 81900,
+        "SG": 15700,
+    }
+    assert len(crude) == len(manual_values)
+    assert all(
+        [
+            np.isclose(crude[crude.to_iso2 == k].value.iloc[0], v, rtol=1e-2)
+            for k, v in manual_values.items()
+        ]
+    )
+
+
+def test_get_flow_sg_cn():
+    from base.utils import to_datetime
+
+    params = {
+        "platform": "liquids",
+        "origin_iso2": "SG",
+        "destination_iso2": "CN",
+        # "product": "Crude",
+        "date_from": to_datetime("2019-08-01"),
+        "date_to": to_datetime("2019-08-31"),
+        "split": FlowsSplit.Products,
+        "unit": FlowsMeasurementUnit.T,
+        "use_brute_force": True,
+    }
+
+    scraper = KplerScraper()
+    flows = scraper.get_flows(**params)
+    assert all(flows.from_iso2 == "SG")
+    assert all(flows.to_iso2 == "CN")
+    crude = flows[flows["product"] == "Crude"]
+
+    manual_values = {
+        "2019-08-07": 19500,
+        "2019-08-10": 15600,
+        "2019-08-18": 97700,
+    }
+    assert len(crude) == len(manual_values)
+    assert all(
+        [
+            np.isclose(crude[crude.date == k].value.iloc[0], v, rtol=1e-2)
+            for k, v in manual_values.items()
+        ]
+    )
+
+    # But there is a date where Singapore != Singapore Republic and the latter seems correct
+    params = {
+        "platform": "liquids",
+        "origin_iso2": "SG",
+        "destination_iso2": "CN",
+        # "product": "Crude",
+        "date_from": to_datetime("2016-06-01"),
+        "date_to": to_datetime("2016-06-10"),
+        "split": FlowsSplit.Products,
+        "unit": FlowsMeasurementUnit.T,
+        "use_brute_force": True,
+    }
+
+    scraper = KplerScraper()
+    flows = scraper.get_flows(**params)
+    assert all(flows.from_iso2 == "SG")
+    assert all(flows.to_iso2 == "CN")
+    crude = flows[flows["product"] == "Crude/Co"]
+
+    manual_values = {
+        "2016-06-03": 292000,
+    }
+    assert len(crude) == len(manual_values)
+    assert all(
+        [
+            np.isclose(crude[crude.date == k].value.iloc[0], v, rtol=1e-2)
+            for k, v in manual_values.items()
+        ]
+    )

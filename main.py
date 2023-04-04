@@ -40,7 +40,7 @@ def update():
     # backuper.update()
     # currency.update()
     # rscript.update()
-    kpler_scraper.update_trades("2010-01-01", origin_iso2s=["RU"])
+    # kpler_scraper.update_trades("2010-01-01", origin_iso2s=["RU"])
     # callbased.update_arrivals(commodities=[base.OIL_OR_CHEMICAL],
     #                           date_from='2022-01-01',
     #                           date_to='2023-01-01',

@@ -280,6 +280,8 @@ class KplerScraper:
                 name = "Russian Federation"
             elif iso2 == "TR":
                 name = "Turkey"
+            elif iso2 == "SG":
+                name = "Singapore Republic"
 
         found = False
         types = {
@@ -302,22 +304,22 @@ class KplerScraper:
 
         return {"id": int(matching["id"].values[0]), "resourceType": type}
 
-    def get_zone_name(self, platform, id):
-        installations = self.get_installations_brute(platform=platform)
-        id = int(id)
-        try:
-            name = installations[(installations["id"] == id)]["name"].values[0]
-        except IndexError:
-            try:
-                zones = self.get_zones_brute(platform=platform)
-                name = zones[(zones["id"] == id)]["name"].values[0]
-            except IndexError:
-                try:
-                    zones_countries = self.get_zones_countries(platform=platform)
-                    name = zones_countries[(zones_countries["id"] == id)]["name"].values[0]
-                except IndexError:
-                    name = UNKNOWN_COUNTRY
-        return name
+    # def get_zone_name(self, platform, id):
+    #     installations = self.get_installations_brute(platform=platform)
+    #     id = int(id)
+    #     try:
+    #         name = installations[(installations["id"] == id)]["name"].values[0]
+    #     except IndexError:
+    #         try:
+    #             zones = self.get_zones_brute(platform=platform)
+    #             name = zones[(zones["id"] == id)]["name"].values[0]
+    #         except IndexError:
+    #             try:
+    #                 zones_countries = self.get_zones_countries(platform=platform)
+    #                 name = zones_countries[(zones_countries["id"] == id)]["name"].values[0]
+    #             except IndexError:
+    #                 name = UNKNOWN_COUNTRY
+    #     return name
 
     def get_zone_iso2(self, platform, id):
         zones_countries = self.get_zones_countries(platform=platform)
@@ -339,6 +341,35 @@ class KplerScraper:
             }
             manual_iso2 = manual_iso2s.get(platform, {}).get(id, None)
             return manual_iso2
+
+    def get_zone_name(self, platform, id, name=None):
+
+        if name is not None:
+            return name
+
+        manual_names = {
+            "liquids": {
+                299: "Egypt",
+                943: "United Arab Emirates",
+                561: "Malta",
+                261: "Djibouti",
+                707: "Panama",
+                175: "Cap Verde",
+                343: "Gibraltar",
+            }
+        }
+
+        if manual_names.get(platform, {}).get(id, None) is not None:
+            return manual_names[platform][id]
+
+        zones_countries = self.get_zones_countries(platform=platform)
+        found = zones_countries[(zones_countries["id"] == id)]["name"]
+        if len(found) == 1:
+            return found.values[0]
+        elif id == 0:
+            return UNKNOWN_COUNTRY
+        else:
+            raise ValueError(f"Zone name not found: {platform} {id}")
 
     def get_vessel_raw_brute(self, kpler_vessel_id):
         """
@@ -699,7 +730,7 @@ class KplerScraper:
                     "product": [self.get_product_id(platform=platform, name=product)]
                 }
         else:
-            default_products = {"liquids": [1400, 1328, 1370], "lng": []}
+            default_products = {"liquids": [1400, 1328, 1370], "lng": [1750], "dry": [1334]}
             params_raw["filters"] = {"product": default_products[platform]}
 
         token = get_env("KPLER_TOKEN_BRUTE")
@@ -777,15 +808,28 @@ class KplerScraper:
         product=None,
         split=None,
         from_zone=None,
-        from_split=None,
+        from_split=FlowsSplit.OriginCountries,
         to_zone=None,
         to_split=FlowsSplit.DestinationCountries,
         granularity=FlowsPeriod.Daily,
         unit=FlowsMeasurementUnit.T,
         date_from=dt.datetime.now() - dt.timedelta(days=365),
         date_to=dt.datetime.now(),
-        use_brute_force=False,
+        use_brute_force=True,
     ):
+
+        if from_zone is None and origin_iso2 is not None:
+            if from_split == FlowsSplit.OriginCountries:
+                from_zone = self.get_zone_dict(platform=platform, iso2=origin_iso2)
+            else:
+                raise ValueError("Wrong from_zone indication")
+
+        if to_zone is None and destination_iso2 is not None:
+            if to_split == FlowsSplit.DestinationCountries:
+                to_zone = self.get_zone_dict(platform=platform, iso2=destination_iso2)
+            else:
+                raise ValueError("Wrong to_zone indication")
+
         params = {
             "from_zone": from_zone,
             "to_zone": to_zone,
@@ -832,25 +876,6 @@ class KplerScraper:
         df["platform"] = platform
         df = df.rename(columns={"Date": "date"})
 
-        # df = df.melt(
-        #     id_vars=[
-        #         x
-        #         for x in [
-        #             "date",
-        #             "origin_iso2",
-        #             "destination_iso2",
-        #             "from_installation",
-        #             "to_installation",
-        #             "product",
-        #             "unit",
-        #             "platform",
-        #         ]
-        #         if x in df.columns
-        #     ],
-        #     var_name="split",
-        #     value_name="value",
-        # )
-
         def split_to_column(df, split):
             if split in [
                 FlowsSplit.DestinationCountries,
@@ -872,46 +897,22 @@ class KplerScraper:
         df = split_to_column(df, split)
         df = df.drop(columns=["split"])
 
-        df["from_zone_id"] = df.from_zone.apply(lambda x: int(x.get("id")))
-        df["to_zone_id"] = df.to_zone.apply(lambda x: int(x.get("id")))
+        df["from_zone_id"] = df.from_zone.apply(lambda x: self.fix_zone_id(int(x.get("id"))))
+        df["to_zone_id"] = df.to_zone.apply(lambda x: self.fix_zone_id(int(x.get("id"))))
 
-        df["from_zone_name"] = df.from_zone.apply(lambda x: x.get("name"))
-        df["to_zone_name"] = df.to_zone.apply(lambda x: x.get("name"))
-        #
-        # df["from_zone_name"] = df.from_zone_id.apply(
-        #     lambda x: self.get_zone_name(platform=platform, id=x)
-        # )
-        # df["to_zone_name"] = df.to_zone_id.apply(
-        #     lambda x: self.get_zone_name(platform=platform, id=x)
-        # )
         df["to_iso2"] = df.to_zone_id.apply(lambda x: self.get_zone_iso2(platform=platform, id=x))
         df["from_iso2"] = df.from_zone_id.apply(
             lambda x: self.get_zone_iso2(platform=platform, id=x)
         )
 
-        df.drop(columns=["from_zone", "to_zone"], inplace=True)
-        # # Sometimes we have duplicated values
-        # df = (
-        #     df.groupby(
-        #         [
-        #             "date",
-        #             "origin_iso2",
-        #             "destination_iso2",
-        #             "destination_country",
-        #             "from_zone",
-        #             "to_zone",
-        #             "from_split",
-        #             "to_split"
-        #             "product",
-        #             "unit",
-        #             "platform",
-        #         ],
-        #         dropna=False,
-        #     )
-        #     .sum()
-        #     .reset_index()
-        # )
+        df["from_zone_name"] = df.from_zone.apply(
+            lambda x: self.get_zone_name(platform=platform, id=x.get("id"), name=x.get("name"))
+        )
+        df["to_zone_name"] = df.to_zone.apply(
+            lambda x: self.get_zone_name(platform=platform, id=x.get("id"), name=x.get("name"))
+        )
 
+        df.drop(columns=["from_zone", "to_zone"], inplace=True)
         return df
 
     def get_products(self, platform=None):
@@ -954,9 +955,24 @@ class KplerScraper:
         return df
 
     def get_product_id(self, platform, name):
+        manual_values = {"Crude/Co": 1370}
+        if name in manual_values:
+            return manual_values[name]
+
         products = self.get_products(platform=platform)
         product = products[products.name == name]
         return int(product.id.values[0]) if len(product) == 1 else None
+
+    def fix_zone_id(self, id):
+        """
+        Certain zone ids are different based on whether we query with
+        specified destination or specified origin. Meaning there can be double counting.
+        We clean the zones in this function.
+        MUST be run after the flows have been scraped!
+        :return:
+        """
+        manual_fixes = {"1109": "833"}  # SINGAPORE vs SINGAPORE REPUBLIC
+        return type(id)(manual_fixes.get(id, id))
 
 
 def fill_products():
