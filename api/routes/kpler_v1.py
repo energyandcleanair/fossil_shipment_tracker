@@ -180,7 +180,10 @@ class KplerFlowResource(TemplateResource):
             "destination_type": [subquery.c.destination_type],
             "currency": [subquery.c.currency],
             "date": [subquery.c.date],
+            "month": [func.month(subquery.c.date).label("month")],
+            "year": [func.extract("year", subquery.c.date).label("year")],
             "commodity": [subquery.c.commodity],
+            "commodity_equivalent": [subquery.c.commodity_equivalent],
         }
 
     def get_agg_value_cols(self, subquery):
