@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 from base.logger import logger
 from base.utils import to_datetime
+from base.logger import logger_slack
 from base.db import session
 from base.db_utils import upsert
 from base.models import Country, Currency
@@ -21,6 +22,8 @@ def update(date_from=dt.date(2022, 1, 1),
     Fill from countryconvert data
     :return:
     """
+
+    logger_slack.info("=== Currency update ===")
 
     from forex_python.converter import CurrencyRates
     from forex_python.converter import RatesNotAvailableError
