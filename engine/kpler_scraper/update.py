@@ -40,7 +40,7 @@ def upload_flows(df, ignore_if_copy_failed=False):
                 logger.info("Some rows already exist. Skipping")
             else:
                 logger.info("Some rows already exist. Upserting instead")
-                upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow3")
+                upsert(df, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
 
 
 def get_products(scraper, platform, origin_iso2):
@@ -168,8 +168,8 @@ def update_flows(
                             )
                             if df is not None:
                                 df_zones.append(df)
-                            if not add_unknown_only:
-                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                            # if not add_unknown_only:
+                            #     upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
 
                         if add_unknown:
                             # Add an unknown one
@@ -332,7 +332,7 @@ def upload_trades(trades, ignore_if_copy_failed=False):
                 logger.info("Some rows already exist. Skipping")
             else:
                 logger.info("Some rows already exist. Upserting instead")
-                upsert(trades, DB_TABLE_KPLER_TRADE, "kpler_trade_pkey")
+                upsert(trades, DB_TABLE_KPLER_TRADE, "unique_kpler_flow")
 
 
 def update_trades(

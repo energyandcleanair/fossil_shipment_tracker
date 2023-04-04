@@ -356,7 +356,16 @@ class KplerScraper:
                 707: "Panama",
                 175: "Cap Verde",
                 343: "Gibraltar",
-            }
+            },
+            "lng": {
+                299: "Egypt",
+                943: "United Arab Emirates",
+                561: "Malta",
+                261: "Djibouti",
+                707: "Panama",
+                175: "Cap Verde",
+                343: "Gibraltar",
+            },
         }
 
         if manual_names.get(platform, {}).get(id, None) is not None:
