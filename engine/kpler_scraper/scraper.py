@@ -222,7 +222,14 @@ class KplerScraper:
             try:
                 dicts = ast.literal_eval(parent_zones)
                 df = pd.DataFrame([x for x in dicts if x.get("resourceType") == "zone"])
-                country = next((x.get("name") for x in dicts if x.get("type") == "country"), None)
+                # Add countries
+                country = next(
+                    (x.get("name") for x in dicts if x.get("type") == "country"),
+                    next(
+                        (x.get("name") for x in dicts if x.get("type") == "country_checkpoint"),
+                        None,
+                    ),
+                )
                 df["country"] = country
                 df["iso2"] = self.cc.convert(country, to="ISO2")
                 return df
