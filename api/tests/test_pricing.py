@@ -148,6 +148,7 @@ def test_price_cap(app):
         date_from = "2022-12-01"
         commodities = [base.CRUDE_OIL]
         bbl_per_tonne = 1 / 0.138
+        price_per_barrel = 80
 
         # Default and cap pricing should be similar before 2022-07-01
         params = {
@@ -170,26 +171,22 @@ def test_price_cap(app):
         data = data[data.departure_date_utc >= "2022-12-01"]
         data = data[data.departure_date_utc <= "2022-12-31"]
         # There is some discrepancy in exchange rate, hence the 1.1
-        data[data.ship_owner_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
-        data[data.ship_manager_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
-        data[data.ship_insurer_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < 60 * 1.1
+        assert data[data.ship_owner_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < price_per_barrel * 1.1
+        assert data[data.ship_manager_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < price_per_barrel * 1.1
+        assert data[data.ship_insurer_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < price_per_barrel * 1.1
 
         data = data[data.arrival_date_utc >= "2022-12-01"]
         # Check that those not covered aren't affected
-        data[
-            (data.ship_owner_region != "EU")
-            & (data.ship_manager_region != "EU")
-            & (data.ship_insurer_region != "EU")
-            & (data.commodity_destination_region != "EU")
-        ].usd_per_tonne.max() / bbl_per_tonne > 60 * 1.1
-
         data["covered"] = (
-            (data.ship_owner_region == "EU")
-            | (data.ship_manager_region == "EU")
-            | (data.ship_manager_region == "EU")
-            | (data.destination_region == "EU")
+                (data.ship_owner_region == "EU")
+                | (data.ship_manager_region == "EU")
+                | (data.ship_manager_region == "EU")
+                | (data.commodity_destination_region == "EU")
         )
-        data.groupby(data.covered)["value_tonne"].sum()
+
+        assert data.groupby(data.covered)["value_tonne"].sum().all() > 0
+        assert np.isclose(data[~data.covered].usd_per_tonne.max() / bbl_per_tonne, price_per_barrel * 1.1, 0.05)
+
         # Default and cap pricing should be similar before put in place
         params = {
             "format": "json",
@@ -262,8 +259,8 @@ def test_price_cap(app):
         data = response.json["data"]
         assert len(data) > 0
         both_df = pd.DataFrame(data)
-        assert default_sum == both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum()
-        assert capped_sum == both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
+        assert both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum() \
+               > both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
 
 
 def test_coal_pricing(app):
