@@ -230,10 +230,12 @@ class KplerScraper:
                         None,
                     ),
                 )
+                if country is None:
+                    return pd.DataFrame()
                 df["country"] = country
                 df["iso2"] = self.cc.convert(country, to="ISO2")
                 return df
-            except TypeError:
+            except ValueError:
                 return pd.DataFrame()
 
         zones = self.get_zones_brute(platform=platform)
