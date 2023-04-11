@@ -42,5 +42,7 @@ def get_commodity_group(row):
         return base.OIL_PRODUCTS
     elif row["name"] == "lng":
         return base.LNG
+    elif row["name"] in ["Coal", "Thermal", "Metallurgical"]:
+        return base.COAL
     else:
         return None
