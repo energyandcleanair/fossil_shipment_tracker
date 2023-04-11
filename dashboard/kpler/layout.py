@@ -11,7 +11,7 @@ from . import (
     DEFAULT_ROLLING_DAYS,
     DEFAULT_COLOUR_BY,
     DEFAULT_DESTINATION_COUNTRY,
-    DEFAULT_COMMODITY,
+    DEFAULT_COMMODITIES,
     DEFAULT_CHART_TYPE,
 )
 from . import units
@@ -96,8 +96,8 @@ chart_settings = html.Div(
                 dcc.Dropdown(
                     id="kpler-commodity",
                     options=commodities,
-                    multi=False,
-                    value=DEFAULT_COMMODITY,
+                    multi=True,
+                    value=DEFAULT_COMMODITIES,
                     style={"min-width": "150px"},
                 ),
                 html.Div(
