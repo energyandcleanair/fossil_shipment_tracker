@@ -644,12 +644,20 @@ class Price(Base):
         CheckConstraint("eur_per_tonne >= 0", name="price_positive"),
         Index("idx_price_commodity", "commodity"),
         Index("idx_price_date", "date"),
+        Index("idx_price_date_commodity", "date", "commodity"),
         Index("idx_price_destination_iso2s", "destination_iso2s", postgresql_using="gin"),
         Index("idx_price_departure_port_ids", "departure_port_ids", postgresql_using="gin"),
         Index("idx_price_ship_owner_iso2s", "ship_owner_iso2s", postgresql_using="gin"),
         Index("idx_price_ship_insurer_iso2s", "ship_insurer_iso2s", postgresql_using="gin"),
         # To add in SqlAlchemy format
-        # CREATE INDEX idx_price_departure_port_ids_is_null ON price ((departure_port_ids=ARRAY[NULL]::bigint[]));
+        # CREATE INDEX IF NOT EXISTS idx_price_date_noshipinfo
+        #     ON public.price USING btree
+        #       (date ASC NULLS LAST,
+        # 		(departure_port_ids = ARRAY[NULL::bigint]) ASC NULLS LAST,
+        # 	    (ship_insurer_iso2s = ARRAY[NULL::varchar]) ASC NULLS LAST,
+        # 	    (ship_owner_iso2s = ARRAY[NULL::varchar]) ASC NULLS LAST
+        # 	)
+        #     TABLESPACE pg_default;
     )
 
 

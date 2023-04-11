@@ -2,7 +2,7 @@ from sqlalchemy import func
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 from sqlalchemy import case
-
+from sqlalchemy.dialects.postgresql import array
 
 import base
 from .security import key_required
@@ -286,22 +286,23 @@ class KplerFlowResource(TemplateResource):
                     KplerProduct.platform == KplerFlow.platform,
                 ),
             )
-            .outerjoin(Commodity, commodity_id_field == Commodity.id)
-            .outerjoin(
+            .join(Commodity, commodity_id_field == Commodity.id)
+            .join(
                 Price,
                 sa.and_(
                     Price.date == KplerFlow.date,
                     sa.or_(
-                        KplerFlow.to_iso2 == sa.any_(Price.destination_iso2s),
+                        # KplerFlow.to_iso2 == sa.any_(Price.destination_iso2s),
+                        Price.destination_iso2s.contains(array([KplerFlow.to_iso2])),
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                     Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
                     Price.commodity == Commodity.pricing_commodity,
                 ),
             )
-            .outerjoin(Currency, Currency.date == KplerFlow.date)
+            .join(Currency, Currency.date == KplerFlow.date)
             .order_by(
                 KplerFlow.id,
                 Price.scenario,
@@ -351,10 +352,10 @@ class KplerFlowResource(TemplateResource):
             query = query.filter(KplerFlow.platform.in_(to_list(platform)))
 
         if date_from:
-            query = query.filter(KplerFlow.date >= to_datetime(date_from))
+            query = query.filter(KplerFlow.date >= str(to_datetime(date_from)))
 
         if date_to:
-            query = query.filter(KplerFlow.date <= to_datetime(date_to))
+            query = query.filter(KplerFlow.date <= str(to_datetime(date_to)))
 
         if pricing_scenario:
             query = query.filter(Price.scenario.in_(to_list(pricing_scenario)))

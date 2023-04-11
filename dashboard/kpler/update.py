@@ -133,8 +133,6 @@ def update_chart(kpler0, colour_by, facet, rolling_days, unit_id, chart_type):
         )
         for i in range(len(fig["data"])):
             fig["data"][i]["line"]["width"] = 0
-        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-        fig.update_xaxes(autorange=True)
 
     elif chart_type == "line":
         fig = px.line(
@@ -167,6 +165,9 @@ def update_chart(kpler0, colour_by, facet, rolling_days, unit_id, chart_type):
 
     if not fig:
         return None
+
+    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    fig.update_xaxes(autorange=True)
 
     fig.update_traces(
         hovertemplate=hovertemplate,
