@@ -6,11 +6,15 @@ env_variables:
   ENVIRONMENT: 'production'
 entrypoint: gunicorn --log-level debug -b :$PORT -w 8 -t 600 app:app
 automatic_scaling:
-  min_instances: 1
+  min_instances: 0
   max_instances: 5
+  min_idle_instances: 0
 
 handlers:
 - url: /.*
   secure: always
   redirect_http_response_code: 301
   script: auto
+
+inbound_services:
+- warmup
