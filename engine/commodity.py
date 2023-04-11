@@ -30,7 +30,6 @@ def fill():
 
     scraper = KplerScraper()
     kpler_products = scraper.get_products(platform="liquids")
-    kpler_products = scraper.get_products(platform="dry")
 
     # Adding the couple products that correspond to a group or family
     # To note: "group" has a different meaning for Kpler and our db
