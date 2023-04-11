@@ -8,7 +8,7 @@ from utils import palette
 from . import COUNTRY_GLOBAL
 from . import FACET_NONE
 from . import units
-from . import laundromat_iso2s, pcc_iso2s
+from . import laundromat_iso2s, pcc_iso2s, eu27_iso2s
 from .utils import roll_average_kpler
 from .data import get_kpler1
 
@@ -76,6 +76,19 @@ def select_origin_pcc(n_clicks):
 
 
 @app.callback(
+    output=Output("kpler-destination-country", "value", allow_duplicate=True),
+    inputs=[
+        Input("kpler-destination-country-select-eu27", "n_clicks"),
+    ],
+    allow_duplicate=True,
+    suppress_callback_exceptions=True,
+    prevent_initial_call=True,
+)
+def select_destination_eu27(n_clicks):
+    return eu27_iso2s
+
+
+@app.callback(
     output=Output("kpler-area-chart", "figure"),
     inputs=[
         Input("kpler0", "data"),
@@ -114,7 +127,7 @@ def update_chart(kpler0, colour_by, facet, rolling_days, unit_id, chart_type):
             y=value,
             color=colour_by,
             custom_data=[colour_by],
-            title=f"<span class='title'>Daily flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str}</span>",
+            title=f"<span class='title'>Daily flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str} per day</span>",
             color_discrete_map=palette,
             facet_col=facet,
         )
@@ -130,7 +143,7 @@ def update_chart(kpler0, colour_by, facet, rolling_days, unit_id, chart_type):
             y=value,
             color=colour_by,
             custom_data=[colour_by],
-            title=f"<span class='title'>Daily flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str}</span>",
+            title=f"<span class='title'>Daily flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str} per day</span>",
             color_discrete_map=palette,
             facet_col=facet,
         )
@@ -147,7 +160,7 @@ def update_chart(kpler0, colour_by, facet, rolling_days, unit_id, chart_type):
             y=value,
             color=colour_by,
             custom_data=[colour_by],
-            title=f"<span class='title'>Daily flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str}</span>",
+            title=f"<span class='title'>Monthly flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str} per month</span>",
             color_discrete_map=palette,
             facet_col=facet,
         )

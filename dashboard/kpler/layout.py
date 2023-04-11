@@ -73,6 +73,12 @@ chart_settings = html.Div(
                             color="primary",
                             className="btn-preset",
                         ),
+                        dbc.Button(
+                            "EU-27",
+                            id="kpler-destination-country-select-eu27",
+                            color="primary",
+                            className="btn-preset",
+                        ),
                     ],
                     className="btn-preset-group",
                 ),

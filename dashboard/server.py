@@ -17,8 +17,9 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
 )
 
-# Add basic authentication
+app.title = "Russia Fossil Tracker"
 
+# Add basic authentication
 VALID_USERNAME_PASSWORD_PAIRS = {config("USERNAME"): config("PASSWORD")}
 
 auth = dash_auth.BasicAuth(app, VALID_USERNAME_PASSWORD_PAIRS)

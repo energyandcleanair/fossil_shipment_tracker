@@ -4,7 +4,7 @@ COMMODITY_ALL = "All"
 
 # Default values
 DEFAULT_ORIGIN_COUNTRY = "RU"
-DEFAULT_DESTINATION_COUNTRY = "EG"
+DEFAULT_DESTINATION_COUNTRY = COUNTRY_GLOBAL
 DEFAULT_COLOUR_BY = "destination_name"
 DEFAULT_ROLLING_DAYS = 14
 DEFAULT_COMMODITIES = ["crude_oil", "oil_products"]
@@ -40,6 +40,7 @@ colour_bys = {
     "commodity": "Commodity",
     "origin_name": "Origin",
     "destination_name": "Destination",
+    "destination_region": "Destination region",
 }
 from_type = {"country": "Country", "port": "Port"}
 to_type = {"country": "Country", "port": "Port"}
@@ -47,6 +48,9 @@ facet_bys = {
     FACET_NONE: "None",
     "origin_region": "Origin region",
     "origin_country": "Origin country",
+    "product": "Product",
+    "product_group": "Product group",
+    "product_family": "Product family",
     "destination_region": "Destination region",
     "destination_country": "Destination country",
     "commodity_equivalent": "Commodity",
@@ -58,6 +62,37 @@ refreshing = False
 
 # Preset
 laundromat_iso2s = ["EG", "SG", "IN", "CN", "AE"]
+eu27_iso2s = [
+    "AT",
+    "BE",
+    "BG",
+    "HR",
+    "CY",
+    "CZ",
+    "DK",
+    "EE",
+    "FI",
+    "FR",
+    "DE",
+    "GR",
+    "HU",
+    "IE",
+    "IT",
+    "LV",
+    "LT",
+    "LU",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SK",
+    "SI",
+    "ES",
+    "SE",
+]
+
+
 pcc_iso2s = [
     "AT",
     "BE",
