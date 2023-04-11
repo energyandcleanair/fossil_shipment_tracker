@@ -267,7 +267,7 @@ class ChartDepartureDestination(Resource):
 
         def translate(data, language):
             if language != "en":
-                file_path = "api/assets/language/%s.json" % (language)
+                file_path = "assets/language/%s.json" % (language)
                 with open(file_path, "r") as file:
                     translate_dict = json.load(file)
 
