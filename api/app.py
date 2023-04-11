@@ -1,12 +1,16 @@
 import os
 import json
-from base.db import session
 from werkzeug.exceptions import HTTPException
 from flask import Flask, request
 from flask import jsonify
 from flask_cors import CORS
 from flask import Response
 from flask_mail import Mail, Message
+
+from base.db import session
+from base.logger import logger
+from base.db import engine
+
 
 try:
     from .routes import routes
@@ -72,20 +76,13 @@ def get_environment():
     )
 
 
-# @app.route('/v0/counter_update', methods=['POST'])
-# def counter_update():
-#     from engine import counter
-#     try:
-#         counter.update()
-#         return Response(
-#             response=json.dumps({"status": "OK", "message": "counter updated"}),
-#             status=200,
-#             mimetype='application/json')
-#     except Exception as e:
-#         return Response(
-#             response={"status": "ERROR", "message": str(e)},
-#             status=500,
-#             mimetype='application/json')
+@app.route("/_ah/warmup")
+def warmup():
+    # Handle your warmup logic here, e.g. set up a database connection pool
+    logger.info("Warmup call. Connecting to DB")
+    engine.connect()
+    logger.info("Done")
+    return "", 200, {}
 
 
 @app.route("/v0/update", methods=["POST"])
