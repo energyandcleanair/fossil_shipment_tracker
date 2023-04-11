@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+source ../.env
 source .env
 docker buildx build -f Dockerfile -t dashboard . --platform linux/amd64
 docker tag dashboard eu.gcr.io/$PROJECT_ID/dashboard:latest
@@ -16,4 +17,4 @@ gcloud run deploy dashboard \
       --max-instances=10  \
       --allow-unauthenticated \
       --vpc-connector $CONNECTOR_NAME \
-      --set-env-vars REDISHOST=$REDISHOST,REDISPORT=$REDISPORT,REDISURL=$REDISURL
+      --set-env-vars REDISHOST=$REDISHOST,REDISPORT=$REDISPORT

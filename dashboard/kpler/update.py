@@ -167,6 +167,7 @@ def update_chart(kpler0, colour_by, facet, rolling_days, unit_id, chart_type):
         return None
 
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    fig.for_each_xaxis(lambda x: x.update(title=None))
     fig.update_xaxes(autorange=True)
 
     fig.update_traces(

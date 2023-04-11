@@ -46,14 +46,14 @@ from_type = {"country": "Country", "port": "Port"}
 to_type = {"country": "Country", "port": "Port"}
 facet_bys = {
     FACET_NONE: "None",
-    "origin_region": "Origin region",
-    "origin_country": "Origin country",
+    # "origin_region": "Origin region",
+    # "origin_country": "Origin country",
     "product": "Product",
     "product_group": "Product group",
     "product_family": "Product family",
+    "commodity_equivalent": "Commodity",
     "destination_region": "Destination region",
     "destination_country": "Destination country",
-    "commodity_equivalent": "Commodity",
 }
 commodities = {"crude_oil": "Crude", "oil_products": "Oil products", "lng": "LNG", "coal": "Coal"}
 chart_types = {"area": "Area", "line": "Line", "bar": "Bar"}
