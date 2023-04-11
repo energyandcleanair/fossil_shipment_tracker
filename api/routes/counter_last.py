@@ -208,7 +208,6 @@ class RussiaCounterLastResource(Resource):
         query = self.aggregate(query=query, aggregate_by=aggregate_by)
 
         counter = pd.read_sql(query.statement, session.bind)
-        counter['date'] = pd.to_datetime(counter['date'])
         counter_last = self.get_last(counter=counter)
         # Add total
         group_by_total = ["pricing_scenario", "pricing_scenario_name"]
@@ -278,6 +277,7 @@ class RussiaCounterLastResource(Resource):
         ).rename("date")
 
         def resample_and_fill(x):
+            x["date"] = pd.to_datetime(x.date)
             x = x.set_index("date").resample("D").sum().fillna(0)
             # cut 2 last days and take the 7-day mean
             # but only on last ten days to avoid old shipments (like US)
