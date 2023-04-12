@@ -123,8 +123,8 @@ def update_chart(
 ):
     if facet == FACET_NONE:
         facet = None
-    if n is None:
-        raise PreventUpdate
+    # if n is None:
+    #     raise PreventUpdate
 
     if chart_type == "bar":
         rolling_days = 1
@@ -174,7 +174,7 @@ def update_chart(
             y=value,
             color=colour_by,
             custom_data=[colour_by],
-            title=f"<span class='title'>Daily flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str} per day</span>",
+            title=f"<span class='title'><b>Daily flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per day</span>",
             color_discrete_map=palette,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
@@ -189,7 +189,7 @@ def update_chart(
             y=value,
             color=colour_by,
             custom_data=[colour_by],
-            title=f"<span class='title'>Daily flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str} per day</span>",
+            title=f"<span class='title'><b>Daily flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per day</span>",
             color_discrete_map=palette,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
@@ -207,7 +207,7 @@ def update_chart(
             y=value,
             color=colour_by,
             custom_data=[colour_by],
-            title=f"<span class='title'>Monthly flows of Russian fossil fuels</span><br><span class='subtitle'>{unit_str} per month</span>",
+            title=f"<span class='title'><b>Monthly flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per month</span>",
             color_discrete_map=palette,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
@@ -218,6 +218,7 @@ def update_chart(
 
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
     fig.for_each_xaxis(lambda x: x.update(title=None))
+    fig.for_each_yaxis(lambda x: x.update(title=None))
     fig.update_xaxes(autorange=True)
 
     fig.update_traces(
@@ -231,5 +232,7 @@ def update_chart(
         legend={"traceorder": "reversed"},
         xaxis_title=None,
         yaxis_title=None,
+        margin=dict(l=0, r=20),
+        title=dict(xref="paper", xanchor="left", x=0),
     )
     return fig

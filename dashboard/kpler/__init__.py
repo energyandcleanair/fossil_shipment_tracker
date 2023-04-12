@@ -5,7 +5,7 @@ COMMODITY_ALL = "All"
 # Default values
 DEFAULT_ORIGIN_COUNTRY = "RU"
 DEFAULT_DESTINATION_COUNTRY = COUNTRY_GLOBAL
-DEFAULT_COLOUR_BY = "destination_name"
+DEFAULT_COLOUR_BY = "destination_region"
 DEFAULT_ROLLING_DAYS = 30
 DEFAULT_COMMODITIES = ["crude_oil", "oil_products"]
 DEFAULT_CHART_TYPE = "area"

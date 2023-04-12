@@ -28,3 +28,8 @@ aaa {
     background: none;
     color: var(--primary);
 }
+
+.gtitle {
+    color: #35416C;
+    fill: #35416C !important;
+}
