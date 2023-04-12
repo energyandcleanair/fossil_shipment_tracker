@@ -44,6 +44,14 @@ class AlertTestResource(Resource):
     )
 
     parser.add_argument(
+        "departure_port_id",
+        help="Departure port id(s)",
+        action="split",
+        required=False,
+        default=None,
+    )
+
+    parser.add_argument(
         "min_dwt",
         help="Minimal tonnage of ship",
         type=float,
