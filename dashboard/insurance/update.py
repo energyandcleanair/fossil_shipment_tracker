@@ -8,14 +8,14 @@ from server import app, cache
 from utils import palette
 
 from . import COUNTRY_GLOBAL
-from . import FACET_NONE
+from . import FACET_NONE, DATE_FROM
 from . import units
 from . import laundromat_iso2s, pcc_iso2s, eu27_iso2s
-from .utils import roll_average_kpler
-from .data import get_kpler_full, get_kpler1
+from .utils import roll_average_insurance
+from .data import get_insurance_full
 
 
-@app.callback(Output("kpler-rolling-days", "disabled"), Input("kpler-chart-type", "value"))
+@app.callback(Output("insurance-rolling-days", "disabled"), Input("insurance-chart-type", "value"))
 def update_options(chart_type):
     if not chart_type:
         raise PreventUpdate
@@ -23,9 +23,9 @@ def update_options(chart_type):
 
 
 @app.callback(
-    output=Output("kpler-origin-country", "value", allow_duplicate=True),
+    output=Output("insurance-origin-country", "value", allow_duplicate=True),
     inputs=[
-        Input("kpler-origin-country-select-laundromat", "n_clicks"),
+        Input("insurance-origin-country-select-laundromat", "n_clicks"),
     ],
     allow_duplicate=True,
     suppress_callback_exceptions=True,
@@ -36,9 +36,9 @@ def select_origin_laundromat(n_clicks):
 
 
 @app.callback(
-    output=Output("kpler-origin-country", "value", allow_duplicate=True),
+    output=Output("insurance-origin-country", "value", allow_duplicate=True),
     inputs=[
-        Input("kpler-origin-country-select-russia", "n_clicks"),
+        Input("insurance-origin-country-select-russia", "n_clicks"),
     ],
     allow_duplicate=True,
     suppress_callback_exceptions=True,
@@ -49,9 +49,9 @@ def select_origin_laundromat(n_clicks):
 
 
 @app.callback(
-    output=Output("kpler-destination-country", "value", allow_duplicate=True),
+    output=Output("insurance-destination-country", "value", allow_duplicate=True),
     inputs=[
-        Input("kpler-destination-country-select-laundromat", "n_clicks"),
+        Input("insurance-destination-country-select-laundromat", "n_clicks"),
     ],
     allow_duplicate=True,
     suppress_callback_exceptions=True,
@@ -63,12 +63,12 @@ def select_origin_laundromat(n_clicks):
 
 @app.callback(
     output=Output(
-        "kpler-destination-country",
+        "insurance-destination-country",
         "value",
         allow_duplicate=True,
     ),
     inputs=[
-        Input("kpler-destination-country-select-pcc", "n_clicks"),
+        Input("insurance-destination-country-select-pcc", "n_clicks"),
     ],
     suppress_callback_exceptions=True,
     prevent_initial_call=True,
@@ -78,9 +78,9 @@ def select_origin_pcc(n_clicks):
 
 
 @app.callback(
-    output=Output("kpler-destination-country", "value", allow_duplicate=True),
+    output=Output("insurance-destination-country", "value", allow_duplicate=True),
     inputs=[
-        Input("kpler-destination-country-select-eu27", "n_clicks"),
+        Input("insurance-destination-country-select-eu27", "n_clicks"),
     ],
     allow_duplicate=True,
     suppress_callback_exceptions=True,
@@ -91,28 +91,24 @@ def select_destination_eu27(n_clicks):
 
 
 @app.callback(
-    output=Output("kpler-area-chart", "figure"),
+    output=Output("insurance-area-chart", "figure"),
     inputs=[
-        State("kpler-origin-country", "value"),
-        State("kpler-origin-type", "value"),
-        State("kpler-destination-country", "value"),
-        State("kpler-destination-type", "value"),
-        State("kpler-commodity", "value"),
-        Input("kpler-refresh", "n_clicks"),
+        State("insurance-origin-country", "value"),
+        State("insurance-destination-country", "value"),
+        State("insurance-commodity", "value"),
+        Input("insurance-refresh", "n_clicks"),
         Input("colour-by", "value"),
         Input("facet", "value"),
-        Input("kpler-rolling-days", "value"),
+        Input("insurance-rolling-days", "value"),
         # Chart specific
         Input("unit", "value"),
-        Input("kpler-chart-type", "value"),
+        Input("insurance-chart-type", "value"),
     ],
     suppress_callback_exceptions=True,
 )
 def update_chart(
     origin_iso2,
-    origin_type,
     destination_iso2,
-    destination_type,
     commodity,
     n,
     colour_by,
@@ -129,11 +125,9 @@ def update_chart(
     if chart_type == "bar":
         rolling_days = 1
 
-    df = get_kpler_full(
+    df = get_insurance_full(
         origin_iso2,
-        origin_type,
         destination_iso2,
-        destination_type,
         commodity,
         colour_by,
         facet,
@@ -167,7 +161,27 @@ def update_chart(
 
     df = df.sort_values(sort_by)
     fig = None
-    if chart_type == "area":
+
+    if chart_type == "area_share":
+        group_by = [x for x in ["date", facet] if x is not None]
+        # Remove commodities without data
+        df = df[df[value] > 0]
+
+        df["share"] = df.groupby(group_by)[value].apply(lambda x: x / x.sum())
+        fig = px.area(
+            df,
+            x="date",
+            y="share",
+            color=colour_by,
+            custom_data=[colour_by],
+            title=f"<span class='title'><b>Daily flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per day</span>",
+            color_discrete_map=palette,
+            facet_col=facet,
+            facet_col_wrap=facet_col_wrap,
+        )
+        fig.for_each_yaxis(lambda x: x.update(tickformat=".0%"))
+
+    elif chart_type == "area":
         fig = px.area(
             df,
             x="date",
@@ -217,9 +231,8 @@ def update_chart(
         return None
 
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-    fig.for_each_xaxis(lambda x: x.update(title=None))
+    # fig.for_each_xaxis(lambda x: x.update(title=None, range=[DATE_FROM, None]))
     fig.for_each_yaxis(lambda x: x.update(title=None))
-    fig.update_xaxes(autorange=True)
 
     fig.update_traces(
         hovertemplate=hovertemplate,

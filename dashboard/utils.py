@@ -21,6 +21,8 @@ palette = {
     "Crude oil": "#741b47",
     "Oil": "#741b47",
     "Oil products and chemicals": "#741b4760",
+    "Owned and / or insured in EU & G7": "#8cc9D0",
+    "Insured in Norway": "#35416C",
 }
 
 

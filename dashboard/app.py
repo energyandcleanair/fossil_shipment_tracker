@@ -21,6 +21,9 @@ import kpler
 from kpler import layout as kpler_layout, chart_settings as kpler_chart_settings
 from kpler import store as kpler_store
 
+import insurance
+from insurance import layout as insurance_layout, chart_settings as insurance_chart_settings
+from insurance import store as insurance_store
 
 SIDEBAR_STYLE = {
     "position": "fixed",
@@ -57,8 +60,8 @@ sidebar = html.Div(
         dbc.Nav(
             [
                 # dbc.NavLink("Counter", href="/", active="exact"),
-                # dbc.NavLink("Shipments", href="/shipments", active="exact"),
                 dbc.NavLink("Kpler", href="/kpler", active="exact"),
+                dbc.NavLink("Insurance", href="/insurance", active="exact"),
             ],
             vertical=True,
             pills=True,
@@ -69,13 +72,14 @@ sidebar = html.Div(
 )
 
 content = html.Div(id="page-content", style=CONTENT_STYLE)
-shared = [
-    dcc.Interval(id="interval-component", interval=1000, n_intervals=1),  # in milliseconds
-    dcc.Store(id="counter"),
-    dcc.Store(id="counter-rolled"),
-    dcc.Store(id="voyages"),
-    html.Div(id="dummy_div"),
-] + kpler_store
+shared = (
+    [
+        dcc.Interval(id="interval-component", interval=1000, n_intervals=1),  # in milliseconds
+        html.Div(id="dummy_div"),
+    ]
+    + kpler_store
+    + insurance_store
+)
 
 app.layout = dbc.Container(
     [dcc.Location(id="url"), sidebar, content, *shared],
@@ -95,6 +99,8 @@ def render_page_content(pathname):
     #     return voyages_layout
     if pathname == "/" or pathname == "/kpler":
         return kpler_layout
+    elif pathname == "/insurance":
+        return insurance_layout
     # If the user tries to reach a different page, return a 404 message
     return html.Div(
         [
@@ -114,4 +120,6 @@ def render_chart_setting(pathname):
     #     return voyages_chart_settings
     if pathname == "/" or pathname == "/kpler":
         return kpler_chart_settings
+    elif pathname == "/insurance":
+        return insurance_chart_settings
     return None
