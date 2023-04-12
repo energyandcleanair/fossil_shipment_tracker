@@ -203,6 +203,7 @@ class KplerFlowResource(TemplateResource):
 
         FromCountry = aliased(Country)
         ToCountry = aliased(Country)
+        CommodityEquivalent = aliased(Commodity)
 
         value_tonne_field = case([(KplerFlow.unit == "t", KplerFlow.value)], else_=sa.null()).label(
             "value_tonne"
@@ -220,7 +221,7 @@ class KplerFlowResource(TemplateResource):
             ),
         ).label("commodity")
 
-        commodity_equivalent_field = case(
+        commodity_equivalent_id_field = case(
             [
                 (
                     sa.and_(KplerProduct.family.in_(["Dirty"]), KplerFlow.product != "Condensate"),
@@ -264,7 +265,8 @@ class KplerFlowResource(TemplateResource):
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
                 Commodity.name.label("commodity"),
-                commodity_equivalent_field,  # For filtering
+                commodity_equivalent_id_field,  # For filtering
+                CommodityEquivalent.name.label("commodity_equivalent_name"),
             )
             .outerjoin(
                 FromCountry,
@@ -287,6 +289,7 @@ class KplerFlowResource(TemplateResource):
                 ),
             )
             .outerjoin(Commodity, commodity_id_field == Commodity.id)
+            .outerjoin(CommodityEquivalent, commodity_equivalent_id_field == CommodityEquivalent.id)
             .outerjoin(
                 Price,
                 sa.and_(
