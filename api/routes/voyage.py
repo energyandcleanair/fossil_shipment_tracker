@@ -852,6 +852,16 @@ class VoyageResource(Resource):
         # for now we will clauclate this in the main query so we can apply weights - we can clean this up all into one
         # value_currency_field = (value_eur_field * Currency.per_eur).label('value_currency')
 
+        destination_iso2_field = case(
+            [
+                (
+                    shipments_combined.c.shipment_status == base.COMPLETED,
+                    ArrivalPort.iso2,
+                )
+            ],
+            else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2),
+        ).label("destination_iso2")
+
         # generate commodity destination field now, after combining shipment tables
         commodity_destination_iso2_field = case(
             # Lauri: My heuristic is that all tankers that discharge cargo
@@ -880,6 +890,16 @@ class VoyageResource(Resource):
                 # Removal of dardaneles discharges + bosphorus strait
                 (ArrivalPort.name.ilike("DARDANELES WAIT AREA"), sa.null()),
                 (ArrivalPort.name.ilike("BOSPHORUS N ANCH"), sa.null()),
+                (
+                    sa.and_(
+                        Departure.date_utc >= "2022-12-05",
+                        commodity_field == base.CRUDE_OIL,
+                        shipments_combined.c.shipment_status != "completed",
+                        Destination.iso2.in_(base.EU27_ISO2S),
+                        Destination.iso2 != "BG",
+                    ),
+                    sa.null(),
+                ),
                 # For completed shipments, we don't use declared destination
                 # but only actual one
                 (
@@ -889,16 +909,6 @@ class VoyageResource(Resource):
             ],
             else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2),
         ).label("commodity_destination_iso2")
-
-        destination_iso2_field = case(
-            [
-                (
-                    shipments_combined.c.shipment_status == base.COMPLETED,
-                    ArrivalPort.iso2,
-                )
-            ],
-            else_=func.coalesce(ArrivalPort.iso2, Destination.iso2, DestinationPort.iso2),
-        ).label("destination_iso2")
 
         commodity_subquery = get_commodity_subquery(
             session=session, grouping_name=commodity_grouping
