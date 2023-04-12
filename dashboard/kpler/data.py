@@ -34,7 +34,7 @@ def get_kpler0(origin_iso2, origin_type, destination_iso2, destination_type, com
         "product",
         "product_group",
         "product_family",
-        "commodity_equivalent",
+        "commodity_equivalent_name",
         "value_tonne",
         "value_eur",
         "value_usd",

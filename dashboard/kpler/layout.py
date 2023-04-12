@@ -13,6 +13,7 @@ from . import (
     DEFAULT_DESTINATION_COUNTRY,
     DEFAULT_COMMODITIES,
     DEFAULT_CHART_TYPE,
+    DEFAULT_FACET,
 )
 from . import units
 from . import countries
@@ -197,7 +198,7 @@ layout = html.Div(
                         dbc.Select(
                             id="facet",
                             options=facet_bys,
-                            value=FACET_NONE,
+                            value=DEFAULT_FACET,
                             size="sm",
                         ),
                     ]

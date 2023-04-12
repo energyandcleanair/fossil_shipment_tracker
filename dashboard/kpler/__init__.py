@@ -7,8 +7,9 @@ DEFAULT_ORIGIN_COUNTRY = "RU"
 DEFAULT_DESTINATION_COUNTRY = COUNTRY_GLOBAL
 DEFAULT_COLOUR_BY = "destination_region"
 DEFAULT_ROLLING_DAYS = 30
-DEFAULT_COMMODITIES = ["crude_oil", "oil_products"]
+DEFAULT_COMMODITIES = ["crude_oil", "oil_products", "coal", "lng"]
 DEFAULT_CHART_TYPE = "area"
+DEFAULT_FACET = "commodity_equivalent_name"
 
 units = {
     "thousand_tonne": {
@@ -37,7 +38,7 @@ colour_bys = {
     "product": "Product",
     "product_group": "Product group",
     "product_family": "Product family",
-    "commodity_equivalent": "Commodity",
+    "commodity_equivalent_name": "Commodity",
     "origin_name": "Origin",
     "destination_name": "Destination",
     "destination_region": "Destination region",
@@ -52,7 +53,7 @@ facet_bys = {
     "product": "Product",
     "product_group": "Product group",
     "product_family": "Product family",
-    "commodity_equivalent": "Commodity",
+    "commodity_equivalent_name": "Commodity",
     "destination_region": "Destination region",
     "destination_country": "Destination country",
 }

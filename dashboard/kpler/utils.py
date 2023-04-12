@@ -31,7 +31,7 @@ def roll_average_kpler(kpler, rolling_days):
                     "product_family",
                     "pricing_scenario",
                     "commodity",
-                    "commodity_equivalent",
+                    "commodity_equivalent_name",
                 ],
                 data.columns,
             ),
