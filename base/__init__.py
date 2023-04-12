@@ -103,3 +103,34 @@ REFRESH_COMPANY_DAYS = 3
 # NULL FOR POSTGRES CONSTRAINTS TO WORK
 PRICE_NULLARRAY_CHAR = sa.sql.expression.literal_column("array[NULL::varchar]")
 PRICE_NULLARRAY_INT = sa.sql.expression.literal_column("array[NULL::bigint]")
+
+
+EU27_ISO2S = [
+    "AT",
+    "BE",
+    "BG",
+    "CY",
+    "CZ",
+    "DE",
+    "DK",
+    "EE",
+    "ES",
+    "FI",
+    "FR",
+    "GR",
+    "HR",
+    "HU",
+    "IE",
+    "IT",
+    "LT",
+    "LU",
+    "LV",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SE",
+    "SI",
+    "SK",
+]
