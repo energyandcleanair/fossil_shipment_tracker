@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 source ../.env
 source .env
-docker buildx build -f Dockerfile -t dashboard . --platform linux/amd64
+docker buildx build -f Dockerfile -t dashboard . --platform linux/amd64 --no-cache
 docker tag dashboard eu.gcr.io/$PROJECT_ID/dashboard:latest
 docker push eu.gcr.io/$PROJECT_ID/dashboard:latest
 
