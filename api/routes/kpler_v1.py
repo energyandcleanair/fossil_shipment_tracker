@@ -2,7 +2,7 @@ from sqlalchemy import func
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 from sqlalchemy import case
-from sqlalchemy.dialects.postgresql import array
+
 
 import base
 from .security import key_required
@@ -203,6 +203,7 @@ class KplerFlowResource(TemplateResource):
 
         FromCountry = aliased(Country)
         ToCountry = aliased(Country)
+        CommodityEquivalent = aliased(Commodity)
 
         value_tonne_field = case([(KplerFlow.unit == "t", KplerFlow.value)], else_=sa.null()).label(
             "value_tonne"
@@ -220,7 +221,7 @@ class KplerFlowResource(TemplateResource):
             ),
         ).label("commodity")
 
-        commodity_equivalent_field = case(
+        commodity_equivalent_id_field = case(
             [
                 (
                     sa.and_(KplerProduct.family.in_(["Dirty"]), KplerFlow.product != "Condensate"),
@@ -264,7 +265,8 @@ class KplerFlowResource(TemplateResource):
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
                 Commodity.name.label("commodity"),
-                commodity_equivalent_field,  # For filtering
+                commodity_equivalent_id_field,  # For filtering
+                CommodityEquivalent.name.label("commodity_equivalent_name"),
             )
             .outerjoin(
                 FromCountry,
@@ -287,22 +289,22 @@ class KplerFlowResource(TemplateResource):
                 ),
             )
             .join(Commodity, commodity_id_field == Commodity.id)
+            .join(CommodityEquivalent, commodity_equivalent_id_field == CommodityEquivalent.id)
             .join(
                 Price,
                 sa.and_(
                     Price.date == KplerFlow.date,
                     sa.or_(
-                        # KplerFlow.to_iso2 == sa.any_(Price.destination_iso2s),
-                        Price.destination_iso2s.contains(array([KplerFlow.to_iso2])),
+                        KplerFlow.to_iso2 == sa.any_(Price.destination_iso2s),
                         Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
                     ),
                     Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     Price.commodity == Commodity.pricing_commodity,
                 ),
             )
-            .join(Currency, Currency.date == KplerFlow.date)
+            .outerjoin(Currency, Currency.date == KplerFlow.date)
             .order_by(
                 KplerFlow.id,
                 Price.scenario,
@@ -352,10 +354,10 @@ class KplerFlowResource(TemplateResource):
             query = query.filter(KplerFlow.platform.in_(to_list(platform)))
 
         if date_from:
-            query = query.filter(KplerFlow.date >= str(to_datetime(date_from)))
+            query = query.filter(KplerFlow.date >= to_datetime(date_from))
 
         if date_to:
-            query = query.filter(KplerFlow.date <= str(to_datetime(date_to)))
+            query = query.filter(KplerFlow.date <= to_datetime(date_to))
 
         if pricing_scenario:
             query = query.filter(Price.scenario.in_(to_list(pricing_scenario)))
