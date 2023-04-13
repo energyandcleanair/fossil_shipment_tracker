@@ -5,7 +5,7 @@ import plotly.express as px
 from dash import DiskcacheManager, CeleryManager, Input, Output, html, State, dcc
 from dash.exceptions import PreventUpdate
 from server import app, cache
-from utils import palette
+from utils import palette, opaque_background
 
 from . import COUNTRY_GLOBAL
 from . import FACET_NONE
@@ -167,7 +167,28 @@ def update_chart(
 
     df = df.sort_values(sort_by)
     fig = None
-    if chart_type == "area":
+    if chart_type == "area_share":
+        group_by = [x for x in ["date", facet] if x is not None]
+        # Remove commodities without data
+        df = df[df[value] > 0]
+
+        df["share"] = df.groupby(group_by)[value].apply(lambda x: x / x.sum())
+        fig = px.area(
+            df,
+            x="date",
+            y="share",
+            color=colour_by,
+            custom_data=[colour_by],
+            title=f"<span class='title'><b>Daily flows of Russian fossil fuels</b></span><br><span class='subtitle'>Percentage of {unit_str}</span>",
+            color_discrete_map=palette,
+            facet_col=facet,
+            facet_col_wrap=facet_col_wrap,
+            # make it opaque
+        )
+        fig.for_each_yaxis(lambda x: x.update(tickformat=".0%"))
+        fig = opaque_background(fig)
+
+    elif chart_type == "area":
         fig = px.area(
             df,
             x="date",
@@ -179,8 +200,7 @@ def update_chart(
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
         )
-        for i in range(len(fig["data"])):
-            fig["data"][i]["line"]["width"] = 0
+        fig = opaque_background(fig)
 
     elif chart_type == "line":
         fig = px.line(

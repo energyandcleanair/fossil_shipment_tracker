@@ -5,6 +5,33 @@ h1, h2, h3, h4, h5, h6 {
     color: #35416;
 }
 
+:root{
+    --bs-link-color: #35416C;
+}
+
+.Select--multi .Select-value {
+    color: #35416C;
+}
+
+.nav-pills .nav-link.active, .nav-pills .show>.nav-link {
+    color: #fff;
+    background-color: #8cc9D0;
+}
+
+
+
+.dashboard-title {
+    color: #35416C;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+.dashboard-subtitle {
+    color: #35416C;
+    font-size: 1.2rem;
+    font-weight: 300;
+}
+
+
 aaa {
     --contrast: #222222;
     --contrast-2: #575760;

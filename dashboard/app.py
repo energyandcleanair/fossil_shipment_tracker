@@ -55,7 +55,8 @@ LAYOUT_STYLE = {
 
 sidebar = html.Div(
     [
-        html.H3("Russia Fossil Tracker"),
+        html.Div("Russia Fossil Tracker", className="dashboard-title"),
+        html.Div("Dashboard", className="dashboard-subtitle"),
         html.Hr(),
         dbc.Nav(
             [

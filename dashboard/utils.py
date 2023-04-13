@@ -35,3 +35,11 @@ def to_list(d, convert_tuple=False):
         return [d]
     else:
         return d
+
+
+def opaque_background(fig):
+    for i in range(len(fig["data"])):
+        fig["data"][i]["line"]["width"] = 1
+        fig["data"][i]["fillcolor"] = fig["data"][i]["line"].color
+
+    return fig

@@ -58,7 +58,7 @@ facet_bys = {
     "destination_country": "Destination country",
 }
 commodities = {"crude_oil": "Crude", "oil_products": "Oil products", "lng": "LNG", "coal": "Coal"}
-chart_types = {"area": "Area", "line": "Line", "bar": "Bar"}
+chart_types = {"area": "Area", "area_share": "Area (%)", "line": "Line", "bar": "Bar"}
 
 refreshing = False
 

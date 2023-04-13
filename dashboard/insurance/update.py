@@ -5,7 +5,7 @@ import plotly.express as px
 from dash import DiskcacheManager, CeleryManager, Input, Output, html, State, dcc
 from dash.exceptions import PreventUpdate
 from server import app, cache
-from utils import palette
+from utils import palette, opaque_background
 
 from . import COUNTRY_GLOBAL
 from . import FACET_NONE, DATE_FROM
@@ -178,8 +178,10 @@ def update_chart(
             color_discrete_map=palette,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
+            # make it opaque
         )
         fig.for_each_yaxis(lambda x: x.update(tickformat=".0%"))
+        fig = opaque_background(fig)
 
     elif chart_type == "area":
         fig = px.area(
@@ -193,8 +195,7 @@ def update_chart(
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
         )
-        for i in range(len(fig["data"])):
-            fig["data"][i]["line"]["width"] = 0
+        fig = opaque_background(fig)
 
     elif chart_type == "line":
         fig = px.line(
