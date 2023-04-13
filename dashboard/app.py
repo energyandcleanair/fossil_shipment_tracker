@@ -97,7 +97,9 @@ def render_page_content(pathname):
     #     return counter_layout
     # elif pathname == "/shipments":
     #     return voyages_layout
-    if pathname == "/" or pathname == "/kpler":
+    if pathname == "/":
+        return dcc.Location(pathname="/kpler", id="someid_doesnt_matter")
+    elif pathname == "/kpler":
         return kpler_layout
     elif pathname == "/insurance":
         return insurance_layout
