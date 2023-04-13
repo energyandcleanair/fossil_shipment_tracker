@@ -91,6 +91,13 @@ class ChartDepartureDestination(Resource):
         default=30,
     )
     parser.add_argument(
+        "pivot_by",
+        type=str,
+        help="pivot column. Default: region.",
+        required=False,
+        default="region",
+    )
+    parser.add_argument(
         "pivot_value",
         action="split",
         help="pivoted value(s). Default: value_tonne.",
@@ -129,6 +136,7 @@ class ChartDepartureDestination(Resource):
         nest_in_data = params_chart.get("nest_in_data")
         country_grouping = params_chart.get("country_grouping")
         date_to = params_chart.get("date_to")
+        pivot_by = params_chart.get("pivot_by")
         pivot_value = params_chart.get("pivot_value")
         departure_date_from = params_chart.get("departure_date_from")
         language = params_chart.get("language")
@@ -237,11 +245,14 @@ class ChartDepartureDestination(Resource):
 
             return data
 
-        def pivot_data(data, pivot_value):
+        def pivot_data(data, pivot_by, pivot_value):
             pivot_values = to_list(pivot_value)
             if len(pivot_values) > 1:
                 return pd.concat(
-                    [pivot_data(data=data.copy(), pivot_value=x) for x in pivot_values]
+                    [
+                        pivot_data(data=data.copy(), pivot_by=pivot_by, pivot_value=x)
+                        for x in pivot_values
+                    ]
                 )
             else:
                 pivot_value = pivot_values[0]
@@ -256,7 +267,7 @@ class ChartDepartureDestination(Resource):
                 .reset_index()
                 .pivot_table(
                     index=["commodity_group", "departure_date", "variable"],
-                    columns=["region"],
+                    columns=[pivot_by],
                     values=pivot_value,
                     sort=False,
                     fill_value=0,
@@ -361,13 +372,14 @@ class ChartDepartureDestination(Resource):
 
         data = group_countries(data, country_grouping)
         data = group_commodities(data)
-        data = pivot_data(data, pivot_value=pivot_value)
+        if pivot_by is not None and pivot_by != "":
+            data = pivot_data(data, pivot_by=pivot_by, pivot_value=pivot_value)
         data = self.postcompute(data, params=params)
 
         # Drop pricing scenario until we find issue of why it is not present sometimes
         # TODO remove once fixed
-        if 'pricing_scenario' in data.columns:
-            data.drop('pricing_scenario', axis=1, inplace=True)
+        if "pricing_scenario" in data.columns:
+            data.drop("pricing_scenario", axis=1, inplace=True)
 
         data = translate(data=data, language=language)
 
