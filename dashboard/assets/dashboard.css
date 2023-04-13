@@ -18,19 +18,28 @@ h1, h2, h3, h4, h5, h6 {
     background-color: #8cc9D0;
 }
 
+.nav-pills-div {
+     padding: 1rem 15px;
+      margin-bottom: 1rem;
+}
 
 
 .dashboard-title {
     color: #35416C;
     font-size: 1.5rem;
     font-weight: 600;
+    padding: 0rem 15px;
 }
 .dashboard-subtitle {
     color: #35416C;
     font-size: 1.2rem;
     font-weight: 300;
+    padding: 0rem 15px;
 }
 
+.dash-default-spinner > div {
+    background-color: #35416C !important;
+}
 
 aaa {
     --contrast: #222222;

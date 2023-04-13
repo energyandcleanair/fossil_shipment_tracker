@@ -24,119 +24,115 @@ from .utils import get_from_countries, get_to_countries, to_options
 
 chart_settings = html.Div(
     [
-        dbc.Col(
+        dbc.Label("From:", size="sm"),
+        dcc.Dropdown(
+            id="insurance-origin-country",
+            options=get_from_countries(),
+            multi=True,
+            value="RU",
+            style={"min-width": "150px"},
+        ),
+        html.Div(
             [
-                dbc.Label("From:", size="sm"),
-                dcc.Dropdown(
-                    id="insurance-origin-country",
-                    options=get_from_countries(),
-                    multi=True,
-                    value="RU",
-                    style={"min-width": "150px"},
+                dbc.Button(
+                    "Russia",
+                    id="insurance-origin-country-select-russia",
+                    color="primary",
+                    className="btn-preset",
                 ),
-                html.Div(
-                    [
-                        dbc.Button(
-                            "Russia",
-                            id="insurance-origin-country-select-russia",
-                            color="primary",
-                            className="btn-preset",
-                        ),
-                        dbc.Button(
-                            "Laudromat",
-                            id="insurance-origin-country-select-laundromat",
-                            color="primary",
-                            className="btn-preset",
-                        ),
-                    ],
-                    className="btn-preset-group",
+                dbc.Button(
+                    "Laudromat",
+                    id="insurance-origin-country-select-laundromat",
+                    color="primary",
+                    className="btn-preset",
                 ),
-                dbc.Label("To:", size="sm"),
-                dcc.Dropdown(
-                    id="insurance-destination-country",
-                    options=get_to_countries(),
-                    multi=True,
-                    value=DEFAULT_DESTINATION_COUNTRY,
-                    style={"min-width": "150px"},
-                    maxHeight=150,
+            ],
+            className="btn-preset-group",
+        ),
+        dbc.Label("To:", size="sm"),
+        dcc.Dropdown(
+            id="insurance-destination-country",
+            options=get_to_countries(),
+            multi=True,
+            value=DEFAULT_DESTINATION_COUNTRY,
+            style={"min-width": "150px"},
+            maxHeight=150,
+        ),
+        html.Div(
+            [
+                dbc.Button(
+                    "Laudromat",
+                    id="insurance-destination-country-select-laundromat",
+                    color="primary",
+                    className="btn-preset",
                 ),
-                html.Div(
-                    [
-                        dbc.Button(
-                            "Laudromat",
-                            id="insurance-destination-country-select-laundromat",
-                            color="primary",
-                            className="btn-preset",
-                        ),
-                        dbc.Button(
-                            "PCC",
-                            id="insurance-destination-country-select-pcc",
-                            color="primary",
-                            className="btn-preset",
-                        ),
-                        dbc.Button(
-                            "EU-27",
-                            id="insurance-destination-country-select-eu27",
-                            color="primary",
-                            className="btn-preset",
-                        ),
-                    ],
-                    className="btn-preset-group",
+                dbc.Button(
+                    "PCC",
+                    id="insurance-destination-country-select-pcc",
+                    color="primary",
+                    className="btn-preset",
                 ),
-                # dbc.Label("Origin by:", size="sm"),
-                # dcc.Dropdown(
-                #     id="insurance-origin-type",
-                #     options=from_type,
-                #     multi=False,
-                #     value="country",
-                #     style={"min-width": "150px"},
-                # ),
-                # dbc.Label("Destination by:", size="sm"),
-                # dcc.Dropdown(
-                #     id="insurance-destination-type",
-                #     options=to_type,
-                #     multi=False,
-                #     value="country",
-                #     style={"min-width": "150px"},
-                # ),
-                dbc.Label("Commodities:", size="sm"),
-                dcc.Dropdown(
-                    id="insurance-commodity",
-                    options=commodities,
-                    multi=True,
-                    value=DEFAULT_COMMODITIES,
-                    style={"min-width": "150px"},
+                dbc.Button(
+                    "EU-27",
+                    id="insurance-destination-country-select-eu27",
+                    color="primary",
+                    className="btn-preset",
                 ),
-                html.Div(
-                    [
-                        dbc.Button(
-                            " Refresh data",
-                            id="insurance-refresh",
-                            color="primary",
-                        )
-                    ],
-                    className="d-grid gap-2 mt-2",
+            ],
+            className="btn-preset-group",
+        ),
+        # dbc.Label("Origin by:", size="sm"),
+        # dcc.Dropdown(
+        #     id="insurance-origin-type",
+        #     options=from_type,
+        #     multi=False,
+        #     value="country",
+        #     style={"min-width": "150px"},
+        # ),
+        # dbc.Label("Destination by:", size="sm"),
+        # dcc.Dropdown(
+        #     id="insurance-destination-type",
+        #     options=to_type,
+        #     multi=False,
+        #     value="country",
+        #     style={"min-width": "150px"},
+        # ),
+        dbc.Label("Commodities:", size="sm"),
+        dcc.Dropdown(
+            id="insurance-commodity",
+            options=commodities,
+            multi=True,
+            value=DEFAULT_COMMODITIES,
+            style={"min-width": "150px"},
+        ),
+        html.Div(
+            [
+                dbc.Button(
+                    " Refresh data",
+                    id="insurance-refresh",
+                    color="primary",
+                )
+            ],
+            className="d-grid gap-2 mt-2",
+        ),
+        # dbc.InputGroupText("Rolling days:"),
+        html.Div(
+            [
+                dbc.Button(
+                    "Download raw data",
+                    id="btn-download-insurance0",
+                    color="secondary",
                 ),
-                # dbc.InputGroupText("Rolling days:"),
-                html.Div(
-                    [
-                        dbc.Button(
-                            "Download raw data",
-                            id="btn-download-insurance0",
-                            color="secondary",
-                        ),
-                        dbc.Button(
-                            "Download processed data",
-                            id="btn-download-insurance1",
-                            color="secondary",
-                        ),
-                    ],
-                    className="d-grid gap-2 mt-2",
+                dbc.Button(
+                    "Download processed data",
+                    id="btn-download-insurance1",
+                    color="secondary",
                 ),
-                dcc.Download(id="download-insurance0"),
-                dcc.Download(id="download-insurance1"),
-            ]
-        )
+            ],
+            className="d-grid gap-2 mt-2",
+        ),
+        dcc.Download(id="download-insurance0"),
+        dcc.Download(id="download-insurance1"),
     ]
 )
 
@@ -209,7 +205,12 @@ layout = html.Div(
         dbc.Row(
             [
                 dbc.Col(
-                    dcc.Graph(id="insurance-area-chart", className="flex-grow-1"),
+                    dcc.Loading(
+                        id="loading-kpler",
+                        type="default",
+                        parent_className="loading d-flex flex-grow-1",
+                        children=[dcc.Graph(id="insurance-area-chart", className="flex-grow-1")],
+                    ),
                     className="d-flex",
                 ),
             ],
