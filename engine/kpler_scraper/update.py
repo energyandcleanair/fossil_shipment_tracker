@@ -197,6 +197,14 @@ def update_flows(
                                     .value.sum()
                                     .reset_index()
                                 )
+                                if total is None:
+                                    raise ValueError(
+                                        "No total flows found for %s |%s | %s",
+                                        platform,
+                                        origin_iso2,
+                                        from_zone,
+                                    )
+
                                 unknown = total.merge(
                                     known_zones_total,
                                     on=["product", "date"],
