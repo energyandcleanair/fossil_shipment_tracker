@@ -122,6 +122,8 @@ def update_flows(
     add_unknown_only=False,
 ):
     scraper = KplerScraper()
+    date_from = to_datetime(date_from) if date_from is not None else to_datetime("2013-01-01")
+    date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
 
     _platforms = scraper.platforms if platforms is None else platforms
     for platform in _platforms:
@@ -226,6 +228,8 @@ def update_flows_reverse(
     add_unknown_only=False,
 ):
     scraper = KplerScraper()
+    date_from = to_datetime(date_from) if date_from is not None else to_datetime("2013-01-01")
+    date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
 
     _platforms = scraper.platforms if platforms is None else platforms
     for platform in _platforms:
