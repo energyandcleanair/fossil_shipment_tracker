@@ -153,10 +153,15 @@ def update_chart(
         facet_col_wrap = 1
 
     if colour_by is not None:
-        df[colour_by] = pd.Categorical(
-            df[colour_by],
-            categories=df.groupby(colour_by)[value].sum().sort_values(ascending=False).index,
-        )
+
+        existing_categories = df[colour_by].unique()
+        specific_order = ["G7", "Norway", "Other", "Unknown"]
+        if all([any(x in y for x in specific_order) for y in existing_categories]):
+            categories = [next(x for x in existing_categories if y in x) for y in specific_order]
+        else:
+            categories = df.groupby(colour_by)[value].sum().sort_values(ascending=False).index
+        df[colour_by] = pd.Categorical(df[colour_by], categories=categories)
+
         sort_by.append(colour_by)
 
     df = df.sort_values(sort_by)

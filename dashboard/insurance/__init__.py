@@ -9,7 +9,7 @@ DEFAULT_DESTINATION_COUNTRY = COUNTRY_GLOBAL
 DEFAULT_COLOUR_BY = "insurer_owner_region"
 DEFAULT_ROLLING_DAYS = 30
 DEFAULT_COMMODITIES = ["crude_oil", "oil_products", "coal", "lng"]
-DEFAULT_CHART_TYPE = "area"
+DEFAULT_CHART_TYPE = "area_share"
 DEFAULT_FACET = "commodity_group_name"
 
 units = {
