@@ -64,7 +64,20 @@ def test_portprice(app):
 
     # Create a test client using the Flask application configured for testing
     with app.test_client() as test_client:
+        #https://api.russiafossiltracker.com/v0/portprice?date_from=2022-01-01&commodity=crude_oil&unlocode=RUAZO&format=csv&date_to=-1
         params = {}
+        response = test_client.get('/v0/portprice?' + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) > 0
+
+        # test insurer/owner/destination filtering
+        params = {
+            "date_from": "2022-01-01",
+            "commodity": "crude_oil",
+            "unlocode": "RUAZO",
+            "ship_owner_iso2": "AT,BE,CZ"
+        }
         response = test_client.get('/v0/portprice?' + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
