@@ -5,7 +5,7 @@ import numpy as np
 from sqlalchemy import func
 from sqlalchemy.orm import aliased
 from sqlalchemy import case
-from sqlalchemy.dialects.postgresql import ARRAY, BIGINT
+from sqlalchemy.dialects.postgresql import ARRAY, BIGINT, VARCHAR
 from sqlalchemy import cast, Text
 
 import base
@@ -151,6 +151,7 @@ def get_new_alerts():
             AlertCriteria.min_dwt,
             AlertCriteria.new_destination_name_pattern,
             AlertCriteria.departure_port_ids,
+            AlertCriteria.shipment_status,
             func.unnest(func.coalesce(AlertCriteria.new_destination_iso2, [NULL_ARTIFACT])).label(
                 "destination_iso2"
             ),
@@ -175,6 +176,7 @@ def get_new_alerts():
         query_alert1.c.recipient_email,
         query_alert1.c.destination_iso2,
         query_alert1.c.departure_port_ids,
+        query_alert1.c.shipment_status,
         func.unnest(
             func.coalesce(
                 case(
@@ -204,6 +206,7 @@ def get_new_alerts():
         query_alert2.c.recipient_email,
         query_alert2.c.destination_iso2,
         query_alert2.c.departure_port_ids,
+        query_alert2.c.shipment_status,
         query_alert2.c.destination_name_pattern,
         func.unnest(
             func.coalesce(
@@ -226,6 +229,7 @@ def get_new_alerts():
         query_alert3.c.destination_iso2,
         query_alert3.c.destination_name_pattern,
         query_alert3.c.commodity,
+        query_alert3.c.shipment_status,
         func.unnest(
             func.coalesce(
                 case(
@@ -241,7 +245,32 @@ def get_new_alerts():
     # alert3_df = pd.read_sql(query_alert3.statement, session.bind)
     query_alert4 = query_alert4.subquery()
 
-    query_alert = query_alert4
+    query_alert5 = session.query(
+        query_alert4.c.config_id,
+        query_alert4.c.config_name,
+        query_alert4.c.criteria_id,
+        query_alert4.c.recipient_id,
+        query_alert4.c.recipient_email,
+        query_alert4.c.destination_iso2,
+        query_alert4.c.destination_name_pattern,
+        query_alert4.c.commodity,
+        func.unnest(
+            func.coalesce(
+                case(
+                    [(query_alert4.c.shipment_status == cast([], ARRAY(VARCHAR)), sa.null())],
+                    else_=query_alert4.c.shipment_status,
+                ),
+                [NULL_ARTIFACT],
+            )
+        ).label("shipment_status"),
+        query_alert4.c.departure_port_id,
+        query_alert4.c.min_dwt,
+    )
+
+    # alert3_df = pd.read_sql(query_alert3.statement, session.bind)
+    query_alert5 = query_alert5.subquery()
+
+    query_alert = query_alert5
 
     # Join query alert and shipments
     query_alert_shipment = (
@@ -268,6 +297,10 @@ def get_new_alerts():
                 sa.or_(
                     query_alert.c.departure_port_id == query_shipment.c.departure_port_id,
                     query_alert.c.departure_port_id == NULL_ARTIFACT_BIGINT,
+                ),
+                sa.or_(
+                    query_alert.c.shipment_status == query_shipment.c.status,
+                    query_alert.c.shipment_status == NULL_ARTIFACT,
                 ),
                 sa.or_(
                     query_alert.c.destination_name_pattern == query_shipment.c.destination_name,
