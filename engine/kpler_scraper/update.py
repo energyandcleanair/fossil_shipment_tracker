@@ -24,6 +24,8 @@ def upload_flows(df, ignore_if_copy_failed=False):
     if df is None or len(df) == 0:
         return None
 
+    df["updated_on"] = dt.datetime.now()
+
     if "destination_country" in df.columns:
         df.drop(columns=["destination_country"], inplace=True)
 
@@ -218,6 +220,7 @@ def update_flows(
                                 unknown = unknown[unknown["value_unknown"] > 0]
                                 unknown["to_zone_name"] = UNKNOWN_COUNTRY
                                 unknown["value"] = unknown["value_unknown"]
+                                unknown["updated_on"] = dt.datetime.now()
                                 unknown = unknown[known_zones.columns]
                                 upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
 
@@ -286,8 +289,9 @@ def update_flows_reverse(
                             )
                             if df is not None:
                                 df_zones.append(df)
-                            # if not add_unknown_only:
-                            # upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                                
+                            if not add_unknown_only:
+                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
 
                         if add_unknown and len(df_zones) > 0:
                             # Add an unknown one
@@ -322,8 +326,9 @@ def update_flows_reverse(
                                 unknown = unknown[unknown["value_unknown"] > 0]
                                 unknown["to_zone_name"] = UNKNOWN_COUNTRY
                                 unknown["value"] = unknown["value_unknown"]
+                                unknown["updated_on"] = dt.datetime.now()
                                 unknown = unknown[known_zones.columns]
-                                # upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+                                upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
                             else:
                                 raise ValueError("Total should not be None if we have data by zone")
 

@@ -288,9 +288,9 @@ class KplerFlowResource(TemplateResource):
                     KplerProduct.platform == KplerFlow.platform,
                 ),
             )
-            .outerjoin(Commodity, commodity_id_field == Commodity.id)
-            .outerjoin(CommodityEquivalent, commodity_equivalent_id_field == CommodityEquivalent.id)
-            .outerjoin(
+            .join(Commodity, commodity_id_field == Commodity.id)
+            .join(CommodityEquivalent, commodity_equivalent_id_field == CommodityEquivalent.id)
+            .join(
                 Price,
                 sa.and_(
                     Price.date == KplerFlow.date,

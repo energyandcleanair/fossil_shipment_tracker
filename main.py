@@ -36,11 +36,78 @@ import callbased
 
 def update():
     # flaring.update()
-
+    company.update()
     # backuper.update()
     # currency.update()
     # rscript.update()
-    # kpler_scraper.update_trades("2010-01-01", origin_iso2s=["RU"])
+    # kpler_scraper.update_flows("2010-01-01",
+    #                            origin_iso2s=["RU"],
+    #                            )
+    from kpler.sdk import FlowsDirection, FlowsSplit
+
+    kpler_scraper.update_flows(
+        destination_iso2s=[
+            "IQ",
+            "SG",
+            "CN",
+            "AE",
+            "TR",
+            "EG",
+            "MY",
+            "IN",
+            "HK",
+            "ID",
+            "SA",
+            "US",
+            "IQ",
+            "CA",
+            "KW",
+            "IR",
+            "MX",
+            "AT",
+            "BE",
+            "BG",
+            "HR",
+            "CY",
+            "CZ",
+            "DK",
+            "EE",
+            "FI",
+            "FR",
+            "DE",
+            "GR",
+            "HU",
+            "IE",
+            "IT",
+            "LV",
+            "LT",
+            "LU",
+            "MT",
+            "NL",
+            "PL",
+            "PT",
+            "RO",
+            "SK",
+            "SI",
+            "ES",
+            "SE",
+            "GB",
+            "US",
+            "CA",
+            "AU",
+            "JP",
+        ],
+        ignore_if_copy_failed=True,
+        platforms=["lng"],
+        date_from="2013-01-01",
+        date_to=dt.date.today(),
+        use_brute_force=True,
+        add_unknown=True,
+        add_unknown_only=False,
+        from_splits=[FlowsSplit.OriginCountries],
+        to_splits=[FlowsSplit.DestinationCountries],
+    )
+
     # callbased.update_arrivals(commodities=[base.OIL_OR_CHEMICAL],
     #                           date_from='2022-01-01',
     #                           date_to='2023-01-01',

@@ -67,6 +67,7 @@ def test_kpler_v1(app):
         params = {
             "format": "json",
             "origin_iso2": "RU,CN",
+            "product": "Crude,Diesel",
             "product": "Crude,Diesel,Crude/Co",
             "date_from": "2022-12-01",
             "date_to": "2022-12-31",
@@ -88,11 +89,13 @@ def test_kpler_v1(app):
         assert set(grouped["product"].unique()) == set(["Crude", "Diesel"])
         # Russia - Crude - Dec 2022 = 18.7
         ru_crude = grouped[(grouped.origin_iso2 == "RU") & (grouped["product"] == "Crude")]
+        assert len(ru_crude) == 4
         assert all(round(ru_crude.value_tonne / 1e6) == 19)
         assert all(np.isclose(ru_crude.value_tonne, ru_crude.value_tonne, rtol=1e-6))
 
         # China - Diesel - Dec 2022 = 2.16
         cn_diesel = grouped[(grouped.origin_iso2 == "CN") & (grouped["product"] == "Diesel")]
+        assert len(cn_diesel) == 4
         assert all(round(cn_diesel.value_tonne / 1e6) == 2)
         assert all(np.isclose(cn_diesel.value_tonne, cn_diesel.value_tonne, rtol=1e-6))
 

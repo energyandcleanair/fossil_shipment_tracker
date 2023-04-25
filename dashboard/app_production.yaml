@@ -1,0 +1,15 @@
+### Config file for an AppEngine in a bid to be faster than CloudRun
+### but the VPC connector triggers an code 13 500 Internal error
+###
+service: dashboard
+runtime: python38
+instance_class: F4_1G
+env_variables:
+  PROJECT_ID: 'fossil-shipment-tracker'
+  ENVIRONMENT: 'production'
+  REDISHOST: '10.5.250.243'
+  REDISPORT: '6379'
+  REDISURL: 'redis://10.5.250.243:6379'
+entrypoint: gunicorn --bind :$PORT --log-level debug --workers 1 --threads 8 --timeout 0 app:server
+vpc_access_connector:
+  name: projects/fossil-shipment-tracker/locations/europe-west1/connectors/fst-default-vpc
