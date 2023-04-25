@@ -24,6 +24,8 @@ def upload_flows(df, ignore_if_copy_failed=False):
     if df is None or len(df) == 0:
         return None
 
+    df["updated_on"] = dt.datetime.now()
+
     if "destination_country" in df.columns:
         df.drop(columns=["destination_country"], inplace=True)
 
