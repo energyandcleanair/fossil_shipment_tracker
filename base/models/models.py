@@ -1015,6 +1015,8 @@ class KplerFlow(Base):
 
     value = Column(Numeric, nullable=False)
 
+    updated_on = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
     __tablename__ = DB_TABLE_KPLER_FLOW
     __table_args__ = (
         Index("idx_kpler_flow_product", "product"),
