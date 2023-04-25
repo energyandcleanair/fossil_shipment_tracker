@@ -109,6 +109,7 @@ def get_kpler_full(
     colour_by,
     facet,
     rolling_days,
+    top_n=9,
 ):
 
     kpler0 = get_kpler0(origin_iso2, origin_type, destination_iso2, destination_type, commodity)
@@ -119,7 +120,7 @@ def get_kpler_full(
     df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
 
     # Group largest colours together
-    largest = df.groupby(colour_by)[value_cols].sum().nlargest(9, columns=value_cols[0]).index
+    largest = df.groupby(colour_by)[value_cols].sum().nlargest(top_n, columns=value_cols[0]).index
     df.loc[~df[colour_by].isin(largest), colour_by] = "Other"
     df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
 

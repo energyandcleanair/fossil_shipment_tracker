@@ -7,6 +7,7 @@ DEFAULT_ORIGIN_COUNTRY = "RU"
 DEFAULT_DESTINATION_COUNTRY = COUNTRY_GLOBAL
 DEFAULT_COLOUR_BY = "destination_region"
 DEFAULT_ROLLING_DAYS = 30
+DEFAULT_TOP_N = 10
 DEFAULT_COMMODITIES = ["crude_oil", "oil_products", "coal", "lng"]
 DEFAULT_CHART_TYPE = "area"
 DEFAULT_FACET = "commodity_equivalent_name"
@@ -58,7 +59,13 @@ facet_bys = {
     "destination_country": "Destination country",
 }
 commodities = {"crude_oil": "Crude", "oil_products": "Oil products", "lng": "LNG", "coal": "Coal"}
-chart_types = {"area": "Area", "area_share": "Area (%)", "line": "Line", "bar": "Bar"}
+chart_types = {
+    "area": "Area",
+    "area_share": "Area (%)",
+    "line": "Line",
+    "bar": "Bar",
+    "bar_day": "Bar (Daily average)",
+}
 
 refreshing = False
 

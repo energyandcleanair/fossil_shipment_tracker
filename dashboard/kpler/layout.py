@@ -9,6 +9,7 @@ from . import COUNTRY_GLOBAL
 from . import FACET_NONE
 from . import (
     DEFAULT_ROLLING_DAYS,
+    DEFAULT_TOP_N,
     DEFAULT_COLOUR_BY,
     DEFAULT_DESTINATION_COUNTRY,
     DEFAULT_COMMODITIES,
@@ -173,6 +174,17 @@ layout = html.Div(
                             id="colour-by",
                             options=colour_bys,
                             value=DEFAULT_COLOUR_BY,
+                            size="sm",
+                        ),
+                    ]
+                ),
+                dbc.Col(
+                    [
+                        dbc.Label("Top N:", size="sm"),
+                        dbc.Input(
+                            id="kpler-top-n",
+                            type="number",
+                            value=DEFAULT_TOP_N,
                             size="sm",
                         ),
                     ]

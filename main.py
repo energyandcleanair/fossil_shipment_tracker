@@ -36,7 +36,7 @@ import callbased
 
 def update():
     # flaring.update()
-
+    company.update()
     # backuper.update()
     # currency.update()
     # rscript.update()

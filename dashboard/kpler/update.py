@@ -105,6 +105,7 @@ def select_destination_eu27(n_clicks):
         # Chart specific
         Input("unit", "value"),
         Input("kpler-chart-type", "value"),
+        Input("kpler-top-n", "value"),
     ],
     suppress_callback_exceptions=True,
 )
@@ -120,6 +121,7 @@ def update_chart(
     rolling_days,
     unit_id,
     chart_type,
+    top_n,
 ):
     if facet == FACET_NONE:
         facet = None
@@ -138,6 +140,7 @@ def update_chart(
         colour_by,
         facet,
         rolling_days,
+        top_n,
     )
 
     unit = units[unit_id]
@@ -228,6 +231,29 @@ def update_chart(
             color=colour_by,
             custom_data=[colour_by],
             title=f"<span class='title'><b>Monthly flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per month</span>",
+            color_discrete_map=palette,
+            facet_col=facet,
+            facet_col_wrap=facet_col_wrap,
+        )
+
+    elif chart_type == "bar_day":
+        # Get floor month
+        frequency = "M"
+        group_by = [x for x in [colour_by, facet] if x is not None]
+
+        # Fill values with 0
+        df = df.set_index("date").groupby(group_by).resample("D").sum().reset_index()
+        df["period"] = pd.to_datetime(df.date).dt.to_period(frequency).dt.to_timestamp()
+        group_by += ["period"]
+        # Then take average
+        df = df.groupby(group_by)[value].mean().reset_index()
+        fig = px.bar(
+            df,
+            x="period",
+            y=value,
+            color=colour_by,
+            custom_data=[colour_by],
+            title=f"<span class='title'><b>Monthly flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per day</span>",
             color_discrete_map=palette,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,

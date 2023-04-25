@@ -69,7 +69,23 @@ sidebar = html.Div(
             pills=True,
             className="nav-pills-div",
         ),
-        dbc.Container(html.Div(id="chart-settings")),
+        dbc.Container(
+            [
+                html.Div(id="chart-settings"),
+                html.Div(
+                    id="bottom",
+                    className="bottom",
+                    children=[
+                        dbc.Button(
+                            "Clear cache",
+                            id="btn-clear-cache",
+                            color="primary",
+                            className="btn-preset",
+                        )
+                    ],
+                ),
+            ]
+        ),
     ],
     style=SIDEBAR_STYLE,
 )
@@ -79,6 +95,7 @@ shared = (
     [
         dcc.Interval(id="interval-component", interval=1000, n_intervals=1),  # in milliseconds
         html.Div(id="dummy_div"),
+        dcc.Store(id="cleared_cache"),
     ]
     + kpler_store
     + insurance_store
@@ -128,3 +145,17 @@ def render_chart_setting(pathname):
     elif pathname == "/insurance":
         return insurance_chart_settings
     return None
+
+
+@app.callback(
+    Output("cleared_cache", "data"),
+    Input("btn-clear-cache", "n_clicks"),
+    prevent_initial_call=True,
+)
+def clear_cache(n):
+    from decouple import config
+    import redis
+
+    redis_client = redis.Redis.from_url(config("REDISURL", "redis://localhost:6379"))
+    redis_client.flushall()
+    return "cleared"
