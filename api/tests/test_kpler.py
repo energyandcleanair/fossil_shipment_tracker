@@ -135,53 +135,6 @@ def test_kpler_v1_key(app):
         assert response.status_code == 403
 
 
-def test_kpler_values(app):
-    """
-    Test values against manually collected ones
-    :param app:
-    :return:
-    """
-    import country_converter as coco
-
-    cc = coco.CountryConverter()
-
-    manual_values = pd.read_csv("assets/kpler/crude_yearly.csv")
-    # Melt
-    manual_values = manual_values.melt(
-        id_vars=["date"], var_name="country", value_name="value_ktonne"
-    )
-    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
-    manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
-    manual_values.rename(columns={"date": "year"}, inplace=True)
-
-    with app.test_client() as test_client:
-
-        params = {
-            "format": "json",
-            "date_from": "2022-01-01",
-            "date_to": "2022-12-31",
-            "origin_iso2": ",".join(["RU", "TR", "CN", "MY", "US", "EG", "AE"]),
-            "aggregate_by": "origin_iso2,product,year",
-            "product": ",".join(["Crude", "Crude/Co", "Condensate"]),
-            "api_key": get_env("API_KEY"),
-        }
-
-        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        data = response.json["data"]
-        data_df = pd.DataFrame(data)
-        data_df = data_df.groupby(["origin_iso2", "year"]).value_tonne.sum().reset_index()
-        # Merge
-        merge = data_df[["origin_iso2", "year", "value_tonne"]].merge(
-            manual_values[["origin_iso2", "year", "value_tonne"]],
-            how="left",
-            on=["origin_iso2", "year"],
-            suffixes=("_api", "_manual"),
-        )
-
-        assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=1e-2))
-
-
 def test_kpler_crude_export(app):
     """
     Test values against manually collected ones
