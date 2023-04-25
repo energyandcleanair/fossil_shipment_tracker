@@ -908,6 +908,7 @@ class AlertCriteria(Base):
     new_destination_name_pattern = Column(ARRAY(String))
 
     departure_port_ids = Column(ARRAY(BigInteger))  # If null, all ports considered
+    shipment_status = Column(ARRAY(String))  # If null, all statuses are included
 
     __tablename__ = DB_TABLE_ALERT_CRITERIA
 

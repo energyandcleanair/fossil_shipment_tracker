@@ -2,10 +2,12 @@ import json
 import pandas as pd
 import datetime as dt
 import numpy as np
+import sqlalchemy as sa
 from flask import Response
 from flask_restx import Resource, reqparse, inputs
 from sqlalchemy import func
 
+import base
 from base.models import Price, Port, Currency
 from base.encoder import JsonEncoder
 from base.db import session
@@ -140,6 +142,27 @@ class PortPriceResource(Resource):
         default=dt.datetime.today().strftime("%Y-%m-%d"),
     )
     parser.add_argument(
+        "ship_owner_iso2",
+        action="split",
+        help="iso2(s) of ship owner",
+        required=False,
+        default=base.PRICE_NULLARRAY_CHAR,
+    )
+    parser.add_argument(
+        "ship_insurer_iso2",
+        action="split",
+        help="iso2(s) of ship insurer",
+        required=False,
+        default=base.PRICE_NULLARRAY_CHAR,
+    )
+    parser.add_argument(
+        "destination_iso2",
+        action="split",
+        help="iso2(s) of destination",
+        required=False,
+        default=base.PRICE_NULLARRAY_CHAR,
+    )
+    parser.add_argument(
         "scenario",
         help="Pricing scenario (standard or pricecap)",
         default=PRICING_DEFAULT,
@@ -170,6 +193,9 @@ class PortPriceResource(Resource):
         scenario = params.get("scenario")
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
+        ship_owner_iso2 = params.get("ship_owner_iso2")
+        ship_insurer_iso2 = params.get("ship_insurer_iso2")
+        destination_iso2 = params.get("destination_iso2")
 
         unnested_query = (
             session.query(
@@ -177,6 +203,8 @@ class PortPriceResource(Resource):
                 Price.date,
                 Price.scenario,
                 Price.destination_iso2s,
+                Price.ship_owner_iso2s,
+                Price.ship_insurer_iso2s,
                 func.unnest(Price.departure_port_ids).label("port_id"),
                 (Currency.per_eur * Price.eur_per_tonne).label("usd_per_tonne"),
                 (Currency.per_eur * Price.eur_per_tonne * 0.138).label(
@@ -203,6 +231,24 @@ class PortPriceResource(Resource):
 
         if date_to is not None:
             query = query.filter(unnested_query.c.date <= to_datetime(date_to))
+
+        if ship_owner_iso2 is not None:
+            if ship_owner_iso2 != base.PRICE_NULLARRAY_CHAR:
+                query = query.filter(unnested_query.c.ship_owner_iso2s.overlap(to_list(ship_owner_iso2)))
+            else:
+                query = query.filter(unnested_query.c.ship_owner_iso2s == ship_owner_iso2)
+
+        if ship_insurer_iso2 is not None:
+            if ship_insurer_iso2 != base.PRICE_NULLARRAY_CHAR:
+                query = query.filter(unnested_query.c.ship_insurer_iso2s.overlap(to_list(ship_insurer_iso2)))
+            else:
+                query = query.filter(unnested_query.c.ship_insurer_iso2s == ship_insurer_iso2)
+
+        if destination_iso2 is not None:
+            if destination_iso2 != base.PRICE_NULLARRAY_CHAR:
+                query = query.filter(unnested_query.c.destination_iso2s.overlap(to_list(destination_iso2)))
+            else:
+                query = query.filter(unnested_query.c.destination_iso2s == destination_iso2)
 
         price_df = pd.read_sql(query.statement, session.bind)
         price_df.replace({np.nan: None}, inplace=True)

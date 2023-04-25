@@ -38,7 +38,7 @@ try:
         pool_recycle=1800,
     )
 except Exception as e:
-    logger.error("Could not connect to database: %s" % e)
+    logger.error("Could not connect to database.")
 
 session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 

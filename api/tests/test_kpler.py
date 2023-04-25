@@ -68,6 +68,7 @@ def test_kpler_v1(app):
             "format": "json",
             "origin_iso2": "RU,CN",
             "product": "Crude,Diesel",
+            "product": "Crude,Diesel,Crude/Co",
             "date_from": "2022-12-01",
             "date_to": "2022-12-31",
             "origin_type": "country,port",

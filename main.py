@@ -107,6 +107,7 @@ def update():
         from_splits=[FlowsSplit.OriginCountries],
         to_splits=[FlowsSplit.DestinationCountries],
     )
+
     # callbased.update_arrivals(commodities=[base.OIL_OR_CHEMICAL],
     #                           date_from='2022-01-01',
     #                           date_to='2023-01-01',
