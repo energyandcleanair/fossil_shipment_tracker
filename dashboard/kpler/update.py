@@ -128,7 +128,7 @@ def update_chart(
     # if n is None:
     #     raise PreventUpdate
 
-    if chart_type == "bar":
+    if chart_type in ["bar", "bar_day"]:
         rolling_days = 1
 
     df = get_kpler_full(
