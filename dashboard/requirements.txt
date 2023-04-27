@@ -69,3 +69,4 @@ virtualenv==20.21.0
 Werkzeug==2.2.3
 wheel==0.38.4
 zipp==3.14.0
+colorir==2.0.0

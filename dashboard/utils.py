@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
+from colorir import *
 
-palette = {
+palette_map = {
     "China": "#990000",
     "EU": "#8cc9D0",
     "India": "#f6b26b",
@@ -9,6 +10,7 @@ palette = {
     "Turkey": "#27a59c",
     "For orders": "#FFF2CC",
     "Others": "#cacaca",
+    "Other": "#cacaca",
     "United Kingdom": "#741b47",
     "Unknown": "#333333",
     "Russia": "#660000",
@@ -24,6 +26,30 @@ palette = {
     "Owned and / or insured in EU & G7": "#8cc9D0",
     "Insured in Norway": "#35416C",
 }
+
+palette = {
+    "dark_blue": "#35416C",
+    "blue": "#8cc9D0",
+    "light_blue": "#cce7eb",
+    "yellow": "#fff2cc",
+    "orange": "#f6b26b",
+    "red": "#cc0000",
+    "dark_red": "#990000",
+    "dark_purple": "#741b47",
+    "dark_violet": "#351c75",
+    "light_gray": "#cacaca",
+    "turquoise": "#27a59c",
+    "green": "#75b44c",
+}
+
+palette_grad = Grad(Palette(palette))
+
+
+def get_palette(n):
+    if n <= len(palette.values()):
+        return list(palette.values())[:n]
+    else:
+        return palette_grad(n)
 
 
 def to_list(d, convert_tuple=False):

@@ -5,14 +5,13 @@ import plotly.express as px
 from dash import DiskcacheManager, CeleryManager, Input, Output, html, State, dcc
 from dash.exceptions import PreventUpdate
 from server import app, cache
-from utils import palette, opaque_background
+from utils import palette_map, opaque_background, get_palette
 
-from . import COUNTRY_GLOBAL
+
 from . import FACET_NONE
 from . import units
 from . import laundromat_iso2s, pcc_iso2s, eu27_iso2s
-from .utils import roll_average_kpler
-from .data import get_kpler_full, get_kpler1
+from .data import get_kpler_full
 
 
 @app.callback(Output("kpler-rolling-days", "disabled"), Input("kpler-chart-type", "value"))
@@ -169,6 +168,9 @@ def update_chart(
         sort_by.append(colour_by)
 
     df = df.sort_values(sort_by)
+    n_colors = len(df[colour_by].unique()) if colour_by is not None else 1
+    palette_sequence = get_palette(n_colors)
+
     fig = None
     if chart_type == "area_share":
         group_by = [x for x in ["date", facet] if x is not None]
@@ -183,7 +185,8 @@ def update_chart(
             color=colour_by,
             custom_data=[colour_by],
             title=f"<span class='title'><b>Daily flows of Russian fossil fuels</b></span><br><span class='subtitle'>Percentage of {unit_str}</span>",
-            color_discrete_map=palette,
+            color_discrete_sequence=palette_sequence,
+            color_discrete_map=palette_map,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
             # make it opaque
@@ -199,7 +202,8 @@ def update_chart(
             color=colour_by,
             custom_data=[colour_by],
             title=f"<span class='title'><b>Daily flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per day</span>",
-            color_discrete_map=palette,
+            color_discrete_sequence=palette_sequence,
+            color_discrete_map=palette_map,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
         )
@@ -213,7 +217,8 @@ def update_chart(
             color=colour_by,
             custom_data=[colour_by],
             title=f"<span class='title'><b>Daily flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per day</span>",
-            color_discrete_map=palette,
+            color_discrete_sequence=palette_sequence,
+            color_discrete_map=palette_map,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
         )
@@ -231,7 +236,8 @@ def update_chart(
             color=colour_by,
             custom_data=[colour_by],
             title=f"<span class='title'><b>Monthly flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per month</span>",
-            color_discrete_map=palette,
+            color_discrete_sequence=palette_sequence,
+            color_discrete_map=palette_map,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
         )
@@ -254,7 +260,8 @@ def update_chart(
             color=colour_by,
             custom_data=[colour_by],
             title=f"<span class='title'><b>Monthly flows of Russian fossil fuels</b></span><br><span class='subtitle'>{unit_str} per day</span>",
-            color_discrete_map=palette,
+            color_discrete_sequence=palette_sequence,
+            color_discrete_map=palette_map,
             facet_col=facet,
             facet_col_wrap=facet_col_wrap,
         )

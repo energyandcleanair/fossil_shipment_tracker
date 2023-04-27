@@ -5,7 +5,7 @@ from dash.exceptions import PreventUpdate
 from server import app, cache
 from utils import palette
 from . import FACET_NONE
-from .data import get_kpler_full, get_kpler1, get_kpler0
+from .data import get_kpler_full, get_kpler0
 
 
 @app.callback(

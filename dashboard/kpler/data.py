@@ -79,27 +79,6 @@ def get_kpler0(origin_iso2, origin_type, destination_iso2, destination_type, com
 
 
 @cache.memoize()
-def get_kpler1(kpler0, colour_by, facet, rolling_days):
-
-    df = pd.DataFrame(kpler0)
-    aggregate_by = list(set(["date"] + [colour_by] + [facet]))
-    aggregate_by = [x for x in aggregate_by if x is not None]
-    value_cols = [x for x in df.columns if x.startswith("value_")]
-    df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
-
-    # Group largest colours together
-    largest = df.groupby(colour_by)[value_cols].sum().nlargest(9, columns=value_cols[0]).index
-    df.loc[~df[colour_by].isin(largest), colour_by] = "Other"
-    df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
-
-    # Remove all first rows of df until the first date with a non-zero value
-    min_date = df.loc[(df[value_cols] > 0).apply(any, axis=1)]["date"].min()
-    df = df[df["date"] >= min_date]
-    df = roll_average_kpler(df, rolling_days)
-    return df
-
-
-@cache.memoize()
 def get_kpler_full(
     origin_iso2,
     origin_type,
@@ -117,63 +96,15 @@ def get_kpler_full(
     aggregate_by = list(set(["date"] + [colour_by] + [facet]))
     aggregate_by = [x for x in aggregate_by if x is not None]
     value_cols = [x for x in df.columns if x.startswith("value_")]
-    df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
+    df = df.groupby(aggregate_by, dropna=False)[value_cols].sum().reset_index()
 
     # Group largest colours together
     largest = df.groupby(colour_by)[value_cols].sum().nlargest(top_n, columns=value_cols[0]).index
-    df.loc[~df[colour_by].isin(largest), colour_by] = "Other"
-    df = df.groupby(aggregate_by)[value_cols].sum().reset_index()
+    df.loc[~df[colour_by].isin(largest), colour_by] = "Others"
+    df = df.groupby(aggregate_by, dropna=False)[value_cols].sum().reset_index()
 
     # Remove all first rows of df until the first date with a non-zero value
     min_date = df.loc[(df[value_cols] > 0).apply(any, axis=1)]["date"].min()
     df = df[df["date"] >= min_date]
     df = roll_average_kpler(df, rolling_days)
     return df
-
-
-#
-# @app.callback(
-#     output=Output("kpler1", "data"),
-#     inputs=[
-#         Input("kpler0", "data"),
-#         Input("colour-by", "value"),
-#         Input("facet", "value"),
-#         Input("kpler-rolling-days", "value"),
-#     ],
-# )
-# def load_kpler1(kpler0, colour_by, facet, rolling_days):
-#     if facet == FACET_NONE:
-#         facet = None
-#     if kpler0 is None:
-#         raise PreventUpdate
-#     logger.info("=== kpler1: reading json ===")
-#     df = get_kpler1(kpler0, colour_by, facet, rolling_days)
-#     result = df.to_dict(orient="split")
-#     return result
-
-# @app.callback(
-#     output=Output("kpler_full", "data"),
-#     inputs=[
-#         State("kpler-origin-country", "value"),
-#         State("kpler-origin-type", "value"),
-#         State("kpler-destination-country", "value"),
-#         State("kpler-destination-type", "value"),
-#         State("kpler-commodity", "value"),
-#         Input("kpler-refresh", "n_clicks"),
-#         Input("colour-by", "value"),
-#         Input("facet", "value"),
-#         Input("kpler-rolling-days", "value"),
-#     ],
-# )
-# def load_kpler_full(origin_iso2, origin_type, destination_iso2, destination_type, commodity, n,
-#                 colour_by, facet, rolling_days):
-#     if facet == FACET_NONE:
-#         facet = None
-#     if n is None:
-#         raise PreventUpdate
-#
-#     df = get_kpler_full(origin_iso2, origin_type, destination_iso2,
-#                         destination_type, commodity,
-#                         colour_by, facet, rolling_days)
-#     result = df.to_dict(orient="split")
-#     return result
