@@ -49,7 +49,7 @@ def get_palette(n):
     if n <= len(palette.values()):
         return list(palette.values())[:n]
     else:
-        return palette_grad(n)
+        return palette_grad.n_colors(n)
 
 
 def to_list(d, convert_tuple=False):

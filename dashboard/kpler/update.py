@@ -18,7 +18,7 @@ from .data import get_kpler_full
 def update_options(chart_type):
     if not chart_type:
         raise PreventUpdate
-    return chart_type in ["bar"]
+    return chart_type in ["bar", "bar_day"]
 
 
 @app.callback(

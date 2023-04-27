@@ -97,6 +97,9 @@ def get_kpler_full(
     aggregate_by = [x for x in aggregate_by if x is not None]
     value_cols = [x for x in df.columns if x.startswith("value_")]
     df = df.groupby(aggregate_by, dropna=False)[value_cols].sum().reset_index()
+    # Replace unknown with Unknodn in colour_by column
+    df[colour_by] = df[colour_by].replace("unknown", "Unknown")
+    df[colour_by] = df[colour_by].fillna("Unknown")
 
     # Group largest colours together
     largest = df.groupby(colour_by)[value_cols].sum().nlargest(top_n, columns=value_cols[0]).index
