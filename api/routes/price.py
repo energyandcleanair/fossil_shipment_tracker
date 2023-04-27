@@ -2,10 +2,12 @@ import json
 import pandas as pd
 import datetime as dt
 import numpy as np
-import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import array
 from flask import Response
 from flask_restx import Resource, reqparse, inputs
-from sqlalchemy import func
+from sqlalchemy import func, BigInteger
+from sqlalchemy.sql.expression import cast
+
 
 import base
 from base.models import Price, Port, Currency
@@ -50,6 +52,10 @@ class PriceResource(Resource):
     )
 
     parser.add_argument(
+        "port_id", help="id(s) of port(s)", default=None, required=False, action="split"
+    )
+
+    parser.add_argument(
         "nest_in_data",
         help="Whether to nest the json content in a data key.",
         type=inputs.boolean,
@@ -72,6 +78,7 @@ class PriceResource(Resource):
         scenario = params.get("scenario")
         date_to = params.get("date_to")
         format = params.get("format")
+        port_id = params.get("port_id")
         nest_in_data = params.get("nest_in_data")
 
         query = Price.query.filter(Price.scenario == scenario)
@@ -80,13 +87,16 @@ class PriceResource(Resource):
             query = query.filter(Price.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
-            query = query.filter(
-                Price.date >= dt.datetime.strptime(date_from, "%Y-%m-%d")
-            )
+            query = query.filter(Price.date >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
 
         if date_to is not None:
+            query = query.filter(Price.date <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
+
+        if port_id is not None:
             query = query.filter(
-                Price.date <= dt.datetime.strptime(date_to, "%Y-%m-%d")
+                Price.departure_port_ids.contains(
+                    array([cast(int(x), BigInteger) for x in to_list(port_id)])
+                )
             )
 
         price_df = pd.read_sql(query.statement, session.bind)
@@ -105,22 +115,16 @@ class PriceResource(Resource):
                     {"data": price_df.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    price_df.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(price_df.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
 
 @routes_api.route("/v0/portprice", methods=["GET"], strict_slashes=False, doc=False)
 class PortPriceResource(Resource):
 
     parser = reqparse.RequestParser()
-    parser.add_argument(
-        "unlocode", help="UNLOCODE", default=None, action="split", required=False
-    )
+    parser.add_argument("unlocode", help="UNLOCODE", default=None, action="split", required=False)
     parser.add_argument(
         "commodity",
         help="commodity(ies) of interest. Default: returns all of them",
@@ -207,18 +211,14 @@ class PortPriceResource(Resource):
                 Price.ship_insurer_iso2s,
                 func.unnest(Price.departure_port_ids).label("port_id"),
                 (Currency.per_eur * Price.eur_per_tonne).label("usd_per_tonne"),
-                (Currency.per_eur * Price.eur_per_tonne * 0.138).label(
-                    "usd_per_barrel"
-                ),
+                (Currency.per_eur * Price.eur_per_tonne * 0.138).label("usd_per_barrel"),
             )
             .join(Currency, Currency.date == Price.date)
             .filter(Price.scenario.in_(to_list(scenario)), Currency.currency == "USD")
             .subquery()
         )
 
-        query = session.query(unnested_query).join(
-            Port, Port.id == unnested_query.c.port_id
-        )
+        query = session.query(unnested_query).join(Port, Port.id == unnested_query.c.port_id)
 
         if unlocode is not None:
             query = query.filter(Port.unlocode.in_(to_list(unlocode)))
@@ -234,19 +234,25 @@ class PortPriceResource(Resource):
 
         if ship_owner_iso2 is not None:
             if ship_owner_iso2 != base.PRICE_NULLARRAY_CHAR:
-                query = query.filter(unnested_query.c.ship_owner_iso2s.overlap(to_list(ship_owner_iso2)))
+                query = query.filter(
+                    unnested_query.c.ship_owner_iso2s.overlap(to_list(ship_owner_iso2))
+                )
             else:
                 query = query.filter(unnested_query.c.ship_owner_iso2s == ship_owner_iso2)
 
         if ship_insurer_iso2 is not None:
             if ship_insurer_iso2 != base.PRICE_NULLARRAY_CHAR:
-                query = query.filter(unnested_query.c.ship_insurer_iso2s.overlap(to_list(ship_insurer_iso2)))
+                query = query.filter(
+                    unnested_query.c.ship_insurer_iso2s.overlap(to_list(ship_insurer_iso2))
+                )
             else:
                 query = query.filter(unnested_query.c.ship_insurer_iso2s == ship_insurer_iso2)
 
         if destination_iso2 is not None:
             if destination_iso2 != base.PRICE_NULLARRAY_CHAR:
-                query = query.filter(unnested_query.c.destination_iso2s.overlap(to_list(destination_iso2)))
+                query = query.filter(
+                    unnested_query.c.destination_iso2s.overlap(to_list(destination_iso2))
+                )
             else:
                 query = query.filter(unnested_query.c.destination_iso2s == destination_iso2)
 
@@ -268,10 +274,6 @@ class PortPriceResource(Resource):
                     {"data": price_df.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    price_df.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(price_df.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
