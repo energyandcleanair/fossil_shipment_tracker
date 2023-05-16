@@ -42,6 +42,6 @@ def update():
         success = res.status_code == 200
 
     if not success:
-        logger_slack.error("R script failed")
+        logger_slack.error("R script failed, @Hubert.")
     else:
         logger_slack.info("R script succeeded")

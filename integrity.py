@@ -29,7 +29,7 @@ def check():
         test_portcall_relationship()
         test_berths()
     except AssertionError:
-        logger_slack.error("Failed integrity: shipment, portcall and berth relationship.")
+        logger_slack.error("Failed integrity: shipment, portcall and berth relationship, @Hubert.")
         raise
 
     try:
@@ -37,7 +37,7 @@ def check():
         test_counter.test_counter_against_voyage(app)
         test_counter.test_pricing_gt0(app)
     except AssertionError:
-        logger_slack.error("Failed integrity: counter, voyage and pricing")
+        logger_slack.error("Failed integrity: counter, voyage and pricing, @Hubert.")
         raise
 
     try:
