@@ -3,7 +3,7 @@
 # We use our Python/R capacity in the air pollution containers. Not ideal...
 
 import requests
-from base.logger import logger_slack
+from base.logger import logger_slack, slacker
 
 
 def update():
@@ -42,6 +42,7 @@ def update():
         success = res.status_code == 200
 
     if not success:
-        logger_slack.error("R script failed, @Hubert.")
+        logger_slack.error("R script failed")
+        response = slacker.chat_postMessage(channel='#log-russia-counter', text="Please check error <@U012ZQ5NU4U>")
     else:
         logger_slack.info("R script succeeded")

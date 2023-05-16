@@ -14,7 +14,7 @@ from base.models import (
 )
 from api.tests import test_counter
 from api.app import app
-from base.logger import logger_slack
+from base.logger import logger_slack, slacker
 from api.routes.voyage import VoyageResource
 from api.routes.overland import PipelineFlowResource
 from api.routes.counter_last import RussiaCounterLastResource
@@ -29,7 +29,8 @@ def check():
         test_portcall_relationship()
         test_berths()
     except AssertionError:
-        logger_slack.error("Failed integrity: shipment, portcall and berth relationship, @Hubert.")
+        logger_slack.error("Failed integrity: shipment, portcall and berth relationship.")
+        response = slacker.chat_postMessage(channel='#log-russia-counter', text="Please check error <@U012ZQ5NU4U>")
         raise
 
     try:
@@ -37,7 +38,8 @@ def check():
         test_counter.test_counter_against_voyage(app)
         test_counter.test_pricing_gt0(app)
     except AssertionError:
-        logger_slack.error("Failed integrity: counter, voyage and pricing, @Hubert.")
+        logger_slack.error("Failed integrity: counter, voyage and pricing.")
+        response = slacker.chat_postMessage(channel='#log-russia-counter', text="Please check error <@U012ZQ5NU4U>")
         raise
 
     try:
@@ -45,6 +47,7 @@ def check():
         test_insurer()
     except AssertionError:
         logger_slack.error("Failed integrity: insurer data")
+        response = slacker.chat_postMessage(channel='#log-russia-counter', text="Please check error <@U012ZQ5NU4U>")
         raise
 
 
