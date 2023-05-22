@@ -128,6 +128,9 @@ def update(min_dwt=base.DWT_MIN,
             func.max(MarineTrafficCall.params['todate'].astext.cast(DateTime)).label('max_queried_date')
         ) \
             .filter(MarineTrafficCall.status == base.HTTP_OK) \
+            .filter(sqlalchemy.or_(MarineTrafficCall.params['movetype'].astext == '0',
+                                   sqlalchemy.not_(MarineTrafficCall.params.has_key('movetype')))
+                    ) \
             .filter(MarineTrafficCall.method == base.VESSEL_PORTCALLS) \
         .filter(MarineTrafficCall.params['imo'].astext.in_([x.ship_imo for x in dangling_departures])) \
         .group_by(MarineTrafficCall.params['imo'].astext) \
