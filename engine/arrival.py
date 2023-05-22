@@ -160,7 +160,7 @@ def update(min_dwt=base.DWT_MIN,
 
         for d in dangling_departures:
             date_from = max([d for d in [to_datetime(d.max_queried_date), to_datetime(d.max_arrival_date), to_datetime(dt.date.today() - dt.timedelta(days=90))] if d is not None])
-            date_to = dt.date.today()
+            date_to = to_datetime(dt.date.today())
 
             portcalls = Marinetraffic.get_portcalls_between_dates(
                 date_from=date_from,
