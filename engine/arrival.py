@@ -202,7 +202,7 @@ def update(
             .all()
         )
 
-        for d in dangling_departures:
+        for d in tqdm(dangling_departures):
             date_from = max(
                 [
                     d
