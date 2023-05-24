@@ -269,9 +269,9 @@ class ChartProductOnWater(Resource):
 
         result = pivot_data(result, variable=pivot_value)
 
-        result = translate(data=result, language=language)
-
         result = self.sort(data=result)
+
+        result = translate(data=result, language=language)
 
         return self.build_response(result=result, format=format, nest_in_data=nest_in_data)
 
@@ -297,9 +297,7 @@ class ChartProductOnWater(Resource):
             return Response(
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
-                headers={
-                    "Content-disposition": "attachment; filename=departure_by_destination.csv"
-                },
+                headers={"Content-disposition": "attachment; filename=product_on_water.csv"},
             )
 
         if format == "json":
