@@ -24,7 +24,7 @@ import datetime as dt
 
 
 def update():
-    integrity.check()
+    #integrity.check()
     #portcall.update_departures(departure_port_iso2=['RU'],
     #                           date_from=-14,
     #                           force_rebuild=True,
