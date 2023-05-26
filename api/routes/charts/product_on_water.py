@@ -79,9 +79,7 @@ class ChartProductOnWater(Resource):
         default="value_tonne",
     )
 
-    parser.add_argument(
-        "language", type=str, help="en or ua", default="en", required=False
-    )
+    parser.add_argument("language", type=str, help="en or ua", default="en", required=False)
 
     parser.add_argument(
         "nest_in_data",
@@ -104,6 +102,36 @@ class ChartProductOnWater(Resource):
         required=False,
         default="json",
     )
+
+    recode_commodity = {
+        "coal": "Coal",
+        "coal_rail_road": "Coal",
+        "coke_rail_road": "Coal",
+        "lng": "LNG",
+        "lng_pipeline": "LNG",
+        "crude_oil": "Crude oil",
+        "crude_oil_rail_road": "Crude oil",
+        "natural_gas": "Pipeline gas",
+        "lng_rail_road": "LNG",
+        "oil_products": "Oil products and chemicals",
+        "oil_products_pipeline": "Oil products and chemicals",
+        "oil_products_rail_road": "Oil products and chemicals",
+        "oil_or_chemical": "Oil products and chemicals",
+        "pipeline_oil": "Crude oil",
+        "lpg": "Oil products and chemicals",
+        "bulk_not_coal": "Others",
+        "general_cargo": "Others",
+        "oil_or_ore": "Others",
+    }
+
+    order_commodity = [
+        "Crude oil",
+        "Oil products and chemicals",
+        "LNG",
+        "Coal",
+        "Pipeline gas",
+        "Others",
+    ]
 
     @routes_api.expect(parser)
     def get(self):
@@ -129,27 +157,6 @@ class ChartProductOnWater(Resource):
             }
         )
 
-        recode_commodity = {
-            "coal": "Coal",
-            "coal_rail_road": "Coal",
-            "coke_rail_road": "Coal",
-            "lng": "LNG",
-            "lng_pipeline": "LNG",
-            "crude_oil": "Crude oil",
-            "crude_oil_rail_road": "Crude oil",
-            "natural_gas": "Pipeline gas",
-            "lng_rail_road": "LNG",
-            "oil_products": "Oil products and chemicals",
-            "oil_products_pipeline": "Oil products and chemicals",
-            "oil_products_rail_road": "Oil products and chemicals",
-            "oil_or_chemical": "Oil products and chemicals",
-            "pipeline_oil": "Crude oil",
-            "lpg": "Oil products and chemicals",
-            "bulk_not_coal": "Others",
-            "general_cargo": "Others",
-            "oil_or_ore": "Others",
-        }
-
         def translate(data, language):
             if language != "en":
                 file_path = "assets/language/%s.json" % (language)
@@ -171,7 +178,7 @@ class ChartProductOnWater(Resource):
 
         data["departure_date"] = pd.to_datetime(data["departure_date"])
 
-        data.replace({"commodity": recode_commodity}, inplace=True)
+        data.replace({"commodity": self.recode_commodity}, inplace=True)
         data["commodity"].fillna("Others", inplace=True)
 
         data = data[
@@ -226,9 +233,7 @@ class ChartProductOnWater(Resource):
 
         for d in date_range:
             _data = (
-                data[
-                    (data["departure_date"] <= d) & (data["arrival_detected_date"] >= d)
-                ]
+                data[(data["departure_date"] <= d) & (data["arrival_detected_date"] >= d)]
                 .groupby(["commodity", "commodity_destination_region"])
                 .agg({pivot_value: "sum"})
                 .reset_index()
@@ -264,11 +269,24 @@ class ChartProductOnWater(Resource):
 
         result = pivot_data(result, variable=pivot_value)
 
+        result = self.sort(data=result)
+
         result = translate(data=result, language=language)
 
-        return self.build_response(
-            result=result, format=format, nest_in_data=nest_in_data
-        )
+        return self.build_response(result=result, format=format, nest_in_data=nest_in_data)
+
+    def sort(self, data):
+        """Sort the data by date and commodity"""
+        if "commodity" in data.columns:
+            # Create category variable
+            data["commodity"] = pd.Categorical(
+                data["commodity"],
+                categories=self.order_commodity,
+                ordered=True,
+            )
+            data.sort_values(by=["commodity", "date"], inplace=True)
+
+        return data
 
     def build_response(self, result, format, nest_in_data):
 
@@ -279,9 +297,7 @@ class ChartProductOnWater(Resource):
             return Response(
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
-                headers={
-                    "Content-disposition": "attachment; filename=departure_by_destination.csv"
-                },
+                headers={"Content-disposition": "attachment; filename=product_on_water.csv"},
             )
 
         if format == "json":
@@ -290,13 +306,9 @@ class ChartProductOnWater(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         return Response(
             response="Unknown format. Should be either csv or json",

@@ -1,4 +1,5 @@
 import datetime as dt
+from decouple import config
 from sqlalchemy import func
 from sqlalchemy import or_
 import sqlalchemy as sa
@@ -63,17 +64,24 @@ def update(
     date_from=None,
 ):
 
-    create_new(
-        shipment_id=shipment_id,
-        rebuild_all=rebuild_all,
-        do_cluster=do_cluster,
-        cluster_deg=cluster_deg,
-        extend_beyond=extend_beyond,
-        add_port_location_if_need_be=add_port_location_if_need_be,
-        arrival_port_iso2=arrival_port_iso2,
-    )
+    logger_slack.info("=== Trajectory update ===")
 
-    reroute(date_from=date_from, shipment_id=shipment_id)
+    try:
+        create_new(
+            shipment_id=shipment_id,
+            rebuild_all=rebuild_all,
+            do_cluster=do_cluster,
+            cluster_deg=cluster_deg,
+            extend_beyond=extend_beyond,
+            add_port_location_if_need_be=add_port_location_if_need_be,
+            arrival_port_iso2=arrival_port_iso2,
+        )
+
+        reroute(date_from=date_from, shipment_id=shipment_id)
+
+    except Exception as e:
+        logger.info("Failed: %s" % (str(e),))
+        pass
 
 
 def create_new(
@@ -86,14 +94,11 @@ def create_new(
     arrival_port_iso2=None,
 ):
 
-    logger_slack.info("=== Trajectory update ===")
     DepartureBerthPosition = aliased(Position)
     ArrivalBerthPosition = aliased(Position)
     ArrivalPort = aliased(Port)
 
-    buffer_before_hours = (
-        base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE if extend_beyond else 0
-    )
+    buffer_before_hours = base.QUERY_POSITION_HOURS_BEFORE_DEPARTURE if extend_beyond else 0
     buffer_after_hours = base.QUERY_POSITION_HOURS_AFTER_ARRIVAL if extend_beyond else 0
 
     shipments_all = return_combined_shipments(session)
@@ -407,14 +412,20 @@ def get_routing_cost():
 
 
 def to_3857(coords):
-    from pyproj import Proj, Transformer
+    from pyproj import Proj, Transformer, datadir
+
+    if config("PROJ_DIR", default=None):
+        datadir.set_data_dir(config("PROJ_DIR"))
 
     transformer = Transformer.from_crs(4326, 3857)
     return list(transformer.itransform([[x[1], x[0]] for x in coords]))
 
 
 def to_4326(coords):
-    from pyproj import Proj, Transformer
+    from pyproj import Proj, Transformer, datadir
+
+    if config("PROJ_DIR", default=None):
+        datadir.set_data_dir(config("PROJ_DIR"))
 
     transformer = Transformer.from_crs(3857, 4326)
     return [[x[1], x[0]] for x in list(transformer.itransform(coords))]
@@ -451,11 +462,7 @@ def remove_intermediary_points(coords):
             pts = pts[:-1]
         return (
             [pts[0]]
-            + [
-                p
-                for bef, p, aft in zip(pts[0:-2], pts[1:-1], pts[2:])
-                if not lined_up(bef, p, aft)
-            ]
+            + [p for bef, p, aft in zip(pts[0:-2], pts[1:-1], pts[2:]) if not lined_up(bef, p, aft)]
             + [pts[-1]]
         )
 
@@ -539,13 +546,9 @@ def reroute(
 
                 from skimage.graph import route_through_array
 
-                route, weight = route_through_array(
-                    img, starts[0], ends[0], geometric=True
-                )
+                route, weight = route_through_array(img, starts[0], ends[0], geometric=True)
                 route_simplified = remove_intermediary_points(coords=route)
-                route_3857 = [
-                    dataset.xy(rowcol[0], rowcol[1]) for rowcol in route_simplified
-                ]
+                route_3857 = [dataset.xy(rowcol[0], rowcol[1]) for rowcol in route_simplified]
                 route_4326 = to_4326(route_3857)
 
                 geometry_routed = LineString(route_4326)

@@ -318,3 +318,37 @@ def test_kpler_gasoline_exports(app):
         )
 
         assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=1e-2))
+
+
+def test_kpler_crude_export_byport(app):
+    """
+    Test values against manually collected ones
+    :param app:
+    :return:
+    """
+    with app.test_client() as test_client:
+
+        params = {
+            "format": "json",
+            "date_from": "2023-04-01",
+            "date_to": "2023-04-30",
+            "origin_iso2": "RU",
+            "origin_type": "port",
+            "aggregate_by": "origin,product,year",
+            "product": ",".join(["Crude"]),
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        data_df = pd.DataFrame(data)
+        data_df = (
+            data_df.groupby(["origin_name"], dropna=False)
+            .value_tonne.sum()
+            .reset_index()
+            .sort_values("value_tonne", ascending=False)
+        )
+        # Merge
+
+        assert np.isclose(data_df.value_tonne.sum(), 21.17e6, rtol=1e-2)

@@ -17,6 +17,8 @@ from engine import company
 from engine import mtevents
 from engine import flaring
 from engine import sts
+from engine import backuper
+
 import integrity
 import base
 
@@ -24,6 +26,7 @@ import datetime as dt
 
 
 def update():
+    
     #integrity.check()
     #portcall.update_departures(departure_port_iso2=['RU'],
     #                           date_from=-14,
@@ -36,13 +39,13 @@ def update():
     #company.update()
     #mtevents.update()
     #shipment.update()
-    #position.update()
-    #destination.update()
-    #berth.update()
+    position.update()
+    destination.update()
+    berth.update()
     #sts.update(date_from=dt.date.today() - dt.timedelta(days=90))
     entsog.update(date_from=-21, nodata_error_date_from=-4)
     rscript.update()
-    #trajectory.update()
+    trajectory.update()
     flaring.update()
     #alert.update()
     counter.update()
