@@ -64,17 +64,24 @@ def update(
     date_from=None,
 ):
 
-    create_new(
-        shipment_id=shipment_id,
-        rebuild_all=rebuild_all,
-        do_cluster=do_cluster,
-        cluster_deg=cluster_deg,
-        extend_beyond=extend_beyond,
-        add_port_location_if_need_be=add_port_location_if_need_be,
-        arrival_port_iso2=arrival_port_iso2,
-    )
+    logger_slack.info("=== Trajectory update ===")
 
-    reroute(date_from=date_from, shipment_id=shipment_id)
+    try:
+        create_new(
+            shipment_id=shipment_id,
+            rebuild_all=rebuild_all,
+            do_cluster=do_cluster,
+            cluster_deg=cluster_deg,
+            extend_beyond=extend_beyond,
+            add_port_location_if_need_be=add_port_location_if_need_be,
+            arrival_port_iso2=arrival_port_iso2,
+        )
+
+        reroute(date_from=date_from, shipment_id=shipment_id)
+
+    except Exception as e:
+        logger.info("Failed: %s" % (str(e),))
+        pass
 
 
 def create_new(
@@ -87,7 +94,6 @@ def create_new(
     arrival_port_iso2=None,
 ):
 
-    logger_slack.info("=== Trajectory update ===")
     DepartureBerthPosition = aliased(Position)
     ArrivalBerthPosition = aliased(Position)
     ArrivalPort = aliased(Port)
