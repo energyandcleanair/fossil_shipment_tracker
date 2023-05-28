@@ -50,7 +50,7 @@ class Marinetraffic:
     last_call_dt = None
 
     @classmethod
-    def wait(cls, interval_after_last_call=dt.timedelta(seconds=65)):
+    def wait(cls, interval_after_last_call=dt.timedelta(seconds=125)):
         if cls.last_call_dt is not None:
             interval_since_last_call = dt.datetime.now() - cls.last_call_dt
 
