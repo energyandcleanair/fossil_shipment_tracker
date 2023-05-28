@@ -37,7 +37,7 @@ def update(
     include_undetected_arrival_shipments=True,
     cache_only=False,
     exclude_sts=False,
-    use_call_based=False,
+    use_call_based=True,
 ):
     """
 
