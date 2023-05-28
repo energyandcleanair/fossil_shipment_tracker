@@ -4,12 +4,13 @@ import pandas as pd
 import datetime as dt
 from sqlalchemy import func
 import sqlalchemy as sa
-from base.db_utils import execute_statement
+from sqlalchemy.exc import IntegrityError
 from difflib import SequenceMatcher
 import re
 import base
 import json
 
+from base.db_utils import execute_statement
 from base.encoder import JsonEncoder
 from base.utils import to_list
 from base.db import session
@@ -87,9 +88,7 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
     ).subquery()
     existing_company = (
         session.query(company_sq)
-        .filter(
-            company_sq.c.name == raw_name, sa.or_(imo is None, company_sq.c.imo == imo)
-        )
+        .filter(company_sq.c.name == raw_name, sa.or_(imo is None, company_sq.c.imo == imo))
         .first()
     )
 
@@ -115,8 +114,7 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
                 company_id = existing_company.id
             else:
                 logger.warning(
-                    "Inconsistency: %s != %s (IMO=%s)"
-                    % (existing_company.name, raw_name, imo)
+                    "Inconsistency: %s != %s (IMO=%s)" % (existing_company.name, raw_name, imo)
                 )
                 company_id = None
 
@@ -232,16 +230,9 @@ def update_info_from_equasis(
                     # After we had a departure with it, and so the first insurer
                     # would always be after the first departure otherwise
                     has_insurer = (
-                        session.query(ShipInsurer)
-                        .filter(ShipInsurer.ship_imo == imo)
-                        .count()
-                        > 0
+                        session.query(ShipInsurer).filter(ShipInsurer.ship_imo == imo).count() > 0
                     )
-                    date_from_ = (
-                        insurer_raw_date_from or dt.datetime.now()
-                        if has_insurer
-                        else None
-                    )
+                    date_from_ = insurer_raw_date_from or dt.datetime.now() if has_insurer else None
                     insurer = ShipInsurer(
                         company_raw_name=insurer_raw_name,
                         imo=None,
@@ -257,7 +248,11 @@ def update_info_from_equasis(
                     # and that the contract was only renewed
                     insurer.date_from = insurer_raw_date_from
                 session.add(insurer)
-                session.commit()
+                try:
+                    session.commit()
+                except IntegrityError as e:
+                    session.rollback()
+                    logger.warning("Failed to add insurer %s for ship %s" % (insurer_raw_name, imo))
 
             # Manager
             manager_info = equasis_infos.get("manager")
@@ -393,9 +388,7 @@ def fill_country():
 
         for key, regexps in address_regexps.items():
             condition = sa.or_(*[Company.address.op("~")(regexp) for regexp in regexps])
-            update = (
-                Company.__table__.update().values(country_iso2=key).where(condition)
-            )
+            update = Company.__table__.update().values(country_iso2=key).where(condition)
             execute_statement(update)
 
     def fill_using_name_regexps():
@@ -439,12 +432,8 @@ def fill_country():
 
     def remove_care_of():
         to_remove = ["^Care of"]
-        condition = sa.and_(
-            sa.or_(*[Company.address.op("~")(regexp) for regexp in to_remove])
-        )
-        update = (
-            Company.__table__.update().values(country_iso2=sa.null()).where(condition)
-        )
+        condition = sa.and_(sa.or_(*[Company.address.op("~")(regexp) for regexp in to_remove]))
+        update = Company.__table__.update().values(country_iso2=sa.null()).where(condition)
         execute_statement(update)
 
     def fill_using_file():
@@ -537,11 +526,7 @@ def fill_using_imo_website():
 
     companies = (
         session.query(Company)
-        .filter(
-            sa.and_(
-                Company.registration_country_iso2 == sa.null(), Company.imo != sa.null()
-            )
-        )
+        .filter(sa.and_(Company.registration_country_iso2 == sa.null(), Company.imo != sa.null()))
         .all()
     )
 
@@ -570,9 +555,7 @@ def fill_using_imo_website():
             )
         except IndexError:
             logger.warning(
-                "Failed to parse correct information from IMO website for {}.".format(
-                    company.imo
-                )
+                "Failed to parse correct information from IMO website for {}.".format(company.imo)
             )
 
 
@@ -662,13 +645,11 @@ class CompanyImoScraper:
 
         for i in range(0, 3):
             try:
-                username_select = self.browser.find_element(
-                    By.CSS_SELECTOR, LOGIN_FIELD_CSS
-                )
+                username_select = self.browser.find_element(By.CSS_SELECTOR, LOGIN_FIELD_CSS)
 
-                ActionChains(browser).click(username_select).send_keys(
-                    username
-                ).send_keys(Keys.ENTER).perform()
+                ActionChains(browser).click(username_select).send_keys(username).send_keys(
+                    Keys.ENTER
+                ).perform()
 
                 login_button = WebDriverWait(
                     browser, 3, ignored_exceptions=EC.StaleElementReferenceException
@@ -685,9 +666,7 @@ class CompanyImoScraper:
         if pwd_field is None:
             return False
 
-        ActionChains(browser).click(pwd_field).send_keys(password).send_keys(
-            Keys.ENTER
-        ).perform()
+        ActionChains(browser).click(pwd_field).send_keys(password).send_keys(Keys.ENTER).perform()
 
         # verify we logged in
         search_button = WebDriverWait(
@@ -808,9 +787,7 @@ class CompanyImoScraper:
         if address_table is None:
             return None
 
-        table_df = pd.read_html(address_table.get_attribute("outerHTML"), index_col=0)[
-            0
-        ].T
+        table_df = pd.read_html(address_table.get_attribute("outerHTML"), index_col=0)[0].T
 
         if table_df.empty:
             return None
