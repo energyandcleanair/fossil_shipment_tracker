@@ -481,6 +481,7 @@ def update_departures(
     force_rebuild=False,
     between_existing_only=False,
     ignore_check_departure=False,
+    use_call_based=False
 ):
     """
     This function collects departure portcalls for ports which we have selected
@@ -570,6 +571,7 @@ def update_departures(
                 marinetraffic_port_id=port.marinetraffic_id,
                 date_from=to_datetime(query_date_from),
                 date_to=to_datetime(query_date_to),
+                use_call_based=use_call_based
             )
 
             # Store them in db so that we won't query them
