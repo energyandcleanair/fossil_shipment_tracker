@@ -29,11 +29,12 @@ def update():
     integrity.check()
     portcall.update_departures(departure_port_iso2=['RU'],
                                date_from=-14,
-                               force_rebuild=True,
-                               between_existing_only=True)
+                               force_rebuild=False,
+                               between_existing_only=False,
+                               use_call_based=True)
     ship.update()
     departure.update()
-    arrival.update(date_from=dt.date.today() - dt.timedelta(days=90), departure_port_iso2=['RU'])
+    arrival.update(date_from=dt.date.today() - dt.timedelta(days=90), departure_port_iso2=['RU'], use_call_based=True)
     currency.update()
     company.update()
     mtevents.update(date_from=dt.date.today() - dt.timedelta(days=90))

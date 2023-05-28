@@ -114,7 +114,7 @@ def get_departures_without_arrival(min_dwt=None, commodities=None,
             )
         )
 
-    return query.order_by(Departure.date_utc).all()
+    return query.order_by(Departure.date_utc).subquery()
 
 
 def get_departures_without_shipment(min_dwt=None, commodities=None, date_from=None, ship_imo=None):
