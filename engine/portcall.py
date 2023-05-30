@@ -37,9 +37,7 @@ def initial_fill(limit=None):
         lambda row: {"marinetraffic": {"DRAUGHT": str(row.draught)}}, axis=1
     )
 
-    portcalls_df = portcalls_df.drop_duplicates(
-        subset=["ship_imo", "move_type", "date_utc"]
-    )
+    portcalls_df = portcalls_df.drop_duplicates(subset=["ship_imo", "move_type", "date_utc"])
     portcall_imos = portcalls_df.ship_imo.unique()
 
     # First ensure ships are in our database
@@ -49,9 +47,7 @@ def initial_fill(limit=None):
     if port.count() == 0:
         port.fill()
 
-    ports_df = pd.read_sql(
-        session.query(Port.id, Port.unlocode).statement, session.bind
-    )
+    ports_df = pd.read_sql(session.query(Port.id, Port.unlocode).statement, session.bind)
 
     portcalls_df = pd.merge(
         portcalls_df,
@@ -77,9 +73,7 @@ def initial_fill(limit=None):
 
     portcalls_df["ship_mmsi"] = portcalls_df.ship_mmsi.apply(str)
     portcalls_df["ship_imo"] = portcalls_df.ship_imo.apply(str)
-    portcalls_df["port_id"] = list(
-        [int(x) for x in portcalls_df["port_id"].values.astype(int)]
-    )
+    portcalls_df["port_id"] = list([int(x) for x in portcalls_df["port_id"].values.astype(int)])
     import numpy as np
 
     portcalls_df.replace({np.nan: None}, inplace=True)
@@ -159,9 +153,7 @@ def fill_missing_port_id():
         port_name = pc.others.get("marinetraffic", {}).get("PORT_NAME")
         mt_port_id = pc.others.get("marinetraffic", {}).get("PORT_ID")
 
-        port_id = port.get_id(
-            name=port_name, marinetraffic_id=mt_port_id, add_if_needed=True
-        )
+        port_id = port.get_id(name=port_name, marinetraffic_id=mt_port_id, add_if_needed=True)
         if port_id:
             pc.port_id = port_id
             session.commit()
@@ -184,18 +176,14 @@ def upload_portcalls(portcalls):
             if portcall.port_id is None and not "unique_portcall" in str(e):
                 unlocode = portcall.others.get("marinetraffic", {}).get("UNLOCODE")
                 name = portcall.others.get("marinetraffic", {}).get("PORT_NAME")
-                marinetraffic_id = portcall.others.get("marinetraffic", {}).get(
-                    "PORT_ID"
-                )
+                marinetraffic_id = portcall.others.get("marinetraffic", {}).get("PORT_ID")
 
                 if unlocode is None:
                     from engine.datalastic import Datalastic
                     from difflib import SequenceMatcher
                     import numpy as np
 
-                    found = Datalastic.search_ports(
-                        name=name, marinetraffic_id=marinetraffic_id
-                    )
+                    found = Datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id)
                     if found:
                         ratios = np.array(
                             [SequenceMatcher(None, x.name, name).ratio() for x in found]
@@ -237,9 +225,7 @@ def upload_portcalls(portcalls):
                 if "unique_portcall" in str(e):
                     duplicated += 1
                 else:
-                    logger.warning(
-                        "Failed to add portcall: %s" % (str(e).split("\n")[0])
-                    )
+                    logger.warning("Failed to add portcall: %s" % (str(e).split("\n")[0]))
                 continue
 
     if duplicated:
@@ -267,9 +253,7 @@ def get_next_portcall(
     if use_cache:
         cached_portcalls = PortCall.query
         if arrival_or_departure:
-            cached_portcalls = cached_portcalls.filter(
-                PortCall.move_type == arrival_or_departure
-            )
+            cached_portcalls = cached_portcalls.filter(PortCall.move_type == arrival_or_departure)
         if go_backward:
             direction = -1
             cached_portcalls = cached_portcalls.filter(PortCall.date_utc < date_from)
@@ -281,13 +265,11 @@ def get_next_portcall(
             if date_to:
                 cached_portcalls = cached_portcalls.filter(PortCall.date_utc <= date_to)
         if imo:
-            cached_portcalls = cached_portcalls.filter(
-                PortCall.ship_imo.in_(to_list(imo))
-            )
+            cached_portcalls = cached_portcalls.filter(PortCall.ship_imo.in_(to_list(imo)))
         if unlocode:
-            cached_portcalls = cached_portcalls.join(
-                Port, Port.id == PortCall.port_id
-            ).filter(Port.unlocode.in_(to_list(unlocode)))
+            cached_portcalls = cached_portcalls.join(Port, Port.id == PortCall.port_id).filter(
+                Port.unlocode.in_(to_list(unlocode))
+            )
 
         cached_portcalls = cached_portcalls.all()
     else:
@@ -343,21 +325,22 @@ def get_next_portcall(
                     ),
                 ),
             )
-            .order_by(
-                MarineTrafficCall.params["todate"].astext.cast(sa.TIMESTAMP).asc()
-            )
+            .order_by(MarineTrafficCall.params["todate"].astext.cast(sa.TIMESTAMP).asc())
         )
 
         if arrival_or_departure is None:
             portcall_queries = portcall_queries.filter(
-                ~MarineTrafficCall.params.has_key('movetype')
+                ~MarineTrafficCall.params.has_key("movetype")
             )
         else:
             portcall_queries = portcall_queries.filter(
-                MarineTrafficCall.params["movetype"].astext == str({
-                    "departure": MOVETYPE_DEPARTURE,
-                    "arrival": MOVETYPE_ARRIVAL,
-                }[arrival_or_departure])
+                MarineTrafficCall.params["movetype"].astext
+                == str(
+                    {
+                        "departure": MOVETYPE_DEPARTURE,
+                        "arrival": MOVETYPE_ARRIVAL,
+                    }[arrival_or_departure]
+                )
             )
 
         if imo is not None:
@@ -371,10 +354,7 @@ def get_next_portcall(
             )
 
         portcall_query_dates = collapse_dates(
-            [
-                (to_datetime(p.datefrom), to_datetime(p.dateto))
-                for p in portcall_queries.all()
-            ]
+            [(to_datetime(p.datefrom), to_datetime(p.dateto)) for p in portcall_queries.all()]
         )
 
     # If not, query MarineTraffic
@@ -392,10 +372,7 @@ def get_next_portcall(
                 for x in cached_portcalls
                 if (
                     (go_backward and x.date_utc > filtered_cached_portcalls[0].date_utc)
-                    or (
-                        not go_backward
-                        and x.date_utc < filtered_cached_portcalls[0].date_utc
-                    )
+                    or (not go_backward and x.date_utc < filtered_cached_portcalls[0].date_utc)
                 )
                 and (x.date_utc != date_from)
             ]
@@ -408,9 +385,7 @@ def get_next_portcall(
         for dates in list(zip(date_froms, date_tos)):
             date_from = dates[0] + direction * dt.timedelta(minutes=1)
             date_to = (
-                dates[1] - direction * dt.timedelta(minutes=1)
-                if dates[1]
-                else dt.datetime.utcnow()
+                dates[1] - direction * dt.timedelta(minutes=1) if dates[1] else dt.datetime.utcnow()
             )
 
             intervals = [(date_from, date_to)]
@@ -481,7 +456,7 @@ def update_departures(
     force_rebuild=False,
     between_existing_only=False,
     ignore_check_departure=False,
-    use_call_based=False
+    use_call_based=False,
 ):
     """
     This function collects departure portcalls for ports which we have selected
@@ -495,6 +470,12 @@ def update_departures(
     logger_slack.info("=== Update departures (Portcall) ===")
     ports = session.query(Port)
     date_from = to_datetime(date_from)
+
+    if use_call_based and between_existing_only:
+        raise ValueError(
+            """Most likely not what you want to use
+            call_based and between_existing_only. Would burn lot of calls"""
+        )
 
     if not ignore_check_departure:
         ports = ports.filter(Port.check_departure)
@@ -556,9 +537,9 @@ def update_departures(
             port_date_froms = [to_datetime(date_from)] + [
                 x.date_utc + dt.timedelta(minutes=1) for x in port_portcalls
             ]
-            port_date_tos = [
-                x.date_utc - dt.timedelta(minutes=1) for x in port_portcalls
-            ] + [to_datetime(date_to)]
+            port_date_tos = [x.date_utc - dt.timedelta(minutes=1) for x in port_portcalls] + [
+                to_datetime(date_to)
+            ]
             date_bounds = list(zip(port_date_froms, port_date_tos))
 
         for dates in date_bounds:
@@ -571,7 +552,7 @@ def update_departures(
                 marinetraffic_port_id=port.marinetraffic_id,
                 date_from=to_datetime(query_date_from),
                 date_to=to_datetime(query_date_to),
-                use_call_based=use_call_based
+                use_call_based=use_call_based,
             )
 
             # Store them in db so that we won't query them
@@ -583,9 +564,7 @@ def update_departures(
                         logger.info("Found a missing port call")
                 except sa.exc.IntegrityError as e:
                     if "psycopg2.errors.UniqueViolation" in str(e):
-                        logger.warning(
-                            "Failed to upload portcall: duplicated port call"
-                        )
+                        logger.warning("Failed to upload portcall: duplicated port call")
                     else:
                         logger.warning("Failed to upload portcall: %s" % (str(e),))
                     session.rollback()
@@ -603,9 +582,7 @@ def find_arrival(departure, date_to=dt.datetime.utcnow(), cache_only=False):
     """
 
     if departure.portcall_id is not None:
-        departure_portcall = PortCall.query.filter(
-            PortCall.id == departure.portcall_id
-        ).first()
+        departure_portcall = PortCall.query.filter(PortCall.id == departure.portcall_id).first()
         ship_imo, date_utc, load_status, is_sts = (
             departure_portcall.ship_imo,
             departure_portcall.date_utc,
@@ -627,13 +604,10 @@ def find_arrival(departure, date_to=dt.datetime.utcnow(), cache_only=False):
 
     # filter_departure = lambda x: x.port_operation in ["discharge", "both"]
     filter_departure_russia = (
-        lambda x: x.port_id in originally_checked_port_ids
-        and x.port_operation == "load"
+        lambda x: x.port_id in originally_checked_port_ids and x.port_operation == "load"
     )
     filter_departure = lambda x: (
-        load_status == base.FULLY_LADEN
-        and x.load_status == base.IN_BALLAST
-        and not is_sts
+        load_status == base.FULLY_LADEN and x.load_status == base.IN_BALLAST and not is_sts
     ) or x.port_operation in ["discharge", "both"]
     filter_arrival = lambda x: x.port_id is not None
 
@@ -659,8 +633,7 @@ def find_arrival(departure, date_to=dt.datetime.utcnow(), cache_only=False):
         or next_departure.port_id in [originally_checked_port_ids]
         or (
             next_departure_russia
-            and to_datetime(next_departure.date_utc)
-            > to_datetime(next_departure_russia.date_utc)
+            and to_datetime(next_departure.date_utc) > to_datetime(next_departure_russia.date_utc)
         )
     ):
         next_departure_date_to = (
@@ -892,9 +865,7 @@ def fill_gaps_within_shipments_using_mtcall(
     # sa.cast(MarineTrafficCall.params['imo'], sa.String)) \
 
     ship_imo = sa.func.regexp_replace(
-        sa.func.regexp_replace(
-            sa.cast(MarineTrafficCall.params["imo"], sa.String), '"', ""
-        ),
+        sa.func.regexp_replace(sa.cast(MarineTrafficCall.params["imo"], sa.String), '"', ""),
         '"',
         "",
     ).label("ship_imo")
@@ -902,9 +873,7 @@ def fill_gaps_within_shipments_using_mtcall(
     # Get hours for which
     calls = (
         session.query(
-            sa.sql.expression.literal_column("0").label(
-                "dummy"
-            ),  # Necessary for the anti-join
+            sa.sql.expression.literal_column("0").label("dummy"),  # Necessary for the anti-join
             MarineTrafficCall.id,
             ship_imo,
             func.generate_series(
@@ -967,9 +936,7 @@ def fill_gaps_within_shipments_using_mtcall(
         session.query(
             Departure.id.label("departure_id"),
             Departure.ship_imo,
-            func.generate_series(shipment_date_from, shipment_date_to, "1 hour").label(
-                "date_utc"
-            ),
+            func.generate_series(shipment_date_from, shipment_date_to, "1 hour").label("date_utc"),
         )
         .outerjoin(Arrival, Arrival.departure_id == Departure.id)
         .join(Ship, Ship.imo == Departure.ship_imo)
