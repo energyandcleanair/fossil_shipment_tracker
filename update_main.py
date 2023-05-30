@@ -32,7 +32,6 @@ def update():
         departure_port_iso2=["RU"],
         date_from=-14,
         force_rebuild=True,
-        between_existing_only=True,
         use_call_based=True,
     )
     ship.update()
