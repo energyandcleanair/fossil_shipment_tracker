@@ -51,27 +51,6 @@ KPLER_TOTAL = "Total"
 class KplerScraper:
     def __init__(self):
         self.platforms = ["liquids", "lng", "dry"]
-
-        # self.configs = {
-        #     "liquids": Configuration(
-        #         Platform.Liquids, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")
-        #     ),
-        #     "lng": Configuration(Platform.LNG, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")),
-        #     "dry": Configuration(Platform.Dry, get_env("KPLER_EMAIL"), get_env("KPLER_PASSWORD")),
-        # }
-        #
-        # self.flows_clients = {
-        #     "liquids": Flows(self.configs["liquids"]),
-        #     "lng": Flows(self.configs["lng"]),
-        #     "dry": Flows(self.configs["dry"]),
-        # }
-        #
-        # self.products_clients = {
-        #     "liquids": Products(self.configs["liquids"]),
-        #     "lng": Products(self.configs["lng"]),
-        #     "dry": Products(self.configs["dry"]),
-        # }
-
         self.cc = coco.CountryConverter()
 
         # To cache products
@@ -89,6 +68,24 @@ class KplerScraper:
         self.session = requests.Session()
         retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
+        self.login()
+
+    def login(self):
+        # r = self.session.post(
+        #     "https://terminal.kpler.com/api/login",
+        #     data={"email": get_env("KPLER_EMAIL"),
+        #           "password": get_env("KPLER_PASSWORD")},
+        #     headers={"Content-Type": "application/json",
+        #              "Accept": "application/json",
+        #              "origin": "https://terminal.kpler.com",
+        #              "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        # )
+        # if r.status_code != 200:
+        #     raise Exception("Kpler login failed")
+        # self.token = r.json()["token"]
+
+        self.token = get_env("KPLER_TOKEN_BRUTE")
 
     def get_installations(self, origin_iso2, platform, split, product=None):
         # We collect flows split by installation
@@ -173,7 +170,7 @@ class KplerScraper:
             file = f"engine/{file}"
 
         if not os.path.exists(file):
-            token = get_env("KPLER_TOKEN_BRUTE")
+            token = self.token  # get_env("KPLER_TOKEN_BRUTE")
             url = {
                 "dry": "https://dry.kpler.com/api/installations",
                 "liquids": "https://terminal.kpler.com/api/installations",
@@ -198,7 +195,7 @@ class KplerScraper:
             file = f"engine/{file}"
 
         if not os.path.exists(file):
-            token = get_env("KPLER_TOKEN_BRUTE")
+            token = self.token  # get_env("KPLER_TOKEN_BRUTE")
             url = {
                 "dry": "https://dry.kpler.com/api/zones",
                 "liquids": "https://terminal.kpler.com/api/zones",
@@ -254,7 +251,7 @@ class KplerScraper:
             file = f"engine/{file}"
 
         if not os.path.exists(file):
-            token = get_env("KPLER_TOKEN_BRUTE")
+            token = self.token  # get_env("KPLER_TOKEN_BRUTE")
             url = {
                 "dry": "https://dry.kpler.com/api/products",
                 "liquids": "https://terminal.kpler.com/api/products",
@@ -424,7 +421,7 @@ class KplerScraper:
         Returns KplerVessel object
         """
 
-        token = get_env("KPLER_TOKEN_BRUTE")
+        token = self.token  # get_env("KPLER_TOKEN_BRUTE")
         url = "https://terminal.kpler.com/api/vessels/{}".format(kpler_vessel_id)
         headers = {"Authorization": f"Bearer {token}"}
         try:
@@ -463,7 +460,7 @@ class KplerScraper:
             file = f"engine/{file}"
 
         if not os.path.exists(file):
-            token = get_env("KPLER_TOKEN_BRUTE")
+            token = self.token  # get_env("KPLER_TOKEN_BRUTE")
             url = {
                 "dry": "https://dry.kpler.com/api/vessels",
                 "liquids": "https://terminal.kpler.com/api/vessels",
@@ -556,7 +553,7 @@ class KplerScraper:
                 get_installation_dict(origin_iso2, installation)
             ]
 
-        token = get_env("KPLER_TOKEN_BRUTE")
+        token = self.token  # get_env("KPLER_TOKEN_BRUTE")
         url = "https://terminal.kpler.com/graphql/"
         headers = {"Authorization": f"Bearer {token}"}
         try:
@@ -778,7 +775,7 @@ class KplerScraper:
             default_products = {"liquids": [1400, 1328, 1370], "lng": [1750], "dry": [1334]}
             params_raw["filters"] = {"product": default_products[platform]}
 
-        token = get_env("KPLER_TOKEN_BRUTE")
+        token = self.token  # get_env("KPLER_TOKEN_BRUTE")
         url = {
             "dry": "https://dry.kpler.com/api/flows",
             "liquids": "https://terminal.kpler.com/api/flows",

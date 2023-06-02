@@ -318,6 +318,9 @@ class KplerFlowResource(TemplateResource):
             )
         )
 
+        # Only keep valid flows
+        query = query.filter(KplerFlow.is_valid == True)
+
         return query
 
     def filter(self, query, params=None):

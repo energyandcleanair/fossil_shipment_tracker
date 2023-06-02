@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import os
 from base.utils import to_datetime, to_list
 from base import UNKNOWN_COUNTRY
 from base.models import (
@@ -17,6 +18,15 @@ import sqlalchemy as sa
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from . import KplerScraper
+
+
+def update_is_valid():
+    # Read sql from 'update_is_valid.sql'
+    with open(os.path.join(os.path.dirname(__file__), "update_is_valid.sql")) as f:
+        sql = f.read()
+    session.execute(sql)
+    session.commit()
+    return
 
 
 def upload_flows(df, ignore_if_copy_failed=False):
@@ -143,7 +153,7 @@ def update_flows(
                     split=from_split,
                 )
 
-                for from_zone in tqdm(from_zones):
+                for from_zone in from_zones:
 
                     for to_split in to_splits:
 
@@ -156,7 +166,7 @@ def update_flows(
                         )
 
                         df_zones = []
-                        for to_zone in tqdm(to_zones):
+                        for to_zone in to_zones:
 
                             df = scraper.get_flows(
                                 platform=platform,
@@ -289,7 +299,7 @@ def update_flows_reverse(
                             )
                             if df is not None:
                                 df_zones.append(df)
-                                
+
                             if not add_unknown_only:
                                 upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
 

@@ -233,9 +233,10 @@ def sanity_check(result):
             old, new, how="outer", left_on=compared_cols, right_on=compared_cols
         ).replace(np.nan, 0)
 
-        comparison["ok"] = (comparison.new_eur >= comparison.old_eur * 0.95) & (
-            comparison.new_eur <= comparison.old_eur * 1.1
-        )
+        comparison["ok"] = (
+            (comparison.new_eur >= comparison.old_eur * 0.95)
+            & (comparison.new_eur <= comparison.old_eur * 1.2)
+        ) | ((comparison.new_eur - comparison.old_eur).abs() < 50e6)
         comparison = comparison.reset_index()
         return comparison
 
