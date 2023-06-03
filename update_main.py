@@ -53,7 +53,7 @@ def update():
     alert.update()
     counter.update()
     backuper.update()
-    # integrity.check()
+    integrity.check()
     return
 
 
