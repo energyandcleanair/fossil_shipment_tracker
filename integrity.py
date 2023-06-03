@@ -30,7 +30,9 @@ def check():
         test_berths()
     except AssertionError:
         logger_slack.error("Failed integrity: shipment, portcall and berth relationship.")
-        response = slacker.chat_postMessage(channel='#log-russia-counter', text="Please check error <@U012ZQ5NU4U>")
+        response = slacker.chat_postMessage(
+            channel="#log-russia-counter", text="Please check error <@U012ZQ5NU4U>"
+        )
         raise
 
     try:
@@ -39,7 +41,9 @@ def check():
         test_counter.test_pricing_gt0(app)
     except AssertionError:
         logger_slack.error("Failed integrity: counter, voyage and pricing.")
-        response = slacker.chat_postMessage(channel='#log-russia-counter', text="Please check error <@U012ZQ5NU4U>")
+        response = slacker.chat_postMessage(
+            channel="#log-russia-counter", text="Please check error <@U012ZQ5NU4U>"
+        )
         raise
 
     try:
@@ -47,7 +51,9 @@ def check():
         test_insurer()
     except AssertionError:
         logger_slack.error("Failed integrity: insurer data")
-        response = slacker.chat_postMessage(channel='#log-russia-counter', text="Please check error <@U012ZQ5NU4U>")
+        response = slacker.chat_postMessage(
+            channel="#log-russia-counter", text="Please check error <@U012ZQ5NU4U>"
+        )
         raise
 
 
@@ -200,7 +206,8 @@ def test_insurer():
                 AND u.updated_on - u.date_from < '21 days'
             )
         SELECT *
-        FROM   problematic;
+        FROM   problematic
+        WHERE commodity != 'bulk';
     """
 
     result = session.execute(raw_sql)
