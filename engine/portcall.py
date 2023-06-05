@@ -556,19 +556,28 @@ def update_departures(
             )
 
             # Store them in db so that we won't query them
+            messages = {"missing": 0, "duplicated": 0, "uploaded": 0, "failed": 0}
+
             for portcall in portcalls:
                 try:
                     session.add(portcall)
                     session.commit()
                     if force_rebuild:
-                        logger.info("Found a missing port call")
+                        messages["missing"] += 1
+
+                    messages["uploaded"] += 1
                 except sa.exc.IntegrityError as e:
                     if "psycopg2.errors.UniqueViolation" in str(e):
-                        logger.warning("Failed to upload portcall: duplicated port call")
+                        messages["duplicated"] += 1
                     else:
-                        logger.warning("Failed to upload portcall: %s" % (str(e),))
+                        messages["failed"] += 1
                     session.rollback()
                     continue
+
+            logger.info(
+                f"""{port.name} ({port.unlocode}) - {query_date_from} to {query_date_to}:
+                {messages['uploaded']} uploaded, {messages['missing']} missing, {messages['duplicated']} duplicated, {messages['failed']} failed"""
+            )
 
     return
 
