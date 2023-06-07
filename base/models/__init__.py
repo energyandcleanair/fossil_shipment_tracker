@@ -62,3 +62,4 @@ DB_TABLE_KPLER_ZONE = "kpler_zone"
 DB_TABLE_API_KEY = "api_key"
 
 from .models import *
+from .kpler import *

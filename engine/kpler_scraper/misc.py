@@ -1,5 +1,5 @@
 import sqlalchemy as sa
-
+from base.logger import logger
 import base
 
 
@@ -46,3 +46,19 @@ def get_commodity_group(row):
         return base.COAL
     else:
         return None
+
+
+def get_nested(x, *keys):
+    """
+    Get a nested value from a dict
+    :param x:
+    :param keys:
+    :return:
+    """
+    if keys:
+        try:
+            return get_nested(x.get(keys[0]), *keys[1:])
+        except AttributeError:
+            logger.warning(f"Error while getting nested value {keys} in {x}")
+            return None
+    return x

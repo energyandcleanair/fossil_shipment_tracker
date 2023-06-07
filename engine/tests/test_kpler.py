@@ -4,7 +4,7 @@ from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementU
 
 from base.db import session, engine
 
-from engine.kpler_scraper import KplerScraper
+from engine.kpler_scraper import KplerScraper, KplerFlowScraper, KplerTradeScraper
 
 
 def test_get_flow():
@@ -107,20 +107,19 @@ def test_get_vessel_brute():
     assert len([x for x in found_vessels if x.id in vessel_ids]) == len(vessel_ids)
 
 
-def test_get_trades_brute():
-    scraper = KplerScraper()
+def test_get_trades_raw():
+    scraper = KplerTradeScraper()
 
-    iso2s = ["RU", "CN", "AE"]
+    from_zones = [{"id": "757", "type": "ZONE"}]
     date_from = dt.datetime(2022, 1, 1)
-    for iso2 in iso2s:
-        cursor_after = None
+    for from_zone in from_zones:
+        cursor_after = 0
         while True:
-            cursor_after, trades = scraper.get_trades_raw_brute(
-                origin_iso2=iso2, platform="liquids", cursor_after=cursor_after
+            cursor_after, trades = scraper.get_trades_raw(
+                from_zone=from_zone, platform="liquids", cursor_after=cursor_after
             )
             if cursor_after is None or len(trades) == 0 or trades.departure_date.min() < date_from:
                 break
-
     pass
 
 

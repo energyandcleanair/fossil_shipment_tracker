@@ -29,6 +29,13 @@ def update_is_valid():
     return
 
 
+def update_products():
+    scraper = KplerScraper()
+    products = scraper.get_products()
+    upsert(products, DB_TABLE_KPLER_PRODUCT, "kpler_product_pkey")
+    return
+
+
 def upload_flows(df, ignore_if_copy_failed=False):
 
     if df is None or len(df) == 0:
