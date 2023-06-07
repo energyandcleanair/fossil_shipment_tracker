@@ -5,13 +5,50 @@ from engine.kpler_scraper.misc import get_nested
 
 
 class KplerTradeScraper(KplerScraper):
+    def get_trades(
+        self, platform, from_iso2=None, to_zone=None, date_from=-30, product=None, sts_only=False
+    ):
+
+        if sts_only:
+            operational_filter = "shipToShip"
+        else:
+            operational_filter = None
+
+        for current_iso2 in to_list(from_iso2):
+            date_from = to_datetime(date_from)
+            from_zone = self.get_zone_dict(iso2=current_iso2, platform=platform)
+            trades_raw = []
+
+            query_from = 0
+            while True:
+                print("Querying")
+                size, query_trades_raw = self.get_trades_raw(
+                    from_zone=from_zone,
+                    platform="liquids",
+                    query_from=query_from,
+                    operational_filter=operational_filter,
+                )
+                trades_raw.extend(query_trades_raw)
+                query_from += size
+                if (
+                    size == 0
+                    or min([pd.to_datetime(x.get("start")) for x in query_trades_raw]) < date_from
+                ):
+                    break
+
+            trades = []
+            [trades.extend(self._parse_trade(x) or []) for x in trades_raw]
+
+        return trades
+
     def get_trades_raw(
         self,
         platform,
         from_zone=None,
         to_zone=None,
-        cursor_after=0,
+        query_from=0,
         product=None,
+        operational_filter=None,
     ):
 
         if from_zone and from_zone.get("name") == "Unknown":
@@ -44,13 +81,14 @@ class KplerTradeScraper(KplerScraper):
 
         # Get zone dict
         params_raw = {
-            "from": cursor_after,
+            "from": query_from,
             "size": 1000,
             "view": "kpler",
             "withForecasted": "false",
             "withFreightView": "false",
             "withProductEstimation": "false",
             "locations": from_locations,
+            "operationalFilter": operational_filter,
         }
 
         if product is not None:
@@ -77,10 +115,7 @@ class KplerTradeScraper(KplerScraper):
             return None
 
         trades_raw = r.json()
-        trades = []
-        [trades.extend(self._parse_trade(x) or []) for x in trades_raw]
-
-        return len(trades_raw), trades
+        return len(trades_raw), trades_raw
 
     def _parse_sts(self, x, origin_or_destination):
         sts = {}
@@ -89,6 +124,9 @@ class KplerTradeScraper(KplerScraper):
         elif origin_or_destination == "destination":
             sts_raw = get_nested(x, "portCallDestination", "shipToShipInfo")
         else:
+            return None
+
+        if sts_raw is None:
             return None
 
         sts["id"] = sts_raw.get("id")
@@ -157,9 +195,10 @@ class KplerTradeScraper(KplerScraper):
         # Origin and destination
         trade["from_installation_id"] = get_nested(x, "portCallOrigin", "installation", "id")
         trade["from_port_id"] = get_nested(x, "portCallOrigin", "installation", "port", "id")
-
+        trade["has_sts"] = False
         if get_nested(x, "portCallOrigin", "shipToShip"):
             trade["from_sts"] = self._parse_sts(x, origin_or_destination="origin")
+            trade["has_sts"] = True
         else:
             trade["from_sts"] = None
 
@@ -172,20 +211,42 @@ class KplerTradeScraper(KplerScraper):
 
         if get_nested(x, "portDestinationOrigin", "shipToShip"):
             trade["to_sts"] = self._parse_sts(x, origin_or_destination="destination")
+            trade["has_sts"] = True
         else:
             trade["to_sts"] = None
 
         # Vessels
         vessels = x.get("vessels")
-        if len(vessels) > 1:
+        if len(vessels) > 1 and not trade["has_sts"]:
             logger.warning(f"More than one vessel in trade {x.get('id')}. Not managed yet.")
+            return None
+        elif len(vessels) > 2 and trade["has_sts"]:
+            logger.warning(f"More than two vessels in sts trade {x.get('id')}. Not managed yet.")
             return None
         elif len(vessels) == 0:
             logger.warning(f"No vessel in trade {x.get('id')}. Not managed yet.")
             return None
 
-        vessel = vessels[0]
-        trade["vessel_id"] = vessel.get("id")
-        trade["ship_imo"] = vessel.get("imo")
+        if len(vessels) == 1:
+            vessel = vessels[0]
+            trade["vessel_id"] = vessel.get("id")
+            trade["vessel_name"] = vessel.get("name")
+            trade["vessel_imo"] = vessel.get("imo")
+
+        elif len(vessels) == 2 and trade["has_sts"]:
+            vessel_from = vessels[0]
+            vessel_to = vessels[1]
+            trade["vessel_id"] = vessel_from.get("id")
+            trade["vessel_name"] = vessel_from.get("name")
+            trade["vessel_imo"] = vessel_from.get("imo")
+            trade["vessel_from_id"] = vessel_from.get("id")
+            trade["vessel_from_name"] = vessel_from.get("name")
+            trade["vessel_from_imo"] = vessel_from.get("imo")
+            trade["vessel_to_id"] = vessel_to.get("id")
+            trade["vessel_to_name"] = vessel_to.get("name")
+            trade["vessel_to_imo"] = vessel_to.get("imo")
+        else:
+            logger.warning(f"Unmanaged number of vessels for rrade {x.get('id')}")
+            return None
 
         return [trade]

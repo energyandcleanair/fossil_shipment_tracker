@@ -1,5 +1,6 @@
 import datetime as dt
 import numpy as np
+import pandas as pd
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from base.db import session, engine
@@ -110,17 +111,14 @@ def test_get_vessel_brute():
 def test_get_trades_raw():
     scraper = KplerTradeScraper()
 
-    from_zones = [{"id": "757", "type": "ZONE"}]
-    date_from = dt.datetime(2022, 1, 1)
-    for from_zone in from_zones:
-        cursor_after = 0
-        while True:
-            cursor_after, trades = scraper.get_trades_raw(
-                from_zone=from_zone, platform="liquids", cursor_after=cursor_after
-            )
-            if cursor_after is None or len(trades) == 0 or trades.departure_date.min() < date_from:
-                break
-    pass
+    # from_zones = [{"id": "757", "type": "ZONE"}]
+    date_from = dt.datetime(2023, 5, 1)
+    from_iso2 = ["RU"]
+    trades = scraper.get_trades(
+        date_from=date_from, from_iso2=from_iso2, platform="liquids", sts_only=True
+    )
+
+    trades_df = pd.DataFrame(trades)
 
 
 def test_get_flow_cn():
