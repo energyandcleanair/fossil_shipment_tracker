@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
+import json
 import datetime as dt
 from flask import Response
 from flask_restx import Resource, reqparse, inputs
@@ -256,6 +257,8 @@ class RussiaCounterResource(Resource):
         default=False,
     )
 
+    parser.add_argument("language", type=str, help="en or ua", default="en", required=False)
+
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterResource.parser.parse_args()
@@ -288,6 +291,7 @@ class RussiaCounterResource(Resource):
         keep_zeros = params.get("keep_zeros")
         columns_order = params.get("columns_order")
         select = params.get("select")
+        language = params.get("language")
 
         if aggregate_by and "" in aggregate_by:
             aggregate_by.remove("")
@@ -520,6 +524,9 @@ class RussiaCounterResource(Resource):
 
         # Select, rename
         counter = self.select(counter, select=select)
+
+        # Translate
+        counter = self.translate(data=counter, language=language)
 
         if format == "csv":
             return Response(
@@ -778,3 +785,14 @@ class RussiaCounterResource(Resource):
         if postcompute_fn:
             result = postcompute_fn(result, params=params)
         return result
+
+    def translate(self, data, language):
+        if language != "en":
+            file_path = "assets/language/%s.json" % (language)
+            with open(file_path, "r") as file:
+                translate_dict = json.load(file)
+
+            data = data.replace(translate_dict)
+            data.columns = [translate_dict.get(x, x) for x in data.columns]
+
+        return data
