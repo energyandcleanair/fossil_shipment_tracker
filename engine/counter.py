@@ -127,7 +127,7 @@ def update(date_from="2021-01-01"):
     # Progressively restore new EU oil pipeline that we missed before
     # result = resume_pipeline_oil_eu(result, n_days=3)
 
-    # # Progressively resume EU shipments that have been paused to reached 100bn
+    # Progressively resume EU shipments that have been paused to reached 100bn
     # result = resume_eu_shipments(result, n_days=3)
 
     # Sanity check before updating counter
