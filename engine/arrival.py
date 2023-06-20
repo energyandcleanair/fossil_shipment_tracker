@@ -38,6 +38,7 @@ def update(
     cache_only=False,
     exclude_sts=False,
     use_call_based=True,
+    force_rebuild=False,
 ):
     """
 
@@ -59,17 +60,31 @@ def update(
 
     # We take dangling departures, and try to find the next arrival
     # As in, the arrival before the next relevant departure (i.e. with discharge)
-    dangling_departures_query = departure.get_departures_without_arrival(
-        min_dwt=min_dwt,
-        commodities=commodities,
-        date_from=date_from,
-        date_to=date_to,
-        ship_imo=ship_imo,
-        unlocode=unlocode,
-        port_id=port_id,
-        departure_port_iso2=departure_port_iso2,
-        shipment_id=shipment_id,
-    )
+    if not force_rebuild:
+        dangling_departures_query = departure.get_departures_without_arrival(
+            min_dwt=min_dwt,
+            commodities=commodities,
+            date_from=date_from,
+            date_to=date_to,
+            ship_imo=ship_imo,
+            unlocode=unlocode,
+            port_id=port_id,
+            departure_port_iso2=departure_port_iso2,
+            shipment_id=shipment_id,
+        ).subquery()
+
+    else:
+        dangling_departures_query = departure.get_departures(
+            min_dwt=min_dwt,
+            commodities=commodities,
+            date_from=date_from,
+            date_to=date_to,
+            ship_imo=ship_imo,
+            unlocode=unlocode,
+            port_id=port_id,
+            departure_port_iso2=departure_port_iso2,
+            shipment_id=shipment_id,
+        ).subquery()
 
     dangling_departures = session.query(dangling_departures_query).all()
 
@@ -226,6 +241,7 @@ def update(
                 arrival_or_departure=None,
                 imo=d.ship_imo,
                 use_call_based=True,
+                split_days=10,
             )
 
             portcall.upload_portcalls(portcalls)

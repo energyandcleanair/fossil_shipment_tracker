@@ -52,6 +52,7 @@ def update(imo=None):
         base.OIL_PRODUCTS: 3,
         base.OIL_OR_CHEMICAL: 3,
         base.LNG: 3,
+        base.LPG: 3,
         base.COAL: 15,
         base.BULK: 15,
     }

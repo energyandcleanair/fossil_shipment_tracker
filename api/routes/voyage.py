@@ -875,6 +875,7 @@ class VoyageResource(Resource):
                                 base.OIL_PRODUCTS,
                                 base.CRUDE_OIL,
                                 base.LNG,
+                                base.LPG,
                                 base.OIL_OR_CHEMICAL,
                             ]
                         ),

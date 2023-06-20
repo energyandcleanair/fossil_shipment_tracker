@@ -99,6 +99,12 @@ class RussiaCounterLastResource(Resource):
         required=False,
         default="json",
     )
+    parser.add_argument(
+        "version",
+        help="Which counter version to use",
+        type=str,
+        default=base.COUNTER_VERSION0,
+    )
 
     @routes_api.expect(parser)
     def get(self):
@@ -121,17 +127,7 @@ class RussiaCounterLastResource(Resource):
         pricing_scenario = params.get("pricing_scenario")
         use_eu = params.get("use_eu")
         format = params.get("format", "json")
-
-        # cache = EndpointCacher.get_cache(
-        #     endpoint=self.endpoint,
-        #     params=original_params,
-        #     max_age_minutes=self.max_age_minutes,
-        # )
-        # if cache:
-        #     return self.build_response(
-        #         counter_last=pd.DataFrame(cache),
-        #         format=format
-        #     )
+        version = params.get("version")
 
         destination_region_field = case(
             [
@@ -163,26 +159,16 @@ class RussiaCounterLastResource(Resource):
                 destination_region_field,
                 Counter.date,
                 Counter.updated_on,
-                # func.sum(Counter.value_tonne).label("value_tonne"),
-                # func.sum(Counter.value_eur).label("value_eur"),
                 Counter.value_tonne,
                 Counter.value_eur,
                 Counter.pricing_scenario,
                 PriceScenario.name.label("pricing_scenario_name"),
+                Counter.version,
             )
             .join(commodity_subquery, Counter.commodity == commodity_subquery.c.id)
             .join(Country, Country.iso2 == Counter.destination_iso2)
             .outerjoin(PriceScenario, PriceScenario.id == Counter.pricing_scenario)
-            # .group_by(
-            #     Counter.commodity,
-            #     Counter.destination_iso2,
-            #     Country.name,
-            #     destination_region_field,
-            #     Counter.date,
-            #     commodity_subquery.c.group,
-            #     Counter.pricing_scenario,
-            #     PriceScenario.name,
-            # )
+            .filter(Counter.version == version)
         )
 
         if destination_region:
@@ -210,7 +196,7 @@ class RussiaCounterLastResource(Resource):
         counter = pd.read_sql(query.statement, session.bind)
         counter_last = self.get_last(counter=counter)
         # Add total
-        group_by_total = ["pricing_scenario", "pricing_scenario_name"]
+        group_by_total = ["pricing_scenario", "pricing_scenario_name", "version"]
         index_total = [x for x in counter_last.index.names if x not in group_by_total]
         total = (
             counter_last.groupby(group_by_total, dropna=False).sum(numeric_only=True).reset_index()
@@ -343,7 +329,7 @@ class RussiaCounterLastResource(Resource):
         ]
 
         # Adding must have grouping columns
-        must_group_by = ["date", "pricing_scenario"]
+        must_group_by = ["date", "pricing_scenario", "version"]
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if "" in aggregate_by:
             aggregate_by.remove("")
@@ -368,6 +354,7 @@ class RussiaCounterLastResource(Resource):
             "destination_region": [subquery.c.destination_region],
             "commodity_group": [subquery.c.commodity_group],
             "commodity": [subquery.c.commodity, subquery.c.commodity_group],
+            "version": [subquery.c.version],
         }
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):

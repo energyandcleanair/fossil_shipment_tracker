@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import base
 import re
 import json
 import datetime as dt
@@ -53,6 +54,7 @@ class RussiaCounterResource(Resource):
                 "destination_region",
             ],
             "destination_region": ["destination_region"],
+            "version": ["version"],
         }
 
         if subquery is not None:
@@ -259,6 +261,10 @@ class RussiaCounterResource(Resource):
 
     parser.add_argument("language", type=str, help="en or ua", default="en", required=False)
 
+    parser.add_argument(
+        "version", help="Which counter version to use", type=str, default=base.COUNTER_VERSION0
+    )
+
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterResource.parser.parse_args()
@@ -292,6 +298,7 @@ class RussiaCounterResource(Resource):
         columns_order = params.get("columns_order")
         select = params.get("select")
         language = params.get("language")
+        version = params.get("version")
 
         if aggregate_by and "" in aggregate_by:
             aggregate_by.remove("")
@@ -335,12 +342,14 @@ class RussiaCounterResource(Resource):
                 value_currency_field,
                 Counter.pricing_scenario,
                 PriceScenario.name.label("pricing_scenario_name"),
+                Counter.version,
             )
             .outerjoin(commodity_subquery, Counter.commodity == commodity_subquery.c.id)
             .outerjoin(Country, Counter.destination_iso2 == Country.iso2)
             .outerjoin(Currency, Counter.date == Currency.date)
             .outerjoin(PriceScenario, Counter.pricing_scenario == PriceScenario.id)
             .filter(Counter.date >= to_datetime(date_from))
+            .filter(Counter.version == version)
         )
 
         if pricing_scenario:
@@ -390,6 +399,7 @@ class RussiaCounterResource(Resource):
                     "currency",
                     "pricing_scenario",
                     "pricing_scenario_name",
+                    "version",
                 ],
                 counter.columns,
             )
@@ -422,6 +432,7 @@ class RussiaCounterResource(Resource):
                     "currency",
                     "pricing_scenario",
                     "pricing_scenario_name",
+                    "version",
                 ]
                 if aggregate_by is None or not aggregate_by or x in aggregate_by
             ]
@@ -450,6 +461,7 @@ class RussiaCounterResource(Resource):
                             "currency",
                             "pricing_scenario",
                             "pricing_scenario_name",
+                            "version",
                         ],
                         counter.columns,
                     ),
@@ -563,7 +575,7 @@ class RussiaCounterResource(Resource):
         }
 
         # Adding must have grouping columns
-        must_group_by = ["currency", "pricing_scenario"]
+        must_group_by = ["currency", "pricing_scenario", "version"]
         aggregate_by.extend([x for x in must_group_by if x not in aggregate_by])
         if "" in aggregate_by:
             aggregate_by.remove("")

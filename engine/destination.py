@@ -3,6 +3,7 @@ from engine.marinetraffic import Marinetraffic
 from base.db import session, engine
 import datetime as dt
 import base
+from base.utils import to_datetime
 from base.logger import logger_slack
 from base.models import (
     Ship,
@@ -25,9 +26,9 @@ from base.db_utils import execute_statement
 from engine.shipment import return_combined_shipments
 
 
-def update():
+def update(date_from=None):
     logger_slack.info("=== Destination update ===")
-    update_from_positions()
+    update_from_positions(date_from=date_from)
     # update_from_voyageinfo()
     update_matching()
     # Update once more to have destination_iso2s updated
@@ -263,13 +264,25 @@ def update_matching():
     execute_statement(update)
 
 
-def update_from_positions():
+def update_from_positions(date_from=None, date_to=None):
 
     shipments_all = return_combined_shipments(session)
+    shipments_all_query = session.query(
+        shipments_all, Departure.date_utc.label("departure_date_utc")
+    ).join(Departure, Departure.id == shipments_all.c.shipment_departure_id)
 
+    if date_from:
+        shipments_all_query = shipments_all_query.filter(
+            Departure.date_utc >= to_datetime(date_from)
+        )
+
+    if date_to:
+        shipments_all_query = shipments_all_query.filter(Departure.date_utc <= to_datetime(date_to))
+
+    shipments_all_query = shipments_all_query.subquery()
     shipments_distinct_departure = (
-        session.query(shipments_all.c.shipment_departure_id)
-        .distinct(shipments_all.c.shipment_departure_id)
+        session.query(shipments_all_query.c.shipment_departure_id)
+        .distinct(shipments_all_query.c.shipment_departure_id)
         .subquery()
     )
 
@@ -419,7 +432,7 @@ def update_from_positions():
 
 
 def update_from_voyageinfo(
-    commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS, base.OIL_OR_CHEMICAL]
+    commodities=[base.LNG, base.CRUDE_OIL, base.OIL_PRODUCTS, base.OIL_OR_CHEMICAL, base.LPG]
 ):
     """
     For shipments for which we have no information on destination,
