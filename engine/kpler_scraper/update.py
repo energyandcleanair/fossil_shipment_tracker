@@ -184,7 +184,7 @@ def update_flows(
                                 from_split=from_split,
                                 to_zone=to_zone,
                                 to_split=to_split,
-                                split=FlowsSplit.Products,
+                                split=FlowsSplit.Grades,
                                 use_brute_force=use_brute_force,
                             )
                             if df is not None:
