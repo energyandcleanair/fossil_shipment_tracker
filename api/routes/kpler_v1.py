@@ -105,22 +105,6 @@ class KplerFlowResource(TemplateResource):
     )
 
     parser.add_argument(
-        "from_split",
-        type=str,
-        help="How to split departures: Can be any of country,port,installation",
-        default=False,
-        required=False,
-    )
-
-    parser.add_argument(
-        "to_split",
-        type=str,
-        help="How to split arrivals: Can be any of country,port,installation",
-        default=False,
-        required=False,
-    )
-
-    parser.add_argument(
         "platform",
         type=str,
         help="platform",
@@ -182,8 +166,11 @@ class KplerFlowResource(TemplateResource):
             "date": [subquery.c.date],
             "month": [func.month(subquery.c.date).label("month")],
             "year": [func.extract("year", subquery.c.date).label("year")],
-            "commodity": [subquery.c.commodity],
-            "commodity_equivalent": [subquery.c.commodity_equivalent],
+            "commodity": [subquery.c.commodity, subquery.c.commodity_group],
+            "commodity_equivalent": [
+                subquery.c.commodity_equivalent,
+                subquery.c.commodity_equivalent_group,
+            ],
         }
 
     def get_agg_value_cols(self, subquery):
@@ -265,8 +252,10 @@ class KplerFlowResource(TemplateResource):
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
                 Commodity.name.label("commodity"),
+                Commodity.group.label("commodity_group"),
                 commodity_equivalent_id_field,  # For filtering
                 CommodityEquivalent.name.label("commodity_equivalent_name"),
+                CommodityEquivalent.group.label("commodity_equivalent_group"),
             )
             .outerjoin(
                 FromCountry,

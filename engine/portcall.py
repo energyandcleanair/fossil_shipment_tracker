@@ -705,6 +705,7 @@ def fill_departure_gaps(
     imo=None,
     commodities=[
         base.LNG,
+        base.LPG,
         base.CRUDE_OIL,
         base.OIL_PRODUCTS,
         base.OIL_OR_CHEMICAL,
@@ -862,7 +863,7 @@ def fill_gaps_within_shipments(
 def fill_gaps_within_shipments_using_mtcall(
     ship_imo=None,
     date_from=None,
-    commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG, base.OIL_OR_CHEMICAL],
+    commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG, base.LPG, base.OIL_OR_CHEMICAL],
     min_dwt=base.DWT_MIN,
     max_time_delta=dt.timedelta(days=7),
 ):

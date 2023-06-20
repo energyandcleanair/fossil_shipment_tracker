@@ -14,20 +14,21 @@ from base.db_utils import upsert
 try:
     from api.routes.voyage import VoyageResource
     from api.routes.overland import PipelineFlowResource
+    from api.routes.kpler_v1 import KplerFlowResource
 except ImportError:
     from routes.voyage import VoyageResource
     from routes.overland import PipelineFlowResource
+    from routes.kpler_v1 import KplerFlowResource
 
 import base
 
 
-def update(date_from="2021-01-01"):
+def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
     """
     Fill counter
     :return:
     """
-    logger_slack.info("=== Counter update ===")
-    # date_from = "2022-01-01"
+    logger_slack.info(f"=== Counter update {version} ===")
 
     # Get pipeline flows
     params_pipelineflows = {
@@ -50,45 +51,110 @@ def update(date_from="2021-01-01"):
     pipelineflows = json.loads(pipelineflows_resp.response[0])
     pipelineflows = pd.DataFrame(pipelineflows)
 
-    # Bruegel: Finally, on Turkey, our assumption was to attribute:
-    # • All of Kipi to Azerbaijan,
-    # • All of Strandzha to Russia.
-    # -> we remove TR -> GR
-    # pipelineflows = remove_kipi_flows(pipelineflows, n_days=1)
+    if version == base.COUNTER_VERSION0:
+        # Version 0: MT voyages for everything
 
-    # Get shipments
-    # Very important: we aggregate by ARRIVAL_DATE for counter pricing.
-    params_voyage = {
-        "format": "json",
-        "download": False,
-        "date_from": date_from,
-        "commodity_origin_iso2": ["RU"],
-        "aggregate_by": [
-            "commodity_origin_iso2",
-            "commodity_destination_iso2",
-            "commodity",
-            "arrival_date",
-            "status",
-        ],
-        "nest_in_data": False,
-        "currency": "EUR",
-        "status": "completed",
-        "pricing_scenario": None,
-        "bypass_maintenance": True,
-    }
-    voyages_resp = VoyageResource().get_from_params(params=params_voyage)
-    voyages = json.loads(voyages_resp.response[0])
-    voyages = pd.DataFrame(voyages)
-    voyages = voyages.loc[voyages.commodity_origin_iso2 == "RU"]
-    voyages = voyages.loc[voyages.commodity_destination_iso2 != "RU"]
-    voyages = voyages.loc[voyages.status == base.COMPLETED]  # just to confirm
-    voyages.rename(columns={"arrival_date": "date"}, inplace=True)
+        # Get shipments
+        # Very important: we aggregate by ARRIVAL_DATE for counter pricing.
+        params_voyage = {
+            "format": "json",
+            "download": False,
+            "date_from": date_from,
+            "commodity_origin_iso2": ["RU"],
+            "aggregate_by": [
+                "commodity_origin_iso2",
+                "commodity_destination_iso2",
+                "commodity",
+                "arrival_date",
+                "status",
+            ],
+            "nest_in_data": False,
+            "currency": "EUR",
+            "status": "completed",
+            "pricing_scenario": None,
+            "bypass_maintenance": True,
+        }
+        voyages_resp = VoyageResource().get_from_params(params=params_voyage)
+        voyages = json.loads(voyages_resp.response[0])
+        voyages = pd.DataFrame(voyages)
+        voyages = voyages.loc[voyages.commodity_origin_iso2 == "RU"]
+        voyages = voyages.loc[voyages.commodity_destination_iso2 != "RU"]
+        voyages = voyages.loc[voyages.status == base.COMPLETED]  # just to confirm
+        voyages.rename(columns={"arrival_date": "date"}, inplace=True)
+        result = pd.concat([pipelineflows, voyages])
+
+    elif version == base.COUNTER_VERSION1:
+        # Version 1: MT voyages for LPG only, Kpler flows for the rest
+        params_voyage = {
+            "format": "json",
+            "download": False,
+            "date_from": date_from,
+            "commodity_origin_iso2": ["RU"],
+            "aggregate_by": [
+                "commodity_origin_iso2",
+                "commodity_destination_iso2",
+                "commodity",
+                "arrival_date",
+                "status",
+            ],
+            "nest_in_data": False,
+            "currency": "EUR",
+            "status": "completed",
+            "pricing_scenario": None,
+            "bypass_maintenance": True,
+            "commodity": [base.LPG],
+        }
+        voyages_resp = VoyageResource().get_from_params(params=params_voyage)
+        voyages = json.loads(voyages_resp.response[0])
+        voyages = pd.DataFrame(voyages)
+        voyages = voyages.loc[voyages.commodity_origin_iso2 == "RU"]
+        voyages = voyages.loc[voyages.commodity_destination_iso2 != "RU"]
+        voyages = voyages.loc[voyages.status == base.COMPLETED]  # just to confirm
+        voyages.rename(columns={"arrival_date": "date"}, inplace=True)
+        assert np.all(voyages.commodity == base.LPG)
+
+        # Add Kpler flows
+        params_kpler_flows = {
+            "format": "json",
+            "download": False,
+            "date_from": date_from,
+            "origin_iso2": ["RU"],
+            "origin_type": ["country"],
+            "destination_type": ["country"],
+            "aggregate_by": [
+                "origin_iso2",
+                "destination_iso2",
+                "commodity_equivalent",
+                "date",
+            ],
+            "nest_in_data": False,
+            "currency": "EUR",
+            "pricing_scenario": None,
+            "bypass_maintenance": True,
+        }
+        kpler_flows_resp = KplerFlowResource().get_from_params(params=params_kpler_flows)
+        kpler_flows = json.loads(kpler_flows_resp.response[0])
+        kpler_flows = pd.DataFrame(kpler_flows)
+        kpler_flows = kpler_flows.loc[kpler_flows.origin_iso2 == "RU"]
+        kpler_flows = kpler_flows.loc[kpler_flows.destination_iso2 != "RU"]
+        kpler_flows.rename(
+            columns={
+                "commodity_equivalent": "commodity",
+                "destination_region": "commodity_destination_region",
+                "destination_iso2": "commodity_destination_iso2",
+            },
+            inplace=True,
+        )
+        result = pd.concat([pipelineflows, voyages, kpler_flows])
+
+    else:
+        raise ValueError(f"Unknown counter version {version}")
 
     # Aggregate
     # Fill missing dates so that we're sure we're erasing everything
     # But only within commodity, to keep the last date available
     # daterange = pd.date_range(date_from, dt.datetime.today()).rename("date")
-    result = pd.concat([pipelineflows, voyages]).sort_values(["date", "commodity"])[
+    result = result.sort_values(["date", "commodity"])[
         [
             "commodity",
             "commodity_group",
@@ -123,6 +189,9 @@ def update(date_from="2021-01-01"):
 
     # Remove EU coal shipments following coal ban
     result = remove_coal_to_eu(result)
+
+    # Add version
+    result["version"] = version
 
     # Progressively restore new EU oil pipeline that we missed before
     # result = resume_pipeline_oil_eu(result, n_days=3)

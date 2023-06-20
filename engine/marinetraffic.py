@@ -240,12 +240,30 @@ class Marinetraffic:
         marinetraffic_port_id=None,
         arrival_or_departure=None,
         use_call_based=False,
+        split_days=189,
     ):
         if imo is None and unlocode is None and marinetraffic_port_id is None:
             raise ValueError("Need to specify either imo, unlocode or marinetraffic_port_id")
 
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
+
+        if date_to - date_from > dt.timedelta(days=split_days):
+            date_froms = [date_from, date_from + dt.timedelta(days=split_days)]
+            date_tos = [date_from + dt.timedelta(days=split_days), date_to]
+            results = [
+                cls.get_portcalls_between_dates(
+                    date_from=date_from,
+                    date_to=date_to,
+                    unlocode=unlocode,
+                    imo=imo,
+                    marinetraffic_port_id=marinetraffic_port_id,
+                    arrival_or_departure=arrival_or_departure,
+                    use_call_based=use_call_based,
+                )
+                for date_from, date_to in zip(date_froms, date_tos)
+            ]
+            return [item for sublist in results for item in sublist]
 
         if use_call_based:
             api_key = get_env("KEY_MARINETRAFFIC_EV01_CALL_BASED")

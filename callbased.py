@@ -30,7 +30,7 @@ def update(
     date_from,
     date_to,
     departure_port_iso2,
-    commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG],
+    commodities=[base.CRUDE_OIL, base.OIL_PRODUCTS, base.LNG, base.LPG],
     use_credit_key_if_short=False,
 ):
     # This call is to update history using the CALL-BASED MARINE TRAFFIC KEY
@@ -40,9 +40,7 @@ def update(
     #
     # We use it to fill historical data and laundromat countries
 
-    update_departures(
-        date_from=date_from, date_to=date_to, departure_port_iso2=departure_port_iso2
-    )
+    update_departures(date_from=date_from, date_to=date_to, departure_port_iso2=departure_port_iso2)
 
     departure.update(date_from=date_from)
 
@@ -100,15 +98,11 @@ def get_queried_port_hours(port_id, date_from=None):
         )
         queried_df["date_to"] = queried_df[["date_to", "date_to_cap"]].min(axis=1)
         queried_df["dates"] = queried_df.apply(
-            lambda row: pd.date_range(
-                row.date_from.ceil("H"), row.date_to.floor("H"), freq="H"
-            ),
+            lambda row: pd.date_range(row.date_from.ceil("H"), row.date_to.floor("H"), freq="H"),
             axis=1,
         )
 
-        return (
-            queried_df.explode("dates").drop_duplicates().dates.sort_values().tolist()
-        )
+        return queried_df.explode("dates").drop_duplicates().dates.sort_values().tolist()
     else:
         return []
 
@@ -148,15 +142,11 @@ def get_queried_ship_hours(ship_imo, date_from=None):
         )
         queried_df["date_to"] = queried_df[["date_to", "date_to_cap"]].min(axis=1)
         queried_df["dates"] = queried_df.apply(
-            lambda row: pd.date_range(
-                row.date_from.floor("H"), row.date_to.floor("H"), freq="H"
-            ),
+            lambda row: pd.date_range(row.date_from.floor("H"), row.date_to.floor("H"), freq="H"),
             axis=1,
         )
 
-        return (
-            queried_df.explode("dates").drop_duplicates().dates.sort_values().tolist()
-        )
+        return queried_df.explode("dates").drop_duplicates().dates.sort_values().tolist()
     else:
         return []
 
@@ -167,15 +157,11 @@ def wanted_dates_to_hours(date_from, date_to):
 
 def wanted_intervals_to_hours(wanted_intervals):
     wanted_intervals["dates"] = wanted_intervals.apply(
-        lambda row: pd.date_range(
-            row.date_from.floor("H"), row.date_to.floor("H"), freq="H"
-        ),
+        lambda row: pd.date_range(row.date_from.floor("H"), row.date_to.floor("H"), freq="H"),
         axis=1,
     )
 
-    wanted_hours = (
-        wanted_intervals.explode("dates").dates.drop_duplicates().sort_values()
-    )
+    wanted_hours = wanted_intervals.explode("dates").dates.drop_duplicates().sort_values()
 
     return wanted_hours
 
@@ -246,9 +232,7 @@ def get_intervals(
             split_rows.append(new_row1)
             split_rows.append(new_row2)
         else:
-            split_rows.append(
-                {"date_from": row["date_from"], "date_to": row["date_to"]}
-            )
+            split_rows.append({"date_from": row["date_from"], "date_to": row["date_to"]})
 
     intervals = pd.DataFrame(split_rows, columns=["date_from", "date_to"])
 
@@ -260,9 +244,9 @@ def get_intervals(
     if merge_under_max_days:
         i = 0
         while i < len(intervals) - 1:
-            if intervals.loc[i + 1, "date_to"] <= intervals.loc[
-                i, "date_from"
-            ] + pd.Timedelta(days=MAX_DAYS):
+            if intervals.loc[i + 1, "date_to"] <= intervals.loc[i, "date_from"] + pd.Timedelta(
+                days=MAX_DAYS
+            ):
                 intervals.loc[i, "date_to"] = max(
                     intervals.loc[i, "date_to"], intervals.loc[i + 1, "date_to"]
                 )
@@ -278,9 +262,7 @@ def get_intervals(
             date_to = pd.to_datetime(row["date_to"])
             now = dt.datetime.now()
             diff = date_to - date_from
-            if diff < dt.timedelta(days=MAX_DAYS) and diff > dt.timedelta(
-                days=MIN_DAYS
-            ):
+            if diff < dt.timedelta(days=MAX_DAYS) and diff > dt.timedelta(days=MIN_DAYS):
                 date_to = min(
                     date_from + dt.timedelta(days=MAX_DAYS),
                     now - dt.timedelta(hours=1),
@@ -294,9 +276,7 @@ def get_intervals(
     return intervals.to_dict(orient="records")
 
 
-def update_departures(
-    date_from, date_to=None, departure_port_iso2=None, departure_port_id=None
-):
+def update_departures(date_from, date_to=None, departure_port_iso2=None, departure_port_id=None):
     date_from = to_datetime(date_from)
     date_to = to_datetime(date_to) if date_to else dt.datetime.now()
 
@@ -322,9 +302,7 @@ def update_departures(
             date_from=date_from, date_to=date_to, queried_hours=list(queried_hours)
         )
         for interval in intervals:
-            if interval["date_to"] - interval["date_from"] > dt.timedelta(
-                days=MIN_DAYS
-            ):
+            if interval["date_to"] - interval["date_from"] > dt.timedelta(days=MIN_DAYS):
                 portcalls = Marinetraffic.get_portcalls_between_dates(
                     arrival_or_departure="departure",
                     unlocode=port.unlocode,
@@ -392,9 +370,7 @@ def update_arrivals(
     )
 
     if departure_port_iso2:
-        query_departure = query_departure.filter(
-            Port.iso2.in_(to_list(departure_port_iso2))
-        )
+        query_departure = query_departure.filter(Port.iso2.in_(to_list(departure_port_iso2)))
 
     if ship_imo:
         query_departure = query_departure.filter(Ship.imo.in_(to_list(ship_imo)))
@@ -410,9 +386,7 @@ def update_arrivals(
 
     departures["now"] = dt.datetime.now()
     departures["date_to"] = (
-        departures[["arrival_date", "next_departure_date", "now"]]
-        .bfill(axis=1)
-        .iloc[:, 0]
+        departures[["arrival_date", "next_departure_date", "now"]].bfill(axis=1).iloc[:, 0]
     )
 
     departures = departures[~departures.imo.str.contains("NOTFOUND")]
@@ -428,17 +402,13 @@ def update_arrivals(
         queried_hours = get_queried_ship_hours(
             ship_imo=imo, date_from=wanted_intervals.date_from.min()
         )
-        intervals = get_intervals(
-            wanted_intervals=wanted_intervals, queried_hours=queried_hours
-        )
+        intervals = get_intervals(wanted_intervals=wanted_intervals, queried_hours=queried_hours)
 
         # Only consider those invervals that start before date_to
         intervals = [x for x in intervals if x["date_from"] < date_to]
 
         for interval in intervals:
-            if interval["date_to"] - interval["date_from"] > dt.timedelta(
-                days=MIN_DAYS
-            ):
+            if interval["date_to"] - interval["date_from"] > dt.timedelta(days=MIN_DAYS):
                 portcalls = portcall.get_next_portcall(
                     date_from=interval["date_from"],
                     date_to=interval["date_to"],
