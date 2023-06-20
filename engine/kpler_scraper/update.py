@@ -20,6 +20,37 @@ from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementU
 from . import KplerScraper
 
 
+def update(
+    date_from=-90,
+    date_to=None,
+    platforms=None,
+    products=None,
+    origin_iso2s=["RU"],
+    from_splits=[FlowsSplit.OriginCountries],
+    to_splits=[FlowsSplit.DestinationCountries],
+    ignore_if_copy_failed=False,
+    use_brute_force=True,
+    add_unknown=True,
+    add_unknown_only=False,
+):
+
+    update_flows(
+        date_from=date_from,
+        date_to=date_to,
+        platforms=platforms,
+        products=products,
+        origin_iso2s=origin_iso2s,
+        from_splits=from_splits,
+        to_splits=to_splits,
+        ignore_if_copy_failed=ignore_if_copy_failed,
+        use_brute_force=use_brute_force,
+        add_unknown=add_unknown,
+        add_unknown_only=add_unknown_only,
+    )
+
+    update_is_valid()
+
+
 def update_is_valid():
     # Read sql from 'update_is_valid.sql'
     with open(os.path.join(os.path.dirname(__file__), "update_is_valid.sql")) as f:
@@ -203,7 +234,7 @@ def update_flows(
                                 from_split=from_split,
                                 to_zone=None,
                                 to_split=to_split,
-                                split=FlowsSplit.Products,
+                                split=FlowsSplit.Grades,
                                 use_brute_force=use_brute_force,
                             )
 
