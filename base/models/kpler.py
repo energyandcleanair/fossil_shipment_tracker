@@ -24,17 +24,7 @@ from . import DB_TABLE_KPLER_PRODUCT
 from . import DB_TABLE_KPLER_FLOW
 from . import DB_TABLE_KPLER_VESSEL
 from . import DB_TABLE_KPLER_TRADE
-from . import DB_TABLE_KPLER_INSTALLATION
 from . import DB_TABLE_KPLER_ZONE
-
-
-class KplerProduct(Base):
-    name = Column(String, primary_key=True)
-    platform = Column(String, primary_key=True)
-    group = Column(String)
-    family = Column(String)
-
-    __tablename__ = DB_TABLE_KPLER_PRODUCT
 
 
 class KplerFlow(Base):
@@ -126,23 +116,30 @@ class KplerTrade(Base):
     __tablename__ = DB_TABLE_KPLER_TRADE
 
 
+class KplerProduct(Base):
+    id = Column(BigInteger, primary_key=True)
+    name = Column(String)
+    full_name = Column(String)
+    type = Column(String)
+    grade_id = Column(BigInteger)
+    grade_name = Column(String)
+    commodity_id = Column(BigInteger)
+    commodity_name = Column(String)
+    group_id = Column(BigInteger)
+    group_name = Column(String)
+    family_id = Column(BigInteger)
+    family_name = Column(String)
+    __tablename__ = DB_TABLE_KPLER_PRODUCT
+
+
 class KplerZone(Base):
     id = Column(BigInteger, primary_key=True)
     name = Column(String)
-    isPort = Column(Boolean)
-    isSupplyDemand = Column(Boolean)
-    # geo = Column(Geometry("POINT", srid=4326))
-    continent = Column(JSONB)
-    export = Column(JSONB)
-    parentZones = Column(JSONB)
-    range = Column(Numeric)
-    subcontinent = Column(JSONB)
-    # shape = Column(Geometry("GEOMETRY", srid=4326))
     type = Column(String)
-    import_info = Column(JSONB)
-    isStorageSelected = Column(Boolean)
-    fullname = Column(String)
-    platform = Column(String)
+    port_id = Column(BigInteger)
+    port_name = Column(String)
+    country_id = Column(BigInteger)
+    country_name = Column(String)
+    country_iso2 = Column(String)
 
     __tablename__ = DB_TABLE_KPLER_ZONE
-    __table_args__ = (UniqueConstraint("id", name="unique_kpler_zone"),)
