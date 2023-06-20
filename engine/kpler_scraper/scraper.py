@@ -746,7 +746,7 @@ class KplerScraper:
             "view": "kpler",
             "withBetaVessels": False,
             "withForecasted": False,
-            "withGrades": False,
+            "withGrades": True,
             "withIncompleteTrades": True,
             "withIntraCountry": False,
             "vesselClassifications": [],
@@ -933,6 +933,14 @@ class KplerScraper:
                 df["from_zone"] = df["split"]
             elif split == FlowsSplit.Products:
                 df["product"] = df["split"].apply(lambda x: x.get("name"))
+            elif split == FlowsSplit.Grades:
+                df["grade"] = df["split"].apply(lambda x: x.get("name"))
+                df["product"] = df["split"].apply(
+                    lambda x: KplerProduct.get_commodity_name(platform=platform, id=x.get("id"))
+                )
+                # Remove CPC Kazakhstan for now
+                df = df[df["grade"] != "CPC Kazakhstan"]
+                df = df.drop(columns=["grade"])
 
             return df
 
@@ -1015,6 +1023,50 @@ class KplerScraper:
         """
         manual_fixes = {"1109": "833"}  # SINGAPORE vs SINGAPORE REPUBLIC
         return type(id)(manual_fixes.get(id, id))
+
+
+class KplerProduct:
+
+    cache = {}
+    session = requests.Session()
+    retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
+    token = get_env("KPLER_TOKEN_BRUTE")
+
+    @classmethod
+    def get_info(cls, platform, id):
+        if id in KplerProduct.cache:
+            return KplerProduct.cache[id]
+        else:
+            infos = KplerProduct.collect_infos(platform=platform, id=id)
+            KplerProduct.cache[id] = infos
+            return infos
+
+    @classmethod
+    def get_commodity_name(cls, platform, id):
+        infos = cls.get_info(platform=platform, id=id)
+        return infos.get("closestAncestorCommodity").get("name")
+
+    @classmethod
+    def collect_infos(cls, platform, id):
+        token = KplerProduct.token  # get_env("KPLER_TOKEN_BRUTE")
+        url = {
+            "dry": "https://dry.kpler.com/api/products",
+            "liquids": "https://terminal.kpler.com/api/products",
+            "lng": "https://lng.kpler.com/api/products",
+        }.get(platform)
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "x-web-application-version": "v21.316.0",
+            "content-type": "application/json",
+        }
+        try:
+            r = KplerProduct.session.get(f"{url}/{id}", headers=headers)
+        except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
+            logger.warning(f"Kpler request failed")
+            return None
+
+        return r.json()
 
 
 def fill_products():
