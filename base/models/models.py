@@ -1012,7 +1012,14 @@ class KplerFlow(Base):
 
     date = Column(Date, nullable=False)
     unit = Column(String, nullable=False)
+
+    grade = Column(String, nullable=True)
+    commodity = Column(String, nullable=True)
+    group = Column(String, nullable=True)
+    family = Column(String, nullable=True)
+
     product = Column(String, nullable=False)
+
     platform = Column(String, nullable=False)
 
     value = Column(Numeric, nullable=False)

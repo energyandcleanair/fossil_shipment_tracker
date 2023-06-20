@@ -931,16 +931,22 @@ class KplerScraper:
                 FlowsSplit.OriginPorts,
             ]:
                 df["from_zone"] = df["split"]
-            elif split == FlowsSplit.Products:
+            elif split in [FlowsSplit.Products, FlowsSplit.Grades]:
+                # product is the generic term that is returned by the API
                 df["product"] = df["split"].apply(lambda x: x.get("name"))
-            elif split == FlowsSplit.Grades:
-                df["grade"] = df["split"].apply(lambda x: x.get("name"))
-                df["product"] = df["split"].apply(
+
+                df["grade"] = df["split"].apply(
+                    lambda x: KplerProduct.get_grade_name(platform=platform, id=x.get("id"))
+                )
+                df["commodity"] = df["split"].apply(
                     lambda x: KplerProduct.get_commodity_name(platform=platform, id=x.get("id"))
                 )
-                # Remove CPC Kazakhstan for now
-                df = df[df["grade"] != "CPC Kazakhstan"]
-                df = df.drop(columns=["grade"])
+                df["group"] = df["split"].apply(
+                    lambda x: KplerProduct.get_group_name(platform=platform, id=x.get("id"))
+                )
+                df["family"] = df["split"].apply(
+                    lambda x: KplerProduct.get_family_name(platform=platform, id=x.get("id"))
+                )
 
             return df
 
@@ -1034,7 +1040,7 @@ class KplerProduct:
     token = get_env("KPLER_TOKEN_BRUTE")
 
     @classmethod
-    def get_info(cls, platform, id):
+    def get_infos(cls, platform, id):
         if id in KplerProduct.cache:
             return KplerProduct.cache[id]
         else:
@@ -1043,9 +1049,24 @@ class KplerProduct:
             return infos
 
     @classmethod
+    def get_grade_name(cls, platform, id):
+        infos = cls.get_infos(platform=platform, id=id)
+        return infos.get("closestAncestorGrade", {}).get("name")
+
+    @classmethod
     def get_commodity_name(cls, platform, id):
-        infos = cls.get_info(platform=platform, id=id)
-        return infos.get("closestAncestorCommodity").get("name")
+        infos = cls.get_infos(platform=platform, id=id)
+        return infos.get("closestAncestorCommodity", {}).get("name")
+
+    @classmethod
+    def get_group_name(cls, platform, id):
+        infos = cls.get_infos(platform=platform, id=id)
+        return infos.get("closestAncestorGroup", {}).get("name")
+
+    @classmethod
+    def get_family_name(cls, platform, id):
+        infos = cls.get_infos(platform=platform, id=id)
+        return infos.get("closestAncestorFamily", {}).get("name")
 
     @classmethod
     def collect_infos(cls, platform, id):
