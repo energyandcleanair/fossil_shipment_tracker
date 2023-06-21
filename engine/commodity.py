@@ -17,6 +17,7 @@ def fill():
     """
     commodities_df = pd.read_csv("assets/commodities.csv")
     commodities_df["alternative_groups"] = commodities_df.alternative_groups.apply(eval)
+    commodities_df["equivalent_id"] = commodities_df["id"]
     upsert(
         df=commodities_df,
         table=DB_TABLE_COMMODITY,
@@ -24,43 +25,49 @@ def fill():
         dtype={"alternative_groups": JSONB},
     )
 
+    fill_kpler_commodities(commodities_df=commodities_df)
+
+
+def fill_kpler_commodities(commodities_df):
+
     # Add Kpler Products
     from engine.kpler_scraper import KplerScraper
-    from engine.kpler_scraper import get_product_id, get_commodity_group
+    from engine.kpler_scraper import get_product_id, get_commodity_equivalent, get_commodity_pricing
 
     scraper = KplerScraper()
-    kpler_products = scraper.get_products(platform="liquids")
+    kpler_products = scraper.get_products()
 
-    # Adding the couple products that correspond to a group or family
-    # To note: "group" has a different meaning for Kpler and our db
-    groups_to_add = [
-        "Crude/Co",
-        "Gasoil/Diesel",
-        "Kero/Jet",
-        "Gasoline/Naphtha",
-        "Fuel Oils",
-    ]
-    for group in groups_to_add:
-        new = kpler_products[kpler_products.group == group].head(1).copy()
-        new.name = group
-        kpler_products = pd.concat([kpler_products, new])
+    def add_groups_as_commodities(kpler_products):
+        # Adding the couple products that correspond to a group or family
+        # To note: "group" has a different meaning for Kpler and our db
+        groups_to_add = [
+            "Crude/Co",
+            "Gasoil/Diesel",
+            "Kero/Jet",
+            "Gasoline/Naphtha",
+            "Fuel Oils",
+            "Coal",
+        ]
+        for group in groups_to_add:
+            new = kpler_products[kpler_products.group == group].head(1).copy()
+            new.name = group
+            kpler_products = pd.concat([kpler_products, new])
 
-    # Use similar grouping names than original commodities
-    def corresponding_commodity_field(x, field="group"):
-        if x is None:
-            return None
-        return commodities_df[commodities_df.id == x][field].values[0]
+        return kpler_products
 
-    for field in ["group_name", "group", "alternative_groups"]:
-        kpler_products[field] = kpler_products.apply(
-            lambda x: corresponding_commodity_field(get_commodity_group(x), field=field), axis=1
-        )
-
+    kpler_products = add_groups_as_commodities(kpler_products)
     kpler_products["id"] = kpler_products["name"].apply(get_product_id)
-    kpler_products["pricing_commodity"] = kpler_products["id"]
+    kpler_products["equivalent_id"] = kpler_products.apply(get_commodity_equivalent, axis=1)
+    kpler_products["pricing_commodity"] = kpler_products.apply(get_commodity_pricing, axis=1)
 
-    crude_idx = kpler_products.name.isin(["Crude/Co", "Crude", "Condensate"])
-    kpler_products.loc[crude_idx, "pricing_commodity"] = base.CRUDE_OIL
+    # Add fields from commodities
+    kpler_products = pd.merge(
+        kpler_products.drop(columns=["group"]),
+        commodities_df[["id", "group_name", "group", "alternative_groups"]].rename(
+            columns={"id": "equivalent_id"}
+        ),
+        how="left",
+    )
 
     kpler_products["transport"] = base.SEABORNE
     kpler_products["grouping"] = "default"

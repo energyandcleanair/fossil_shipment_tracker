@@ -791,6 +791,7 @@ class EndpointCache(Base):
 
 class Commodity(Base):
     id = Column(String, primary_key=True)
+    equivalent_id = Column(String)  # Used for kpler commodities to have a generic equivalent
     transport = Column(String)
     name = Column(String)
     pricing_commodity = Column(String)
@@ -1030,6 +1031,8 @@ class KplerFlow(Base):
     __tablename__ = DB_TABLE_KPLER_FLOW
     __table_args__ = (
         Index("idx_kpler_flow_product", "product"),
+        Index("idx_kpler_flow_commodity", "commodity"),
+        Index("idx_kpler_flow_group", "group"),
         Index("idx_kpler_flow_from_iso2", "from_iso2"),
         Index("idx_kpler_flow_from_split", "from_split"),
         Index("idx_kpler_flow_to_split", "to_split"),

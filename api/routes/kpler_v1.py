@@ -95,10 +95,33 @@ class KplerFlowResource(TemplateResource):
 
     parser.add_argument("date_to", type=str, help="End date", default=None, required=False)
 
-    parser.add_argument("product", help="Product", required=False, action="split", default=None)
+    parser.add_argument(
+        "grade",
+        help="Kpler grade (typically a grade)",
+        required=False,
+        action="split",
+        default=None,
+    )
     parser.add_argument(
         "commodity",
-        help="Commodity using CREA's nomenclature: either crude_oil, oil_products, or lng",
+        help="Kpler commodity (e.g. Crude)",
+        required=False,
+        action="split",
+        default=None,
+    )
+    parser.add_argument(
+        "group",
+        help="Kpler product group (e.g. Crude/Co)",
+        required=False,
+        action="split",
+        default=None,
+    )
+    parser.add_argument(
+        "family", help="Kpler product family", required=False, action="split", default=None
+    )
+    parser.add_argument(
+        "commodity_equivalent",
+        help="Commodity using CREA's nomenclature: either crude_oil, oil_products, lng, or coal",
         required=False,
         action="split",
         default=None,
@@ -116,11 +139,23 @@ class KplerFlowResource(TemplateResource):
     date_cols = ["date"]
     value_cols = ["value_tonne", "value_eur", "value_currency"]
     pivot_dependencies = {
-        "product": ["product_group", "product_family", "commodity"],
+        "grade": ["commodity", "group", "family", "commodity_equivalent"],
+        "commodity": ["group", "family", "commodity_equivalent"],
+        "group": ["family", "commodity_equivalent"],
         "origin_country": ["origin_iso2", "origin_region"],
+        "commodity_origin_country": ["commodity_origin_iso2", "commodity_origin_region"],
         "origin_iso2": ["origin_country", "origin_region"],
+        "commodity_origin_iso2": ["commodity_origin_country", "commodity_origin_region"],
         "destination_country": ["destination_iso2", "destination_region"],
+        "commodity_destination_country": [
+            "commodity_destination_iso2",
+            "commodity_destination_region",
+        ],
         "destination_iso2": ["destination_country", "destination_region"],
+        "commodity_destination_iso2": [
+            "commodity_destination_country",
+            "commodity_destination_region",
+        ],
     }
     filename = "kpler_flow"
 
@@ -135,6 +170,16 @@ class KplerFlowResource(TemplateResource):
                 subquery.c.origin_iso2,
                 subquery.c.origin_country,
                 subquery.c.origin_region,
+            ],
+            "commodity_origin_country": [
+                subquery.c.commodity_origin_iso2,
+                subquery.c.commodity_origin_country,
+                subquery.c.commodity_origin_region,
+            ],
+            "commodity_origin_iso2": [
+                subquery.c.commodity_origin_iso2,
+                subquery.c.commodity_origin_country,
+                subquery.c.commodity_origin_region,
             ],
             "origin": [
                 subquery.c.origin_name,
@@ -152,13 +197,40 @@ class KplerFlowResource(TemplateResource):
                 subquery.c.destination_country,
                 subquery.c.destination_region,
             ],
+            "commodity_destination_country": [
+                subquery.c.commodity_destination_iso2,
+                subquery.c.commodity_destination_country,
+                subquery.c.commodity_destination_region,
+            ],
+            "commodity_destination_iso2": [
+                subquery.c.commodity_destination_iso2,
+                subquery.c.commodity_destination_country,
+                subquery.c.commodity_destination_region,
+            ],
             "destination": [subquery.c.destination_name],
-            "product": [
-                subquery.c.product,
-                subquery.c.product_group,
-                subquery.c.product_family,
+            "grade": [
+                subquery.c.grade,
                 subquery.c.commodity,
+                subquery.c.group,
+                subquery.c.family,
                 subquery.c.commodity_equivalent,
+                subquery.c.commodity_equivalent_group,
+            ],
+            "commodity": [
+                subquery.c.commodity,
+                subquery.c.group,
+                subquery.c.family,
+                subquery.c.commodity_equivalent,
+                subquery.c.commodity_equivalent_group,
+            ],
+            "group": [
+                subquery.c.group,
+                subquery.c.commodity_equivalent,
+                subquery.c.commodity_equivalent_group,
+            ],
+            "commodity_equivalent": [
+                subquery.c.commodity_equivalent,
+                subquery.c.commodity_equivalent_group,
             ],
             "origin_type": [subquery.c.origin_type],
             "destination_type": [subquery.c.destination_type],
@@ -166,11 +238,6 @@ class KplerFlowResource(TemplateResource):
             "date": [subquery.c.date],
             "month": [func.month(subquery.c.date).label("month")],
             "year": [func.extract("year", subquery.c.date).label("year")],
-            "commodity": [subquery.c.commodity, subquery.c.commodity_group],
-            "commodity_equivalent": [
-                subquery.c.commodity_equivalent,
-                subquery.c.commodity_equivalent_group,
-            ],
         }
 
     def get_agg_value_cols(self, subquery):
@@ -183,52 +250,64 @@ class KplerFlowResource(TemplateResource):
     @routes_api.expect(parser)
     @key_required
     def get(self):
-        params = KplerFlowResource.parser.parse_args()
+        params = KplerFlowResource.parser.parse_args(strict=True)
         return self.get_from_params(params)
 
     def initial_query(self, params=None):
 
         FromCountry = aliased(Country)
+        CommodityOriginCountry = aliased(Country)
+
         ToCountry = aliased(Country)
+        CommodityDestinationCountry = aliased(Country)
         CommodityEquivalent = aliased(Commodity)
+
+        commodity_origin_iso2_field = case(
+            [(KplerFlow.grade == "CPC Kazakhstan", "KZ")],
+            else_=KplerFlow.from_iso2,
+        ).label("commodity_origin_iso2")
+
+        commodity_destination_iso2_field = KplerFlow.to_iso2.label("commodity_destination_iso2")
 
         value_tonne_field = case([(KplerFlow.unit == "t", KplerFlow.value)], else_=sa.null()).label(
             "value_tonne"
         )
 
         value_eur_field = (value_tonne_field * Price.eur_per_tonne).label("value_eur")
-        commodity_id_field = sa.case(
-            [
-                (KplerFlow.product == "lng", "lng"),
-                (KplerFlow.product.in_(["Coal", "Thermal", "Metallurgical"]), "coal"),
-            ],
-            else_="kpler_"
+
+        # Commodity used for pricing
+        commodity_id_field = (
+            "kpler_"
             + sa.func.replace(
-                sa.func.replace(sa.func.lower(KplerFlow.product), " ", "_"), "/", "_"
-            ),
+                sa.func.replace(
+                    sa.func.lower(func.coalesce(KplerFlow.commodity, KplerFlow.group)), " ", "_"
+                ),
+                "/",
+                "_",
+            )
         ).label("commodity")
 
-        commodity_equivalent_id_field = case(
-            [
-                (
-                    sa.and_(KplerProduct.family.in_(["Dirty"]), KplerFlow.product != "Condensate"),
-                    "crude_oil",
-                ),
-                (
-                    sa.and_(
-                        sa.or_(
-                            KplerProduct.group.in_(["Fuel Oils"]),
-                            KplerProduct.family.in_(["Light Ends", "Middle Distillates"]),
-                        ),
-                        KplerFlow.product != "Clean Condensate",
-                    ),
-                    "oil_products",
-                ),
-                (KplerProduct.name.in_(["lng"]), "lng"),
-                (KplerProduct.name.in_(["Coal", "Thermal", "Metallurgical"]), "coal"),
-            ],
-            else_="others",
-        ).label("commodity_equivalent")
+        # commodity_equivalent_id_field = case(
+        #     [
+        #         (
+        #             sa.and_(KplerProduct.family.in_(["Dirty"]), KplerFlow.commodity != "Condensate"),
+        #             "crude_oil",
+        #         ),
+        #         (
+        #             sa.and_(
+        #                 sa.or_(
+        #                     KplerProduct.group.in_(["Fuel Oils"]),
+        #                     KplerProduct.family.in_(["Light Ends", "Middle Distillates"]),
+        #                 ),
+        #                 KplerFlow.commodity != "Clean Condensate",
+        #             ),
+        #             "oil_products",
+        #         ),
+        #         (KplerProduct.name.in_(["lng"]), "lng"),
+        #         (KplerProduct.name.in_(["Coal", "Thermal", "Metallurgical"]), "coal"),
+        #     ],
+        #     else_="others",
+        # ).label("commodity_equivalent")
 
         query = (
             session.query(
@@ -240,20 +319,29 @@ class KplerFlowResource(TemplateResource):
                 KplerFlow.to_iso2.label("destination_iso2"),
                 ToCountry.name.label("destination_country"),
                 ToCountry.region.label("destination_region"),
+                # Commodity origin and destination
+                commodity_origin_iso2_field,
+                CommodityOriginCountry.name.label("commodity_origin_country"),
+                CommodityOriginCountry.region.label("commodity_origin_region"),
+                commodity_destination_iso2_field,
+                CommodityDestinationCountry.name.label("commodity_destination_country"),
+                CommodityDestinationCountry.region.label("commodity_destination_region"),
                 KplerFlow.to_split.label("destination_type"),
                 KplerFlow.to_zone_name.label("destination_name"),
                 KplerFlow.date,
-                KplerFlow.product.label("product"),
-                KplerProduct.group.label("product_group"),
-                KplerProduct.family.label("product_family"),
+                # KplerFlow.product.label("product"),
+                KplerFlow.grade.label("grade"),
+                KplerFlow.commodity.label("commodity"),
+                KplerFlow.group.label("group"),
+                KplerFlow.family.label("family"),
                 Price.scenario.label("pricing_scenario"),
                 value_tonne_field,
                 value_eur_field,
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
-                Commodity.name.label("commodity"),
-                Commodity.group.label("commodity_group"),
-                commodity_equivalent_id_field,  # For filtering
+                # Commodity.name.label("commodity"),
+                # Commodity.group.label("commodity_group"),
+                Commodity.equivalent_id.label("commodity_equivalent"),  # For filtering
                 CommodityEquivalent.name.label("commodity_equivalent_name"),
                 CommodityEquivalent.group.label("commodity_equivalent_group"),
             )
@@ -265,20 +353,30 @@ class KplerFlowResource(TemplateResource):
                 ToCountry,
                 ToCountry.iso2 == KplerFlow.to_iso2,
             )
+            .outerjoin(
+                CommodityOriginCountry,
+                CommodityOriginCountry.iso2 == commodity_origin_iso2_field,
+            )
+            .outerjoin(
+                CommodityDestinationCountry,
+                CommodityDestinationCountry.iso2 == commodity_destination_iso2_field,
+            )
             # join to avoid double counting (we collected both by product and by group)
             # but this isn't perfect, as sometimes, kpler is using group when not knowing product
-            .outerjoin(
-                KplerProduct,
-                sa.and_(
-                    sa.or_(
-                        KplerProduct.name == KplerFlow.product,
-                        KplerProduct.group == KplerFlow.product,
-                    ),
-                    KplerProduct.platform == KplerFlow.platform,
-                ),
-            )
+            # .outerjoin(
+            #     KplerProduct,
+            #     sa.and_(
+            #         sa.or_(
+            #             KplerProduct.name == KplerFlow.product,
+            #             # TODO CHECK this is not creating double counting
+            #             # or removing rows because of no pricing for the group
+            #             KplerProduct.group == KplerFlow.product,
+            #         ),
+            #         KplerProduct.platform == KplerFlow.platform,
+            #     ),
+            # )
             .join(Commodity, commodity_id_field == Commodity.id)
-            .join(CommodityEquivalent, commodity_equivalent_id_field == CommodityEquivalent.id)
+            .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
             .join(
                 Price,
                 sa.and_(
@@ -315,12 +413,19 @@ class KplerFlowResource(TemplateResource):
     def filter(self, query, params=None):
 
         origin_iso2 = params.get("origin_iso2")
+        commodity_origin_iso2 = params.get("commodity_origin_iso2")
         destination_iso2 = params.get("destination_iso2")
+        commodity_destination_iso2 = params.get("commodity_destination_iso2")
         destination_region = params.get("destination_region")
         origin_type = params.get("origin_type")
         destination_type = params.get("destination_type")
-        product = params.get("product")
+
+        grade = params.get("grade")
         commodity = params.get("commodity")
+        group = params.get("group")
+        family = params.get("family")
+        commodity_equivalent = params.get("commodity_equivalent")
+
         date_from = params.get("date_from")
         date_to = params.get("date_to")
         platform = params.get("platform")
@@ -333,8 +438,17 @@ class KplerFlowResource(TemplateResource):
         if destination_iso2:
             query = query.filter(KplerFlow.to_iso2.in_(to_list(destination_iso2)))
 
-        if product:
-            query = query.filter(KplerFlow.product.in_(to_list(product)))
+        if grade:
+            query = query.filter(KplerFlow.grade.in_(to_list(grade)))
+
+        if commodity:
+            query = query.filter(KplerFlow.commodity.in_(to_list(commodity)))
+
+        if group:
+            query = query.filter(KplerFlow.group.in_(to_list(group)))
+
+        if family:
+            query = query.filter(KplerFlow.family.in_(to_list(family)))
 
         if origin_type:
             query = query.filter(KplerFlow.from_split.in_(to_list(origin_type)))
@@ -346,10 +460,10 @@ class KplerFlowResource(TemplateResource):
             query = query.filter(KplerFlow.platform.in_(to_list(platform)))
 
         if date_from:
-            query = query.filter(KplerFlow.date >= to_datetime(date_from))
+            query = query.filter(KplerFlow.date >= str(to_datetime(date_from)))
 
         if date_to:
-            query = query.filter(KplerFlow.date <= to_datetime(date_to))
+            query = query.filter(KplerFlow.date <= str(to_datetime(date_to)))
 
         if pricing_scenario:
             query = query.filter(Price.scenario.in_(to_list(pricing_scenario)))
@@ -360,10 +474,20 @@ class KplerFlowResource(TemplateResource):
         subquery = query.subquery()
         query = session.query(subquery)
 
-        if commodity:
-            query = query.filter(subquery.c.commodity_equivalent.in_(to_list(commodity)))
+        if commodity_equivalent:
+            query = query.filter(subquery.c.commodity_equivalent.in_(to_list(commodity_equivalent)))
 
         if destination_region:
             query = query.filter(subquery.c.destination_region.in_(to_list(destination_region)))
+
+        if commodity_origin_iso2:
+            query = query.filter(
+                subquery.c.commodity_origin_iso2.in_(to_list(commodity_origin_iso2))
+            )
+
+        if commodity_destination_iso2:
+            query = query.filter(
+                subquery.c.commodity_destination_iso2.in_(to_list(commodity_destination_iso2))
+            )
 
         return query

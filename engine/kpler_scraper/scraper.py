@@ -936,16 +936,16 @@ class KplerScraper:
                 df["product"] = df["split"].apply(lambda x: x.get("name"))
 
                 df["grade"] = df["split"].apply(
-                    lambda x: KplerProduct.get_grade_name(platform=platform, id=x.get("id"))
+                    lambda x: KplerProductInfo.get_grade_name(platform=platform, id=x.get("id"))
                 )
                 df["commodity"] = df["split"].apply(
-                    lambda x: KplerProduct.get_commodity_name(platform=platform, id=x.get("id"))
+                    lambda x: KplerProductInfo.get_commodity_name(platform=platform, id=x.get("id"))
                 )
                 df["group"] = df["split"].apply(
-                    lambda x: KplerProduct.get_group_name(platform=platform, id=x.get("id"))
+                    lambda x: KplerProductInfo.get_group_name(platform=platform, id=x.get("id"))
                 )
                 df["family"] = df["split"].apply(
-                    lambda x: KplerProduct.get_family_name(platform=platform, id=x.get("id"))
+                    lambda x: KplerProductInfo.get_family_name(platform=platform, id=x.get("id"))
                 )
 
             return df
@@ -1031,7 +1031,7 @@ class KplerScraper:
         return type(id)(manual_fixes.get(id, id))
 
 
-class KplerProduct:
+class KplerProductInfo:
 
     cache = {}
     session = requests.Session()
@@ -1041,11 +1041,11 @@ class KplerProduct:
 
     @classmethod
     def get_infos(cls, platform, id):
-        if id in KplerProduct.cache:
-            return KplerProduct.cache[id]
+        if id in KplerProductInfo.cache:
+            return KplerProductInfo.cache[id]
         else:
-            infos = KplerProduct.collect_infos(platform=platform, id=id)
-            KplerProduct.cache[id] = infos
+            infos = KplerProductInfo.collect_infos(platform=platform, id=id)
+            KplerProductInfo.cache[id] = infos
             return infos
 
     @classmethod
@@ -1070,7 +1070,7 @@ class KplerProduct:
 
     @classmethod
     def collect_infos(cls, platform, id):
-        token = KplerProduct.token  # get_env("KPLER_TOKEN_BRUTE")
+        token = KplerProductInfo.token  # get_env("KPLER_TOKEN_BRUTE")
         url = {
             "dry": "https://dry.kpler.com/api/products",
             "liquids": "https://terminal.kpler.com/api/products",
@@ -1082,7 +1082,7 @@ class KplerProduct:
             "content-type": "application/json",
         }
         try:
-            r = KplerProduct.session.get(f"{url}/{id}", headers=headers)
+            r = KplerProductInfo.session.get(f"{url}/{id}", headers=headers)
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
             logger.warning(f"Kpler request failed")
             return None

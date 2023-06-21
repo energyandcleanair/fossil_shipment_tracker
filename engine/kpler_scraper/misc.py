@@ -26,7 +26,7 @@ def get_product_id_field(name_field):
     return id
 
 
-def get_commodity_group(row):
+def get_commodity_equivalent(row):
     """
 
     :param row:
@@ -46,3 +46,19 @@ def get_commodity_group(row):
         return base.COAL
     else:
         return None
+
+
+def get_commodity_pricing(row):
+
+    id = row["id"]
+    equivalent_id = row["equivalent_id"]
+    name = row["name"]
+
+    if name in ["Crude/Co", "Crude", "Condensate"]:
+        return base.CRUDE_OIL
+    elif equivalent_id == base.LNG:
+        return base.LNG
+    elif equivalent_id == base.COAL:
+        return base.COAL
+    else:
+        return id
