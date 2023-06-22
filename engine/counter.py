@@ -281,8 +281,8 @@ def sanity_check(result, version):
             .outerjoin(Country, Country.iso2 == Counter.destination_iso2)
             .join(Commodity, Commodity.id == Counter.commodity)
             .filter(Counter.pricing_scenario == PRICING_DEFAULT)
-            # .filter(Counter.version == version)
-            .filter(Counter.version == base.COUNTER_VERSION0).statement,
+            .filter(Counter.version == version)
+            .statement,
             session.bind,
         )
         old = (
