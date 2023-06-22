@@ -122,7 +122,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
             "origin_type": ["country"],
             "destination_type": ["country"],
             "aggregate_by": [
-                "origin_iso2",
+                "commodity_origin_iso2",
                 "destination_iso2",
                 "commodity_equivalent",
                 "date",
@@ -135,11 +135,13 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
         kpler_flows_resp = KplerFlowResource().get_from_params(params=params_kpler_flows)
         kpler_flows = json.loads(kpler_flows_resp.response[0])
         kpler_flows = pd.DataFrame(kpler_flows)
-        kpler_flows = kpler_flows.loc[kpler_flows.origin_iso2 == "RU"]
+        kpler_flows = kpler_flows.loc[kpler_flows.commodity_origin_iso2 == "RU"]
         kpler_flows = kpler_flows.loc[kpler_flows.destination_iso2 != "RU"]
+        kpler_flows = kpler_flows.loc[kpler_flows.destination_iso2 != "not found"]
         kpler_flows.rename(
             columns={
                 "commodity_equivalent": "commodity",
+                "commodity_equivalent_group": "commodity_group",
                 "destination_region": "commodity_destination_region",
                 "destination_iso2": "commodity_destination_iso2",
             },
@@ -201,18 +203,18 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
 
     # Sanity check before updating counter
     ok, global_new, global_old, eu_new, eu_old = sanity_check(
-        result.loc[result.pricing_scenario == PRICING_DEFAULT]
+        result.loc[result.pricing_scenario == PRICING_DEFAULT], version=version
     )
 
     if not ok:
         logger_slack.error(
-            "[ERROR] New global counter: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check."
-            % (global_new / 1e9, global_old / 1e9)
+            "[ERROR] New global counter %s: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check."
+            % (version, global_new / 1e9, global_old / 1e9)
         )
     else:
         logger_slack.info(
-            "[COUNTER UPDATE] New global counter: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)"
-            % (global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9)
+            "[COUNTER UPDATE] New global counter %s: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)"
+            % (version, global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9)
         )
 
         result.drop(["commodity_destination_region", "commodity_group"], axis=1, inplace=True)
@@ -220,7 +222,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
 
         if True:
             # Erase and replace everything
-            Counter.query.delete()
+            Counter.query.filter(Counter.version == version).delete()
             session.commit()
             result.to_sql(DB_TABLE_COUNTER, con=engine, if_exists="append", index=False)
             session.commit()
@@ -233,14 +235,13 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
             )
 
 
-def sanity_check(result):
+def sanity_check(result, version):
     ok = True
     missing_price = result.loc[
         (result.value_tonne > 0)
         & (result.value_eur <= 0)
         & (result.commodity != "bulk_not_coal")
         & (result.commodity != "general_cargo")
-        & (result.commodity != "lpg")
         & (pd.to_datetime(result.date) <= dt.datetime.now())
     ]
 
@@ -280,7 +281,8 @@ def sanity_check(result):
             .outerjoin(Country, Country.iso2 == Counter.destination_iso2)
             .join(Commodity, Commodity.id == Counter.commodity)
             .filter(Counter.pricing_scenario == PRICING_DEFAULT)
-            .statement,
+            # .filter(Counter.version == version)
+            .filter(Counter.version == base.COUNTER_VERSION0).statement,
             session.bind,
         )
         old = (

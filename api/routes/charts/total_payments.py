@@ -75,6 +75,7 @@ class ChartTotalPayments(Resource):
                 "nest_in_data": True,
                 "destination_region": None,
                 "limit": None,
+                "version": base.COUNTER_VERSION0,
             }
         )
 
