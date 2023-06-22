@@ -135,7 +135,7 @@ class KplerFlowResource(TemplateResource):
         required=False,
     )
 
-    must_group_by = ["origin_type", "destination_type", "currency"]
+    must_group_by = ["origin_type", "destination_type", "currency", "pricing_scenario"]
     date_cols = ["date"]
     value_cols = ["value_tonne", "value_eur", "value_currency"]
     pivot_dependencies = {
@@ -238,6 +238,7 @@ class KplerFlowResource(TemplateResource):
             "date": [subquery.c.date],
             "month": [func.month(subquery.c.date).label("month")],
             "year": [func.extract("year", subquery.c.date).label("year")],
+            "pricing_scenario": [subquery.c.pricing_scenario],
         }
 
     def get_agg_value_cols(self, subquery):

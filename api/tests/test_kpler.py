@@ -116,6 +116,7 @@ def test_kpler_v1(app):
                 "value_tonne",
                 "value_eur",
                 "value_usd",
+                "pricing_scenario",
             ]
         )
         assert set(data_df.columns) >= expected_columns
@@ -390,6 +391,25 @@ def test_kpler_v1_commodity_origin(app):
             "date_from": "2022-12-01",
             "date_to": "2022-12-31",
             "aggregate_by": "origin_iso2,commodity",
+            "api_key": get_env("API_KEY"),
+        }
+        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        api = pd.DataFrame(response.json["data"])
+        assert len(api) > 0  # Not all cou
+
+
+def test_kpler_south_korea(app):
+
+    with app.test_client() as test_client:
+        params = {
+            "format": "json",
+            "origin_iso2": "RU",
+            "destination_iso2": "KR",
+            "group": "Coal",
+            "date_from": "2022-12-01",
+            "date_to": "2022-12-31",
+            "aggregate_by": "commodity_origin_iso2,destination_iso2,commodity",
             "api_key": get_env("API_KEY"),
         }
         response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
