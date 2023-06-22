@@ -36,7 +36,7 @@ from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementU
 from kpler.sdk.resources.installations import Installations
 from .misc import get_split_name
 
-KPLER_TOTAL = "Total"
+from engine.kpler_scraper import KPLER_TOTAL
 
 
 class KplerScraper:

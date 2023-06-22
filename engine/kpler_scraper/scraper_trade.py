@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 
 from engine.kpler_scraper.scraper import *
+from engine.kpler_scraper.scraper_product import KplerProductScraper
 from engine.kpler_scraper.misc import get_nested
 
 
@@ -40,7 +41,21 @@ class KplerTradeScraper(KplerScraper):
                     break
 
             trades = []
-            [trades.extend(self._parse_trade(x) or []) for x in trades_raw]
+            vessels = []
+            zones = []
+            products = []
+
+            for x in trades_raw:
+                trades_, vessels_, zones_, products_ = self._parse_trade(x, platform=platform)
+                trades.extend(trades_)
+                vessels.extend(vessels_)
+                zones.extend(zones_)
+                products.extend(products_)
+
+            trades_df = pd.DataFrame(trades)
+            vessels_df = pd.DataFrame(vessels)
+            zones_df = pd.DataFrame(zones)
+            products_df = pd.DataFrame(products)
 
         return trades
 
@@ -224,6 +239,29 @@ class KplerTradeScraper(KplerScraper):
         trade["vessel_ids"] = [y.get("id") for y in trade_raw.get("vessels")]
         return [trade]
 
+    def _parse_trade_flows(self, trade_raw) -> (List[dict]):
+
+        trade_id = trade_raw.get("id")
+        flows_raw = trade_raw.get("flowQuantities")
+        if len(flows_raw) == 0:
+            return []
+
+        flows = []
+        for flow_raw in flows_raw:
+
+            flow = {}
+            flow["trade_id"] = trade_id
+            flow["product_id"] = flow_raw.get("confirmedProduct").get("productId")
+            # flow["product_name"] = flow_raw.get("confirmedProduct").get("name")
+            # flow["product_type"] = flow_raw.get("confirmedProduct").get("type")
+            flow["mass"] = flow_raw.get("flowQuantity").get("mass")
+            flow["volume"] = flow_raw.get("flowQuantity").get("volume")
+            flow["energy"] = flow_raw.get("flowQuantity").get("energy")
+            flow["volume_gas"] = flow_raw.get("flowQuantity").get("volume_gas")
+            flows += [flow]
+
+        return flows
+
     def _parse_trade_zone(self, zone) -> (List[dict]):
 
         if not zone:
@@ -234,14 +272,17 @@ class KplerTradeScraper(KplerScraper):
         primary_zone["name"] = zone.get("name")
         primary_zone["type"] = zone.get("type")
 
-        primary_zone["port_id"] = zone.get("port", {}).get("id")
-        primary_zone["port_name"] = zone.get("port", {}).get("name")
+        primary_zone["port_id"] = (zone.get("port") or {}).get("id")
+        primary_zone["port_name"] = (zone.get("port") or {}).get("name")
+        primary_zone["country_id"] = (zone.get("country") or {}).get("id")
+        primary_zone["country_name"] = (zone.get("country") or {}).get("name")
+        primary_zone["country_iso2"] = (
+            self.cc.convert(primary_zone["country_name"], to="ISO2")
+            if primary_zone["country_name"]
+            else None
+        )
 
-        primary_zone["country_id"] = zone.get("country", {}).get("id")
-        primary_zone["country_name"] = zone.get("country", {}).get("name")
-        primary_zone["country_iso2"] = self.cc.convert(primary_zone["country_name"], to="ISO2")
-
-        port = zone.get("port")
+        port = zone.get("port") or {}
         port_zone = {}
         port_zone["id"] = port.get("id")
         port_zone["name"] = port.get("name")
@@ -252,89 +293,91 @@ class KplerTradeScraper(KplerScraper):
 
         return [primary_zone, port_zone]
 
-    def _parse_trade_products(self, flow) -> (List[dict]):
+    def _parse_trade_products(self, flow, platform) -> (List[dict]):
 
         if not flow:
             return []
 
-        commodity = flow.get("closestAncestorCommodity")
-        grade = flow.get("closestAncestorGrade")
-        group = flow.get("closestAncestorGroup")
-        family = flow.get("closestAncestorFamily")
+        # commodity = flow.get("closestAncestorCommodity") or {}
+        # grade = flow.get("closestAncestorGrade") or {}
+        # group = flow.get("closestAncestorGroup") or {}
+        # family = flow.get("closestAncestorFamily") or {}
 
         primary_product = {}
-        primary_product["id"] = flow.get("id")
-        primary_product["name"] = flow.get("name")
-        primary_product["full_name"] = flow.get("fullName")
-        primary_product["type"] = flow.get("type")
-        primary_product["grade_id"] = grade.get("id")
-        primary_product["grade_name"] = grade.get("name")
-        primary_product["commodity_id"] = commodity.get("id")
-        primary_product["commodity_name"] = commodity.get("name")
-        primary_product["group_id"] = group.get("id")
-        primary_product["group_name"] = group.get("name")
-        primary_product["family_id"] = family.get("id")
-        primary_product["family_name"] = family.get("name")
+        # primary_product["id"] = flow.get("id")
+        return KplerProductScraper.get_infos(platform=platform, id=flow.get("id"))
 
-        grade_product = {}
-        grade_product["id"] = grade.get("id")
-        grade_product["name"] = grade.get("name")
-        grade_product["full_name"] = grade.get("fullName")
-        grade_product["type"] = grade.get("type")
-        grade_product["grade_id"] = grade.get("id")
-        grade_product["grade_name"] = grade.get("name")
-        grade_product["commodity_id"] = commodity.get("id")
-        grade_product["commodity_name"] = commodity.get("name")
-        grade_product["group_id"] = group.get("id")
-        grade_product["group_name"] = group.get("name")
-        grade_product["family_id"] = family.get("id")
-        grade_product["family_name"] = family.get("name")
+        # primary_product["name"] = flow.get("name")
+        # primary_product["full_name"] = flow.get("fullName")
+        # primary_product["type"] = flow.get("type")
+        # primary_product["grade_id"] = grade.get("id")
+        # primary_product["grade_name"] = grade.get("name")
+        # primary_product["commodity_id"] = commodity.get("id")
+        # primary_product["commodity_name"] = commodity.get("name")
+        # primary_product["group_id"] = group.get("id")
+        # primary_product["group_name"] = group.get("name")
+        # primary_product["family_id"] = family.get("id")
+        # primary_product["family_name"] = family.get("name")
 
-        commodity_product = {}
-        commodity_product["id"] = commodity.get("id")
-        commodity_product["name"] = commodity.get("name")
-        commodity_product["full_name"] = commodity.get("fullName")
-        commodity_product["type"] = commodity.get("type")
-        commodity_product["grade_id"] = None
-        commodity_product["grade_name"] = None
-        commodity_product["commodity_id"] = commodity.get("id")
-        commodity_product["commodity_name"] = commodity.get("name")
-        commodity_product["group_id"] = group.get("id")
-        commodity_product["group_name"] = group.get("name")
-        commodity_product["family_id"] = family.get("id")
-        commodity_product["family_name"] = family.get("name")
+        # grade_product = {}
+        # grade_product["id"] = grade.get("id")
+        # grade_product["name"] = grade.get("name")
+        # grade_product["full_name"] = grade.get("fullName")
+        # grade_product["type"] = grade.get("type")
+        # grade_product["grade_id"] = grade.get("id")
+        # grade_product["grade_name"] = grade.get("name")
+        # grade_product["commodity_id"] = commodity.get("id")
+        # grade_product["commodity_name"] = commodity.get("name")
+        # grade_product["group_id"] = group.get("id")
+        # grade_product["group_name"] = group.get("name")
+        # grade_product["family_id"] = family.get("id")
+        # grade_product["family_name"] = family.get("name")
+        #
+        # commodity_product = {}
+        # commodity_product["id"] = commodity.get("id")
+        # commodity_product["name"] = commodity.get("name")
+        # commodity_product["full_name"] = commodity.get("fullName")
+        # commodity_product["type"] = commodity.get("type")
+        # commodity_product["grade_id"] = None
+        # commodity_product["grade_name"] = None
+        # commodity_product["commodity_id"] = commodity.get("id")
+        # commodity_product["commodity_name"] = commodity.get("name")
+        # commodity_product["group_id"] = group.get("id")
+        # commodity_product["group_name"] = group.get("name")
+        # commodity_product["family_id"] = family.get("id")
+        # commodity_product["family_name"] = family.get("name")
+        #
+        # group_product = {}
+        # group_product["id"] = group.get("id")
+        # group_product["name"] = group.get("name")
+        # group_product["full_name"] = group.get("fullName")
+        # group_product["type"] = group.get("type")
+        # group_product["grade_id"] = None
+        # group_product["grade_name"] = None
+        # group_product["commodity_id"] = None
+        # group_product["commodity_name"] = None
+        # group_product["group_id"] = group.get("id")
+        # group_product["group_name"] = group.get("name")
+        # group_product["family_id"] = family.get("id")
+        # group_product["family_name"] = family.get("name")
+        #
+        # family_product = {}
+        # family_product["id"] = family.get("id")
+        # family_product["name"] = family.get("name")
+        # family_product["full_name"] = family.get("fullName")
+        # family_product["type"] = family.get("type")
+        # family_product["grade_id"] = None
+        # family_product["grade_name"] = None
+        # family_product["commodity_id"] = None
+        # family_product["commodity_name"] = None
+        # family_product["group_id"] = None
+        # family_product["group_name"] = None
+        # family_product["family_id"] = family.get("id")
+        # family_product["family_name"] = family.get("name")
+        #
+        # return [primary_product, grade_product, commodity_product, group_product]
 
-        group_product = {}
-        group_product["id"] = group.get("id")
-        group_product["name"] = group.get("name")
-        group_product["full_name"] = group.get("fullName")
-        group_product["type"] = group.get("type")
-        group_product["grade_id"] = None
-        group_product["grade_name"] = None
-        group_product["commodity_id"] = None
-        group_product["commodity_name"] = None
-        group_product["group_id"] = group.get("id")
-        group_product["group_name"] = group.get("name")
-        group_product["family_id"] = family.get("id")
-        group_product["family_name"] = family.get("name")
-
-        family_product = {}
-        family_product["id"] = family.get("id")
-        family_product["name"] = family.get("name")
-        family_product["full_name"] = family.get("fullName")
-        family_product["type"] = family.get("type")
-        family_product["grade_id"] = None
-        family_product["grade_name"] = None
-        family_product["commodity_id"] = None
-        family_product["commodity_name"] = None
-        family_product["group_id"] = None
-        family_product["group_name"] = None
-        family_product["family_id"] = family.get("id")
-        family_product["family_name"] = family.get("name")
-
-        return [primary_product, grade_product, commodity_product, group_product]
-
-    def _parse_trade(self, trade_raw) -> (List[dict], List[dict], List[dict], List[dict]):
+    def _parse_trade(self, trade_raw, platform) -> (List[dict], List[dict], List[dict], List[dict]):
         """
         Parse a single trade and return a list of dictionaries.
         At the moment, it will only return either None or a list of single dictionary,
@@ -344,14 +387,25 @@ class KplerTradeScraper(KplerScraper):
          - trades
          - vessels
          - zones
-         - sts
+         - products
         """
 
         trades = self._parse_trade_trade(trade_raw=trade_raw)
+        # #DEBUG save trades using pickle
+        # import pickle
+        # # with open('trades.pickle', 'wb') as outfile:
+        # #     pickle.dump(trades, outfile)
+        # with open('trades.pickle', 'rb') as picklefile:
+        #     trades = pickle.load(picklefile)
+
         vessels = self._parse_trade_vessels(vessels=get_nested(trade_raw, "vessels"))
         from_zones = self._parse_trade_zone(zone=get_nested(trade_raw, "portCallOrigin", "zone"))
         to_zones = self._parse_trade_zone(zone=get_nested(trade_raw, "portCallDestination", "zone"))
         zones = from_zones + to_zones
-        products = self._parse_trade_products(flow=get_nested(trade_raw, "flowQuantities"))
+
+        products = [
+            self._parse_trade_products(flow=x, platform=platform)
+            for x in get_nested(trade_raw, "flowQuantities")
+        ]
         # sts = self._parse_trade_sts(trade_raw)
-        return trades, vessels, zones, products, []
+        return trades, vessels, zones, products

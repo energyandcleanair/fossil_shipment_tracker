@@ -24,6 +24,7 @@ from . import DB_TABLE_KPLER_PRODUCT
 from . import DB_TABLE_KPLER_FLOW
 from . import DB_TABLE_KPLER_VESSEL
 from . import DB_TABLE_KPLER_TRADE
+from . import DB_TABLE_KPLER_TRADE_FLOW
 from . import DB_TABLE_KPLER_ZONE
 
 
@@ -43,7 +44,14 @@ class KplerFlow(Base):
 
     date = Column(Date, nullable=False)
     unit = Column(String, nullable=False)
+
+    grade = Column(String, nullable=True)
+    commodity = Column(String, nullable=True)
+    group = Column(String, nullable=True)
+    family = Column(String, nullable=True)
+
     product = Column(String, nullable=False)
+
     platform = Column(String, nullable=False)
 
     value = Column(Numeric, nullable=False)
@@ -54,6 +62,8 @@ class KplerFlow(Base):
     __tablename__ = DB_TABLE_KPLER_FLOW
     __table_args__ = (
         Index("idx_kpler_flow_product", "product"),
+        Index("idx_kpler_flow_commodity", "commodity"),
+        Index("idx_kpler_flow_group", "group"),
         Index("idx_kpler_flow_from_iso2", "from_iso2"),
         Index("idx_kpler_flow_from_split", "from_split"),
         Index("idx_kpler_flow_to_split", "to_split"),
@@ -114,6 +124,18 @@ class KplerTrade(Base):
     others = Column(JSONB)
 
     __tablename__ = DB_TABLE_KPLER_TRADE
+
+
+class KplerTradeFlow(Base):
+    id = Column(BigInteger, primary_key=True)
+    trade_id = Column(BigInteger, primary_key=True)
+    product_id = Column(BigInteger, primary_key=True)
+    mass = Column(Numeric)
+    volume = Column(Numeric)
+    energy = Column(Numeric)
+    volume_gas = Column(Numeric)
+
+    __tablename__ = DB_TABLE_KPLER_TRADE_FLOW
 
 
 class KplerProduct(Base):

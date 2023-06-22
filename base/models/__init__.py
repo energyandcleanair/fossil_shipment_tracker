@@ -56,6 +56,7 @@ DB_TABLE_KPLER_PRODUCT = "kpler_product"
 DB_TABLE_KPLER_FLOW = "kpler_flow"
 DB_TABLE_KPLER_VESSEL = "kpler_vessel"
 DB_TABLE_KPLER_TRADE = "kpler_trade"
+DB_TABLE_KPLER_TRADE_FLOW = "kpler_trade_flow"
 DB_TABLE_KPLER_INSTALLATION = "kpler_installation"
 DB_TABLE_KPLER_ZONE = "kpler_zone"
 
