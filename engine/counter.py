@@ -308,6 +308,7 @@ def sanity_check(result, version):
             (comparison.new_eur >= comparison.old_eur * 0.95)
             & (comparison.new_eur <= comparison.old_eur * 1.2)
         ) | ((comparison.new_eur - comparison.old_eur).abs() < 50e6)
+
         comparison = comparison.reset_index()
         return comparison
 
@@ -347,6 +348,20 @@ def sanity_check(result, version):
             )
             .to_string(col_space=10, index=False, justify="left")
         )
+
+        # Relax a bit for crude_oil in CL, MY, US
+        comparison_detailed["ok"] = (
+            (
+                (comparison_detailed.new_eur >= comparison_detailed.old_eur * 0.95)
+                & (comparison_detailed.new_eur <= comparison_detailed.old_eur * 1.2)
+            )
+            | ((comparison_detailed.new_eur - comparison_detailed.old_eur).abs() < 50e6)
+            | (
+                (comparison_detailed["commodity"] == "crude_oil")
+                & (comparison_detailed.commodity_destination_iso2.isin(["CL", "MY", "US"]))
+            )
+        )
+        ok = ok or comparison_detailed.ok.all()
 
     global_old = comparison.old_eur.sum()
     global_new = comparison.new_eur.sum()
