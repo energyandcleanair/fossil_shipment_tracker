@@ -107,9 +107,9 @@ app.layout = dbc.Container(
     fluid=True,
     # die ganze app steckt in einem flex container; flex richtung ist column (standard); die row mit dem hauptinhalt bekommt flew grow
 )
+
 # Expose server
 server = app.server
-
 
 @app.callback(Output("page-content", "children"), [Input("url", "pathname")])
 def render_page_content(pathname):
