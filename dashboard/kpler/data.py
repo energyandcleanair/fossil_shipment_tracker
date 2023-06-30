@@ -30,10 +30,11 @@ def get_kpler0(origin_iso2, origin_type, destination_iso2, destination_type, com
         "origin_name",
         "destination_name",
         "destination_region",
+        "commodity",
         "date",
-        "product",
-        "product_group",
-        "product_family",
+        "grade",
+        "group",
+        "family",
         "commodity_equivalent_name",
         "value_tonne",
         "value_eur",
@@ -47,11 +48,12 @@ def get_kpler0(origin_iso2, origin_type, destination_iso2, destination_type, com
         "select": ",".join(columns),
     }
 
+
     if COUNTRY_GLOBAL not in to_list(destination_iso2):
         params["destination_iso2"] = ",".join(to_list(destination_iso2))
 
     if COMMODITY_ALL not in to_list(commodity):
-        params["commodity"] = ",".join(to_list(commodity))
+        params["commodity_equivalent"] = ",".join(to_list(commodity))
 
     url = "https://api.russiafossiltracker.com/v1/kpler_flow"
     r = requests.get(url, params=params)
@@ -92,11 +94,15 @@ def get_kpler_full(
 ):
 
     kpler0 = get_kpler0(origin_iso2, origin_type, destination_iso2, destination_type, commodity)
+ 
     df = pd.DataFrame(kpler0)
+    
     aggregate_by = list(set(["date"] + [colour_by] + [facet]))
     aggregate_by = [x for x in aggregate_by if x is not None]
+
     value_cols = [x for x in df.columns if x.startswith("value_")]
     df = df.groupby(aggregate_by, dropna=False)[value_cols].sum().reset_index()
+
     # Replace unknown with Unknodn in colour_by column
     df[colour_by] = df[colour_by].replace("unknown", "Unknown")
     df[colour_by] = df[colour_by].fillna("Unknown")
@@ -110,4 +116,5 @@ def get_kpler_full(
     min_date = df.loc[(df[value_cols] > 0).apply(any, axis=1)]["date"].min()
     df = df[df["date"] >= min_date]
     df = roll_average_kpler(df, rolling_days)
+
     return df
