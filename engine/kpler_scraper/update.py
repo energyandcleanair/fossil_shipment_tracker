@@ -20,14 +20,32 @@ from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementU
 from . import KplerScraper
 
 
+def update_full():
+    return update(
+        date_from=-30,
+        origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG"],
+        from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
+        to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
+    )
+
+
+def update_lite():
+    return update(
+        date_from=-30,
+        origin_iso2s=["RU"],
+        from_splits=[FlowsSplit.OriginCountries],
+        to_splits=[FlowsSplit.DestinationCountries]
+    )
+
+
 def update(
-    date_from=-90,
+    date_from=-30,
     date_to=None,
     platforms=None,
     products=None,
-    origin_iso2s=["RU"],
-    from_splits=[FlowsSplit.OriginCountries],
-    to_splits=[FlowsSplit.DestinationCountries],
+    origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG"],
+    from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
+    to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     ignore_if_copy_failed=False,
     use_brute_force=True,
     add_unknown=True,
@@ -135,7 +153,8 @@ def get_to_zones(
         date_from="2010-01-01",
         date_to=dt.date.today(),
         from_zone=from_zone,
-        to_zone=scraper.get_zone_dict(platform=platform, iso2=destination_iso2),
+        to_zone=scraper.get_zone_dict(
+            platform=platform, iso2=destination_iso2),
         split=split,
         granularity=FlowsPeriod.Annually,
     )
@@ -145,7 +164,8 @@ def get_to_zones(
         # dict unashable. Use a trick to get unique values
         zones_unique = list({v["id"]: v for v in df.split}.values())
         if not include_unknown:
-            zones_unique = [x for x in zones_unique if x["name"].lower() != UNKNOWN_COUNTRY.lower()]
+            zones_unique = [
+                x for x in zones_unique if x["name"].lower() != UNKNOWN_COUNTRY.lower()]
         return zones_unique
 
 
@@ -165,7 +185,8 @@ def update_flows(
     add_unknown_only=False,
 ):
     scraper = KplerScraper()
-    date_from = to_datetime(date_from) if date_from is not None else to_datetime("2013-01-01")
+    date_from = to_datetime(
+        date_from) if date_from is not None else to_datetime("2013-01-01")
     date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
 
     _platforms = scraper.platforms if platforms is None else platforms
@@ -214,7 +235,8 @@ def update_flows(
                             if df is not None:
                                 df_zones.append(df)
                             if not add_unknown_only:
-                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                                upload_flows(
+                                    df, ignore_if_copy_failed=ignore_if_copy_failed)
 
                         if add_unknown:
                             # Add an unknown one
@@ -232,7 +254,8 @@ def update_flows(
                             )
 
                             if len(df_zones) == 0:
-                                logger.warning("No flows found for %s", from_zone)
+                                logger.warning(
+                                    "No flows found for %s", from_zone)
                             else:
                                 known_zones = pd.concat(df_zones)
                                 known_zones_total = (
@@ -254,7 +277,8 @@ def update_flows(
                                     how="left",
                                     suffixes=("", "_byzone"),
                                 )
-                                unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
+                                unknown["value_byzone"] = unknown["value_byzone"].fillna(
+                                    0)
                                 unknown["value_unknown"] = (
                                     unknown["value"] - unknown["value_byzone"]
                                 )
@@ -263,7 +287,8 @@ def update_flows(
                                 unknown["value"] = unknown["value_unknown"]
                                 unknown["updated_on"] = dt.datetime.now()
                                 unknown = unknown[known_zones.columns]
-                                upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+                                upload_flows(
+                                    unknown, ignore_if_copy_failed=ignore_if_copy_failed)
 
 
 def update_flows_reverse(
@@ -280,7 +305,8 @@ def update_flows_reverse(
     add_unknown_only=False,
 ):
     scraper = KplerScraper()
-    date_from = to_datetime(date_from) if date_from is not None else to_datetime("2013-01-01")
+    date_from = to_datetime(
+        date_from) if date_from is not None else to_datetime("2013-01-01")
     date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
 
     _platforms = scraper.platforms if platforms is None else platforms
@@ -332,7 +358,8 @@ def update_flows_reverse(
                                 df_zones.append(df)
 
                             if not add_unknown_only:
-                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                                upload_flows(
+                                    df, ignore_if_copy_failed=ignore_if_copy_failed)
 
                         if add_unknown and len(df_zones) > 0:
                             # Add an unknown one
@@ -351,7 +378,8 @@ def update_flows_reverse(
 
                             known_zones = pd.concat(df_zones)
                             known_zones_total = (
-                                known_zones.groupby(["date", "product"]).value.sum().reset_index()
+                                known_zones.groupby(
+                                    ["date", "product"]).value.sum().reset_index()
                             )
                             if total is not None:
                                 unknown = total.merge(
@@ -360,7 +388,8 @@ def update_flows_reverse(
                                     how="left",
                                     suffixes=("", "_byzone"),
                                 )
-                                unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
+                                unknown["value_byzone"] = unknown["value_byzone"].fillna(
+                                    0)
                                 unknown["value_unknown"] = (
                                     unknown["value"] - unknown["value_byzone"]
                                 )
@@ -369,9 +398,11 @@ def update_flows_reverse(
                                 unknown["value"] = unknown["value_unknown"]
                                 unknown["updated_on"] = dt.datetime.now()
                                 unknown = unknown[known_zones.columns]
-                                upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+                                upload_flows(
+                                    unknown, ignore_if_copy_failed=ignore_if_copy_failed)
                             else:
-                                raise ValueError("Total should not be None if we have data by zone")
+                                raise ValueError(
+                                    "Total should not be None if we have data by zone")
 
 
 def upload_trades(trades, ignore_if_copy_failed=False):
@@ -411,7 +442,8 @@ def update_trades(
                 cursor_after, trades = scraper.get_trades_raw_brute(
                     platform=platform, origin_iso2=origin_iso2, cursor_after=cursor_after
                 )
-                upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
+                upload_trades(
+                    trades, ignore_if_copy_failed=ignore_if_copy_failed)
                 print(trades.departure_date.min())
                 if (
                     cursor_after is None
@@ -429,10 +461,12 @@ def update_zones(platforms=None):
         import ast
 
         import_installation = pd.concat(
-            [pd.DataFrame(ast.literal_eval(x).get("installations")) for x in zones["import"]]
+            [pd.DataFrame(ast.literal_eval(x).get("installations"))
+             for x in zones["import"]]
         )
         export_installation = pd.concat(
-            [pd.DataFrame(ast.literal_eval(x).get("installations")) for x in zones["export"]]
+            [pd.DataFrame(ast.literal_eval(x).get("installations"))
+             for x in zones["export"]]
         )
 
         def parent_zones_to_zones_df(parent_zones):
@@ -443,19 +477,23 @@ def update_zones(platforms=None):
             :return:
             """
             dicts = ast.literal_eval(parent_zones)
-            df = pd.DataFrame([x for x in dicts if x.get("resourceType") == "zone"])
-            country = next((x.get("name") for x in dicts if x.get("type") == "country"), None)
+            df = pd.DataFrame(
+                [x for x in dicts if x.get("resourceType") == "zone"])
+            country = next((x.get("name")
+                           for x in dicts if x.get("type") == "country"), None)
             df["country"] = country
             return df
 
-        ports = pd.concat([parent_zones_to_zones_df(x) for x in zones.parentZones])
+        ports = pd.concat([parent_zones_to_zones_df(x)
+                          for x in zones.parentZones])
         ports = (
             ports[["id", "name", "country"]]
             .rename(columns={"id": "port_id", "name": "port_name", "country": "port_country"})
             .drop_duplicates()
         )
 
-        import_installation["port_id"] = import_installation.port.apply(lambda x: x.get("id"))
+        import_installation["port_id"] = import_installation.port.apply(
+            lambda x: x.get("id"))
         a = import_installation.merge(ports, on="port_id", how="left")
         assert len(import_installation) == len(a)
         assert pd.isna(a.port_country).sum() == 0

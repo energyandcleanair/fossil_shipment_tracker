@@ -18,6 +18,7 @@ from engine import mtevents
 from engine import flaring
 from engine import sts
 from engine import backuper
+from engine import kpler_scraper
 
 import integrity
 import base
@@ -50,6 +51,7 @@ def update():
     # rscript.update()
     # trajectory.update()
     # flaring.update()
+    kpler_scraper.update_full()
     alert.update()
     counter.update()
     backuper.update()

@@ -18,6 +18,7 @@ from engine import mtevents
 from engine import flaring
 from engine import sts
 from engine import backuper
+from engine import kpler_scraper
 
 import integrity
 import base
@@ -36,6 +37,8 @@ def update():
     # departure.update()
     # arrival.update(date_from=dt.date.today() - dt.timedelta(days=90), departure_port_iso2=['RU'])
     currency.update()
+    kpler_scraper.update_lite()
+
     # company.update()
     # mtevents.update(date_from=dt.date.today() - dt.timedelta(days=90))
     # sts.update(date_from=dt.date.today() - dt.timedelta(days=90))
