@@ -264,7 +264,9 @@ class KplerFlowResource(TemplateResource):
         CommodityEquivalent = aliased(Commodity)
 
         commodity_origin_iso2_field = case(
-            [(KplerFlow.grade == "CPC Kazakhstan", "KZ")],
+            [
+                (KplerFlow.grade.in_(["CPC Kazakhstan", "KEBCO"]), "KZ"),
+            ],
             else_=KplerFlow.from_iso2,
         ).label("commodity_origin_iso2")
 
