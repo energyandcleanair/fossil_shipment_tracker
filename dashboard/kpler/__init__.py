@@ -36,10 +36,11 @@ units = {
 
 countries = {"RU": "Russia", "EG": "Egypt"}
 colour_bys = {
-    "product": "Product",
-    "product_group": "Product group",
-    "product_family": "Product family",
-    "commodity_equivalent_name": "Commodity",
+    "grade": "Grade",
+    "commodity":"Product",
+    "group": "Group",
+    "family": "Family",
+    "commodity_equivalent_name": "Commodity (CREA)",
     "origin_name": "Origin",
     "destination_name": "Destination",
     "destination_region": "Destination region",
@@ -51,10 +52,11 @@ facet_bys = {
     # "origin_region": "Origin region",
     # "origin_country": "Origin country",
     "origin_name": "Origin",
-    "product": "Product",
-    "product_group": "Product group",
-    "product_family": "Product family",
-    "commodity_equivalent_name": "Commodity",
+    "grade": "Grade",
+    "commodity": "Product",
+    "group": "Product group",
+    "family": "Product family",
+    "commodity_equivalent_name": "Commodity (CREA)",
     "destination_region": "Destination region",
     "destination_country": "Destination country",
 }

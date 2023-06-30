@@ -141,7 +141,7 @@ def update_chart(
         rolling_days,
         top_n,
     )
-
+  
     unit = units[unit_id]
     value = unit["column"]
     unit_str = unit["label"]
