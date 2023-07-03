@@ -53,6 +53,7 @@ def update():
     flaring.update()
     #alert.update()
     counter.update()
+    counter.update(version=base.COUNTER_VERSION1)
     integrity.check()
     return
 

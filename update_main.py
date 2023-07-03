@@ -54,6 +54,7 @@ def update():
     kpler_scraper.update_full()
     alert.update()
     counter.update()
+    counter.update(version=base.COUNTER_VERSION1)
     backuper.update()
     integrity.check()
     return
