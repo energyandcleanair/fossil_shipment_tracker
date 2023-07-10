@@ -66,6 +66,7 @@ def update(imo=None):
         )
 
     fill_country()
+    logger_slack.info("=== Company update done ===")
     return
 
 

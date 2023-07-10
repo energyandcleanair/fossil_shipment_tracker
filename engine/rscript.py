@@ -13,7 +13,6 @@ def update():
         "rscript": {
             "content": [
                 "library(remotes)",
-                # "remotes::install_github('energyandcleanair/rcrea', upgrade=F, force=F)",
                 "library(rcrea)",
                 "remotes::install_github('energyandcleanair/fossil_shipment_tracker_r', upgrade=F, force=F)",
                 # To ensure latest version is being used
@@ -43,6 +42,8 @@ def update():
 
     if not success:
         logger_slack.error("R script failed")
-        response = slacker.chat_postMessage(channel='#log-russia-counter', text="Please check error <@U012ZQ5NU4U>")
+        response = slacker.chat_postMessage(
+            channel="#log-russia-counter", text="Please check error <@U012ZQ5NU4U>"
+        )
     else:
         logger_slack.info("R script succeeded")
