@@ -1,5 +1,7 @@
 id,transport,name,pricing_commodity,group,group_name,grouping,alternative_groups
 crude_oil,seaborne,Crude oil,crude_oil,oil,Oil,default,"{""split_gas"": ""Oil"",""split_gas_oil"": ""Crude oil""}"
+crude_oil_urals,seaborne,Crude oil,crude_oil_urals,oil,Oil,default,"{""split_gas"": ""Oil"",""split_gas_oil"": ""Crude oil""}"
+crude_oil_espo,seaborne,Crude oil,crude_oil_espo,oil,Oil,default,"{""split_gas"": ""Oil"",""split_gas_oil"": ""Crude oil""}"
 lng,seaborne,LNG,lng,gas,Gas,default,"{""split_gas"": ""LNG"",""split_gas_oil"": ""LNG""}"
 lng_rail_road,rail_road,LNG (rail or road),lng,gas,Gas,default,"{""split_gas"": ""LNG"",""split_gas_oil"": ""LNG""}"
 lng_pipeline,pipeline,LNG (pipeline),lng,gas,Gas,default,"{""split_gas"": ""LNG"",""split_gas_oil"": ""LNG""}"

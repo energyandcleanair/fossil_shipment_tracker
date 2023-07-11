@@ -279,38 +279,35 @@ class KplerFlowResource(TemplateResource):
         value_eur_field = (value_tonne_field * Price.eur_per_tonne).label("value_eur")
 
         # Commodity used for pricing
-        commodity_id_field = (
-            "kpler_"
+        commodity_id_field = case(
+            [
+                (
+                    sa.and_(
+                        KplerFlow.group == "Crude/Co",
+                        KplerFlow.from_iso2 == "RU",
+                        KplerFlow.grade.notin_(["CPC Kazakhstan", "KEBCO"]),
+                        KplerFlow.from_zone_name.op("~*")("^Nakhodka|^De Kast|^Prigorod"),
+                    ),
+                    "crude_oil_espo",
+                ),
+                (
+                    sa.and_(
+                        KplerFlow.group == "Crude/Co",
+                        KplerFlow.from_iso2 == "RU",
+                        KplerFlow.grade.notin_(["CPC Kazakhstan", "KEBCO"]),
+                    ),
+                    "crude_oil_urals",
+                ),
+            ],
+            else_="kpler_"
             + sa.func.replace(
                 sa.func.replace(
                     sa.func.lower(func.coalesce(KplerFlow.commodity, KplerFlow.group)), " ", "_"
                 ),
                 "/",
                 "_",
-            )
+            ),
         ).label("commodity")
-
-        # commodity_equivalent_id_field = case(
-        #     [
-        #         (
-        #             sa.and_(KplerProduct.family.in_(["Dirty"]), KplerFlow.commodity != "Condensate"),
-        #             "crude_oil",
-        #         ),
-        #         (
-        #             sa.and_(
-        #                 sa.or_(
-        #                     KplerProduct.group.in_(["Fuel Oils"]),
-        #                     KplerProduct.family.in_(["Light Ends", "Middle Distillates"]),
-        #                 ),
-        #                 KplerFlow.commodity != "Clean Condensate",
-        #             ),
-        #             "oil_products",
-        #         ),
-        #         (KplerProduct.name.in_(["lng"]), "lng"),
-        #         (KplerProduct.name.in_(["Coal", "Thermal", "Metallurgical"]), "coal"),
-        #     ],
-        #     else_="others",
-        # ).label("commodity_equivalent")
 
         query = (
             session.query(
