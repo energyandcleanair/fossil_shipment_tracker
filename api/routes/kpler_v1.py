@@ -279,7 +279,18 @@ class KplerFlowResource(TemplateResource):
         value_eur_field = (value_tonne_field * Price.eur_per_tonne).label("value_eur")
 
         # Commodity used for pricing
-        commodity_id_field = case(
+        commodity_id_field = (
+            "kpler_"
+            + sa.func.replace(
+                sa.func.replace(
+                    sa.func.lower(func.coalesce(KplerFlow.commodity, KplerFlow.group)), " ", "_"
+                ),
+                "/",
+                "_",
+            )
+        ).label("commodity")
+
+        pricing_commodity_id_field = case(
             [
                 (
                     sa.and_(
@@ -299,15 +310,8 @@ class KplerFlowResource(TemplateResource):
                     "crude_oil_urals",
                 ),
             ],
-            else_="kpler_"
-            + sa.func.replace(
-                sa.func.replace(
-                    sa.func.lower(func.coalesce(KplerFlow.commodity, KplerFlow.group)), " ", "_"
-                ),
-                "/",
-                "_",
-            ),
-        ).label("commodity")
+            else_=Commodity.pricing_commodity,
+        ).label("pricing_commodity")
 
         query = (
             session.query(
@@ -344,6 +348,7 @@ class KplerFlowResource(TemplateResource):
                 Commodity.equivalent_id.label("commodity_equivalent"),  # For filtering
                 CommodityEquivalent.name.label("commodity_equivalent_name"),
                 CommodityEquivalent.group.label("commodity_equivalent_group"),
+                pricing_commodity_id_field,
             )
             .outerjoin(
                 FromCountry,
@@ -388,7 +393,7 @@ class KplerFlowResource(TemplateResource):
                     Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    Price.commodity == Commodity.pricing_commodity,
+                    Price.commodity == pricing_commodity_id_field,
                 ),
             )
             .outerjoin(Currency, Currency.date == KplerFlow.date)

@@ -416,3 +416,40 @@ def test_kpler_south_korea(app):
         assert response.status_code == 200
         api = pd.DataFrame(response.json["data"])
         assert len(api) > 0  # Not all cou
+
+
+def test_kpler_urals_espo(app):
+
+    with app.test_client() as test_client:
+        params = {
+            "format": "json",
+            "origin_iso2": "RU",
+            "commodity_equivalent": "crude_oil",
+            "date_from": -10,
+            "date_to": -5,
+            "origin_type": "country,port",
+            "api_key": get_env("API_KEY"),
+        }
+        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        api = pd.DataFrame(response.json["data"])
+        assert len(api) > 0  # Not all cou
+
+        # Assert value_tonne is equal across origin_type but not value_eur
+        api_by_type = (
+            api.groupby(["origin_type"])
+            .agg({"value_tonne": "sum", "value_eur": "sum"})
+            .reset_index()
+        )
+        assert all(np.isclose(api_by_type.value_tonne, api_by_type.value_tonne[0], rtol=1e-3))
+        assert not all(np.isclose(api_by_type.value_eur, api_by_type.value_eur[0], rtol=1e-3))
+        assert set(api.pricing_commodity.unique()) >= set(["crude_oil_espo", "crude_oil_urals"])
+        assert all(api.groupby("pricing_commodity").value_tonne.sum() > 0)
+        assert all(api.groupby("pricing_commodity").value_eur.sum() > 0)
+
+        # There shouldn't be any crude_oil that is not crude_oil_espo or crude_oil_urals
+        assert not any(
+            (api.pricing_commodity == "crude_oil")
+            & (api.origin_type == "port")
+            & (api.commodity_origin_iso2 == "RU")
+        )
