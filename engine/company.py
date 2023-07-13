@@ -42,7 +42,7 @@ from selenium.webdriver.common.keys import Keys
 import time
 
 
-def update(imo=None):
+def update(imo=None, force_unknown=False):
     logger_slack.info("=== Company update ===")
     # For crude oil and oil products, force a daily refresh
     # given the importance for price caps and bans
@@ -63,6 +63,7 @@ def update(imo=None):
             imo=imo,
             commodities=to_list(commodity),
             last_updated=dt.datetime.now() - dt.timedelta(days=max_age),
+            force_unknown=force_unknown,
         )
 
     fill_country()
@@ -130,6 +131,7 @@ def update_info_from_equasis(
     imo=None,
     departure_port_id=None,
     departure_port_iso2=None,
+    force_unknown=False,
 ):
     """
     Collect infos from equasis about shipments that either don't have infos,
@@ -139,9 +141,13 @@ def update_info_from_equasis(
     imos = (
         session.query(
             Departure.ship_imo,
+            ShipInsurer.company_raw_name,
             (func.max(ShipInsurer.updated_on).label("last_updated")),
         )
-        .group_by(Departure.ship_imo)
+        .group_by(
+            Departure.ship_imo,
+            ShipInsurer.company_raw_name,
+        )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Departure.ship_imo)
     )
 
@@ -166,7 +172,11 @@ def update_info_from_equasis(
 
     imos = imos.subquery()
     imos = session.query(imos).filter(
-        sa.or_(imos.c.last_updated <= last_updated, imos.c.last_updated == None)
+        sa.or_(
+            imos.c.last_updated <= last_updated,
+            imos.c.last_updated == None,
+            sa.and_(force_unknown, imos.c.company_raw_name == base.UNKNOWN_INSURER),
+        )
     )
 
     imos = imos.distinct().all()
