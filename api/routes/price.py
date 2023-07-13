@@ -81,7 +81,16 @@ class PriceResource(Resource):
         port_id = params.get("port_id")
         nest_in_data = params.get("nest_in_data")
 
-        query = Price.query.filter(Price.scenario == scenario)
+        # query = Price.query.filter(Price.scenario == scenario)
+        query = (
+            session.query(
+                Price,
+                (Currency.per_eur * Price.eur_per_tonne).label("usd_per_tonne"),
+                (Currency.per_eur * Price.eur_per_tonne * 0.138).label("usd_per_barrel"),
+            )
+            .join(Currency, Currency.date == Price.date)
+            .filter(Price.scenario.in_(to_list(scenario)), Currency.currency == "USD")
+        )
 
         if commodity is not None:
             query = query.filter(Price.commodity.in_(to_list(commodity)))
@@ -101,6 +110,8 @@ class PriceResource(Resource):
 
         price_df = pd.read_sql(query.statement, session.bind)
         price_df.replace({np.nan: None}, inplace=True)
+        price_df.sort_values(["date"], inplace=True)
+        price_df["date"] = pd.to_datetime(price_df["date"]).dt.date
 
         if format == "csv":
             return Response(
