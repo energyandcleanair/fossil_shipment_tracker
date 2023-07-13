@@ -87,10 +87,10 @@ class PriceResource(Resource):
             query = query.filter(Price.commodity.in_(to_list(commodity)))
 
         if date_from is not None:
-            query = query.filter(Price.date >= dt.datetime.strptime(date_from, "%Y-%m-%d"))
+            query = query.filter(Price.date >= to_datetime(date_from))
 
         if date_to is not None:
-            query = query.filter(Price.date <= dt.datetime.strptime(date_to, "%Y-%m-%d"))
+            query = query.filter(Price.date <= to_datetime(date_to))
 
         if port_id is not None:
             query = query.filter(
