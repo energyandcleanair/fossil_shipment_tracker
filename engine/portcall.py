@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 
 import base
-from base.logger import logger, logger_slack
+from base.logger import logger, logger_slack, slacker
 from base.db import session
 from base.db_utils import upsert
 from base.utils import to_datetime, to_list, collapse_dates, remove_dates
@@ -467,117 +467,123 @@ def update_departures(
     :param force_rebuild:
     :return:
     """
-    logger_slack.info("=== Update departures (Portcall) ===")
-    ports = session.query(Port)
-    date_from = to_datetime(date_from)
+    try:
+        logger_slack.info("=== Update departures (Portcall) ===")
+        ports = session.query(Port)
+        date_from = to_datetime(date_from)
 
-    if use_call_based and between_existing_only:
-        raise ValueError(
-            """Most likely not what you want to use
-            call_based and between_existing_only. Would burn lot of calls"""
+        if use_call_based and between_existing_only:
+            raise ValueError(
+                """Most likely not what you want to use
+                call_based and between_existing_only. Would burn lot of calls"""
+            )
+
+        if not ignore_check_departure:
+            ports = ports.filter(Port.check_departure)
+
+        if unlocode is not None:
+            ports = ports.filter(Port.unlocode.in_(to_list(unlocode)))
+
+        if marinetraffic_port_id is not None:
+            ports = ports.filter(Port.marinetraffic_id.in_(to_list(marinetraffic_port_id)))
+
+        if port_id is not None:
+            ports = ports.filter(Port.id.in_(to_list(port_id)))
+
+        if departure_port_iso2 is not None:
+            ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
+
+        ports = ports.all()
+        for port in tqdm(ports):
+            # Three cases:
+            # - only from last (force_rebuild=False)
+            # - force rebuild between existing ones
+            # - force rebuild all of them
+            if not force_rebuild:
+                last_portcall = (
+                    session.query(PortCall)
+                    .filter(
+                        PortCall.port_id == port.id,
+                        PortCall.move_type == "departure",
+                        PortCall.date_utc <= to_datetime(date_to),
+                    )
+                    .order_by(PortCall.date_utc.desc())
+                    .first()
+                )
+
+                if last_portcall is not None:
+                    port_date_from = last_portcall.date_utc + dt.timedelta(minutes=1)
+                else:
+                    port_date_from = date_from
+
+                date_bounds = [(port_date_from, to_datetime(date_to))]
+
+            if force_rebuild and not between_existing_only:
+                date_bounds = [(date_from, date_to)]
+
+            if force_rebuild and between_existing_only:
+                # Query existing portcalls, and use MT between existing portcalls only
+                port_portcalls = (
+                    session.query(PortCall)
+                    .filter(
+                        PortCall.port_id == port.id,
+                        PortCall.move_type == "departure",
+                        PortCall.date_utc >= to_datetime(date_from),
+                        PortCall.date_utc <= to_datetime(date_to),
+                    )
+                    .order_by(PortCall.date_utc)
+                    .all()
+                )
+
+                port_date_froms = [to_datetime(date_from)] + [
+                    x.date_utc + dt.timedelta(minutes=1) for x in port_portcalls
+                ]
+                port_date_tos = [x.date_utc - dt.timedelta(minutes=1) for x in port_portcalls] + [
+                    to_datetime(date_to)
+                ]
+                date_bounds = list(zip(port_date_froms, port_date_tos))
+
+            for dates in date_bounds:
+                query_date_from = dates[0]
+                query_date_to = dates[1]
+
+                portcalls = Marinetraffic.get_portcalls_between_dates(
+                    arrival_or_departure="departure",
+                    unlocode=port.unlocode,
+                    marinetraffic_port_id=port.marinetraffic_id,
+                    date_from=to_datetime(query_date_from),
+                    date_to=to_datetime(query_date_to),
+                    use_call_based=use_call_based,
+                )
+
+                # Store them in db so that we won't query them
+                messages = {"missing": 0, "duplicated": 0, "uploaded": 0, "failed": 0}
+
+                for portcall in portcalls:
+                    try:
+                        session.add(portcall)
+                        session.commit()
+                        if force_rebuild:
+                            messages["missing"] += 1
+
+                        messages["uploaded"] += 1
+                    except sa.exc.IntegrityError as e:
+                        if "psycopg2.errors.UniqueViolation" in str(e):
+                            messages["duplicated"] += 1
+                        else:
+                            messages["failed"] += 1
+                        session.rollback()
+                        continue
+
+                logger.info(
+                    f"""{port.name} ({port.unlocode}) - {query_date_from} to {query_date_to}:
+                    {messages['uploaded']} uploaded, {messages['missing']} missing, {messages['duplicated']} duplicated, {messages['failed']} failed"""
+                )
+    except Exception as e:
+        logger_slack.error("Departure update failed")
+        response = slacker.chat_postMessage(
+            channel="#log-russia-counter", text="Please check error <@U012ZQ5NU4U>"
         )
-
-    if not ignore_check_departure:
-        ports = ports.filter(Port.check_departure)
-
-    if unlocode is not None:
-        ports = ports.filter(Port.unlocode.in_(to_list(unlocode)))
-
-    if marinetraffic_port_id is not None:
-        ports = ports.filter(Port.marinetraffic_id.in_(to_list(marinetraffic_port_id)))
-
-    if port_id is not None:
-        ports = ports.filter(Port.id.in_(to_list(port_id)))
-
-    if departure_port_iso2 is not None:
-        ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
-
-    ports = ports.all()
-    for port in tqdm(ports):
-        # Three cases:
-        # - only from last (force_rebuild=False)
-        # - force rebuild between existing ones
-        # - force rebuild all of them
-        if not force_rebuild:
-            last_portcall = (
-                session.query(PortCall)
-                .filter(
-                    PortCall.port_id == port.id,
-                    PortCall.move_type == "departure",
-                    PortCall.date_utc <= to_datetime(date_to),
-                )
-                .order_by(PortCall.date_utc.desc())
-                .first()
-            )
-
-            if last_portcall is not None:
-                port_date_from = last_portcall.date_utc + dt.timedelta(minutes=1)
-            else:
-                port_date_from = date_from
-
-            date_bounds = [(port_date_from, to_datetime(date_to))]
-
-        if force_rebuild and not between_existing_only:
-            date_bounds = [(date_from, date_to)]
-
-        if force_rebuild and between_existing_only:
-            # Query existing portcalls, and use MT between existing portcalls only
-            port_portcalls = (
-                session.query(PortCall)
-                .filter(
-                    PortCall.port_id == port.id,
-                    PortCall.move_type == "departure",
-                    PortCall.date_utc >= to_datetime(date_from),
-                    PortCall.date_utc <= to_datetime(date_to),
-                )
-                .order_by(PortCall.date_utc)
-                .all()
-            )
-
-            port_date_froms = [to_datetime(date_from)] + [
-                x.date_utc + dt.timedelta(minutes=1) for x in port_portcalls
-            ]
-            port_date_tos = [x.date_utc - dt.timedelta(minutes=1) for x in port_portcalls] + [
-                to_datetime(date_to)
-            ]
-            date_bounds = list(zip(port_date_froms, port_date_tos))
-
-        for dates in date_bounds:
-            query_date_from = dates[0]
-            query_date_to = dates[1]
-
-            portcalls = Marinetraffic.get_portcalls_between_dates(
-                arrival_or_departure="departure",
-                unlocode=port.unlocode,
-                marinetraffic_port_id=port.marinetraffic_id,
-                date_from=to_datetime(query_date_from),
-                date_to=to_datetime(query_date_to),
-                use_call_based=use_call_based,
-            )
-
-            # Store them in db so that we won't query them
-            messages = {"missing": 0, "duplicated": 0, "uploaded": 0, "failed": 0}
-
-            for portcall in portcalls:
-                try:
-                    session.add(portcall)
-                    session.commit()
-                    if force_rebuild:
-                        messages["missing"] += 1
-
-                    messages["uploaded"] += 1
-                except sa.exc.IntegrityError as e:
-                    if "psycopg2.errors.UniqueViolation" in str(e):
-                        messages["duplicated"] += 1
-                    else:
-                        messages["failed"] += 1
-                    session.rollback()
-                    continue
-
-            logger.info(
-                f"""{port.name} ({port.unlocode}) - {query_date_from} to {query_date_to}:
-                {messages['uploaded']} uploaded, {messages['missing']} missing, {messages['duplicated']} duplicated, {messages['failed']} failed"""
-            )
 
     return
 
