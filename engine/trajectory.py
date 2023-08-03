@@ -313,7 +313,7 @@ def cluster(ordered_positions, buffer_deg=0.005):
 
 
 def get_trajectories_over_land(
-    date_from=-31, min_land_distance=2, ignore_recent_hours=24, shipment_id=None
+    date_from=-31, min_land_distance=2, ignore_recent_hours=24, shipment_id=None, commodity=None
 ):
 
     if isinstance(date_from, int):
@@ -327,19 +327,29 @@ def get_trajectories_over_land(
             "date_from": date_from,
             "min_land_distance": min_land_distance,
             "ignore_recent_hours": ignore_recent_hours,
+            "commodity": commodity,
         }
 
+        # if not commodity is None:
+        #     import json
+        #     commodity = json.dumps(to_list(commodity))
+        # else:
+        #     commodity = 'NULL'
+
         statement = text(
-            """WITH lines as (SELECT t.shipment_id, t.geometry,
+            """WITH lines as (SELECT t.shipment_id,
+                                     sh.commodity,
                             SUM(ST_LENGTH(ST_Intersection(t.geometry, l.geom))) AS length
                             FROM ne_110m_land l, trajectory t
                             LEFT JOIN shipment s ON t.shipment_id = s.id
-                            LEFT JOIN departure d ON s.departure_id = d.id
+                            INNER JOIN departure d ON s.departure_id = d.id
+                            LEFT JOIN ship sh ON d.ship_imo = sh.imo
                             WHERE ST_Intersects(l.geom, t.geometry)
                             AND (
                                 (routing_date IS NULL) OR ((NOW() - routing_date) > ':ignore_recent_hours hours')
                                 )
                             AND d.date_utc >= :date_from
+                            AND (:commodity IS NULL OR sh.commodity = any(ARRAY[:commodity]))
                             GROUP BY 1,2)
 
                             SELECT shipment_id FROM lines
@@ -349,13 +359,12 @@ def get_trajectories_over_land(
         )
 
         rs = con.execute(statement, **data)
+        overland_shipment_ids = [row[0] for row in rs]
+        trajs = Trajectory.query.filter(Trajectory.shipment_id.in_(overland_shipment_ids))
+        if shipment_id:
+            trajs = trajs.filter(Trajectory.shipment_id.in_(to_list(shipment_id)))
 
-    overland_shipment_ids = [row[0] for row in rs]
-    trajs = Trajectory.query.filter(Trajectory.shipment_id.in_(overland_shipment_ids))
-    if shipment_id:
-        trajs = trajs.filter(Trajectory.shipment_id.in_(to_list(shipment_id)))
-
-    return trajs.all()
+        return trajs.all()
 
 
 def get_splitted_traj(trajectory_id):
@@ -479,12 +488,14 @@ def reroute(
     min_segment_land_distance=3,
     max_segment_land_distance=90,  # Use to remove segmenta that cross the +180/-180 line
     shipment_id=None,
+    commodity=None,
 ):
 
     trajs = get_trajectories_over_land(
         date_from=date_from,
         min_land_distance=min_land_distance,
         shipment_id=shipment_id,
+        commodity=commodity,
     )
 
     dataset, img = get_routing_cost()
