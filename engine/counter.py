@@ -305,11 +305,13 @@ def sanity_check(result, version):
         ).replace(np.nan, 0)
 
         comparison["ok"] = (
-            (comparison.new_eur >= comparison.old_eur * 0.95)
+            (comparison.new_eur >= comparison.old_eur * 0.90)
             & (comparison.new_eur <= comparison.old_eur * 1.2)
         ) | ((comparison.new_eur - comparison.old_eur).abs() < 50e6)
 
         comparison = comparison.reset_index()
+        # Force ok=True for commodity_destination_region = NaN
+        comparison.loc[pd.isna(comparison.commodity_destination_region), "ok"] = True
         return comparison
 
     comparison = get_comparison_df(

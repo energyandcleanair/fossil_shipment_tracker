@@ -340,7 +340,7 @@ def update_info_from_equasis(
                     session.commit()
                 else:
                     logger.warning(
-                        "Failed to find/create company_id for company %s, ship_imo %s.".format(
+                        "Failed to find/create company_id for company {}, ship_imo {}.".format(
                             owner.company_raw_name, owner.ship_imo
                         )
                     )
