@@ -134,6 +134,12 @@ class KplerTrade(Base):
     vessel_ids = Column(ARRAY(Integer))
     vessel_imos = Column(ARRAY(String))
 
+    buyer_ids = Column(ARRAY(Integer))
+    buyer_names = Column(ARRAY(String))
+
+    seller_ids = Column(ARRAY(Integer))
+    seller_names = Column(ARRAY(String))
+
     product_id = Column(Integer, primary_key=True)
     value_tonne = Column(Numeric)
     value_m3 = Column(Numeric)

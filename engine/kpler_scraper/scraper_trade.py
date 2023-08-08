@@ -256,6 +256,19 @@ class KplerTradeScraper(KplerScraper):
         # Flows
         flows = self._parse_trade_flows(trade_raw)
 
+        # Players
+        buyers = (
+            get_nested(trade_raw, "orgSpecificInfo", "default", "confirmedBuyers", warn=False) or []
+        )
+        sellers = (
+            get_nested(trade_raw, "orgSpecificInfo", "default", "confirmedSellers", warn=False)
+            or []
+        )
+        trade["buyer_ids"] = [x.get("id") for x in buyers]
+        trade["buyer_names"] = [x.get("name") for x in buyers]
+        trade["seller_ids"] = [x.get("id") for x in sellers]
+        trade["seller_names"] = [x.get("name") for x in sellers]
+
         # Do a cross product of all flows with trade
         result = []
         for flow in flows:
