@@ -84,8 +84,8 @@ class KplerFlow(Base):
 class KplerVessel(Base):
     id = Column(BigInteger, primary_key=True)
     imo = Column(String)
-    mmsi = Column(ARRAY(String))
-    name = Column(ARRAY(String))
+    mmsi = Column(String)
+    name = Column(String)
     type = Column(String)
     dwt = Column(Numeric)  # in tonnes
 
@@ -98,28 +98,47 @@ class KplerVessel(Base):
 
 
 class KplerTrade(Base):
+
     id = Column(BigInteger, primary_key=True)
-    product_id = Column(Integer, primary_key=True)
-    product_name = Column(String)
-
-    departure_date = Column(DateTime, nullable=False)
-    arrival_date = Column(DateTime)
+    flow_id = Column(BigInteger, primary_key=True)
     status = Column(String)
-    vessel_id = Column(Integer)
-    vessel_imo = Column(String)  # Redundant, but just in case
 
-    departure_zone_id = Column(Integer)
-    departure_zone_name = Column(String)
+    departure_date_utc = Column(DateTime, nullable=False)
+    departure_zone_id = Column(Integer, nullable=False)
+    # departure_zone_name = Column(String)
     departure_installation_id = Column(Integer)
     departure_installation_name = Column(String)
+    departure_berth_id = Column(Integer)
+    departure_berth_name = Column(String)
+    # departure_port_id = Column(Integer)
+    # departure_port_name = Column(String)
+    # departure_country_id = Column(Integer)
+    # departure_country_name = Column(String)
+    # departure_iso2 = Column(String)
+    departure_sts = Column(Boolean)
 
+    arrival_date_utc = Column(DateTime)
     arrival_zone_id = Column(Integer)
-    arrival_zone_name = Column(String)
+    # arrival_zone_name = Column(String)
     arrival_installation_id = Column(Integer)
     arrival_installation_name = Column(String)
+    arrival_berth_id = Column(Integer)
+    arrival_berth_name = Column(String)
+    # arrival_port_id = Column(Integer)
+    # arrival_port_name = Column(String)
+    # arrival_country_id = Column(Integer)
+    # arrival_country_name = Column(String)
+    # arrival_iso2 = Column(String)
+    arrival_sts = Column(Boolean)
 
+    vessel_ids = Column(ARRAY(Integer))
+    vessel_imos = Column(ARRAY(String))
+
+    product_id = Column(Integer, primary_key=True)
     value_tonne = Column(Numeric)
-    value_m3 = Column(String)
+    value_m3 = Column(Numeric)
+    value_energy = Column(Numeric)
+    value_gas_m3 = Column(Numeric)
 
     others = Column(JSONB)
 

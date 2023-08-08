@@ -108,17 +108,31 @@ def test_get_vessel_brute():
     assert len([x for x in found_vessels if x.id in vessel_ids]) == len(vessel_ids)
 
 
-def test_get_trades_raw():
+def test_get_trades():
     scraper = KplerTradeScraper()
 
     # from_zones = [{"id": "757", "type": "ZONE"}]
-    date_from = dt.datetime(2023, 5, 1)
+    date_from = dt.datetime(2023, 7, 1)
     from_iso2 = ["RU"]
-    trades = scraper.get_trades(
+    trades, vessels, zones, products = scraper.get_trades(
         date_from=date_from, from_iso2=from_iso2, platform="liquids", sts_only=True
     )
+    assert len(trades) > 0
+    assert len(vessels) > 0
+    assert len(zones) > 0
+    assert len(products) > 0
 
     trades_df = pd.DataFrame(trades)
+    assert not any(pd.isna(trades_df.departure_zone_id))
+
+
+def test_update_trades():
+    from base.db import init_db
+
+    init_db()
+    from engine.kpler_scraper import update_trades
+
+    update_trades(date_from=-5)
 
 
 def test_get_flow_cn():
