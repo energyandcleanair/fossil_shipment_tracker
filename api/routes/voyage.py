@@ -1850,7 +1850,7 @@ class VoyageResource(Resource):
         result = pd.merge(result, top, how="inner")
 
         return result
-   
+
     def build_response(
         self,
         result,
@@ -1864,12 +1864,8 @@ class VoyageResource(Resource):
 
         # If bulk and departure berth is coal, replace commodity with coal
         if format == "csv":
-            def iter_csv(data):
-                for row in data.split("\n"):
-                    yield row
-            data = result.to_csv(index=False)
             return Response(
-                response=iter_csv(data),
+                response=result.to_csv(index=False),
                 mimetype="text/csv",
                 headers={"Content-disposition": "attachment; filename=shipments.csv"},
             )
