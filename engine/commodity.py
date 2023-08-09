@@ -31,11 +31,29 @@ def fill():
 def fill_kpler_commodities(commodities_df):
 
     # Add Kpler Products
-    from engine.kpler_scraper import KplerScraper
+    from engine.kpler_scraper import KplerScraper, KplerProductScraper
     from engine.kpler_scraper import get_product_id, get_commodity_equivalent, get_commodity_pricing
+    from engine.kpler_scraper import upload_products
 
-    scraper = KplerScraper()
-    kpler_products = scraper.get_products()
+    kpler_products = KplerProductScraper().get_products_brute()
+    from base.models import KplerProduct
+
+    # kpler_products = pd.read_sql(
+    #     KplerProduct.query.statement,
+    #     session.bind,
+    # )
+    # commodities_df.columns
+    kpler_products = [x for x in kpler_products if x is not None]
+
+    # First upload in kpler_products table
+    upload_products(kpler_products)
+
+    # then into commodity table
+    kpler_products = pd.DataFrame(kpler_products).rename(
+        columns={"group_name": "group", "family_name": "family"}
+    )
+
+    kpler_products.drop_duplicates(subset=["id", "platform"], inplace=True)
 
     def add_groups_as_commodities(kpler_products):
         # Adding the couple products that correspond to a group or family

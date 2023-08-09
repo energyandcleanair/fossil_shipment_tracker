@@ -38,6 +38,8 @@ from .alert import *
 from .flaring import *
 
 # from .kpler import *
-from .kpler_v1 import *
+# from .kpler_v1 import *
+from .kpler_flow import *
+from .kpler_trade import *
 
 from .charts import *

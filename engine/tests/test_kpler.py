@@ -1,10 +1,11 @@
 import datetime as dt
 import numpy as np
+import pandas as pd
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from base.db import session, engine
 
-from engine.kpler_scraper import KplerScraper
+from engine.kpler_scraper import KplerScraper, KplerFlowScraper, KplerTradeScraper
 
 
 def test_get_flow():
@@ -107,21 +108,31 @@ def test_get_vessel_brute():
     assert len([x for x in found_vessels if x.id in vessel_ids]) == len(vessel_ids)
 
 
-def test_get_trades_brute():
-    scraper = KplerScraper()
+def test_get_trades():
+    scraper = KplerTradeScraper()
 
-    iso2s = ["RU", "CN", "AE"]
-    date_from = dt.datetime(2022, 1, 1)
-    for iso2 in iso2s:
-        cursor_after = None
-        while True:
-            cursor_after, trades = scraper.get_trades_raw_brute(
-                origin_iso2=iso2, platform="liquids", cursor_after=cursor_after
-            )
-            if cursor_after is None or len(trades) == 0 or trades.departure_date.min() < date_from:
-                break
+    # from_zones = [{"id": "757", "type": "ZONE"}]
+    date_from = dt.datetime(2023, 7, 1)
+    from_iso2 = ["RU"]
+    trades, vessels, zones, products = scraper.get_trades(
+        date_from=date_from, from_iso2=from_iso2, platform="liquids", sts_only=True
+    )
+    assert len(trades) > 0
+    assert len(vessels) > 0
+    assert len(zones) > 0
+    assert len(products) > 0
 
-    pass
+    trades_df = pd.DataFrame(trades)
+    assert not any(pd.isna(trades_df.departure_zone_id))
+
+
+def test_update_trades():
+    from base.db import init_db
+
+    init_db()
+    from engine.kpler_scraper import update_trades
+
+    update_trades(date_from=-5)
 
 
 def test_get_flow_cn():
