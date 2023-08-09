@@ -285,7 +285,7 @@ def test_kpler_diesel_exports(app):
         assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=5e-2))
 
 
-def test_kpler_gasoline_exports(app):
+def test_kpler_gasoline_exports_yearly(app):
     """
     Test values against manually collected ones
     :param app:
@@ -316,18 +316,84 @@ def test_kpler_gasoline_exports(app):
 
         response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
         assert response.status_code == 200
-        data = response.json["data"]
-        data_df = pd.DataFrame(data)
-        data_df = data_df.groupby(["origin_iso2", "year"]).value_tonne.sum().reset_index()
+        flow = response.json["data"]
+        flow = pd.DataFrame(flow)
+        flow = flow.groupby(["origin_iso2", "year"]).value_tonne.sum().reset_index()
         # Merge
-        merge = data_df[["origin_iso2", "year", "value_tonne"]].merge(
+        merge_flow = flow[["origin_iso2", "year", "value_tonne"]].merge(
             manual_values[["origin_iso2", "year", "value_tonne"]],
             how="left",
             on=["origin_iso2", "year"],
             suffixes=("_api", "_manual"),
         )
+        assert all(np.isclose(merge_flow.value_tonne_api, merge_flow.value_tonne_manual, rtol=5e-2))
 
-        assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=5e-2))
+
+def test_kpler_gasoline_exports_monthly(app):
+    """
+    Test values against manually collected ones
+    :param app:
+    :return:
+    """
+    import country_converter as coco
+
+    cc = coco.CountryConverter()
+
+    manual_values = pd.read_csv("assets/kpler/gasoline_exports_monthly_2023.csv")
+    manual_values = manual_values.melt(
+        id_vars=["date"], var_name="country", value_name="value_ktonne"
+    )
+    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
+    manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
+    manual_values.rename(columns={"date": "month"}, inplace=True)
+
+    with app.test_client() as test_client:
+        params = {
+            "format": "json",
+            "date_from": "2023-01-01",
+            "date_to": "2023-06-30",
+            "origin_iso2": ",".join(["RU", "CN", "IN", "SG", "TR", "AE"]),
+            "aggregate_by": "origin_iso2,group,month",
+            "commodity": "Gasoline",
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        flow = response.json["data"]
+        flow = pd.DataFrame(flow)
+        flow = flow.groupby(["origin_iso2", "month"]).value_tonne.sum().reset_index()
+        # Month to YYYY-MM
+        flow["month"] = flow["month"].map(lambda x: pd.to_datetime(x).strftime("%Y-%m"))
+        # Merge
+        merge_flow = flow[["origin_iso2", "month", "value_tonne"]].merge(
+            manual_values[["origin_iso2", "month", "value_tonne"]],
+            how="left",
+            on=["origin_iso2", "month"],
+            suffixes=("_api", "_manual"),
+        )
+        assert all(
+            np.isclose(merge_flow.value_tonne_api, merge_flow.value_tonne_manual, rtol=10e-2)
+        )
+
+        # Same using trade
+        params["aggregate_by"] = "origin_iso2,group,origin_month"
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        trade = response.json["data"]
+        trade = pd.DataFrame(trade)
+        trade = trade.groupby(["origin_iso2", "month"]).value_tonne.sum().reset_index()
+        trade["month"] = trade["month"].map(lambda x: pd.to_datetime(x).strftime("%Y-%m"))
+        # Merge
+        merge_trade = trade[["origin_iso2", "month", "value_tonne"]].merge(
+            manual_values[["origin_iso2", "month", "value_tonne"]],
+            how="left",
+            on=["origin_iso2", "month"],
+            suffixes=("_api", "_manual"),
+        )
+        assert all(
+            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10e-2)
+        )
 
 
 def test_kpler_crude_export_byport(app):
@@ -453,3 +519,40 @@ def test_kpler_urals_espo(app):
             & (api.origin_type == "port")
             & (api.commodity_origin_iso2 == "RU")
         )
+
+
+def test_flow_equals_trade(app):
+
+    with app.test_client() as test_client:
+
+        date_from = "2023-01-01"
+        date_to = "2023-01-31"
+
+        params = {
+            "format": "json",
+            "origin_iso2": "RU",
+            # "commodity_equivalent": "crude_oil",
+            "commodity": "Crude",
+            "date_from": date_from,
+            "date_to": date_to,
+            "api_key": get_env("API_KEY"),
+        }
+
+        params_flow = params.copy()
+        params_flow["origin_type"]: "country"
+
+        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params_flow))
+        assert response.status_code == 200
+        flow = pd.DataFrame(response.json["data"])
+        assert len(flow) > 0  # Not all cou
+
+        params_trade = params.copy()
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params_trade))
+        assert response.status_code == 200
+        trade = pd.DataFrame(response.json["data"])
+        assert len(trade) > 0  # Not all cou
+
+        assert np.isclose(flow.value_tonne.sum(), trade.value_tonne.sum(), rtol=1e-3)
+        assert np.isclose(flow.value_eur.sum(), trade.value_eur.sum(), rtol=1e-3)
+
+    return

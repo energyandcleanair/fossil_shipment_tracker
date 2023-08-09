@@ -791,6 +791,7 @@ class EndpointCache(Base):
 
 class Commodity(Base):
     id = Column(String, primary_key=True)
+    equivalent_id = Column(String)  # Used for kpler commodities to have a generic equivalent
     transport = Column(String)
     name = Column(String)
     pricing_commodity = Column(String)

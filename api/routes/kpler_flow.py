@@ -236,7 +236,8 @@ class KplerFlowResource(TemplateResource):
             "destination_type": [subquery.c.destination_type],
             "currency": [subquery.c.currency],
             "date": [subquery.c.date],
-            "month": [func.month(subquery.c.date).label("month")],
+            # date_trunc month
+            "month": [func.date_trunc("month", subquery.c.date).label("month")],
             "year": [func.extract("year", subquery.c.date).label("year")],
             "pricing_scenario": [subquery.c.pricing_scenario],
         }
@@ -468,7 +469,7 @@ class KplerFlowResource(TemplateResource):
             query = query.filter(KplerFlow.date >= str(to_datetime(date_from)))
 
         if date_to:
-            query = query.filter(KplerFlow.date <= str(to_datetime(date_to)))
+            query = query.filter(KplerFlow.date <= to_datetime(date_to))
 
         if pricing_scenario:
             query = query.filter(Price.scenario.in_(to_list(pricing_scenario)))

@@ -73,7 +73,7 @@ def get_nested(x, *keys, warn=True):
     """
     if keys:
         try:
-            return get_nested(x.get(keys[0]), *keys[1:])
+            return get_nested(x.get(keys[0]), *keys[1:], warn=warn)
         except AttributeError:
             if warn:
                 logger.warning(f"Error while getting nested value {keys} in {x}")

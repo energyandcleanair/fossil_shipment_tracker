@@ -14,11 +14,11 @@ from base.db_utils import upsert
 try:
     from api.routes.voyage import VoyageResource
     from api.routes.overland import PipelineFlowResource
-    from api.routes.kpler_v1 import KplerFlowResource
+    from api.routes.kpler_flow import KplerFlowResource
 except ImportError:
     from routes.voyage import VoyageResource
     from routes.overland import PipelineFlowResource
-    from routes.kpler_v1 import KplerFlowResource
+    from routes.kpler_flow import KplerFlowResource
 
 import base
 

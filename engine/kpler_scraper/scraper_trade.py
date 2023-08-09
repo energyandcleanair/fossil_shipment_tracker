@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-import datetime as dt
+from tqdm import tqdm
 
 import base
 from engine.kpler_scraper.scraper import *
@@ -25,7 +25,6 @@ class KplerTradeScraper(KplerScraper):
 
             query_from = 0
             while True:
-                print("Querying")
                 size, query_trades_raw = self.get_trades_raw(
                     from_zone=from_zone,
                     platform="liquids",
@@ -45,7 +44,7 @@ class KplerTradeScraper(KplerScraper):
             zones = []
             products = []
 
-            for x in trades_raw:
+            for x in tqdm(trades_raw):
                 trades_, vessels_, zones_, products_ = self._parse_trade(x, platform=platform)
                 trades.extend(trades_)
                 vessels.extend(vessels_)
@@ -120,7 +119,15 @@ class KplerTradeScraper(KplerScraper):
             logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
             return None
 
-        trades_raw = r.json()
+        try:
+            trades_raw = r.json()
+        except (json.decoder.JSONDecodeError, requests.JSONDecodeError, requests.RequestException):
+            if "Result window is too large" in r.text:
+                logger.warning(f"Reached the end for Kpler trade")
+                return 0, []
+            else:
+                logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+                return None
         return len(trades_raw), trades_raw
 
     def _parse_trade_sts(self, x, origin_or_destination):
