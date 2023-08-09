@@ -101,6 +101,8 @@ class KplerTrade(Base):
 
     id = Column(BigInteger, primary_key=True)
     flow_id = Column(BigInteger, primary_key=True)
+
+    platform = Column(String, nullable=False)
     status = Column(String)
 
     departure_date_utc = Column(DateTime, nullable=False)
@@ -165,7 +167,7 @@ class KplerTradeFlow(Base):
 
 class KplerProduct(Base):
     id = Column(BigInteger, primary_key=True)
-    name = Column(String)
+    name = Column(String, nullable=False)
     full_name = Column(String)
     type = Column(String)
     grade_id = Column(BigInteger)

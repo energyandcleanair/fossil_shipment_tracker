@@ -77,7 +77,7 @@ def upload_products(products, ignore_if_copy_failed=False):
     if not isinstance(products, pd.DataFrame):
         products = pd.DataFrame(products)
 
-    products = products.drop_duplicates(subset=["id", "platform"])
+    products = products.drop_duplicates(subset=["id"])
     if len(products) == 0:
         return None
 

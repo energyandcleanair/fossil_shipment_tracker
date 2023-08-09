@@ -351,7 +351,7 @@ def test_kpler_gasoline_exports_monthly(app):
         params = {
             "format": "json",
             "date_from": "2023-01-01",
-            "date_to": "2023-06-30",
+            "date_to": "2023-07-01",
             "origin_iso2": ",".join(["RU", "CN", "IN", "SG", "TR", "AE"]),
             "aggregate_by": "origin_iso2,group,month",
             "commodity": "Gasoline",

@@ -142,4 +142,20 @@ class KplerProductScraper:
 
             products.extend([self.get_parsed_infos(platform=platform, id=id) for id in ids])
 
-        return products
+        products = [x for x in products if x is not None]
+        products_df = pd.DataFrame(products)
+
+        # Check that each id has one unique name and three distinct platforms
+        assert (
+            len(
+                products_df.groupby("id")
+                .agg({"name": "nunique", "platform": "nunique"})
+                .reset_index()
+                .query("name > 1 or platform != 3")
+            )
+            == 0
+        )
+
+        # Then drop platform
+        products_df = products_df[products_df.platform == "liquids"].drop(columns=["platform"])
+        return products_df.to_dict(orient="records")

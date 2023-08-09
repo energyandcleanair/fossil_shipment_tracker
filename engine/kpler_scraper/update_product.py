@@ -18,10 +18,10 @@ import sqlalchemy as sa
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from .scraper_product import KplerProductScraper
+from .upload import upload_products
 
 
 def update_products():
     scraper = KplerProductScraper()
-    products = scraper.get_products()
-    upsert(products, DB_TABLE_KPLER_PRODUCT, "kpler_product_pkey")
-    return
+    products = scraper.get_products_brute()
+    upload_products(products)

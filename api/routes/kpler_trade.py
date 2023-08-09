@@ -358,7 +358,7 @@ class KplerFlowResource(TemplateResource):
                     ),
                     Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
                     Price.commodity == pricing_commodity_id_field,
                 ),
             )

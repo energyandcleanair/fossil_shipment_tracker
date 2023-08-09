@@ -179,11 +179,12 @@ class KplerTradeScraper(KplerScraper):
             for x in vessels
         ]
 
-    def _parse_trade_trade(self, trade_raw) -> (List[dict]):
+    def _parse_trade_trade(self, trade_raw, platform) -> (List[dict]):
 
         trade = {}
         # General
         trade["id"] = trade_raw.get("id")
+        trade["platform"] = platform
         status_dict = {
             "In Transit": base.ONGOING,
             "Delivered": base.COMPLETED,
@@ -390,7 +391,7 @@ class KplerTradeScraper(KplerScraper):
          - products
         """
 
-        trades = self._parse_trade_trade(trade_raw=trade_raw)
+        trades = self._parse_trade_trade(trade_raw=trade_raw, platform=platform)
         # #DEBUG save trades using pickle
         # import pickle
         # # with open('trades.pickle', 'wb') as outfile:
