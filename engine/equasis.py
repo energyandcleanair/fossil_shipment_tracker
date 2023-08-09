@@ -7,7 +7,10 @@ import base
 from base.env import get_env
 from base.logger import logger_slack, logger
 from base.utils import to_list
+from decouple import config
 
+ACCOUNT_START_RANGE=int(config("EQUASIS_ACCOUNT_RANGE_START", "1"))
+ACCOUNT_END_RANGE=int(config("EQUASIS_ACCOUNT_RANGE_END", "200"))
 
 class Equasis:
     session = None
@@ -41,7 +44,7 @@ class Equasis:
         return next_credentials
 
     def _get_all_credentials(self):
-        emails = ["rutankers+%d@protonmail.com" % (x) for x in range(120, 160)]
+        emails = ["rutankers+%d@protonmail.com" % (x) for x in range(ACCOUNT_START_RANGE, ACCOUNT_END_RANGE)]
         password = get_env("EQUASIS_PASSWORD")
         return [{"username": x, "password": password} for x in emails]
 
