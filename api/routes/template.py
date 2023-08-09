@@ -472,24 +472,19 @@ class TemplateResource(Resource):
         result["currency"] = "value_" + result.currency.str.lower()
 
         # Create a hashable version
-        # if "destination_names" in result.columns:
-        #     result["destination_names"] = result["destination_names"].apply(
-        #         lambda row: sep.join(row) if row else row
-        #     )
-        #     result["destination_iso2s"] = result["destination_iso2s"].apply(
-        #         lambda row: sep.join([str(x) for x in row]) if row else row
-        #     )
-        #     result["destination_dates"] = result["destination_dates"].apply(
-        #         lambda row: sep.join([x.strftime("%Y-%m-%d %H:%M:%S") for x in row])
-        #         if row
-        #         else row
-        #     )
+        # find columns that are list and convert them to tuple
+        list_columns = [
+            col
+            for col in result.columns
+            if any(result[col].notna())
+            and isinstance(result.loc[result[col].notna(), col].iloc[0], list)
+        ]
+        for col in list_columns:
+            result[col] = result[col].apply(tuple)
 
         index_cols = [
             x for x in result.columns if x not in ["currency", "value_currency", "value_eur"]
         ]
-        # result[index_cols] = result[index_cols].replace({np.nan: na_str})
-        # result[index_cols] = result[index_cols].replace({None: na_str})
 
         result = (
             result[index_cols + ["currency", "value_currency"]]
@@ -499,30 +494,8 @@ class TemplateResource(Resource):
         )
 
         # Recreate lists
-        # if "destination_names" in result.columns:
-        #     result.loc[
-        #         ~result.destination_names.isnull(), "destination_names"
-        #     ] = result.loc[
-        #         ~result.destination_names.isnull(), "destination_names"
-        #     ].apply(
-        #         lambda row: row.split(sep)
-        #     )
-        #
-        #     result.loc[
-        #         ~result.destination_iso2s.isnull(), "destination_iso2s"
-        #     ] = result.loc[
-        #         ~result.destination_iso2s.isnull(), "destination_iso2s"
-        #     ].apply(
-        #         lambda row: row.split(sep)
-        #     )
-        #
-        #     result.loc[
-        #         ~result.destination_dates.isnull(), "destination_dates"
-        #     ] = result.loc[
-        #         ~result.destination_dates.isnull(), "destination_dates"
-        #     ].apply(
-        #         lambda row: row.split(sep)
-        #     )  # We keep it as string
+        for col in list_columns:
+            result[col] = result[col].apply(list)
 
         # Quick sanity check
         len_after = len(result)
