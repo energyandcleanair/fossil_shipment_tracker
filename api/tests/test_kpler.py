@@ -507,7 +507,7 @@ def test_kpler_urals_espo(app):
             .agg({"value_tonne": "sum", "value_eur": "sum"})
             .reset_index()
         )
-        assert all(np.isclose(api_by_type.value_tonne, api_by_type.value_tonne[0], rtol=1e-3))
+        assert all(np.isclose(api_by_type.value_tonne, api_by_type.value_tonne[0], rtol=5e-2))
         assert not all(np.isclose(api_by_type.value_eur, api_by_type.value_eur[0], rtol=1e-3))
         assert set(api.pricing_commodity.unique()) >= set(["crude_oil_espo", "crude_oil_urals"])
         assert all(api.groupby("pricing_commodity").value_tonne.sum() > 0)

@@ -411,7 +411,9 @@ class KplerFlowResource(TemplateResource):
             query = query.filter(KplerTrade.departure_date_utc >= str(to_datetime(date_from)))
 
         if date_to:
-            query = query.filter(KplerTrade.departure_date_utc <= str(to_datetime(date_to)))
+            query = query.filter(
+                func.date_trunc("day", KplerTrade.departure_date_utc) <= to_datetime(date_to)
+            )
 
         if pricing_scenario:
             query = query.filter(Price.scenario.in_(to_list(pricing_scenario)))
