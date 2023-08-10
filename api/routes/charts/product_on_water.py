@@ -10,6 +10,7 @@ import base
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from .. import routes_api, ns_charts
+from ...definitions import ROOT_DIR
 from ..voyage import VoyageResource
 
 
@@ -159,7 +160,7 @@ class ChartProductOnWater(Resource):
 
         def translate(data, language):
             if language != "en":
-                file_path = "assets/language/%s.json" % (language)
+                file_path = f"{ROOT_DIR}/assets/language/%s.json" % (language)
                 with open(file_path, "r") as file:
                     translate_dict = json.load(file)
 
