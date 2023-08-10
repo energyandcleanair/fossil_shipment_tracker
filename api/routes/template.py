@@ -466,9 +466,6 @@ class TemplateResource(Resource):
         # But pandas need clean non-null and hashable data, hence this whole function...
         len_before = len(result)
         n_currencies = len(result.currency.unique())
-        sep = "#,#"
-        old_columns = result.columns  # Used to keep the order
-
         result["currency"] = "value_" + result.currency.str.lower()
 
         # Create a hashable version
@@ -481,6 +478,11 @@ class TemplateResource(Resource):
         ]
         for col in list_columns:
             result[col] = result[col].apply(tuple)
+
+        # Round all value_ columns to prevent pivoting error when there is an epsilon diff
+        # Observed on kpler_trade once
+        value_cols = [x for x in result.columns if x.startswith("value_")]
+        result[value_cols] = result[value_cols].round(6)
 
         index_cols = [
             x for x in result.columns if x not in ["currency", "value_currency", "value_eur"]
