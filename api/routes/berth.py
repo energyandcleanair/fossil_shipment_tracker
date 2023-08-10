@@ -11,6 +11,7 @@ from base.encoder import JsonEncoder
 from base.db import session
 from base.utils import update_geometry_from_wkb
 from . import routes_api
+from ..definitions import ROOT_DIR
 
 import pandas as pd
 

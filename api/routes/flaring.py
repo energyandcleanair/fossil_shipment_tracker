@@ -15,6 +15,7 @@ from base.utils import to_datetime, to_list, update_geometry_from_wkb
 from base.logger import logger
 
 from . import routes_api, ns_flaring
+from ..definitions import ROOT_DIR
 
 
 @ns_flaring.route("/v0/flaring_facility", strict_slashes=False)
@@ -64,7 +65,7 @@ class FlaringFacilityResource(Resource):
         download = params.get("download")
 
         if with_anomaly_index:
-            with open("assets/flaring_anomaly_index.sql", "r") as file:
+            with open(f"{ROOT_DIR}/assets/flaring_anomaly_index.sql", "r") as file:
                 sql_content = file.read()
 
             with engine.connect() as con:
