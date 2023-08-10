@@ -41,7 +41,7 @@ class KplerProductScraper:
 
         return {
             "id": id,
-            "platform": platform,
+            # "platform": platform,
             "name": infos.get("name"),
             "full_name": infos.get("fullName"),
             "type": infos.get("type"),
