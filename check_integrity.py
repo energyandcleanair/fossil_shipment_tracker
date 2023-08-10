@@ -1,9 +1,9 @@
-from engine import company
 import integrity
 import base
 
+import datetime as dt
+
 def update():
-    company.update()
     integrity.check()
     return
 
