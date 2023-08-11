@@ -49,33 +49,38 @@ class Equasis:
         text = text.replace("\t", "").replace("\r", "").replace("\n", "")
         return text
 
-    def _find_pni(self, parent):
-        pni_div = parent.find("div", attrs={"class": "access-body"})
-        if not pni_div:
-            return
-        pni_ps = pni_div.find_all("p")
-        if not len(pni_ps) > 1:
-            return
+    def _find_pnis(self, parent):
+        pni_divs = parent.find_all("div", attrs={"class": "access-body"})
+        if not len(pni_divs) > 0:
+            return []
+        
+        results = []
 
-        result = {}
-        result["name"] = self._clean_text(pni_ps[0].text)
+        for pni_div in pni_divs:
+            pni_ps = pni_div.find_all("p")
+            if not len(pni_ps) > 1:
+                break
 
-        def extract_inception_date(p):
-            if p.startswith("Inception at "):
-                # Extract date from date_from_p that can be in various formats, including dd/mm/YYY, YYYY-mm-dd
-                formats = ["%d/%m/%Y", "%Y-%m-%d"]
-                for format in formats:
-                    try:
-                        result = dt.datetime.strptime(p.replace("Inception at ", ""), format)
-                        return result.date()
-                    except ValueError:
-                        continue
-            return None
+            result = {}
+            result["name"] = self._clean_text(pni_ps[0].text)
 
-        date_from = extract_inception_date(self._clean_text(pni_ps[1].text))
-        if date_from:
-            result["date_from"] = date_from
-        return result
+            def extract_inception_date(p):
+                if p.startswith("Inception at "):
+                    # Extract date from date_from_p that can be in various formats, including dd/mm/YYY, YYYY-mm-dd
+                    formats = ["%d/%m/%Y", "%Y-%m-%d"]
+                    for format in formats:
+                        try:
+                            result = dt.datetime.strptime(p.replace("Inception at ", ""), format)
+                            return result.date()
+                        except ValueError:
+                            continue
+                return None
+
+            date_from = extract_inception_date(self._clean_text(pni_ps[1].text))
+            if date_from:
+                result["date_from"] = date_from
+            results.append(result)
+        return results
 
     def _find_management(self, parent):
         resp = []
@@ -153,7 +158,7 @@ class Equasis:
         # Insurer
         pni_div = html_obj.body.find("div", attrs={"id": "collapse6"})
         if pni_div:
-            ship_data["insurer"] = self._find_pni(pni_div)
+            ship_data["insurers"] = self._find_pnis(pni_div)
 
         # Manager & Owner
         management_div = html_obj.body.find("div", attrs={"id": "collapse3"})
@@ -186,9 +191,9 @@ class Equasis:
 
         # If (and only if) we have owner or manager but no insurer, we'll add an empty insurer
         if "owner" in ship_data or "manager" in ship_data:
-            if "insurer" not in ship_data:
+            if "insurers" not in ship_data or len(ship_data["insurers"]) == 0:
                 logger.debug("No owner, manager or insurer found for ship %s:" % (imo))
-                ship_data["insurer"] = {"name": base.UNKNOWN_INSURER}
+                ship_data["insurers"] = [{"name": base.UNKNOWN_INSURER}]
 
         return ship_data
 
