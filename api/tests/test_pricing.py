@@ -14,6 +14,19 @@ from base import PRICING_DEFAULT
 
 PRICING_PRICECAP = "usd40"
 
+class Helper:
+    @staticmethod
+    def get_destination_iso2(row):
+        if (
+            row["departure_date_utc"] <= "2022-12-05"
+                or row["commodity"] != base.CRUDE_OIL
+                or row["status"] == "completed"
+                or row["destination_region"] != "EU"
+        ):
+            return row["destination_iso2"]
+        else:
+            return None
+
 
 def test_voyage_pricing(app):
     # Create a test client using the Flask application configured for testing
@@ -65,6 +78,12 @@ def test_voyage_pricing(app):
         data["eur_per_tonne"] = data["value_eur_unweighted"] / data["ship_dwt"]
         data["date"] = pd.to_datetime(data.departure_date_utc).dt.date
         data["data_index"] = data.index
+
+        # Exclude ships that don't have a dwt
+        data = data[~np.isnan(data.ship_dwt)]
+
+        # Remove destination_iso2 when not used to filter for price
+        data["destination_iso2"] = data.apply(Helper.get_destination_iso2, axis = 1)
 
         # Checking different matching
         max_match = [
