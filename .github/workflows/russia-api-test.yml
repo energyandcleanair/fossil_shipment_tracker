@@ -33,6 +33,6 @@ jobs:
       run: |
         echo "${{ secrets.ENV_FILE }}" > .env
     - name: Test with pytest
-      workingdirectory: ./api/
+      working-directory: ./api/
       run: |
         pytest -c ./tests/pytest.ini -v
