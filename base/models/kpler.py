@@ -150,6 +150,12 @@ class KplerTrade(Base):
 
     others = Column(JSONB)
 
+    __table_args__ = (
+        Index("idx_kpler_trade_product_id", "product_id"),
+        Index("idx_kpler_flow_departure_zone_id", "departure_zone_id"),
+        Index("idx_kpler_flow_arrival_zone_id", "arrival_zone_id"),
+    )
+
     __tablename__ = DB_TABLE_KPLER_TRADE
 
 

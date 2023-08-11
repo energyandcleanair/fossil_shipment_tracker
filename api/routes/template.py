@@ -468,6 +468,9 @@ class TemplateResource(Resource):
         n_currencies = len(result.currency.unique())
         result["currency"] = "value_" + result.currency.str.lower()
 
+        # Replace nan with None
+        result.replace({np.nan: None}, inplace=True)
+
         # Create a hashable version
         # find columns that are list and convert them to tuple
         list_columns = [
