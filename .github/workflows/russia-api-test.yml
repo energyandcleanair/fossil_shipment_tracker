@@ -3,7 +3,7 @@ name: russia-api-test
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, push]
     branches:
       - master
 
