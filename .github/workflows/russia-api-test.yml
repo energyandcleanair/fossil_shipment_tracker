@@ -6,6 +6,8 @@ on:
     types: [opened, reopened]
     branches:
       - master
+  push:
+    branches-ignore: master
 
 jobs:
   build:
@@ -33,5 +35,6 @@ jobs:
       run: |
         echo "${{ secrets.ENV_FILE }}" > .env
     - name: Test with pytest
+      working-directory: ./api/
       run: |
-        pytest -c ./api/tests/pytest.ini -v
+        pytest -c ./tests/pytest.ini -v

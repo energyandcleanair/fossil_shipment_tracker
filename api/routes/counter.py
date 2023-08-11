@@ -12,7 +12,6 @@ from sqlalchemy import case
 from operator import attrgetter
 
 from . import routes_api, postcompute
-from ..definitions import ROOT_DIR
 from base import PRICING_DEFAULT
 from base.logger import logger
 from base.db import session
@@ -801,7 +800,7 @@ class RussiaCounterResource(Resource):
 
     def translate(self, data, language):
         if language != "en":
-            file_path = f"{ROOT_DIR}/assets/language/%s.json" % (language)
+            file_path = "assets/language/%s.json" % (language)
             with open(file_path, "r") as file:
                 translate_dict = json.load(file)
 

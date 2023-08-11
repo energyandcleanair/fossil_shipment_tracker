@@ -32,7 +32,8 @@ jobs:
           echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Run tests
-        run: python -m pytest -c ./api/tests/pytest.ini -v
+        working-directory: ./api/
+        run: python -m pytest -c ./tests/pytest.ini -v
 
   deploy:
     runs-on: ubuntu-latest
