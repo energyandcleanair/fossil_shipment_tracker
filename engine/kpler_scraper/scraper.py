@@ -971,51 +971,18 @@ class KplerScraper:
         df.drop(columns=["from_zone", "to_zone"], inplace=True)
         return df
 
-    def get_products(self, platform=None):
-        platforms = self.platforms if platform is None else [platform]
+    def get_products(self):
+        return pd.read_sql(
+            KplerProduct.query.statement,
+            session.bind,
+        )
 
-        def get_platform_products(platform):
-            if self.products.get(platform) is None:
-                # This yields 17 commodities while we had 20 when using the API
-                # products = self.get_products_brute(platform=platform)
-                # products = products[~pd.isna(products.closestAncestorCommodity)]
-                # products = products[~pd.isna(products.closestAncestorGroup)]
-                # commodities = products.closestAncestorCommodity.apply(lambda x: pd.Series(x))
-                # commodities["group_name"] = products.closestAncestorGroup.apply(lambda x: x.get('name'))
-                # commodities["family_name"] = products.closestAncestorFamily.apply(lambda x: x.get('name'))
-                # commodities["belongs_to_platform"] = products.ancestors.apply(lambda x: any([y.get('name').lower() == platform and y.get('type') == 'family' for y in x]))
-                # commodities = commodities[commodities.belongs_to_platform]
-                # commodities = commodities.drop_duplicates()
-                # commodities["platform"] = platform
-                # commodities.rename(
-                #     columns={
-                #         "family_name": "family",
-                #         "group_name": "group",
-                #     },
-                #     inplace=True,
-                # )
-                # columns = ["id", "name", "type", "family", "group"]
-                # self.products[platform] = commodities[columns]
-                products = pd.read_sql(
-                    KplerProduct.query.filter(KplerProduct.platform == platform).statement,
-                    session.bind,
-                )
-                self.products[platform] = products
-
-            return self.products.get(platform)
-
-        df = pd.concat([get_platform_products(platform) for platform in platforms])
-        # df = df[["id", "name", "family", "type", "group", "platform"]].drop_duplicates()
-        df = df[["name", "family", "group", "platform"]].drop_duplicates()
-        df = df[~pd.isna(df.name)]
-        return df
-
-    def get_product_id(self, platform, name):
+    def get_product_id(self, name):
         manual_values = {"Crude/Co": 1370}
         if name in manual_values:
             return manual_values[name]
 
-        products = self.get_products(platform=platform)
+        products = self.get_products()
         product = products[products.name == name]
         return int(product.id.values[0]) if len(product) == 1 else None
 

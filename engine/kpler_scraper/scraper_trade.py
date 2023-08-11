@@ -18,31 +18,39 @@ class KplerTradeScraper(KplerScraper):
         else:
             operational_filter = None
 
+        trades = []
+        vessels = []
+        zones = []
+        products = []
+
         for current_iso2 in to_list(from_iso2):
             date_from = to_datetime(date_from)
             from_zone = self.get_zone_dict(iso2=current_iso2, platform=platform)
             trades_raw = []
 
-            query_from = 0
-            while True:
-                size, query_trades_raw = self.get_trades_raw(
-                    from_zone=from_zone,
-                    platform="liquids",
-                    query_from=query_from,
-                    operational_filter=operational_filter,
-                )
-                trades_raw.extend(query_trades_raw)
-                query_from += size
-                if (
-                    size == 0
-                    or min([pd.to_datetime(x.get("start")) for x in query_trades_raw]) < date_from
-                ):
-                    break
+            # We split by group to be able to go further back in time (otherwise hitting 10000 window)
+            products_ = pd.DataFrame(self.get_products())
+            products_ = products_[products_["type"] == "group"]
+            product_ids = products_["id"].tolist()
 
-            trades = []
-            vessels = []
-            zones = []
-            products = []
+            for product_id in product_ids:
+                query_from = 0
+                while True:
+                    size, query_trades_raw = self.get_trades_raw(
+                        from_zone=from_zone,
+                        platform="liquids",
+                        query_from=query_from,
+                        operational_filter=operational_filter,
+                        product_ids=[product_id],
+                    )
+                    trades_raw.extend(query_trades_raw)
+                    query_from += size
+                    if (
+                        size == 0
+                        or min([pd.to_datetime(x.get("start")) for x in query_trades_raw])
+                        < date_from
+                    ):
+                        break
 
             for x in tqdm(trades_raw):
                 trades_, vessels_, zones_, products_ = self._parse_trade(x, platform=platform)
@@ -59,7 +67,7 @@ class KplerTradeScraper(KplerScraper):
         from_zone=None,
         to_zone=None,
         query_from=0,
-        product=None,
+        product_ids=None,
         operational_filter=None,
     ):
 
@@ -96,10 +104,8 @@ class KplerTradeScraper(KplerScraper):
             "operationalFilter": operational_filter,
         }
 
-        if product is not None:
-            params_raw["variables"]["where"]["productIds"] = [
-                self.get_product_id(platform=platform, name=product)
-            ]
+        if product_ids is not None:
+            params_raw["products"] = to_list(product_ids)
 
         token = self.token  # get_env("KPLER_TOKEN_BRUTE")
         url = {
@@ -123,7 +129,9 @@ class KplerTradeScraper(KplerScraper):
             trades_raw = r.json()
         except (json.decoder.JSONDecodeError, requests.JSONDecodeError, requests.RequestException):
             if "Result window is too large" in r.text:
-                logger.warning(f"Reached the end for Kpler trade")
+                logger.warning(
+                    f"Reached the end for Kpler trade. Probably required to split by product even further"
+                )
                 return 0, []
             else:
                 logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
