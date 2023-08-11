@@ -3,9 +3,11 @@ name: russia-api-test
 
 on:
   pull_request:
-    types: [opened, reopened, push]
+    types: [opened, reopened]
     branches:
       - master
+  push:
+    branches-ignore: master
 
 jobs:
   build:
