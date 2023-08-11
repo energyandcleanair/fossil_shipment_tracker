@@ -49,6 +49,18 @@ if slack_webhook_ok(get_env("SLACK_WEBHOOK")):
     logger_slack.addHandler(sh2)
 
 slacker = WebClient(token=get_env("SLACK_API_TOKEN"))
+
+USERS = [
+    "<@U012ZQ5NU4U>", # Hubert
+    "<@U05LD5C42G6>"  # Panda
+]
+NOTIFICATION_STRING = " ".join(USERS)
+CHANNEL = "#log-russia-counter"
+def notify_engineers(msg):
+    response = slacker.chat_postMessage(
+        channel = CHANNEL, text=f"{msg} {NOTIFICATION_STRING}"
+    )
+
 # Adding an error logging in file
 # logger_fh = logging.FileHandler('error.log')
 # logger_fh.setLevel(logging.ERROR)

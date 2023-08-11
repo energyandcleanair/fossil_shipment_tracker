@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 
 import base
-from base.logger import logger, logger_slack, slacker
+from base.logger import logger, logger_slack, slacker, notify_engineers
 from base.db import session
 from base.db_utils import upsert
 from base.utils import to_datetime, to_list, collapse_dates, remove_dates
@@ -581,9 +581,7 @@ def update_departures(
                 )
     except Exception as e:
         logger_slack.error("Departure update failed")
-        response = slacker.chat_postMessage(
-            channel="#log-russia-counter", text="Please check error <@U012ZQ5NU4U>"
-        )
+        notify_engineers("Please check error")
 
     return
 
