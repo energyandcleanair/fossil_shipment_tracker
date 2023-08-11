@@ -10,7 +10,7 @@ from base.db import session
 from base import COMMODITY_GROUPING_DEFAULT
 from base.utils import to_list
 from . import routes_api
-from ..definitions import ROOT_DIR
+
 
 @routes_api.route("/v0/commodity", methods=["GET"], strict_slashes=False)
 class CommodityResource(Resource):

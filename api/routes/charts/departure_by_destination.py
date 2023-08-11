@@ -14,7 +14,6 @@ from base.encoder import JsonEncoder
 from base.utils import to_list
 from .. import postcompute
 from .. import routes_api, ns_charts
-from ...definitions import ROOT_DIR
 from ..voyage import VoyageResource
 from ..overland import PipelineFlowResource
 
@@ -279,7 +278,7 @@ class ChartDepartureDestination(Resource):
 
         def translate(data, language):
             if language != "en":
-                file_path = f"{ROOT_DIR}/assets/language/%s.json" % (language)
+                file_path = "assets/language/%s.json" % (language)
                 with open(file_path, "r") as file:
                     translate_dict = json.load(file)
 

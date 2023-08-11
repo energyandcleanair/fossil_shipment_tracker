@@ -55,7 +55,6 @@ from base.env import get_env
 import base
 from .commodity import get_subquery as get_commodity_subquery
 from sqlalchemy.sql import extract
-from ..definitions import ROOT_DIR
 
 
 @routes_api.route(
@@ -1767,7 +1766,7 @@ class VoyageResource(Resource):
 
         if select_set:
             # read assets/presets/voyages.json
-            presets = read_json(f"{ROOT_DIR}/assets/presets/voyages.json")
+            presets = read_json("assets/presets/voyages.json")
             columns = presets.get("select_set", {}).get(select_set, [])
             columns = [x for x in columns if x not in variables and x in result.columns]
             variables += columns
