@@ -52,7 +52,7 @@ class Equasis:
     def _find_pnis(self, parent):
         pni_divs = parent.find_all("div", attrs={"class": "access-body"})
         if not len(pni_divs) > 0:
-            return
+            return []
         
         results = []
 
@@ -191,7 +191,7 @@ class Equasis:
 
         # If (and only if) we have owner or manager but no insurer, we'll add an empty insurer
         if "owner" in ship_data or "manager" in ship_data:
-            if "insurers" not in ship_data:
+            if "insurers" not in ship_data or len(ship_data["insurers"]) == 0:
                 logger.debug("No owner, manager or insurer found for ship %s:" % (imo))
                 ship_data["insurers"] = [{"name": base.UNKNOWN_INSURER}]
 
