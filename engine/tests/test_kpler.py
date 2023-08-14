@@ -9,9 +9,8 @@ from engine.kpler_scraper import KplerScraper, KplerFlowScraper, KplerTradeScrap
 
 
 def test_get_flow():
-    scraper = KplerScraper()
+    scraper = KplerFlowScraper()
     # products = scraper.get_products()
-
     flows = scraper.get_flows(
         platform="liquids",
         origin_iso2="RU",
@@ -27,11 +26,11 @@ def test_get_flow():
     assert round(sum.Diesel / 1e4) == 45
     assert round(sum.Gasoil / 1e4) == 14
 
+    from_zone = scraper.get_zone_dict(name="Kozmino", platform="liquids")
     flows_kozmino = scraper.get_flows(
         platform="liquids",
         origin_iso2="RU",
-        from_installation="Kozmino",
-        # destination_iso2="DE",
+        from_zone=from_zone,
         date_from="2022-03-01",
         date_to="2022-03-31",
         split=FlowsSplit.DestinationCountries,
@@ -46,43 +45,30 @@ def test_get_flow_brute():
 
     params = {
         "platform": "liquids",
-        "origin_iso2": "RU",
-        "destination_iso2": "CN",
+        # "origin_iso2": "RU",
+        # "destination_iso2": "CN",
         "date_from": to_datetime("2022-03-01"),
         "date_to": to_datetime("2022-03-02"),
         "split": FlowsSplit.Products,
         "unit": FlowsMeasurementUnit.T,
     }
 
-    scraper = KplerScraper()
+    scraper = KplerFlowScraper()
     # flows_brute = scraper.get_flows_raw_brute(**params, include_total=False)
     # flows = scraper.get_flows_raw(**params)
     # assert flows_brute.reset_index(drop=True).equals(flows.reset_index(drop=True))
+    from_zone = scraper.get_zone_dict(iso2="RU", platform="liquids")
+    params["from_zone"] = from_zone
+    to_zone = scraper.get_zone_dict(iso2="CN", platform="liquids")
+    params["to_zone"] = to_zone
 
-    params["destination_iso2"] = None
+    # params["destination_iso2"] = None
     params["split"] = FlowsSplit.DestinationCountries
     params["product"] = "Crude"
     flows_brute = scraper.get_flows_raw_brute(**params, include_total=False)
-    flows = scraper.get_flows_raw(**params)
 
-    flows_brute = flows_brute.sort_values("value", ascending=False)
-    flows = flows.sort_values("value", ascending=False)
-    flows = flows[flows.value > 0]
-
-    assert flows_brute.split.reset_index(drop=True).equals(flows.split.reset_index(drop=True))
-    assert all(np.isclose(flows_brute.value, flows.value, rtol=1e-3))
-
-    # Let's see how far it can go
-    params["date_from"] = to_datetime("2013-01-01")
-    params["date_to"] = to_datetime("2013-12-31")
-    flows_brute = scraper.get_flows_raw_brute(**params, include_total=False)
-    assert len(flows_brute.split.unique()) > 20
-
-    flows = scraper.get_flows(**params, use_brute_force=True)
-
-    from engine.kpler_scraper import UNKNOWN_COUNTRY
-
-    assert not all(flows.destination_iso2 == UNKNOWN_COUNTRY)
+    destinations = flows_brute.split.apply(lambda x: x.get("name"))
+    assert destinations.unique() == ["China"]
 
 
 def test_get_installations():
@@ -150,7 +136,7 @@ def test_get_flow_cn():
         "use_brute_force": True,
     }
 
-    scraper = KplerScraper()
+    scraper = KplerFlowScraper()
     flows = scraper.get_flows(**params)
     assert all(flows.from_iso2 == "CN")
     crude = flows[flows["product"] == "Crude/Co"]

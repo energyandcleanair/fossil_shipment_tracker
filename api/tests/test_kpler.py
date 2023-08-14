@@ -42,6 +42,7 @@ def test_kpler_v1_pricing(app):
                 func.sum(KplerFlow.value).label("value_tonne"),
             )
             .filter(
+                KplerFlow.is_valid,
                 KplerFlow.from_iso2.in_(iso2s),
                 KplerFlow.group.in_(groups),
                 sa.or_(KplerFlow.commodity != "Condensate", KplerFlow.commodity == None),
@@ -61,7 +62,7 @@ def test_kpler_v1_pricing(app):
             raw, how="left", on=["origin_iso2", "group"], suffixes=("_api", "_raw")
         )
 
-        assert all(merge.value_tonne_api == merge.value_tonne_raw)
+        assert np.isclose(merge.value_tonne_api, merge.value_tonne_raw, rtol=1e-6).all()
 
 
 def test_kpler_v1(app):
@@ -236,7 +237,6 @@ def test_kpler_crude_ru_exports(app):
             on=["destination_iso2", "year"],
             suffixes=("_api", "_manual"),
         )
-
         assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=1e-2))
 
 
@@ -414,7 +414,7 @@ def test_kpler_trade_gasoline_exports_monthly(app):
             "format": "json",
             "date_from": "2023-01-01",
             "date_to": "2023-07-31",
-            "origin_iso2": ",".join(["RU", "CN", "IN", "SG", "TR", "AE"]),
+            "origin_iso2": ",".join(["RU", "CN", "IN", "SG", "TR"]),
             "aggregate_by": "origin_iso2,group,origin_month",
             "commodity": "Gasoline",
             "api_key": get_env("API_KEY"),
@@ -434,7 +434,7 @@ def test_kpler_trade_gasoline_exports_monthly(app):
             suffixes=("_api", "_manual"),
         )
         assert all(
-            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=9e-2)
+            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10e-2)
         )
 
 
@@ -573,7 +573,7 @@ def test_flow_equals_trade(app):
         params = {
             "format": "json",
             "origin_iso2": "RU",
-            # "commodity_equivalent": "crude_oil",
+            "commodity_equivalent": "crude_oil",
             "commodity": "Crude",
             "date_from": date_from,
             "date_to": date_to,

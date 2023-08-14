@@ -73,6 +73,13 @@ class KplerFlowResource(TemplateResource):
     )
 
     parser.add_argument(
+        "exclude_within_country",
+        type=bool,
+        help="exclude trades within the same country",
+        default=True,
+    )
+
+    parser.add_argument(
         "pricing_scenario",
         help="Pricing scenario (standard or pricecap)",
         action="split",
@@ -378,6 +385,9 @@ class KplerFlowResource(TemplateResource):
             )
         )
 
+        # Only keep valid trades
+        query = query.filter(KplerTrade.is_valid == True)
+
         return query
 
     def filter(self, query, params=None):
@@ -388,6 +398,7 @@ class KplerFlowResource(TemplateResource):
         destination_iso2 = params.get("destination_iso2")
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
         destination_region = params.get("destination_region")
+        exclude_within_country = params.get("exclude_within_country")
 
         grade = params.get("grade")
         commodity = params.get("commodity")
@@ -456,6 +467,14 @@ class KplerFlowResource(TemplateResource):
         if commodity_destination_iso2:
             query = query.filter(
                 subquery.c.commodity_destination_iso2.in_(to_list(commodity_destination_iso2))
+            )
+
+        if exclude_within_country:
+            query = query.filter(
+                sa.or_(
+                    subquery.c.origin_iso2 != subquery.c.destination_iso2,
+                    subquery.c.destination_iso2 == None,
+                )
             )
 
         return query

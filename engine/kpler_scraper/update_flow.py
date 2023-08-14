@@ -15,7 +15,7 @@ from .upload import upload_flows
 
 def update_flow_is_valid():
     # Read sql from 'update_is_valid.sql'
-    with open(os.path.join(os.path.dirname(__file__), "update_flow_is_valid.sql")) as f:
+    with open(os.path.join(os.path.dirname(__file__), "update_is_valid.sql")) as f:
         sql = f.read()
     session.execute(sql)
     session.commit()

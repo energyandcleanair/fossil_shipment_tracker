@@ -97,9 +97,7 @@ class KplerFlowScraper(KplerScraper):
             if isinstance(product, dict):
                 params_raw["filters"] = {"product": [int(product.get("id"))]}
             else:
-                params_raw["filters"] = {
-                    "product": [self.get_product_id(platform=platform, name=product)]
-                }
+                params_raw["filters"] = {"product": [self.get_product_id(name=product)]}
         else:
             default_products = {"liquids": [1400, 1328, 1370], "lng": [1750], "dry": [1334]}
             params_raw["filters"] = {"product": default_products[platform]}

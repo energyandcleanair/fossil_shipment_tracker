@@ -73,8 +73,6 @@ def update(
         add_unknown_only=add_unknown_only,
     )
 
-    update_is_valid()
-
     update_trades(
         date_from=date_from,
         date_to=date_to,
@@ -83,10 +81,12 @@ def update(
         ignore_if_copy_failed=ignore_if_copy_failed,
     )
 
+    update_is_valid()
+
 
 def update_is_valid():
     # Read sql from 'update_is_valid.sql'
-    with open(os.path.join(os.path.dirname(__file__), "update_flow_is_valid.sql")) as f:
+    with open(os.path.join(os.path.dirname(__file__), "update_is_valid.sql")) as f:
         sql = f.read()
     session.execute(sql)
     session.commit()

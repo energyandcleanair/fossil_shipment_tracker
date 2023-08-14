@@ -150,6 +150,9 @@ class KplerTrade(Base):
 
     others = Column(JSONB)
 
+    updated_on = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    is_valid = Column(Boolean, default=True)
+
     __table_args__ = (
         Index("idx_kpler_trade_product_id", "product_id"),
         Index("idx_kpler_flow_departure_zone_id", "departure_zone_id"),

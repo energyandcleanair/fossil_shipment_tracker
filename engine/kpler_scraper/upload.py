@@ -23,6 +23,9 @@ def upload_trades(trades, ignore_if_copy_failed=False):
     if not isinstance(trades, pd.DataFrame):
         trades = pd.DataFrame(trades)
 
+    if not "updated_on" in trades.columns:
+        trades["updated_on"] = dt.datetime.utcnow()
+
     if trades is not None:
         try:
             # trades["others"] = trades.others.apply(json.dumps)
