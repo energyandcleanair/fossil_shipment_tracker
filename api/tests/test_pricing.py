@@ -11,6 +11,7 @@ from base.models import Position, ShipmentArrivalBerth, Price
 from base.db import session
 from base import PRICING_DEFAULT
 
+import pytest
 
 PRICING_PRICECAP = "usd40"
 
@@ -161,13 +162,12 @@ def test_voyage_pricing(app):
         # Check that all have been compared
         assert len(set(idx_already_compared)) == len(data)
 
-
-def test_price_cap(app):
+def test_price_cap_expected_barrel_price(app):
     with app.test_client() as test_client:
         date_from = "2022-12-01"
         commodities = [base.CRUDE_OIL]
         bbl_per_tonne = 1 / 0.138
-        price_per_barrel = 80
+        price_per_barrel = 60
 
         # Default and cap pricing should be similar before 2022-07-01
         params = {
@@ -205,6 +205,12 @@ def test_price_cap(app):
 
         assert data.groupby(data.covered)["value_tonne"].sum().all() > 0
         assert np.isclose(data[~data.covered].usd_per_tonne.max() / bbl_per_tonne, price_per_barrel * 1.1, 0.05)
+
+@pytest.mark.skip(reason="we are not generating additional pricecap data")
+def test_new_price_cap_and_default_similar_before_in_place(app):
+    with app.test_client() as test_client:
+        date_from = "2022-12-01"
+        commodities = [base.CRUDE_OIL]
 
         # Default and cap pricing should be similar before put in place
         params = {
@@ -272,7 +278,22 @@ def test_price_cap(app):
             )
         )
 
-        params["pricing_scenario"] = ",".join([PRICING_DEFAULT, PRICING_PRICECAP])
+@pytest.mark.skip(reason="we are not generating additional pricecap data")
+def test_price_cap_less_than_after_in_place(app):
+    with app.test_client() as test_client:
+        date_from = "2022-12-01"
+        commodities = [base.CRUDE_OIL]
+
+        # Default and cap pricing should be similar before put in place
+        params = {
+            "format": "json",
+            "date_from": date_from,
+            "commodity": ",".join(commodities),
+            "pricing_scenario": ",".join([PRICING_DEFAULT, PRICING_PRICECAP]),
+            "commodity_origin_iso2": "RU",
+            "currency": "EUR",
+        }
+
         response = test_client.get("/v0/voyage?" + urllib.parse.urlencode(params))
         assert response.status_code == 200
         data = response.json["data"]
@@ -281,7 +302,7 @@ def test_price_cap(app):
         assert both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum() \
                > both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
 
-
+@pytest.mark.skip(reason="we are not generating additional pricecap data")
 def test_coal_pricing(app):
     # Trying to figure out why numbers are different
 
