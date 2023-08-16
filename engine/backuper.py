@@ -24,7 +24,7 @@ def update(bucket="russia_fossil_tracker", folder="backup"):
         backup_counter(client_bucket=client_bucket, folder=folder, now=now)
         logger_slack.info("=== Creating backup done ===")
     except Exception as e:
-        logger_slack.info("=== Creating backup FAILED ===")
+        logger_slack.error("=== Creating backup FAILED ===")
 
 
 def upload(df, client_bucket, folder, filename, exts=["RDS", "csv.gz"]):
