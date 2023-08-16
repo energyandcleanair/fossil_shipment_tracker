@@ -2,7 +2,9 @@ from sqlalchemy import func
 import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 from sqlalchemy import case
+from sqlalchemy import nullslast
 
+import datetime as dt
 
 import base
 from .security import key_required
@@ -311,25 +313,83 @@ class KplerFlowResource(TemplateResource):
             else_=Commodity.pricing_commodity,
         ).label("pricing_commodity")
 
-        regions_inner_query = session.query(
+        regions = session.query(
             Country.iso2.label("iso2"),
             func.unnest(Country.regions).label("region")
         ).subquery()
 
-        insurer_inner_query = session.query(
-            KplerTrade.id.label("trade_id"),
-            func.array_agg(func.distinct(Company.name)).label("ship_insurer_names"),
-            func.array_agg(func.distinct(Company.country_iso2)).label("ship_insurer_iso2s"),
-            func.array_agg(func.distinct(regions_inner_query.c.region)).label("ship_insurer_regions")
-        ).outerjoin(
-            ShipInsurer, ShipInsurer.ship_imo == sa.any_(KplerTrade.vessel_imos)
-        ).outerjoin(
-            Company, ShipInsurer.company_id == Company.id
-        ).outerjoin(
-            regions_inner_query, Company.country_iso2 == regions_inner_query.c.iso2
-        ).group_by(
-            KplerTrade.id, KplerTrade.vessel_imos
-        ).subquery()
+        insurance_buffer_days = 14
+
+        voyage_insurer = (
+            session.query(
+                KplerTrade.id.label("trade_id"),
+                ShipInsurer.ship_imo.label("ship_imo"),
+                Company.name.label("insurer_name"),
+                Company.country_iso2.label("insurer_iso2"),
+                regions.c.region.label("insurer_region")
+            )
+            .outerjoin(
+                ShipInsurer, 
+                    sa.and_(
+                        ShipInsurer.ship_imo == sa.any_(KplerTrade.vessel_imos),
+                        sa.or_(
+                            ShipInsurer.date_from <= KplerTrade.departure_date_utc
+                                + dt.timedelta(days=insurance_buffer_days),
+                            ShipInsurer.date_from == None,
+                        )
+                    )
+            )
+            .outerjoin(
+                Company, ShipInsurer.company_id == Company.id
+            )
+            .outerjoin(
+                regions, Company.country_iso2 == regions.c.iso2
+            )
+            .distinct(
+                KplerTrade.id, ShipInsurer.ship_imo
+            )
+            .order_by(
+                KplerTrade.id,
+                ShipInsurer.ship_imo,
+                nullslast(ShipInsurer.date_from.desc())
+            )
+            .subquery()
+        )
+
+        def distinct_array_agg(arg):
+            return (
+                func.array_agg(
+                    func.distinct(
+                        arg
+                    )
+                )
+            )
+
+        insurer_inner_query = (
+            session.query(
+                KplerTrade.id.label("trade_id"),
+                distinct_array_agg(
+                    voyage_insurer.c.insurer_name
+                ).label("ship_insurer_names"),
+                distinct_array_agg(
+                    voyage_insurer.c.insurer_iso2
+                ).label("ship_insurer_iso2s"),
+                distinct_array_agg(
+                    voyage_insurer.c.insurer_region
+                ).label("ship_insurer_regions")
+            )
+            .outerjoin(
+                voyage_insurer, sa.and_(
+                    voyage_insurer.c.ship_imo == sa.any_(KplerTrade.vessel_imos),
+                    voyage_insurer.c.trade_id == KplerTrade.id
+                )
+            )
+            .group_by(
+                KplerTrade.id,
+                KplerTrade.vessel_imos
+            )
+            .subquery()
+        )
 
         query = (
             session.query(
