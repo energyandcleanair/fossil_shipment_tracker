@@ -3,6 +3,7 @@ from tqdm import tqdm
 import pandas as pd
 import datetime as dt
 from sqlalchemy import func
+from sqlalchemy import nullslast
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from difflib import SequenceMatcher
@@ -17,12 +18,16 @@ from base.db import session
 from base.env import get_env
 from base.logger import logger, logger_slack
 from base.models import (
+    Commodity,
     Departure,
     ShipInsurer,
     ShipOwner,
     ShipManager,
     Company,
     Country,
+    KplerProduct,
+    KplerTrade,
+    KplerZone,
     Ship,
     Port,
 )
@@ -138,50 +143,121 @@ def update_info_from_equasis(
     or for infos that are potentially outdated
     :return:
     """
-    imos = (
+
+    departure_ships = (
         session.query(
-            Departure.ship_imo,
-            ShipInsurer.company_raw_name,
-            (func.max(ShipInsurer.updated_on).label("last_updated")),
+            Departure.ship_imo.label("ship_imo"),
+            Departure.date_utc.label("date_utc"),
+            Departure.port_id.label("port_id"),
+            Port.iso2.label("port_iso2"),
+            Ship.commodity.label("commodity"),
+            sa.sql.expression.literal("departure").label("source")
         )
-        .group_by(
-            Departure.ship_imo,
-            ShipInsurer.company_raw_name,
+        .outerjoin(
+            Port, Departure.port_id == Port.id
         )
-        .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Departure.ship_imo)
+        .outerjoin(
+            Ship, Ship.imo == Departure.ship_imo
+        )
+    )
+
+    commodity_id_field = (
+        "kpler_"
+        + sa.func.replace(
+            sa.func.replace(
+                sa.func.lower(
+                    func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)
+                ),
+                " ",
+                "_",
+            ),
+            "/",
+            "_",
+        )
+    ).label("commodity")
+
+    kpler_ships = (
+        session.query(
+            func.unnest(KplerTrade.vessel_imos).label("ship_imo"),
+            KplerTrade.departure_date_utc.label("date_utc"),
+            KplerZone.port_id.label("port_id"),
+            Port.iso2.label("port_iso2"),
+            Commodity.equivalent_id.label("commodity"),
+            sa.sql.expression.literal("kpler").label("source")
+        )
+        .outerjoin(
+            KplerZone, KplerTrade.departure_zone_id == KplerZone.id
+        )
+        .outerjoin(
+            Port, KplerZone.port_id == Port.id
+        )
+        .outerjoin(
+            KplerProduct, KplerTrade.product_id == KplerProduct.id
+        )
+        .outerjoin(
+            Commodity, commodity_id_field == Commodity.id
+        )
+    )
+
+
+    all_ships = kpler_ships.union(departure_ships).subquery()
+
+    imo_query = (
+        session.query(
+            all_ships.c.ship_imo,
+            ShipInsurer.company_raw_name,
+            ShipInsurer.updated_on.label("last_updated"),
+            all_ships.c.source
+        )
+        .outerjoin(ShipInsurer, ShipInsurer.ship_imo == all_ships.c.ship_imo)
+        .distinct(all_ships.c.ship_imo, all_ships.c.source)
+        .order_by(all_ships.c.ship_imo, all_ships.c.source, nullslast(ShipInsurer.updated_on.desc()))
     )
 
     if commodities:
-        imos = imos.join(Ship, Ship.imo == Departure.ship_imo).filter(
-            Ship.commodity.in_(to_list(commodities))
-        )
+        imo_query = imo_query.filter(all_ships.c.commodity.in_(to_list(commodities)))
 
     if departure_date_from:
-        imos = imos.filter(Departure.date_utc >= departure_date_from)
+        imo_query = imo_query.filter(all_ships.c.date_utc >= departure_date_from)
 
     if imo:
-        imos = imos.filter(Departure.ship_imo.in_(to_list(imo)))
+        imo_query = imo_query.filter(all_ships.c.ship_imo.in_(to_list(imo)))
 
     if departure_port_id:
-        imos = imos.filter(Departure.port_id.in_(to_list(departure_port_id)))
+        imo_query = imo_query.filter(all_ships.c.port_id.in_(to_list(departure_port_id)))
 
     if departure_port_iso2:
-        imos = imos.join(Port, Port.id == Departure.port_id).filter(
-            Port.iso2.in_(to_list(departure_port_iso2))
-        )
+        imo_query = imo_query.filter(all_ships.c.port_iso2.in_(to_list(departure_port_iso2)))
 
-    imos = imos.subquery()
-    imos = session.query(imos).filter(
-        sa.or_(
-            imos.c.last_updated <= last_updated,
-            imos.c.last_updated == None,
-            sa.and_(force_unknown, imos.c.company_raw_name == base.UNKNOWN_INSURER),
+    imo_subquery = imo_query.subquery()
+
+    imo_query = (
+        session.query(
+            imo_subquery
+        )
+        .filter(
+            sa.or_(
+                imo_subquery.c.last_updated <= last_updated,
+                imo_subquery.c.last_updated == None,
+                sa.and_(force_unknown, imo_subquery.c.company_raw_name == base.UNKNOWN_INSURER),
+            )
         )
     )
 
-    imos = imos.distinct().all()
+    imos_results = imo_query.all()
 
-    imos = [x[0] for x in imos]
+    results = pd.DataFrame(imos_results)
+    results_by_source = str(
+        results
+            .groupby("source")
+            .count()
+            .reset_index()
+            [["source", "ship_imo"]]
+    )
+
+    logger.info(f"Ship IMOs identified to update by source:\n{results_by_source}")
+
+    imos = results.ship_imo.unique()
     ntries = 3
 
     # Remove thos we know can't be found
