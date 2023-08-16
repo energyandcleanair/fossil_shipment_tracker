@@ -437,6 +437,25 @@ def test_kpler_trade_gasoline_exports_monthly(app):
             np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10e-2)
         )
 
+def test_kpler_trade_no_duplicates(app):
+    with app.test_client() as test_client:
+        params = {
+            "format": "json",
+            "date_from": "2023-01-01",
+            "date_to": "2023-07-31",
+            "origin_iso2": ",".join(["RU", "CN", "IN", "SG", "TR"]),
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        trade = response.json["data"]
+        trade = pd.DataFrame(trade)
+
+        trade["exists"] = True
+        grouped_trades = trade.groupby(["trade_id", "commodity", "grade"]).count().reset_index()
+
+        assert len(grouped_trades[grouped_trades.exists > 1]) == 0
 
 def test_kpler_crude_export_byport(app):
     """

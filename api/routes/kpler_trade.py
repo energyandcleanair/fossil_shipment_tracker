@@ -20,6 +20,8 @@ from base.models import (
     Commodity,
     KplerTrade,
     KplerZone,
+    Company,
+    ShipInsurer
 )
 from base.utils import to_datetime, to_list, intersect, df_to_json
 
@@ -309,6 +311,26 @@ class KplerFlowResource(TemplateResource):
             else_=Commodity.pricing_commodity,
         ).label("pricing_commodity")
 
+        regions_inner_query = session.query(
+            Country.iso2.label("iso2"),
+            func.unnest(Country.regions).label("region")
+        ).subquery()
+
+        insurer_inner_query = session.query(
+            KplerTrade.id.label("trade_id"),
+            func.array_agg(func.distinct(Company.name)).label("ship_insurer_names"),
+            func.array_agg(func.distinct(Company.country_iso2)).label("ship_insurer_iso2s"),
+            func.array_agg(func.distinct(regions_inner_query.c.region)).label("ship_insurer_regions")
+        ).outerjoin(
+            ShipInsurer, ShipInsurer.ship_imo == sa.any_(KplerTrade.vessel_imos)
+        ).outerjoin(
+            Company, ShipInsurer.company_id == Company.id
+        ).outerjoin(
+            regions_inner_query, Company.country_iso2 == regions_inner_query.c.iso2
+        ).group_by(
+            KplerTrade.id, KplerTrade.vessel_imos
+        ).subquery()
+
         query = (
             session.query(
                 # Renaming everything in terms of "origin" and "destination"
@@ -349,12 +371,16 @@ class KplerFlowResource(TemplateResource):
                 KplerTrade.vessel_imos,
                 KplerTrade.buyer_names,
                 KplerTrade.seller_names,
+                insurer_inner_query.c.ship_insurer_names,
+                insurer_inner_query.c.ship_insurer_iso2s,
+                insurer_inner_query.c.ship_insurer_regions
             )
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
             .join(destination_zone, KplerTrade.arrival_zone_id == destination_zone.id)
             .join(Commodity, commodity_id_field == Commodity.id)
             .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
+            .join(insurer_inner_query, KplerTrade.id == insurer_inner_query.c.trade_id)
             .join(
                 Price,
                 sa.and_(
