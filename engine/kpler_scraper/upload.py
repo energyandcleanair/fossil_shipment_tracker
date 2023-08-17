@@ -4,6 +4,7 @@ import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
+from ..ship import fill
 
 from base.models import (
     DB_TABLE_KPLER_PRODUCT,
@@ -141,6 +142,8 @@ def upload_vessels(vessels, ignore_if_copy_failed=False):
         return None
 
     vessels = vessels.drop_duplicates(subset=["id"])
+
+    fill(vessels.imo.unique())
 
     if len(vessels) > 0:
         try:
