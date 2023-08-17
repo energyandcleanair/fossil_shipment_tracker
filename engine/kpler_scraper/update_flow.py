@@ -10,6 +10,7 @@ from tqdm import tqdm
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from . import KplerScraper
+from . import KplerFlowScraper
 from .upload import upload_flows
 
 
@@ -100,7 +101,7 @@ def update_flows(
     add_unknown=True,
     add_unknown_only=False,
 ):
-    scraper = KplerScraper()
+    scraper = KplerFlowScraper()
     date_from = to_datetime(date_from) if date_from is not None else to_datetime("2013-01-01")
     date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
 
