@@ -247,6 +247,9 @@ def update_info_from_equasis(
     imos_results = imo_query.all()
 
     results = pd.DataFrame(imos_results)
+
+    results = results[~results.ship_imo.str.match("_v", case=False)]
+
     results_by_source = str(
         results
             .groupby("source")
@@ -255,18 +258,13 @@ def update_info_from_equasis(
             [["source", "ship_imo"]]
     )
 
-    logger.info(f"Ship IMOs identified to update by source:\n{results_by_source}")
+    unique_imos = results.ship_imo.unique()
+    unique_imos_count = len(unique_imos)
 
-    imos = results.ship_imo.unique()
+    logger.info(f"{unique_imos_count} ship IMOs to update. By source (an IMO can be in both but will only be updated once):\n{results_by_source}")
+
+    imos = unique_imos
     ntries = 3
-
-    # Remove thos we know can't be found
-    imos = [
-        x
-        for x in imos
-        # if x is not None and not re.search("_v|NOTFOUND_", x, re.IGNORECASE)
-        if x is not None and not re.search("_v", x, re.IGNORECASE)
-    ]
 
     if imos:
         equasis = Equasis()
