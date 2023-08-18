@@ -128,21 +128,7 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
 
     return company_id
 
-
-def update_info_from_equasis(
-    commodities=None,
-    last_updated=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
-    departure_date_from=None,
-    imo=None,
-    departure_port_id=None,
-    departure_port_iso2=None,
-    force_unknown=False,
-):
-    """
-    Collect infos from equasis about shipments that either don't have infos,
-    or for infos that are potentially outdated
-    :return:
-    """
+def build_filter_query():
 
     departure_ships = (
         session.query(
@@ -199,47 +185,65 @@ def update_info_from_equasis(
         )
     )
 
+    filter_query = kpler_ships.union(departure_ships).subquery()
 
-    all_ships = kpler_ships.union(departure_ships).subquery()
+    return filter_query
+
+def update_info_from_equasis(
+    commodities=None,
+    last_updated=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
+    departure_date_from=None,
+    imo=None,
+    departure_port_id=None,
+    departure_port_iso2=None,
+    force_unknown=False,
+):
+    """
+    Collect infos from equasis about shipments that either don't have infos,
+    or for infos that are potentially outdated
+    :return:
+    """
+
+    filter_query = build_filter_query()
 
     imo_query = (
         session.query(
-            all_ships.c.ship_imo,
+            Ship.imo,
             ShipInsurer.company_raw_name,
-            ShipInsurer.updated_on.label("last_updated"),
-            all_ships.c.source
+            ShipInsurer.updated_on.label("last_updated")
         )
-        .outerjoin(ShipInsurer, ShipInsurer.ship_imo == all_ships.c.ship_imo)
-        .distinct(all_ships.c.ship_imo, all_ships.c.source)
-        .order_by(all_ships.c.ship_imo, all_ships.c.source, nullslast(ShipInsurer.updated_on.desc()))
+        .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
+        .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
+        .distinct(filter_query.c.ship_imo)
+        .order_by(filter_query.c.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
     )
 
     if commodities:
-        imo_query = imo_query.filter(all_ships.c.commodity.in_(to_list(commodities)))
+        imo_query = imo_query.filter(filter_query.c.commodity.in_(to_list(commodities)))
 
     if departure_date_from:
-        imo_query = imo_query.filter(all_ships.c.date_utc >= departure_date_from)
+        imo_query = imo_query.filter(filter_query.c.date_utc >= departure_date_from)
 
     if imo:
-        imo_query = imo_query.filter(all_ships.c.ship_imo.in_(to_list(imo)))
+        imo_query = imo_query.filter(filter_query.c.ship_imo.in_(to_list(imo)))
 
     if departure_port_id:
-        imo_query = imo_query.filter(all_ships.c.port_id.in_(to_list(departure_port_id)))
+        imo_query = imo_query.filter(filter_query.c.port_id.in_(to_list(departure_port_id)))
 
     if departure_port_iso2:
-        imo_query = imo_query.filter(all_ships.c.port_iso2.in_(to_list(departure_port_iso2)))
+        imo_query = imo_query.filter(filter_query.c.port_iso2.in_(to_list(departure_port_iso2)))
 
-    imo_subquery = imo_query.subquery()
+    imo_query = imo_query.subquery()
 
     imo_query = (
         session.query(
-            imo_subquery
+            imo_query
         )
         .filter(
             sa.or_(
-                imo_subquery.c.last_updated <= last_updated,
-                imo_subquery.c.last_updated == None,
-                sa.and_(force_unknown, imo_subquery.c.company_raw_name == base.UNKNOWN_INSURER),
+                imo_query.c.last_updated <= last_updated,
+                imo_query.c.last_updated == None,
+                sa.and_(force_unknown, imo_query.c.company_raw_name == base.UNKNOWN_INSURER),
             )
         )
     )
@@ -248,20 +252,12 @@ def update_info_from_equasis(
 
     results = pd.DataFrame(imos_results)
 
-    results = results[~results.ship_imo.str.match("_v", case=False)]
+    results = results[~results.imo.str.match("_v", case=False)]
 
-    results_by_source = str(
-        results
-            .groupby("source")
-            .count()
-            .reset_index()
-            [["source", "ship_imo"]]
-    )
-
-    unique_imos = results.ship_imo.unique()
+    unique_imos = results.imo.unique()
     unique_imos_count = len(unique_imos)
 
-    logger.info(f"{unique_imos_count} ship IMOs to update. By source (an IMO can be in both but will only be updated once):\n{results_by_source}")
+    logger.info(f"{unique_imos_count} ship IMOs to update")
 
     imos = unique_imos
     ntries = 3
