@@ -167,15 +167,12 @@ def build_filter_query():
             func.unnest(KplerTrade.vessel_imos).label("ship_imo"),
             KplerTrade.departure_date_utc.label("date_utc"),
             KplerZone.port_id.label("port_id"),
-            Port.iso2.label("port_iso2"),
+            KplerZone.country_iso2.label("port_iso2"),
             Commodity.equivalent_id.label("commodity"),
             sa.sql.expression.literal("kpler").label("source")
         )
         .outerjoin(
             KplerZone, KplerTrade.departure_zone_id == KplerZone.id
-        )
-        .outerjoin(
-            Port, KplerZone.port_id == Port.id
         )
         .outerjoin(
             KplerProduct, KplerTrade.product_id == KplerProduct.id
