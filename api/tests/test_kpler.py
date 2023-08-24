@@ -432,8 +432,11 @@ def test_kpler_trade_gasoline_exports_monthly(app):
             on=["origin_iso2", "month"],
             suffixes=("_api", "_manual"),
         )
+
+        # Cut last month, not complete
+        merge_trade = merge_trade[merge_trade.month != merge_trade.month.max()]
         assert all(
-            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10e-2)
+            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=8e-2)
         )
 
 

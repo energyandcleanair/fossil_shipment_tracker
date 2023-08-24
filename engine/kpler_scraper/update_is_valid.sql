@@ -27,6 +27,23 @@ with last_update as (
 )
 
 update kpler_trade
-set is_valid = updated_on_max - updated_on < '15 minutes'
+set is_valid = is_valid AND (updated_on_max - updated_on < '15 minutes')
 from last_update
 where kpler_trade.id = last_update.id;
+
+
+-- TRADES (using departure date, zones, flow_id and value_tonne)
+with last_update as (
+	select flow_id, departure_date_utc, departure_zone_id, arrival_zone_id, value_tonne, max(updated_on) as updated_on_max
+    from kpler_trade
+    group by 1, 2, 3, 4, 5
+)
+
+update kpler_trade
+set is_valid = (is_valid) and (updated_on_max - updated_on < '15 minutes')
+from last_update
+where kpler_trade.flow_id = last_update.flow_id
+and kpler_trade.departure_date_utc = last_update.departure_date_utc
+and kpler_trade.departure_zone_id = last_update.departure_zone_id
+and kpler_trade.arrival_zone_id = last_update.arrival_zone_id
+and kpler_trade.value_tonne = last_update.value_tonne;
