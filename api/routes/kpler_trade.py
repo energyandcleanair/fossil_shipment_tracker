@@ -599,7 +599,7 @@ class KplerFlowResource(TemplateResource):
                 all_insurers_for_trade.c.ship_insurer_iso2s,
                 all_insurers_for_trade.c.ship_insurer_regions
             )
-            .join(KplerProduct, KplerTrade.product_id == KplerProduct.id)
+            .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
             .join(destination_zone, KplerTrade.arrival_zone_id == destination_zone.id)
             .join(Commodity, commodity_id_field == Commodity.id)
