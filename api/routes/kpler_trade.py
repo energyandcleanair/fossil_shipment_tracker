@@ -440,9 +440,7 @@ class KplerFlowResource(TemplateResource):
             session.query(
                 KplerTrade.id.label("trade_id"),
                 trade_ship.c.ship_imo,
-                pricing_commodity_id_field,
-                Price.eur_per_tonne,
-                Price.scenario
+                Price.id.label("price_id")
             )
             .outerjoin(
                 trade_ship,
@@ -518,7 +516,7 @@ class KplerFlowResource(TemplateResource):
             .cte(name="trade_ship_price")
         )
 
-        value_eur_field = (KplerTrade.value_tonne * trade_ship_price.c.eur_per_tonne).label("value_eur")
+        value_eur_field = (KplerTrade.value_tonne * Price.eur_per_tonne).label("value_eur")
 
         def distinct_array_agg(arg):
             return (
@@ -585,13 +583,13 @@ class KplerFlowResource(TemplateResource):
                 Commodity.equivalent_id.label("commodity_equivalent"),  # For filtering
                 CommodityEquivalent.name.label("commodity_equivalent_name"),
                 CommodityEquivalent.group.label("commodity_equivalent_group"),
-                trade_ship_price.c.scenario.label("pricing_scenario"),
+                Price.scenario.label("pricing_scenario"),
                 KplerTrade.value_tonne,
                 KplerTrade.value_m3,
                 value_eur_field,
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
-                trade_ship_price.c.pricing_commodity,
+                Price.commodity.label("pricing_commodity"),
                 KplerTrade.vessel_imos,
                 KplerTrade.buyer_names,
                 KplerTrade.seller_names,
@@ -609,8 +607,14 @@ class KplerFlowResource(TemplateResource):
                 trade_ship_price,
                 sa.and_(
                     KplerTrade.id == trade_ship_price.c.trade_id,
-                    trade_ship_price.c.ship_imo == func.any(KplerTrade.vessel_imos),
-                    trade_ship_price.c.pricing_commodity == pricing_commodity_id_field
+                    trade_ship_price.c.ship_imo == func.any(KplerTrade.vessel_imos)
+                )
+            )
+            .join(
+                Price,
+                sa.and_(
+                    trade_ship_price.c.price_id == Price.id,
+                    pricing_commodity_id_field == Price.commodity
                 )
             )
             .outerjoin(Currency, Currency.date == price_date)
@@ -618,15 +622,15 @@ class KplerFlowResource(TemplateResource):
                 KplerTrade.id,
                 KplerTrade.flow_id,
                 KplerTrade.product_id,
-                trade_ship_price.c.scenario,
+                Price.scenario,
                 Currency.currency,
-                nullslast(trade_ship_price.c.eur_per_tonne),
+                nullslast(Price.eur_per_tonne),
             )
             .distinct(
                 KplerTrade.id,
                 KplerTrade.flow_id,
                 KplerTrade.product_id,
-                trade_ship_price.c.scenario,
+                Price.scenario,
                 Currency.currency,
             )
         )
@@ -677,10 +681,8 @@ class KplerFlowResource(TemplateResource):
                 func.date_trunc("day", KplerTrade.departure_date_utc) <= to_datetime(date_to)
             )
 
-        pricing_scenario_column = next(c for c in query.column_descriptions if c["name"] == "pricing_scenario")["expr"]
-
         if pricing_scenario:
-            query = query.filter(pricing_scenario_column.in_(to_list(pricing_scenario)))
+            query = query.filter(Price.scenario.in_(to_list(pricing_scenario)))
 
         if currency is not None:
             query = query.filter(Currency.currency.in_(to_list(currency)))
