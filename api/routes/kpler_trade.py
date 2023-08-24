@@ -3,6 +3,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import aliased
 from sqlalchemy import case
 from sqlalchemy import nullslast
+from sqlalchemy import any_
 
 import datetime as dt
 
@@ -23,7 +24,8 @@ from base.models import (
     KplerTrade,
     KplerZone,
     Company,
-    ShipInsurer
+    ShipInsurer,
+    ShipOwner
 )
 from base.utils import to_datetime, to_list, intersect, df_to_json
 
@@ -38,6 +40,14 @@ class KplerFlowResource(TemplateResource):
         action="split",
         default=None,
         help="which variables to aggregate by. Could be any of origin_country,origin,destination_country,destination,product,date,date,country,year",
+    )
+
+    parser.add_argument(
+        "trade_ids",
+        type=int,
+        action="split",
+        default=None,
+        help="The trade IDs to find."
     )
 
     parser.add_argument(
@@ -272,7 +282,22 @@ class KplerFlowResource(TemplateResource):
         destination_zone = aliased(KplerZone)
         CommodityEquivalent = aliased(Commodity)
         price_date = func.date_trunc("day", KplerTrade.departure_date_utc)
-        value_eur_field = (KplerTrade.value_tonne * Price.eur_per_tonne).label("value_eur")
+
+        # This gives us the vessel IMOs as a table
+        # to make other queries possible. We sort
+        # to get the best performance.
+        trade_ship = (
+            session.query(
+                KplerTrade.id.label("trade_id"),
+                func.unnest(KplerTrade.vessel_imos).label("ship_imo"),
+                KplerTrade.departure_date_utc
+            )
+            .order_by(
+                KplerTrade.id,
+                KplerTrade.vessel_imos
+            )
+            .cte(name="trade_ship")
+        )
 
         # Commodity used for pricing
         commodity_id_field = (
@@ -280,7 +305,10 @@ class KplerFlowResource(TemplateResource):
             + sa.func.replace(
                 sa.func.replace(
                     sa.func.lower(
-                        func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)
+                        func.coalesce(
+                            KplerProduct.commodity_name,
+                            KplerProduct.group_name
+                        )
                     ),
                     " ",
                     "_",
@@ -313,31 +341,39 @@ class KplerFlowResource(TemplateResource):
             else_=Commodity.pricing_commodity,
         ).label("pricing_commodity")
 
-        regions = session.query(
-            Country.iso2.label("iso2"),
-            func.unnest(Country.regions).label("region")
-        ).subquery()
+        # This makes querying regions in multiple
+        # places possible.
+        regions = (
+            session.query(
+                Country.iso2.label("iso2"),
+                func.unnest(Country.regions).label("region")
+            )
+            .order_by(Country.iso2)
+            .cte(name="regions")
+        )
 
         insurance_buffer_days = 14
 
+        # We get the earliest (but starting before the
+        # departure date) insurance per trade's ship.
         voyage_insurer = (
             session.query(
-                KplerTrade.id.label("trade_id"),
-                ShipInsurer.ship_imo.label("ship_imo"),
-                Company.name.label("insurer_name"),
-                Company.country_iso2.label("insurer_iso2"),
-                regions.c.region.label("insurer_region")
+                trade_ship.c.trade_id.label("trade_id"),
+                trade_ship.c.ship_imo.label("ship_imo"),
+                Company.name.label("name"),
+                Company.country_iso2.label("iso2"),
+                regions.c.region.label("region")
             )
             .outerjoin(
                 ShipInsurer, 
-                    sa.and_(
-                        ShipInsurer.ship_imo == sa.any_(KplerTrade.vessel_imos),
-                        sa.or_(
-                            ShipInsurer.date_from <= KplerTrade.departure_date_utc
-                                + dt.timedelta(days=insurance_buffer_days),
-                            ShipInsurer.date_from == None,
-                        )
+                sa.and_(
+                    ShipInsurer.ship_imo == trade_ship.c.ship_imo,
+                    sa.or_(
+                        ShipInsurer.date_from <= trade_ship.c.departure_date_utc
+                            + dt.timedelta(days=insurance_buffer_days),
+                        ShipInsurer.date_from == None,
                     )
+                )
             )
             .outerjoin(
                 Company, ShipInsurer.company_id == Company.id
@@ -346,15 +382,143 @@ class KplerFlowResource(TemplateResource):
                 regions, Company.country_iso2 == regions.c.iso2
             )
             .distinct(
-                KplerTrade.id, ShipInsurer.ship_imo
+                trade_ship.c.trade_id,
+                trade_ship.c.ship_imo
+            )
+            .order_by(
+                trade_ship.c.trade_id,
+                trade_ship.c.ship_imo,
+                nullslast(ShipInsurer.date_from)
+            )
+            .cte(name="voyage_insurer")
+        )
+
+        # We get the earliest (but starting before the
+        # departure date) owner per trade's ship.
+        voyage_owner = (
+            session.query(
+                trade_ship.c.trade_id,
+                trade_ship.c.ship_imo,
+                Company.name.label("name"),
+                Company.country_iso2.label("iso2"),
+                regions.c.region.label("region")
+            )
+            .outerjoin(
+                ShipOwner, 
+                sa.and_(
+                    ShipOwner.ship_imo == trade_ship.c.ship_imo,
+                    sa.or_(
+                        ShipOwner.date_from <= trade_ship.c.departure_date_utc
+                            + dt.timedelta(days=insurance_buffer_days),
+                        ShipOwner.date_from == None,
+                    )
+                )
+            )
+            .outerjoin(
+                Company, ShipOwner.company_id == Company.id
+            )
+            .outerjoin(
+                regions, Company.country_iso2 == regions.c.iso2
+            )
+            .distinct(
+                trade_ship.c.trade_id,
+                trade_ship.c.ship_imo,
+            )
+            .order_by(
+                trade_ship.c.trade_id,
+                trade_ship.c.ship_imo,
+                nullslast(ShipOwner.date_from)
+            )
+            .cte(name="voyage_owner")
+        )
+
+        # We need a separate query to get the best matching
+        # price per ship per commodity. Afterwards we can choose the
+        # one for each ship/commodity with the lowest price (the one
+        # that is capped, if applicable).
+        trade_ship_price = (
+            session.query(
+                KplerTrade.id.label("trade_id"),
+                trade_ship.c.ship_imo,
+                pricing_commodity_id_field,
+                Price.eur_per_tonne,
+                Price.scenario
+            )
+            .outerjoin(
+                trade_ship,
+                KplerTrade.id == trade_ship.c.trade_id
+            )
+            .join(
+                KplerProduct, KplerTrade.product_id == KplerProduct.id
+            )
+            .outerjoin(
+                Commodity, commodity_id_field == Commodity.id
+            )
+            .outerjoin(
+                origin_zone,
+                KplerTrade.departure_zone_id == origin_zone.id
+            )
+            .outerjoin(
+                destination_zone,
+                KplerTrade.arrival_zone_id == destination_zone.id
+            )
+            .outerjoin(
+                voyage_insurer,
+                sa.and_(
+                    voyage_insurer.c.trade_id
+                        == trade_ship.c.trade_id,
+                    voyage_insurer.c.ship_imo 
+                        == trade_ship.c.ship_imo
+                )
+            )
+            .outerjoin(
+                voyage_owner,
+                sa.and_(
+                    voyage_owner.c.trade_id
+                        == trade_ship.c.trade_id,
+                    voyage_insurer.c.ship_imo
+                        == trade_ship.c.ship_imo
+                )
+            )
+            .join(
+                Price,
+                sa.and_(
+                    pricing_commodity_id_field == Price.commodity,
+                    Price.date == price_date,
+                    sa.or_(
+                        voyage_insurer.c.iso2 == any_(Price.ship_insurer_iso2s),
+                        Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR
+                    ),
+                    sa.or_(
+                        voyage_owner.c.iso2 == any_(Price.ship_owner_iso2s),
+                        Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR
+                    ),
+                    sa.or_(
+                        destination_zone.country_iso2 == any_(Price.destination_iso2s),
+                        Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    ),
+                    Price.departure_port_ids == base.PRICE_NULLARRAY_INT
+                )
+            )
+            .distinct(
+                KplerTrade.id,
+                trade_ship.c.ship_imo,
+                Price.scenario,
+                Price.commodity,
             )
             .order_by(
                 KplerTrade.id,
-                ShipInsurer.ship_imo,
-                nullslast(ShipInsurer.date_from.desc())
+                trade_ship.c.ship_imo,
+                Price.scenario,
+                Price.commodity,
+                Price.destination_iso2s,
+                Price.ship_insurer_iso2s,
+                Price.ship_owner_iso2s,
             )
-            .subquery()
+            .cte(name="trade_ship_price")
         )
+
+        value_eur_field = (KplerTrade.value_tonne * trade_ship_price.c.eur_per_tonne).label("value_eur")
 
         def distinct_array_agg(arg):
             return (
@@ -365,23 +529,23 @@ class KplerFlowResource(TemplateResource):
                 )
             )
 
-        insurer_inner_query = (
+        all_insurers_for_trade = (
             session.query(
                 KplerTrade.id.label("trade_id"),
                 distinct_array_agg(
-                    voyage_insurer.c.insurer_name
+                    voyage_insurer.c.name
                 ).label("ship_insurer_names"),
                 distinct_array_agg(
-                    voyage_insurer.c.insurer_iso2
+                    voyage_insurer.c.iso2
                 ).label("ship_insurer_iso2s"),
                 distinct_array_agg(
-                    voyage_insurer.c.insurer_region
+                    voyage_insurer.c.region
                 ).label("ship_insurer_regions")
             )
             .outerjoin(
                 voyage_insurer, sa.and_(
+                    voyage_insurer.c.trade_id == KplerTrade.id,
                     voyage_insurer.c.ship_imo == sa.any_(KplerTrade.vessel_imos),
-                    voyage_insurer.c.trade_id == KplerTrade.id
                 )
             )
             .group_by(
@@ -421,52 +585,48 @@ class KplerFlowResource(TemplateResource):
                 Commodity.equivalent_id.label("commodity_equivalent"),  # For filtering
                 CommodityEquivalent.name.label("commodity_equivalent_name"),
                 CommodityEquivalent.group.label("commodity_equivalent_group"),
-                Price.scenario.label("pricing_scenario"),
+                trade_ship_price.c.scenario.label("pricing_scenario"),
                 KplerTrade.value_tonne,
                 KplerTrade.value_m3,
                 value_eur_field,
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
-                pricing_commodity_id_field,
+                trade_ship_price.c.pricing_commodity,
                 KplerTrade.vessel_imos,
                 KplerTrade.buyer_names,
                 KplerTrade.seller_names,
-                insurer_inner_query.c.ship_insurer_names,
-                insurer_inner_query.c.ship_insurer_iso2s,
-                insurer_inner_query.c.ship_insurer_regions
+                all_insurers_for_trade.c.ship_insurer_names,
+                all_insurers_for_trade.c.ship_insurer_iso2s,
+                all_insurers_for_trade.c.ship_insurer_regions
             )
-            .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
+            .join(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
             .join(destination_zone, KplerTrade.arrival_zone_id == destination_zone.id)
             .join(Commodity, commodity_id_field == Commodity.id)
             .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
-            .join(insurer_inner_query, KplerTrade.id == insurer_inner_query.c.trade_id)
+            .join(all_insurers_for_trade, KplerTrade.id == all_insurers_for_trade.c.trade_id)
             .join(
-                Price,
+                trade_ship_price,
                 sa.and_(
-                    Price.date == price_date,
-                    sa.or_(
-                        destination_zone.country_iso2 == sa.any_(Price.destination_iso2s),
-                        Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    ),
-                    Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
-                    Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
-                    Price.commodity == pricing_commodity_id_field,
-                ),
+                    KplerTrade.id == trade_ship_price.c.trade_id,
+                    trade_ship_price.c.ship_imo == func.any(KplerTrade.vessel_imos),
+                    trade_ship_price.c.pricing_commodity == pricing_commodity_id_field
+                )
             )
             .outerjoin(Currency, Currency.date == price_date)
             .order_by(
                 KplerTrade.id,
                 KplerTrade.flow_id,
-                Price.scenario,
+                KplerTrade.product_id,
+                trade_ship_price.c.scenario,
                 Currency.currency,
-                Price.destination_iso2s,
+                nullslast(trade_ship_price.c.eur_per_tonne),
             )
             .distinct(
                 KplerTrade.id,
                 KplerTrade.flow_id,
-                Price.scenario,
+                KplerTrade.product_id,
+                trade_ship_price.c.scenario,
                 Currency.currency,
             )
         )
@@ -486,6 +646,8 @@ class KplerFlowResource(TemplateResource):
         destination_region = params.get("destination_region")
         exclude_within_country = params.get("exclude_within_country")
 
+        trade_ids = params.get("trade_ids")
+
         grade = params.get("grade")
         commodity = params.get("commodity")
         group = params.get("group")
@@ -497,6 +659,9 @@ class KplerFlowResource(TemplateResource):
         platform = params.get("platform")
         pricing_scenario = params.get("pricing_scenario")
         currency = params.get("currency")
+
+        if trade_ids:
+            query = query.filter(KplerTrade.id.in_(to_list(trade_ids)))
 
         if grade:
             query = query.filter(KplerTrade.grade_name.in_(to_list(grade)))
@@ -512,8 +677,10 @@ class KplerFlowResource(TemplateResource):
                 func.date_trunc("day", KplerTrade.departure_date_utc) <= to_datetime(date_to)
             )
 
+        pricing_scenario_column = next(c for c in query.column_descriptions if c["name"] == "pricing_scenario")["expr"]
+
         if pricing_scenario:
-            query = query.filter(Price.scenario.in_(to_list(pricing_scenario)))
+            query = query.filter(pricing_scenario_column.in_(to_list(pricing_scenario)))
 
         if currency is not None:
             query = query.filter(Currency.currency.in_(to_list(currency)))

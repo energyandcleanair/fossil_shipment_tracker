@@ -328,7 +328,6 @@ def test_kpler_gasoline_exports_yearly(app):
         )
         assert all(np.isclose(merge_flow.value_tonne_api, merge_flow.value_tonne_manual, rtol=5e-2))
 
-
 def test_kpler_flow_gasoline_exports_monthly(app):
     """
     Test values against manually collected ones
@@ -459,6 +458,128 @@ def test_kpler_trade_no_duplicates(app):
         assert len(grouped_trades[grouped_trades.exists > 1]) == 0
 
 
+def test_kpler_trade_pricing(app):
+
+    with app.test_client() as test_client:
+    
+        ID__FLOWS_1__SHIPS_1 = {
+            "trade_id": 18583808,
+            "flows": 1,
+            "commodity": ["kpler_diesel"],
+            "total_value_sum": 43103.43 * 789.18
+        }
+
+        ID__FLOWS_2__SHIPS_1 = {
+            "trade_id": 17941591,
+            "flows": 2,
+            "commodity": ["kpler_vgo", "kpler_fo"],
+            "total_value_sum":
+                33999.20 * 721.69
+                    + 66000.35 * 420.29
+        }
+
+        ID__FLOWS_1__SHIPS_2 = {
+            "trade_id": 18485627,
+            "flows": 1,
+            "commodity": ["kpler_gasoil"],
+            "total_value_sum":
+                19481.73 * 727.30
+        }
+
+        ID__COM_no = {
+            "trade_id": 18552571,
+            "flows": 1,
+            "commodity": [None],
+            "total_value_sum": None,
+            "expected_missing": True
+        }
+        ID__INS_n__DES_n = {
+            "trade_id": 13556034,
+            "flows": 1,
+            "commodity": ["crude_oil_urals"],
+            "total_value_sum": 76790.56 * 680.79
+        }
+        ID__INS_y__DES_n = {
+            "trade_id": 18354609,
+            "flows": 1,
+            "commodity": ["crude_oil_urals"],
+            "total_value_sum": 134598.24 * 393.12
+        }
+        ID__INS_n__DES_y = {
+            "trade_id": 18377410,
+            "flows": 1,
+            "commodity": ["crude_oil_urals"],
+            "total_value_sum": 86115.77 * 390.407
+        }
+        ID__INS_y__DES_y = {
+            "trade_id": 17491334,
+            "flows": 1,
+            "commodity": ["crude_oil_urals"],
+            "total_value_sum": 86115.77 * 393.507
+        }
+
+        expected = pd.DataFrame.from_dict([
+            ID__FLOWS_1__SHIPS_1,
+            ID__FLOWS_2__SHIPS_1,
+            ID__FLOWS_1__SHIPS_2,
+            ID__COM_no,
+            ID__INS_n__DES_n,
+            ID__INS_y__DES_n,
+            ID__INS_n__DES_y,
+            ID__INS_y__DES_y
+        ])
+
+        params = {
+            "format": "json",
+            "trade_ids": ','.join(str(x) for x in expected["trade_id"].tolist()),
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        data_df = pd.DataFrame(data)
+
+        grouped_actual = (
+            data_df
+                .groupby("trade_id")
+                .agg({
+                    "value_eur": "sum",
+                    "flow_id": "nunique",
+                    "pricing_commodity": "unique"
+                })
+                .rename(columns={
+                    "flow_id": "flows",
+                    "value_eur": "total_value_sum",
+                    "pricing_commodity": "commodity"
+                })
+                .reset_index()
+        )[["trade_id", "flows", "total_value_sum", "commodity"]]
+
+        merged = expected.merge(
+            grouped_actual,
+            on="trade_id",
+            how="outer",
+            suffixes=("_expected", "_actual")
+        );
+
+        assert all(np.isnan(merged[merged.expected_missing == True]["flows_actual"]))
+
+        excluding_missing = merged[merged.expected_missing == False]
+
+        assert all(
+            excluding_missing["flows_expected"]
+                == excluding_missing["flows_actual"]
+        )
+        assert all(
+            excluding_missing["commodity_expected"]
+                == excluding_missing["commodity_actual"]
+        )
+        assert all(np.isclose(
+            excluding_missing["total_value_sum_expected"],
+            excluding_missing["total_value_sum_actual"]
+        ))
+
 def test_kpler_crude_export_byport(app):
     """
     Test values against manually collected ones
@@ -554,8 +675,8 @@ def test_kpler_urals_espo(app):
             "format": "json",
             "origin_iso2": "RU",
             "commodity_equivalent": "crude_oil",
-            "date_from": -10,
-            "date_to": -5,
+            "date_from": "2023-01-01",
+            "date_to": "2023-05-30",
             "origin_type": "country,port",
             "api_key": get_env("API_KEY"),
         }
