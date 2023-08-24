@@ -452,10 +452,15 @@ def test_kpler_trade_no_duplicates(app):
         trade = response.json["data"]
         trade = pd.DataFrame(trade)
 
-        trade["exists"] = True
-        grouped_trades = trade.groupby(["trade_id", "commodity", "grade"]).count().reset_index()
+        grouped_trades = (
+            trade
+                .groupby(["trade_id", "commodity", "grade"])
+                .size()
+                .to_frame("size")
+                .reset_index()
+        )
 
-        assert len(grouped_trades[grouped_trades.exists > 1]) == 0
+        assert len(grouped_trades[grouped_trades["size"] > 1]) == 0
 
 
 def test_kpler_trade_pricing(app):
