@@ -38,7 +38,7 @@ class KplerTradeScraper(KplerScraper):
                 while True:
                     size, query_trades_raw = self.get_trades_raw(
                         from_zone=from_zone,
-                        platform="liquids",
+                        platform=platform,
                         query_from=query_from,
                         operational_filter=operational_filter,
                         product_ids=[product_id],
