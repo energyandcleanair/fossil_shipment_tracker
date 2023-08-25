@@ -735,3 +735,40 @@ def test_flow_equals_trade(app):
         assert np.isclose(flow.value_eur.sum(), trade.value_eur.sum(), rtol=10e-2)
 
     return
+
+
+def test_kpler_trade_commodity_origin(app):
+    """
+    Test that CPC is correctly aggregated to KZ
+    :param app:
+    :return:
+    """
+    with app.test_client() as test_client:
+        date_from = "2023-01-01"
+        date_to = "2023-01-31"
+
+        params = {
+            "format": "json",
+            "origin_iso2": "RU",
+            "commodity_equivalent": "crude_oil",
+            "commodity": "Crude",
+            "date_from": date_from,
+            "date_to": date_to,
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        trades = pd.DataFrame(response.json["data"])
+        assert len(trades) > 0  # Not all cou
+
+        assert set(trades.commodity_origin_iso2.unique()) == set(["RU", "KZ"])
+        assert set(trades[trades.commodity_origin_iso2 == "KZ"].grade.unique()) == set(
+            ["CPC Kazakhstan", "KEBCO"]
+        )
+        assert not any(
+            (trades.commodity_origin_iso2 == "RU")
+            & (trades.grade.isin(["CPC Kazakhstan", "KEBCO"]))
+        )
+
+    return

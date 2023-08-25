@@ -15,10 +15,12 @@ try:
     from api.routes.voyage import VoyageResource
     from api.routes.overland import PipelineFlowResource
     from api.routes.kpler_flow import KplerFlowResource
+    from api.routes.kpler_trade import KplerTradeResource
 except ImportError:
     from routes.voyage import VoyageResource
     from routes.overland import PipelineFlowResource
     from routes.kpler_flow import KplerFlowResource
+    from routes.kpler_trade import KplerTradeResource
 
 import base
 
@@ -148,6 +150,68 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
             inplace=True,
         )
         result = pd.concat([pipelineflows, voyages, kpler_flows])
+
+    elif version == base.COUNTER_VERSION2:
+        # Version 1: MT voyages for LPG only, Kpler TRADES for the rest
+        params_voyage = {
+            "format": "json",
+            "download": False,
+            "date_from": date_from,
+            "commodity_origin_iso2": ["RU"],
+            "aggregate_by": [
+                "commodity_origin_iso2",
+                "commodity_destination_iso2",
+                "commodity",
+                "arrival_date",
+                "status",
+            ],
+            "nest_in_data": False,
+            "currency": "EUR",
+            "status": "completed",
+            "pricing_scenario": None,
+            "bypass_maintenance": True,
+            "commodity": [base.LPG],
+        }
+        voyages_resp = VoyageResource().get_from_params(params=params_voyage)
+        voyages = json.loads(voyages_resp.response[0])
+        voyages = pd.DataFrame(voyages)
+        voyages = voyages.loc[voyages.commodity_origin_iso2 == "RU"]
+        voyages = voyages.loc[voyages.commodity_destination_iso2 != "RU"]
+        voyages = voyages.loc[voyages.status == base.COMPLETED]  # just to confirm
+        voyages.rename(columns={"arrival_date": "date"}, inplace=True)
+        assert np.all(voyages.commodity == base.LPG)
+
+        # Add Kpler flows
+        params_kpler_trades = {
+            "format": "json",
+            "download": False,
+            "date_from": date_from,
+            "origin_iso2": ["RU"],
+            "aggregate_by": [
+                "commodity_origin_iso2",
+                "commodity_destination_iso2",
+                "commodity_equivalent",
+                "destination_date",
+            ],
+            "nest_in_data": False,
+            "currency": "EUR",
+            "pricing_scenario": None,
+            "bypass_maintenance": True,
+        }
+        kpler_trades_resp = KplerTradeResource().get_from_params(params=params_kpler_trades)
+        kpler_trades = json.loads(kpler_trades_resp.response[0])
+        kpler_trades = pd.DataFrame(kpler_trades)
+        kpler_trades = kpler_trades.loc[kpler_trades.commodity_origin_iso2 == "RU"]
+        kpler_trades = kpler_trades.loc[kpler_trades.commodity_destination_iso2 != "RU"]
+        kpler_trades = kpler_trades.loc[kpler_trades.commodity_destination_iso2 != "not found"]
+        kpler_trades.rename(
+            columns={
+                "commodity_equivalent": "commodity",
+                "commodity_equivalent_group": "commodity_group",
+            },
+            inplace=True,
+        )
+        result = pd.concat([pipelineflows, voyages, kpler_trades])
 
     else:
         raise ValueError(f"Unknown counter version {version}")
