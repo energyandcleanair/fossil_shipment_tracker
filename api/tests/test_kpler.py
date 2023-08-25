@@ -347,12 +347,15 @@ def test_kpler_flow_gasoline_exports_monthly(app):
     manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
     manual_values.rename(columns={"date": "month"}, inplace=True)
 
+    countries = ["RU", "CN", "IN", "SG", "TR", "AE"]
+    manual_values = manual_values[manual_values["origin_iso2"].isin(countries)]
+
     with app.test_client() as test_client:
         params = {
             "format": "json",
             "date_from": "2023-01-01",
             "date_to": "2023-07-31",
-            "origin_iso2": ",".join(["RU", "CN", "IN", "SG", "TR", "AE"]),
+            "origin_iso2": ",".join(countries),
             "aggregate_by": "origin_iso2,group,month",
             "commodity": "Gasoline",
             "api_key": get_env("API_KEY"),
@@ -366,12 +369,15 @@ def test_kpler_flow_gasoline_exports_monthly(app):
         # Month to YYYY-MM
         flow["month"] = flow["month"].map(lambda x: pd.to_datetime(x).strftime("%Y-%m"))
         # Merge
-        merge_flow = flow[["origin_iso2", "month", "value_tonne"]].merge(
-            manual_values[["origin_iso2", "month", "value_tonne"]],
+        merge_flow = manual_values[["origin_iso2", "month", "value_tonne"]].merge(
+            flow[["origin_iso2", "month", "value_tonne"]],
             how="left",
             on=["origin_iso2", "month"],
-            suffixes=("_api", "_manual"),
+            suffixes=("_manual", "_api"),
         )
+        # Cut last month, not complete
+        merge_flow = merge_flow[merge_flow.month != merge_flow.month.max()]
+        merge_flow["value_tonne_api"] = merge_flow["value_tonne_api"].fillna(0)
 
         merge_flow_agg = merge_flow.groupby("origin_iso2").agg(
             {"value_tonne_api": "sum", "value_tonne_manual": "sum"}
@@ -409,12 +415,15 @@ def test_kpler_trade_gasoline_exports_monthly(app):
     manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
     manual_values.rename(columns={"date": "month"}, inplace=True)
 
+    countries = ["RU", "CN", "IN", "SG", "TR"]
+    manual_values = manual_values[manual_values["origin_iso2"].isin(countries)]
+
     with app.test_client() as test_client:
         params = {
             "format": "json",
             "date_from": "2023-01-01",
             "date_to": "2023-07-31",
-            "origin_iso2": ",".join(["RU", "CN", "IN", "SG", "TR"]),
+            "origin_iso2": ",".join(countries),
             "aggregate_by": "origin_iso2,group,origin_month",
             "commodity": "Gasoline",
             "api_key": get_env("API_KEY"),
@@ -427,17 +436,141 @@ def test_kpler_trade_gasoline_exports_monthly(app):
         trade = trade.groupby(["origin_iso2", "month"]).value_tonne.sum().reset_index()
         trade["month"] = trade["month"].map(lambda x: pd.to_datetime(x).strftime("%Y-%m"))
         # Merge
-        merge_trade = trade[["origin_iso2", "month", "value_tonne"]].merge(
-            manual_values[["origin_iso2", "month", "value_tonne"]],
+        merge_trade = manual_values[["origin_iso2", "month", "value_tonne"]].merge(
+            trade[["origin_iso2", "month", "value_tonne"]],
             how="left",
             on=["origin_iso2", "month"],
-            suffixes=("_api", "_manual"),
+            suffixes=("_manual", "_api"),
         )
 
         # Cut last month, not complete
         merge_trade = merge_trade[merge_trade.month != merge_trade.month.max()]
+        merge_trade["value_tonne_api"] = merge_trade["value_tonne_api"].fillna(0)
+
         assert all(
             np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=5e-2)
+        )
+
+def test_kpler_flow_lng_exports_monthly(app):
+    """
+    Test values against manually collected ones
+    :param app:
+    :return:
+    """
+    import country_converter as coco
+
+    cc = coco.CountryConverter()
+
+    manual_values = pd.read_csv("assets/kpler/lng_exports_monthly_2023.csv")
+    manual_values = manual_values.melt(
+        id_vars=["date"], var_name="country", value_name="value_ktonne"
+    )
+    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
+    manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
+    manual_values.rename(columns={"date": "month"}, inplace=True)
+
+    countries = ["RU"]
+    manual_values = manual_values[manual_values["origin_iso2"].isin(countries)]
+
+    with app.test_client() as test_client:
+        params = {
+            "format": "json",
+            "date_from": "2023-01-01",
+            "date_to": "2023-07-31",
+            "origin_iso2": ",".join(countries),
+            "aggregate_by": "origin_iso2,group,month",
+            "commodity": "lng",
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        flow = response.json["data"]
+        flow = pd.DataFrame(flow)
+        flow = flow.groupby(["origin_iso2", "month"]).value_tonne.sum().reset_index()
+        # Month to YYYY-MM
+        flow["month"] = flow["month"].map(lambda x: pd.to_datetime(x).strftime("%Y-%m"))
+        # Merge
+        merge_flow = manual_values[["origin_iso2", "month", "value_tonne"]].merge(
+            flow[["origin_iso2", "month", "value_tonne"]],
+            how="left",
+            on=["origin_iso2", "month"],
+            suffixes=("_manual", "_api"),
+        )
+
+        # Cut last month, not complete
+        merge_flow = merge_flow[merge_flow.month != merge_flow.month.max()]
+        merge_flow["value_tonne_api"] = merge_flow["value_tonne_api"].fillna(0)
+
+        merge_flow_agg = merge_flow.groupby("origin_iso2").agg(
+            {"value_tonne_api": "sum", "value_tonne_manual": "sum"}
+        )
+        assert all(
+            np.isclose(
+                merge_flow_agg.value_tonne_api, merge_flow_agg.value_tonne_manual, rtol=10e-2
+            )
+        )
+
+        # Much more strict for Russia
+        idx = merge_flow.origin_iso2 == "RU"
+        assert all(
+            np.isclose(
+                merge_flow[idx].value_tonne_api, merge_flow[idx].value_tonne_manual, rtol=1e-2
+            )
+        )
+
+def test_kpler_trade_lng_exports_monthly(app):
+    """
+    Test values against manually collected ones
+    :param app:
+    :return:
+    """
+    import country_converter as coco
+
+    cc = coco.CountryConverter()
+
+    manual_values = pd.read_csv("assets/kpler/lng_exports_monthly_2023.csv")
+    manual_values = manual_values.melt(
+        id_vars=["date"], var_name="country", value_name="value_ktonne"
+    )
+    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
+    manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
+    manual_values.rename(columns={"date": "month"}, inplace=True)
+
+    countries = ["RU", "CN", "IN", "SG", "TR"]
+    manual_values = manual_values[manual_values["origin_iso2"].isin(countries)]
+
+    with app.test_client() as test_client:
+        params = {
+            "format": "json",
+            "date_from": "2023-01-01",
+            "date_to": "2023-07-31",
+            "origin_iso2": ",".join(countries),
+            "aggregate_by": "origin_iso2,group,origin_month",
+            "commodity": "lng",
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        trade = response.json["data"]
+        trade = pd.DataFrame(trade)
+        trade = trade.groupby(["origin_iso2", "month"]).value_tonne.sum().reset_index()
+        trade["month"] = trade["month"].map(lambda x: pd.to_datetime(x).strftime("%Y-%m"))
+        # Merge
+        merge_trade = manual_values[["origin_iso2", "month", "value_tonne"]].merge(
+            trade[["origin_iso2", "month", "value_tonne"]],
+            how="left",
+            on=["origin_iso2", "month"],
+            suffixes=("_manual", "_api"),
+        )
+
+        # Cut last month, not complete
+        merge_trade = merge_trade[merge_trade.month != merge_trade.month.max()]
+        merge_trade["value_tonne_api"] = merge_trade["value_tonne_api"].fillna(0)
+
+        assert all(
+            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10e-2)
         )
 
 
