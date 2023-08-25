@@ -30,7 +30,11 @@ class KplerTradeScraper(KplerScraper):
 
             # We split by group to be able to go further back in time (otherwise hitting 10000 window)
             products_ = pd.DataFrame(self.get_products())
-            products_ = products_[products_["type"] == "group"]
+            if platform == "liquids":
+                products_ = products_[products_["type"] == "group"]
+            else:
+                products_ = products_[products_["type"] == "commodity"]
+            products_ = products_[products_["platform"] == platform]
             product_ids = products_["id"].tolist()
 
             for product_id in product_ids:

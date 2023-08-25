@@ -7,4 +7,5 @@ from .update import update, update_lite, update_full
 from .update_trade import update_trades
 from .update_flow import update_flows
 from .update_product import update_products
+from .update import update_is_valid
 from .misc import *

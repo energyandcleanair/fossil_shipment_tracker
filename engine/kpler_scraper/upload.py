@@ -24,25 +24,27 @@ def upload_trades(trades, ignore_if_copy_failed=False):
     if not isinstance(trades, pd.DataFrame):
         trades = pd.DataFrame(trades)
 
+    if trades.empty:
+        return None
+
     if not "updated_on" in trades.columns:
         trades["updated_on"] = dt.datetime.utcnow()
 
-    if trades is not None:
-        try:
-            # trades["others"] = trades.others.apply(json.dumps)
-            trades = trades[~pd.isnull(trades.product_id)]
-            trades.to_sql(
-                DB_TABLE_KPLER_TRADE,
-                con=engine,
-                if_exists="append",
-                index=False,
-            )
-        except sa.exc.IntegrityError:
-            if ignore_if_copy_failed:
-                logger.info("Some rows already exist. Skipping")
-            else:
-                logger.info("Some rows already exist. Upserting instead")
-                upsert(trades, DB_TABLE_KPLER_TRADE, DB_TABLE_KPLER_TRADE + "_pkey")
+    try:
+        # trades["others"] = trades.others.apply(json.dumps)
+        trades = trades[~pd.isnull(trades.product_id)]
+        trades.to_sql(
+            DB_TABLE_KPLER_TRADE,
+            con=engine,
+            if_exists="append",
+            index=False,
+        )
+    except sa.exc.IntegrityError:
+        if ignore_if_copy_failed:
+            logger.info("Some rows already exist. Skipping")
+        else:
+            logger.info("Some rows already exist. Upserting instead")
+            upsert(trades, DB_TABLE_KPLER_TRADE, DB_TABLE_KPLER_TRADE + "_pkey")
 
 
 def upload_flows(flows, ignore_if_copy_failed=False):
@@ -81,8 +83,8 @@ def upload_products(products, ignore_if_copy_failed=False):
     if not isinstance(products, pd.DataFrame):
         products = pd.DataFrame(products)
 
-    if "platform" in products.columns:
-        products.drop(columns=["platform"], inplace=True)
+    # if "platform" in products.columns:
+    #     products.drop(columns=["platform"], inplace=True)
 
     products = products.drop_duplicates(subset=["id"])
     if len(products) == 0:

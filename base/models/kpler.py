@@ -177,6 +177,7 @@ class KplerTradeFlow(Base):
 class KplerProduct(Base):
     id = Column(BigInteger, primary_key=True)
     name = Column(String, nullable=False)
+    platform = Column(String, nullable=False)
     full_name = Column(String)
     type = Column(String)
     grade_id = Column(BigInteger)

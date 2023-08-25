@@ -13,7 +13,7 @@ from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementU
 
 class KplerProductScraper:
 
-    cache = {}
+    cache = {"liquids": {}, "lng": {}, "dry": {}}
     session = requests.Session()
     retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
     session.mount("https://", HTTPAdapter(max_retries=retries))
@@ -21,11 +21,11 @@ class KplerProductScraper:
 
     @classmethod
     def get_infos(cls, platform, id):
-        if id in KplerProductScraper.cache:
-            return KplerProductScraper.cache[id]
+        if id in KplerProductScraper.cache[platform]:
+            return KplerProductScraper.cache[platform][id]
         else:
             infos = KplerProductScraper.collect_infos(platform=platform, id=id)
-            KplerProductScraper.cache[id] = infos
+            KplerProductScraper.cache[platform][id] = infos
             return infos
 
     @classmethod
@@ -145,17 +145,28 @@ class KplerProductScraper:
         products = [x for x in products if x is not None]
         products_df = pd.DataFrame(products)
 
-        # Check that each id has one unique name and three distinct platforms
+        # Check that each id has only one name
         assert (
-            len(
-                products_df.groupby("id")
-                .agg({"name": "nunique", "platform": "nunique"})
-                .reset_index()
-                .query("name > 1 or platform != 3")
-            )
-            == 0
+            products_df.groupby("id").agg({"name": "nunique"}).reset_index().query("name > 1").empty
         )
 
+        # Check that each id has only one platform
+        assert (
+            products_df.groupby("id")
+            .agg({"platform": "nunique"})
+            .reset_index()
+            .query("platform > 1")
+            .empty
+        )
+        # assert (
+        #     len(
+        #         products_df.groupby("id")
+        #         .agg({"name": "nunique", "platform": "nunique"})
+        #         .reset_index()
+        #         .query("name > 1 or platform != 3")
+        #     )
+        #     == 0
+        # )
+
         # Then drop platform
-        products_df = products_df[products_df.platform == "liquids"].drop(columns=["platform"])
         return products_df.to_dict(orient="records")
