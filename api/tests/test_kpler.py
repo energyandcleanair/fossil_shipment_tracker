@@ -328,6 +328,7 @@ def test_kpler_gasoline_exports_yearly(app):
         )
         assert all(np.isclose(merge_flow.value_tonne_api, merge_flow.value_tonne_manual, rtol=5e-2))
 
+
 def test_kpler_flow_gasoline_exports_monthly(app):
     """
     Test values against manually collected ones
@@ -436,7 +437,7 @@ def test_kpler_trade_gasoline_exports_monthly(app):
         # Cut last month, not complete
         merge_trade = merge_trade[merge_trade.month != merge_trade.month.max()]
         assert all(
-            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=8e-2)
+            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=5e-2)
         )
 
 
@@ -456,11 +457,7 @@ def test_kpler_trade_no_duplicates(app):
         trade = pd.DataFrame(trade)
 
         grouped_trades = (
-            trade
-                .groupby(["trade_id", "commodity", "grade"])
-                .size()
-                .to_frame("size")
-                .reset_index()
+            trade.groupby(["trade_id", "commodity", "grade"]).size().to_frame("size").reset_index()
         )
 
         assert len(grouped_trades[grouped_trades["size"] > 1]) == 0
@@ -469,29 +466,26 @@ def test_kpler_trade_no_duplicates(app):
 def test_kpler_trade_pricing(app):
 
     with app.test_client() as test_client:
-    
+
         ID__FLOWS_1__SHIPS_1 = {
             "trade_id": 18583808,
             "flows": 1,
             "commodity": ["kpler_diesel"],
-            "total_value_sum": 43103.43 * 789.18
+            "total_value_sum": 43103.43 * 789.18,
         }
 
         ID__FLOWS_2__SHIPS_1 = {
             "trade_id": 17941591,
             "flows": 2,
             "commodity": ["kpler_vgo", "kpler_fo"],
-            "total_value_sum":
-                33999.20 * 721.69
-                    + 66000.35 * 420.29
+            "total_value_sum": 33999.20 * 721.69 + 66000.35 * 420.29,
         }
 
         ID__FLOWS_1__SHIPS_2 = {
             "trade_id": 18485627,
             "flows": 1,
             "commodity": ["kpler_gasoil"],
-            "total_value_sum":
-                19481.73 * 727.30
+            "total_value_sum": 19481.73 * 727.30,
         }
 
         ID__COM_no = {
@@ -499,47 +493,49 @@ def test_kpler_trade_pricing(app):
             "flows": 1,
             "commodity": [None],
             "total_value_sum": None,
-            "expected_missing": True
+            "expected_missing": True,
         }
         ID__INS_n__DES_n = {
             "trade_id": 13556034,
             "flows": 1,
             "commodity": ["crude_oil_urals"],
-            "total_value_sum": 76790.56 * 680.79
+            "total_value_sum": 76790.56 * 680.79,
         }
         ID__INS_y__DES_n = {
             "trade_id": 18354609,
             "flows": 1,
             "commodity": ["crude_oil_urals"],
-            "total_value_sum": 134598.24 * 393.12
+            "total_value_sum": 134598.24 * 393.12,
         }
         ID__INS_n__DES_y = {
             "trade_id": 18377410,
             "flows": 1,
             "commodity": ["crude_oil_urals"],
-            "total_value_sum": 86115.77 * 390.407
+            "total_value_sum": 86115.77 * 390.407,
         }
         ID__INS_y__DES_y = {
             "trade_id": 17491334,
             "flows": 1,
             "commodity": ["crude_oil_urals"],
-            "total_value_sum": 86115.77 * 393.507
+            "total_value_sum": 86115.77 * 393.507,
         }
 
-        expected = pd.DataFrame.from_dict([
-            ID__FLOWS_1__SHIPS_1,
-            ID__FLOWS_2__SHIPS_1,
-            ID__FLOWS_1__SHIPS_2,
-            ID__COM_no,
-            ID__INS_n__DES_n,
-            ID__INS_y__DES_n,
-            ID__INS_n__DES_y,
-            ID__INS_y__DES_y
-        ])
+        expected = pd.DataFrame.from_dict(
+            [
+                ID__FLOWS_1__SHIPS_1,
+                ID__FLOWS_2__SHIPS_1,
+                ID__FLOWS_1__SHIPS_2,
+                ID__COM_no,
+                ID__INS_n__DES_n,
+                ID__INS_y__DES_n,
+                ID__INS_n__DES_y,
+                ID__INS_y__DES_y,
+            ]
+        )
 
         params = {
             "format": "json",
-            "trade_ids": ','.join(str(x) for x in expected["trade_id"].tolist()),
+            "trade_ids": ",".join(str(x) for x in expected["trade_id"].tolist()),
             "api_key": get_env("API_KEY"),
         }
 
@@ -549,44 +545,35 @@ def test_kpler_trade_pricing(app):
         data_df = pd.DataFrame(data)
 
         grouped_actual = (
-            data_df
-                .groupby("trade_id")
-                .agg({
-                    "value_eur": "sum",
-                    "flow_id": "nunique",
-                    "pricing_commodity": "unique"
-                })
-                .rename(columns={
+            data_df.groupby("trade_id")
+            .agg({"value_eur": "sum", "flow_id": "nunique", "pricing_commodity": "unique"})
+            .rename(
+                columns={
                     "flow_id": "flows",
                     "value_eur": "total_value_sum",
-                    "pricing_commodity": "commodity"
-                })
-                .reset_index()
+                    "pricing_commodity": "commodity",
+                }
+            )
+            .reset_index()
         )[["trade_id", "flows", "total_value_sum", "commodity"]]
 
         merged = expected.merge(
-            grouped_actual,
-            on="trade_id",
-            how="outer",
-            suffixes=("_expected", "_actual")
-        );
+            grouped_actual, on="trade_id", how="outer", suffixes=("_expected", "_actual")
+        )
 
         assert all(np.isnan(merged[merged.expected_missing == True]["flows_actual"]))
 
         excluding_missing = merged[merged.expected_missing == False]
 
+        assert all(excluding_missing["flows_expected"] == excluding_missing["flows_actual"])
+        assert all(excluding_missing["commodity_expected"] == excluding_missing["commodity_actual"])
         assert all(
-            excluding_missing["flows_expected"]
-                == excluding_missing["flows_actual"]
+            np.isclose(
+                excluding_missing["total_value_sum_expected"],
+                excluding_missing["total_value_sum_actual"],
+            )
         )
-        assert all(
-            excluding_missing["commodity_expected"]
-                == excluding_missing["commodity_actual"]
-        )
-        assert all(np.isclose(
-            excluding_missing["total_value_sum_expected"],
-            excluding_missing["total_value_sum_actual"]
-        ))
+
 
 def test_kpler_crude_export_byport(app):
     """
