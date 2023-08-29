@@ -225,3 +225,21 @@ def test_insurer():
             % ", ".join([row[0] for row in wrong_date_from])
         )
     assert wrong_date_from.rowcount == 0
+
+
+def test_trade_platform():
+    """I've found trades with Crude/Co as a commodity
+    but LNG as a platform. Just ensuring this isn't happening anymore
+    """
+
+    raw_sql = """
+    select * from kpler_trade kt
+    left join kpler_product kp on kp.id = kt.product_id
+    where kp.platform != kt.platform;
+    """
+
+    result = session.execute(raw_sql)
+    if result.rowcount > 0:
+        logger_slack.error(
+            "Some kpler trades have a platform field not matching the platform of their products."
+        )
