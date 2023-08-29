@@ -147,6 +147,22 @@ class KplerTradeResource(TemplateResource):
         required=False,
     )
 
+    parser.add_argument(
+        "buyer",
+        type=str,
+        help="name of the/a buyer",
+        default=None,
+        required=False,
+    )
+
+    parser.add_argument(
+        "seller",
+        type=str,
+        help="name of the/a seller",
+        default=None,
+        required=False,
+    )
+
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date"]
     value_cols = ["value_tonne", "value_m3", "value_eur", "value_currency"]
@@ -666,6 +682,9 @@ class KplerTradeResource(TemplateResource):
         pricing_scenario = params.get("pricing_scenario")
         currency = params.get("currency")
 
+        buyer = params.get("buyer")
+        seller = params.get("seller")
+
         if trade_ids:
             query = query.filter(KplerTrade.id.in_(to_list(trade_ids)))
 
@@ -688,6 +707,12 @@ class KplerTradeResource(TemplateResource):
 
         if currency is not None:
             query = query.filter(Currency.currency.in_(to_list(currency)))
+
+        if buyer:
+            query = query.filter(KplerTrade.buyer_names.overlap(to_list(buyer)))
+
+        if seller:
+            query = query.filter(KplerTrade.seller_names.overlap(to_list(seller)))
 
         subquery = query.subquery()
         query = session.query(subquery)
