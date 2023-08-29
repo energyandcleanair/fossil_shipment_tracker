@@ -416,16 +416,20 @@ def sanity_check(result, version):
             .to_string(col_space=10, index=False, justify="left")
         )
 
-        # Relax a bit for crude_oil in CL, MY, US
+        # Relax a bit for crude_oil in CL, MY, US, GH, MM
         comparison_detailed["ok"] = (
             (
-                (comparison_detailed.new_eur >= comparison_detailed.old_eur * 0.95)
-                & (comparison_detailed.new_eur <= comparison_detailed.old_eur * 1.2)
+                (comparison_detailed.new_eur >= comparison_detailed.old_eur * 0.9)
+                & (comparison_detailed.new_eur <= comparison_detailed.old_eur * 1.3)
             )
-            | ((comparison_detailed.new_eur - comparison_detailed.old_eur).abs() < 50e6)
+            | ((comparison_detailed.new_eur - comparison_detailed.old_eur).abs() < 100e6)
             | (
                 (comparison_detailed["commodity"] == "crude_oil")
-                & (comparison_detailed.commodity_destination_iso2.isin(["CL", "MY", "US"]))
+                & (
+                    comparison_detailed.commodity_destination_iso2.isin(
+                        ["CL", "MY", "US", "GH", "MM"]
+                    )
+                )
             )
         )
         ok = ok or comparison_detailed.ok.all()

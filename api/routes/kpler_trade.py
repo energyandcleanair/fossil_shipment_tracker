@@ -203,27 +203,28 @@ class KplerTradeResource(TemplateResource):
             "destination_country": [
                 subquery.c.destination_iso2,
                 subquery.c.destination_country,
-                # subquery.c.destination_region,
+                subquery.c.destination_region,
             ],
             "destination_iso2": [
                 subquery.c.destination_iso2,
                 subquery.c.destination_country,
-                # subquery.c.destination_region,
+                subquery.c.destination_region,
             ],
             "commodity_destination_country": [
                 subquery.c.commodity_destination_iso2,
                 subquery.c.commodity_destination_country,
-                # subquery.c.commodity_destination_region,
+                subquery.c.commodity_destination_region,
             ],
             "commodity_destination_iso2": [
                 subquery.c.commodity_destination_iso2,
                 subquery.c.commodity_destination_country,
-                # subquery.c.commodity_destination_region,
+                subquery.c.commodity_destination_region,
             ],
             "destination": [
                 subquery.c.destination_zone_name,
                 subquery.c.destination_country,
                 subquery.c.destination_iso2,
+                subquery.c.destination_region,
             ],
             "grade": [
                 subquery.c.grade,
@@ -278,7 +279,7 @@ class KplerTradeResource(TemplateResource):
     @routes_api.expect(parser)
     @key_required
     def get(self):
-        params = KplerFlowResource.parser.parse_args(strict=True)
+        params = KplerTradeResource.parser.parse_args(strict=True)
         return self.get_from_params(params)
 
     def initial_query(self, params=None):
@@ -535,6 +536,7 @@ class KplerTradeResource(TemplateResource):
                 destination_zone.port_name.label("destination_port_name"),
                 destination_zone.country_name.label("destination_country"),
                 destination_zone.country_iso2.label("destination_iso2"),
+                CommodityDestinationCountry.region.label("destination_region"),
                 destination_zone.country_name.label("commodity_destination_country"),
                 destination_zone.country_iso2.label("commodity_destination_iso2"),
                 CommodityDestinationCountry.region.label("commodity_destination_region"),
