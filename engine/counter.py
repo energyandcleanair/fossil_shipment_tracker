@@ -431,6 +431,14 @@ def sanity_check(result, version):
                     )
                 )
             )
+            | (
+                # For na destinations, it is normal to swing more
+                pd.isna(comparison_detailed.commodity_destination_iso2)
+                & (
+                    (comparison_detailed.new_eur >= comparison_detailed.old_eur * 0.5)
+                    & (comparison_detailed.new_eur <= comparison_detailed.old_eur * 2)
+                )
+            )
         )
         ok = ok or comparison_detailed.ok.all()
 
