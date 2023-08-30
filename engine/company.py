@@ -249,6 +249,9 @@ def update_info_from_equasis(
 
     results = pd.DataFrame(imos_results)
 
+    if len(results) == 0:
+        return
+
     results = results[~results.imo.str.match("_v", case=False)]
 
     unique_imos = results.imo.unique()
@@ -259,10 +262,10 @@ def update_info_from_equasis(
     imos = unique_imos
     ntries = 3
 
-    if imos:
-        equasis = Equasis()
-    else:
-        equasis = None
+    if len(imos) == 0:
+        return
+
+    equasis = Equasis()
 
     for imo in tqdm(imos):
         itry = 0
