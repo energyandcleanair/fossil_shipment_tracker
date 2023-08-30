@@ -905,3 +905,125 @@ def test_kpler_trade_commodity_origin(app):
         )
 
     return
+
+def test_kpler_trade_ship_insurer(app):
+    with app.test_client() as test_client:
+        date_from = "2023-01-01"
+        date_to = "2023-01-31"
+
+        # Confirmed all ships of these against the original P&I providers.
+        SINGLE_SHIP_UNKNOWN_INSURER = {
+            "trade_id": 3108824,
+            "ship_insurer_names": ["unknown"],
+            "ship_insurer_iso2s": [None],
+            "ship_insurer_regions": [None]
+        }
+        SINGLE_SHIP_WITH_INSURER = {
+            "trade_id": 794454,
+            "ship_insurer_names": ["North of England P&I Association"],
+            "ship_insurer_iso2s": ["GB"],
+            "ship_insurer_regions": ["Global"],
+        }
+        MULTI_SHIP_ONE_INSURER = {
+            "trade_id": 17145711,
+            "ship_insurer_names": ["Assuranceforeningen Gard - Norway"],
+            "ship_insurer_iso2s": ["NO"],
+            "ship_insurer_regions": ["Global"],
+        }
+        MULTI_SHIP_MULTIPLE_INSURERS = {
+            "trade_id": 17069592,
+            "ship_insurer_names": [
+                "Britannia Steamship insurance Association Ld",
+                "UK P&I Club",
+            ],
+            "ship_insurer_iso2s": ["GB"],
+            "ship_insurer_regions": [
+                "Global",
+                "United Kingdom",
+            ],
+        }
+
+        expected = pd.DataFrame.from_dict([
+            SINGLE_SHIP_UNKNOWN_INSURER,
+            SINGLE_SHIP_WITH_INSURER,
+            MULTI_SHIP_ONE_INSURER,
+            MULTI_SHIP_MULTIPLE_INSURERS,
+        ])
+
+        params = {
+            "format": "json",
+            "trade_ids": ",".join(str(x) for x in expected["trade_id"].tolist()),
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        actual = pd.DataFrame(response.json["data"])
+        assert len(actual) > 0
+
+        merged = expected.merge(actual, on="trade_id", how="left", suffixes=("_expected", "_actual"))
+
+        for index, row in merged.iterrows():
+            assert np.array_equiv(row["ship_insurer_names_expected"], row["ship_insurer_names_actual"])
+            assert np.array_equiv(row["ship_insurer_iso2s_expected"], row["ship_insurer_iso2s_actual"])
+            assert np.array_equiv(row["ship_insurer_regions_expected"], row["ship_insurer_regions_actual"])
+
+    return
+
+
+def test_kpler_trade_ship_owner(app):
+    with app.test_client() as test_client:
+        date_from = "2023-01-01"
+        date_to = "2023-01-31"
+
+        # Confirmed in equasis
+        SINGLE_SHIP_WITH_OWNER = {
+            "trade_id": 804124,
+            "ship_owner_names": ["CORAL ENERGY SHIPPING BV"],
+            "ship_owner_iso2s": ["NO"],
+            "ship_owner_regions": ["Global"],
+        }
+        MULTI_SHIP_ONE_OWNER = {
+            "trade_id": 16468265,
+            "ship_owner_names": ["ARAB MARITIME PETROLEUM TRANS"],
+            "ship_owner_iso2s": ["KW"],
+            "ship_owner_regions": ["Global", "Others"],
+        }
+        MULTI_SHIP_MULTIPLE_OWNERS = {
+            "trade_id": 794079,
+            "ship_owner_names": [
+                "HAI FENG 1716 LTD",
+                "HAI KUO SHIPPING 1605 LTD",
+            ],
+            "ship_owner_iso2s": ["GR", "NO"],
+            "ship_owner_regions": [
+                "EU28",
+                "Global",
+            ],
+        }
+
+        expected = pd.DataFrame.from_dict([
+            SINGLE_SHIP_WITH_OWNER,
+            MULTI_SHIP_ONE_OWNER,
+            MULTI_SHIP_MULTIPLE_OWNERS,
+        ])
+
+        params = {
+            "format": "json",
+            "trade_ids": ",".join(str(x) for x in expected["trade_id"].tolist()),
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        actual = pd.DataFrame(response.json["data"])
+        assert len(actual) > 0
+
+        merged = expected.merge(actual, on="trade_id", how="left", suffixes=("_expected", "_actual"))
+
+        for index, row in merged.iterrows():
+            assert np.array_equiv(row["ship_owner_names_expected"], row["ship_owner_names_actual"])
+            assert np.array_equiv(row["ship_owner_iso2s_expected"], row["ship_owner_iso2s_actual"])
+            assert np.array_equiv(row["ship_owner_regions_expected"], row["ship_owner_regions_actual"])
+
+    return
