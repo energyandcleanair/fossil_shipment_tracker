@@ -23,7 +23,7 @@ def update_trades(
             platform=platform, from_iso2=origin_iso2s, date_from=date_from
         )
 
-        upload_products(products, ignore_if_copy_failed=ignore_if_copy_failed)
+        # upload_products(products, ignore_if_copy_failed=ignore_if_copy_failed)
         upload_zones(zones, ignore_if_copy_failed=ignore_if_copy_failed)
         upload_vessels(vessels, ignore_if_copy_failed=ignore_if_copy_failed)
         upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
