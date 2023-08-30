@@ -10,6 +10,7 @@ from difflib import SequenceMatcher
 import re
 import base
 import json
+import shutil
 
 from base.db_utils import execute_statement
 from base.encoder import JsonEncoder
@@ -790,8 +791,16 @@ class CompanyImoScraper:
                 options.add_argument("--headless")
 
         if not browser:
+
             if not self.service:
-                self.service = Service(ChromeDriverManager().install())
+                # Use the system managed chromedriver if available
+                path = shutil.which("chromedriver")
+
+                if path is None:
+                    self.service = Service(ChromeDriverManager().install())
+                else:
+                    self.service = Service(path)
+
             self.browser = webdriver.Chrome(service=self.service, options=options)
         else:
             self.browser = browser
