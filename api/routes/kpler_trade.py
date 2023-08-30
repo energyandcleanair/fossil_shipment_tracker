@@ -512,6 +512,32 @@ class KplerTradeResource(TemplateResource):
             .subquery()
         )
 
+        all_owners_for_trade = (
+            session.query(
+                KplerTrade.id.label("trade_id"),
+                distinct_array_agg(
+                    voyage_owner.c.name
+                ).label("ship_owner_names"),
+                distinct_array_agg(
+                    voyage_owner.c.iso2
+                ).label("ship_owner_iso2s"),
+                distinct_array_agg(
+                    voyage_owner.c.region
+                ).label("ship_owner_regions")
+            )
+            .outerjoin(
+                voyage_owner, sa.and_(
+                    voyage_owner.c.trade_id == KplerTrade.id,
+                    voyage_owner.c.ship_imo == sa.any_(KplerTrade.vessel_imos),
+                )
+            )
+            .group_by(
+                KplerTrade.id,
+                KplerTrade.vessel_imos
+            )
+            .subquery()
+        )
+
         query = (
             session.query(
                 # Renaming everything in terms of "origin" and "destination"
@@ -560,6 +586,9 @@ class KplerTradeResource(TemplateResource):
                 all_insurers_for_trade.c.ship_insurer_names,
                 all_insurers_for_trade.c.ship_insurer_iso2s,
                 all_insurers_for_trade.c.ship_insurer_regions,
+                all_owners_for_trade.c.ship_owner_names,
+                all_owners_for_trade.c.ship_owner_iso2s,
+                all_owners_for_trade.c.ship_owner_regions,
             )
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
@@ -575,6 +604,7 @@ class KplerTradeResource(TemplateResource):
             .join(Commodity, commodity_id_field == Commodity.id)
             .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
             .join(all_insurers_for_trade, KplerTrade.id == all_insurers_for_trade.c.trade_id)
+            .join(all_owners_for_trade, KplerTrade.id == all_owners_for_trade.c.trade_id)
             .join(
                 trade_ship_price,
                 sa.and_(
