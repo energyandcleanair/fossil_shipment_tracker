@@ -10,6 +10,7 @@ from difflib import SequenceMatcher
 import re
 import base
 import json
+import shutil
 
 from base.db_utils import execute_statement
 from base.encoder import JsonEncoder
@@ -249,6 +250,9 @@ def update_info_from_equasis(
 
     results = pd.DataFrame(imos_results)
 
+    if len(results) == 0:
+        return
+
     results = results[~results.imo.str.match("_v", case=False)]
 
     unique_imos = results.imo.unique()
@@ -259,10 +263,10 @@ def update_info_from_equasis(
     imos = unique_imos
     ntries = 3
 
-    if imos:
-        equasis = Equasis()
-    else:
-        equasis = None
+    if len(imos) == 0:
+        return
+
+    equasis = Equasis()
 
     for imo in tqdm(imos):
         itry = 0
@@ -787,8 +791,16 @@ class CompanyImoScraper:
                 options.add_argument("--headless")
 
         if not browser:
+
             if not self.service:
-                self.service = Service(ChromeDriverManager().install())
+                # Use the system managed chromedriver if available
+                path = shutil.which("chromedriver")
+
+                if path is None:
+                    self.service = Service(ChromeDriverManager().install())
+                else:
+                    self.service = Service(path)
+
             self.browser = webdriver.Chrome(service=self.service, options=options)
         else:
             self.browser = browser
