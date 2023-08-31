@@ -13,6 +13,7 @@ from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from .. import routes_api, ns_charts
 from ..voyage import VoyageResource
+from ..kpler_trade import KplerTradeResource
 
 
 @ns_charts.route("/v0/chart/departure_by_ownership", strict_slashes=False)
@@ -135,6 +136,8 @@ class ChartDepartureOwnership(Resource):
         default=None,
     )
 
+    parser.add_argument("use_kpler", help="Whether to use Kpler or MT", type=bool, default=False)
+
     @routes_api.expect(parser)
     def get(self):
         params = VoyageResource.parser.parse_args()
@@ -148,6 +151,7 @@ class ChartDepartureOwnership(Resource):
         departure_port_area = params_chart.get("departure_port_area")
         commodity_origin_iso2 = params_chart.get("commodity_origin_iso2")
         commodity_destination_iso2 = params_chart.get("commodity_destination_iso2")
+        use_kpler = params_chart.get("use_kpler")
 
         default_aggregate_by = [
             "ship_owner_country",
@@ -177,9 +181,7 @@ class ChartDepartureOwnership(Resource):
             }
         )
 
-        response = VoyageResource().get_from_params(params)
-        data = pd.DataFrame(response.json["data"])
-        data["departure_date"] = pd.to_datetime(data.departure_date).dt.date
+        data = self.get_voyages(params, use_kpler=use_kpler)
 
         def recode_eug7(ship_owner_region, ship_owner_iso2, ship_insurer_region, ship_insurer_iso2):
             g7 = ["CA", "FR", "DE", "IT", "JP", "GB", "US"]
@@ -244,13 +246,14 @@ class ChartDepartureOwnership(Resource):
         result = translate(data=result, language=language)
 
         logger.info(
-            "[Departures by ownership] columns returned: %s. Pandas version: %s." % (",".join(result.columns), pd.__version__)
+            "[Departures by ownership] columns returned: %s. Pandas version: %s."
+            % (",".join(result.columns), pd.__version__)
         )
 
         # Drop pricing scenario until we find issue of why it is not present sometimes
         # TODO remove once fixed
-        if 'pricing_scenario' in result.columns:
-            result.drop('pricing_scenario', axis=1, inplace=True)
+        if "pricing_scenario" in result.columns:
+            result.drop("pricing_scenario", axis=1, inplace=True)
 
         return self.build_response(result=result, format=format, nest_in_data=nest_in_data)
 
@@ -280,3 +283,30 @@ class ChartDepartureOwnership(Resource):
             status=HTTPStatus.BAD_REQUEST,
             mimetype="application/json",
         )
+
+    def get_voyages(self, params, use_kpler=False):
+        if use_kpler:
+            return self.get_voyages_kpler(params)
+        else:
+            return self.get_voyages_mt(params)
+
+    def get_voyages_kpler(self, params):
+        params_kpler = params.copy()
+        params_kpler["commodity_equivalent"] = params_kpler["commodity"]
+        params_kpler["commodity"] = None
+        corr = {
+            "departure_date": "origin_date",
+            "commodity_group": "commodity_equivalent_group",
+        }
+        params_kpler["aggregate_by"] = [corr.get(x, x) for x in params_kpler["aggregate_by"]]
+
+        response = KplerTradeResource().get_from_params(params_kpler)
+        data = pd.DataFrame(response.json["data"])
+        data["departure_date"] = pd.to_datetime(data.departure_date).dt.date
+        return
+
+    def get_voyages_mt(self, params):
+        response = VoyageResource().get_from_params(params)
+        data = pd.DataFrame(response.json["data"])
+        data["departure_date"] = pd.to_datetime(data.departure_date).dt.date
+        return data
