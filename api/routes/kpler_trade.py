@@ -12,6 +12,7 @@ from .security import key_required
 from . import routes_api
 from .template import TemplateResource
 from base import PRICING_DEFAULT
+from base import UNKNOWN_INSURER
 from base.logger import logger
 from base.db import session
 from base.models import (
@@ -55,7 +56,23 @@ class KplerTradeResource(TemplateResource):
     )
 
     parser.add_argument(
-        "origin_port_name", help="Origin port name", required=False, action="split", default=None
+        "commodity_origin_iso2",
+        help="Commodity origin iso2",
+        required=False,
+        action="split",
+        default=None,
+    )
+
+    parser.add_argument(
+        "origin_port_name", help="Origin port name(s)", required=False, action="split", default=None
+    )
+
+    parser.add_argument(
+        "destination_port_name",
+        help="Destination port name(s)",
+        required=False,
+        action="split",
+        default=None,
     )
 
     parser.add_argument(
@@ -513,7 +530,9 @@ class KplerTradeResource(TemplateResource):
         all_insurers_for_trade = (
             session.query(
                 KplerTrade.id.label("trade_id"),
-                distinct_array_agg(voyage_insurer.c.name).label("ship_insurer_names"),
+                distinct_array_agg(func.coalesce(voyage_insurer.c.name, UNKNOWN_INSURER)).label(
+                    "ship_insurer_names"
+                ),
                 distinct_array_agg(voyage_insurer.c.iso2).label("ship_insurer_iso2s"),
                 distinct_array_agg(voyage_insurer.c.region).label("ship_insurer_regions"),
             )
@@ -531,26 +550,18 @@ class KplerTradeResource(TemplateResource):
         all_owners_for_trade = (
             session.query(
                 KplerTrade.id.label("trade_id"),
-                distinct_array_agg(
-                    voyage_owner.c.name
-                ).label("ship_owner_names"),
-                distinct_array_agg(
-                    voyage_owner.c.iso2
-                ).label("ship_owner_iso2s"),
-                distinct_array_agg(
-                    voyage_owner.c.region
-                ).label("ship_owner_regions")
+                distinct_array_agg(voyage_owner.c.name).label("ship_owner_names"),
+                distinct_array_agg(voyage_owner.c.iso2).label("ship_owner_iso2s"),
+                distinct_array_agg(voyage_owner.c.region).label("ship_owner_regions"),
             )
             .outerjoin(
-                voyage_owner, sa.and_(
+                voyage_owner,
+                sa.and_(
                     voyage_owner.c.trade_id == KplerTrade.id,
                     voyage_owner.c.ship_imo == sa.any_(KplerTrade.vessel_imos),
-                )
+                ),
             )
-            .group_by(
-                KplerTrade.id,
-                KplerTrade.vessel_imos
-            )
+            .group_by(KplerTrade.id, KplerTrade.vessel_imos)
             .subquery()
         )
 
@@ -665,6 +676,7 @@ class KplerTradeResource(TemplateResource):
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
         destination_iso2 = params.get("destination_iso2")
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
+        destination_port_name = params.get("destination_port_name")
         destination_region = params.get("destination_region")
         exclude_within_country = params.get("exclude_within_country")
 
@@ -722,6 +734,11 @@ class KplerTradeResource(TemplateResource):
 
         if origin_port_name:
             query = query.filter(subquery.c.origin_port_name.in_(to_list(origin_port_name)))
+
+        if destination_port_name:
+            query = query.filter(
+                subquery.c.destination_port_name.in_(to_list(destination_port_name))
+            )
 
         if destination_iso2:
             query = query.filter(subquery.c.destination_iso2.in_(to_list(destination_iso2)))

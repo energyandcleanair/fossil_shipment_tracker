@@ -42,12 +42,14 @@ def update_lite(
     origin_iso2s=["RU"],
     from_splits=[FlowsSplit.OriginCountries],
     to_splits=[FlowsSplit.DestinationCountries],
+    platforms=None,
 ):
     return update(
         date_from=date_from,
         origin_iso2s=origin_iso2s,
         from_splits=from_splits,
         to_splits=to_splits,
+        platforms=platforms,
     )
 
 
