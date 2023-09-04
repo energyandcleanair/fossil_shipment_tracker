@@ -76,7 +76,7 @@ class KplerTradeScraper(KplerScraper):
     ):
 
         if from_zone and from_zone.get("name") == "Unknown":
-            return None
+            return 0, []
 
         from_locations = (
             [
@@ -127,7 +127,7 @@ class KplerTradeScraper(KplerScraper):
             r = requests.get(url, params=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
             logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
-            return None
+            return 0, []
 
         try:
             trades_raw = r.json()
@@ -139,7 +139,7 @@ class KplerTradeScraper(KplerScraper):
                 return 0, []
             else:
                 logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
-                return None
+                return 0, []
         return len(trades_raw), trades_raw
 
     def _parse_trade_sts(self, x, origin_or_destination):

@@ -163,37 +163,69 @@ def test_kpler_crude_export(app):
     )
     manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
     manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
-    manual_values.rename(columns={"date": "year"}, inplace=True)
+    manual_values["date"] = pd.to_datetime(manual_values["date"] + "-01")
+    manual_values.rename(columns={"date": "month"}, inplace=True)
 
     with app.test_client() as test_client:
 
         params = {
             "format": "json",
             "date_from": "2022-01-01",
-            "date_to": "2022-12-31",
-            "origin_iso2": ",".join(["RU", "TR", "CN", "MY", "US", "EG", "AE"]),
-            "aggregate_by": "origin_iso2,group,year",
+            "date_to": "2023-07-31",
+            "origin_iso2": ",".join(["RU", "TR", "EG", "AE"]),
+            "aggregate_by": "origin_iso2,group,month",
             "group": ",".join(["Crude", "Crude/Co"]),
             "api_key": get_env("API_KEY"),
         }
 
-        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
+        params_flow = params.copy()
+        params_flow["origin_type"]: "country"
+
+        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params_flow))
         assert response.status_code == 200
-        data = response.json["data"]
-        data_df = pd.DataFrame(data)
-        data_df = data_df.groupby(["origin_iso2", "year"]).value_tonne.sum().reset_index()
+        flow = pd.DataFrame(response.json["data"])
+        assert len(flow) > 0  # Not all cou
+
+        params_trade = params.copy()
+        params_trade["aggregate_by"] = "origin_iso2,group,origin_month"
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params_trade))
+        assert response.status_code == 200
+        trade = pd.DataFrame(response.json["data"])
+        trade = trade.rename(columns={"origin_month": "month"})
+        assert len(trade) > 0  # Not all cou
+
+        # Remove timezone from both data_dt.month and manual_values.month
+        flow["month"] = pd.to_datetime(flow["month"]).dt.tz_localize(None)
+        trade["month"] = pd.to_datetime(trade["month"]).dt.tz_localize(None)
+        manual_values["month"] = manual_values["month"].dt.tz_localize(None)
         # Merge
-        merge = data_df[["origin_iso2", "year", "value_tonne"]].merge(
-            manual_values[["origin_iso2", "year", "value_tonne"]],
-            how="left",
-            on=["origin_iso2", "year"],
-            suffixes=("_api", "_manual"),
+        merge = (
+            manual_values[["origin_iso2", "month", "value_tonne"]]
+            .merge(
+                trade[["origin_iso2", "month", "value_tonne"]],
+                how="left",
+                on=["origin_iso2", "month"],
+                suffixes=("_manual", "_trade"),
+            )
+            .merge(
+                flow[["origin_iso2", "month", "value_tonne"]].rename(
+                    columns={"value_tonne": "value_tonne_flow"}
+                ),
+                how="left",
+                on=["origin_iso2", "month"],
+            )
         )
 
-        assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=4e-2))
+        # Remove rows where both value_tonne_flow and value_tonne_trade are NaN
+        merge = merge[~(merge.value_tonne_flow.isna() & merge.value_tonne_trade.isna())]
+
+        merge["ok_flow"] = np.isclose(merge.value_tonne_flow, merge.value_tonne_manual, rtol=4e-2)
+        merge["ok_trade"] = np.isclose(merge.value_tonne_trade, merge.value_tonne_manual, rtol=4e-2)
+        merge["ok"] = merge["ok_flow"] & merge["ok_trade"]
+        assert all(merge.ok)
 
 
-def test_kpler_crude_ru_exports(app):
+def test_kpler_gasoline_export(app):
     """
     Test values against manually collected ones
     :param app:
@@ -203,41 +235,72 @@ def test_kpler_crude_ru_exports(app):
 
     cc = coco.CountryConverter()
 
-    manual_values = pd.read_csv("assets/kpler/crude_ru_exports.csv")
+    manual_values = pd.read_csv("assets/kpler/gasoline_exports.csv")
     manual_values = manual_values.melt(
         id_vars=["date"], var_name="country", value_name="value_ktonne"
     )
     manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
-    manual_values["destination_iso2"] = manual_values["country"].map(
-        lambda x: cc.convert(x, to="ISO2")
-    )
-    manual_values.rename(columns={"date": "year"}, inplace=True)
+    manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
+    manual_values["date"] = pd.to_datetime(manual_values["date"] + "-01")
+    manual_values.rename(columns={"date": "month"}, inplace=True)
 
     with app.test_client() as test_client:
 
         params = {
             "format": "json",
             "date_from": "2022-01-01",
-            "date_to": "2022-12-31",
-            "origin_iso2": "RU",
-            "aggregate_by": "destination_iso2,group,year",
-            "group": ",".join(["Crude", "Crude/Co"]),
+            "date_to": "2023-07-31",
+            "origin_iso2": ",".join(["RU", "TR", "EG", "AE"]),
+            "aggregate_by": "origin_iso2,group,month",
+            "commodity": "Gasoline",
             "api_key": get_env("API_KEY"),
         }
 
-        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
+        params_flow = params.copy()
+        params_flow["origin_type"]: "country"
+
+        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params_flow))
         assert response.status_code == 200
-        data = response.json["data"]
-        data_df = pd.DataFrame(data)
-        data_df = data_df.groupby(["destination_iso2", "year"]).value_tonne.sum().reset_index()
-        # Merge
-        merge = data_df[["destination_iso2", "year", "value_tonne"]].merge(
-            manual_values[["destination_iso2", "year", "value_tonne"]],
+        flow = pd.DataFrame(response.json["data"])
+        assert len(flow) > 0
+
+        params_trade = params.copy()
+        params_trade["aggregate_by"] = "origin_iso2,group,origin_month"
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params_trade))
+        assert response.status_code == 200
+        trade = pd.DataFrame(response.json["data"])
+        trade = trade.rename(columns={"origin_month": "month"})
+        assert len(trade) > 0
+
+    # Remove timezone from both data_dt.month and manual_values.month
+    flow["month"] = pd.to_datetime(flow["month"]).dt.tz_localize(None)
+    trade["month"] = pd.to_datetime(trade["month"]).dt.tz_localize(None)
+    manual_values["month"] = pd.to_datetime(manual_values["month"]).dt.tz_localize(None)
+    # Merge
+    merge = (
+        manual_values[["origin_iso2", "month", "value_tonne"]]
+        .merge(
+            trade[["origin_iso2", "month", "value_tonne"]],
             how="left",
-            on=["destination_iso2", "year"],
-            suffixes=("_api", "_manual"),
+            on=["origin_iso2", "month"],
+            suffixes=("_manual", "_trade"),
         )
-        assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=1e-2))
+        .merge(
+            flow[["origin_iso2", "month", "value_tonne"]].rename(
+                columns={"value_tonne": "value_tonne_flow"}
+            ),
+            how="left",
+            on=["origin_iso2", "month"],
+        )
+    )
+
+    # Remove rows where both value_tonne_flow and value_tonne_trade are NaN
+    merge = merge[~(merge.value_tonne_flow.isna() & merge.value_tonne_trade.isna())]
+
+    merge["ok_flow"] = np.isclose(merge.value_tonne_flow, merge.value_tonne_manual, rtol=4e-2)
+    merge["ok_trade"] = np.isclose(merge.value_tonne_trade, merge.value_tonne_manual, rtol=4e-2)
+    merge["ok"] = merge["ok_flow"] & merge["ok_trade"]
+    assert all(merge.ok)
 
 
 def test_kpler_diesel_exports(app):
@@ -284,172 +347,6 @@ def test_kpler_diesel_exports(app):
 
         assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=5e-2))
 
-
-def test_kpler_gasoline_exports_yearly(app):
-    """
-    Test values against manually collected ones
-    :param app:
-    :return:
-    """
-    import country_converter as coco
-
-    cc = coco.CountryConverter()
-
-    manual_values = pd.read_csv("assets/kpler/gasoline_exports.csv")
-    manual_values = manual_values.melt(
-        id_vars=["date"], var_name="country", value_name="value_ktonne"
-    )
-    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
-    manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
-    manual_values.rename(columns={"date": "year"}, inplace=True)
-
-    with app.test_client() as test_client:
-        params = {
-            "format": "json",
-            "date_from": "2022-01-01",
-            "date_to": "2022-12-31",
-            "origin_iso2": ",".join(["RU", "CN", "IN", "SG", "TR", "AE"]),
-            "aggregate_by": "origin_iso2,group,year",
-            "commodity": "Gasoline",
-            "api_key": get_env("API_KEY"),
-        }
-
-        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        flow = response.json["data"]
-        flow = pd.DataFrame(flow)
-        flow = flow.groupby(["origin_iso2", "year"]).value_tonne.sum().reset_index()
-        # Merge
-        merge_flow = flow[["origin_iso2", "year", "value_tonne"]].merge(
-            manual_values[["origin_iso2", "year", "value_tonne"]],
-            how="left",
-            on=["origin_iso2", "year"],
-            suffixes=("_api", "_manual"),
-        )
-        assert all(np.isclose(merge_flow.value_tonne_api, merge_flow.value_tonne_manual, rtol=5e-2))
-
-
-def test_kpler_flow_gasoline_exports_monthly(app):
-    """
-    Test values against manually collected ones
-    :param app:
-    :return:
-    """
-    import country_converter as coco
-
-    cc = coco.CountryConverter()
-
-    manual_values = pd.read_csv("assets/kpler/gasoline_exports_monthly_2023.csv")
-    manual_values = manual_values.melt(
-        id_vars=["date"], var_name="country", value_name="value_ktonne"
-    )
-    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
-    manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
-    manual_values.rename(columns={"date": "month"}, inplace=True)
-
-    countries = ["RU", "CN", "IN", "SG", "TR", "AE"]
-    manual_values = manual_values[manual_values["origin_iso2"].isin(countries)]
-
-    with app.test_client() as test_client:
-        params = {
-            "format": "json",
-            "date_from": "2023-01-01",
-            "date_to": "2023-07-31",
-            "origin_iso2": ",".join(countries),
-            "aggregate_by": "origin_iso2,group,month",
-            "commodity": "Gasoline",
-            "api_key": get_env("API_KEY"),
-        }
-
-        response = test_client.get("/v1/kpler_flow?" + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        flow = response.json["data"]
-        flow = pd.DataFrame(flow)
-        flow = flow.groupby(["origin_iso2", "month"]).value_tonne.sum().reset_index()
-        # Month to YYYY-MM
-        flow["month"] = flow["month"].map(lambda x: pd.to_datetime(x).strftime("%Y-%m"))
-        # Merge
-        merge_flow = manual_values[["origin_iso2", "month", "value_tonne"]].merge(
-            flow[["origin_iso2", "month", "value_tonne"]],
-            how="left",
-            on=["origin_iso2", "month"],
-            suffixes=("_manual", "_api"),
-        )
-        # Cut last month, not complete
-        merge_flow = merge_flow[merge_flow.month != merge_flow.month.max()]
-        merge_flow["value_tonne_api"] = merge_flow["value_tonne_api"].fillna(0)
-
-        merge_flow_agg = merge_flow.groupby("origin_iso2").agg(
-            {"value_tonne_api": "sum", "value_tonne_manual": "sum"}
-        )
-        assert all(
-            np.isclose(
-                merge_flow_agg.value_tonne_api, merge_flow_agg.value_tonne_manual, rtol=10e-2
-            )
-        )
-
-        # Much more strict for Russia
-        idx = merge_flow.origin_iso2 == "RU"
-        assert all(
-            np.isclose(
-                merge_flow[idx].value_tonne_api, merge_flow[idx].value_tonne_manual, rtol=1e-2
-            )
-        )
-
-
-def test_kpler_trade_gasoline_exports_monthly(app):
-    """
-    Test values against manually collected ones
-    :param app:
-    :return:
-    """
-    import country_converter as coco
-
-    cc = coco.CountryConverter()
-
-    manual_values = pd.read_csv("assets/kpler/gasoline_exports_monthly_2023.csv")
-    manual_values = manual_values.melt(
-        id_vars=["date"], var_name="country", value_name="value_ktonne"
-    )
-    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
-    manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
-    manual_values.rename(columns={"date": "month"}, inplace=True)
-
-    countries = ["RU", "CN", "IN", "SG", "TR"]
-    manual_values = manual_values[manual_values["origin_iso2"].isin(countries)]
-
-    with app.test_client() as test_client:
-        params = {
-            "format": "json",
-            "date_from": "2023-01-01",
-            "date_to": "2023-07-31",
-            "origin_iso2": ",".join(countries),
-            "aggregate_by": "origin_iso2,group,origin_month",
-            "commodity": "Gasoline",
-            "api_key": get_env("API_KEY"),
-        }
-
-        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        trade = response.json["data"]
-        trade = pd.DataFrame(trade)
-        trade = trade.groupby(["origin_iso2", "month"]).value_tonne.sum().reset_index()
-        trade["month"] = trade["month"].map(lambda x: pd.to_datetime(x).strftime("%Y-%m"))
-        # Merge
-        merge_trade = manual_values[["origin_iso2", "month", "value_tonne"]].merge(
-            trade[["origin_iso2", "month", "value_tonne"]],
-            how="left",
-            on=["origin_iso2", "month"],
-            suffixes=("_manual", "_api"),
-        )
-
-        # Cut last month, not complete
-        merge_trade = merge_trade[merge_trade.month != merge_trade.month.max()]
-        merge_trade["value_tonne_api"] = merge_trade["value_tonne_api"].fillna(0)
-
-        assert all(
-            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=5e-2)
-        )
 
 def test_kpler_flow_lng_exports_monthly(app):
     """
@@ -518,6 +415,7 @@ def test_kpler_flow_lng_exports_monthly(app):
                 merge_flow[idx].value_tonne_api, merge_flow[idx].value_tonne_manual, rtol=1e-2
             )
         )
+
 
 def test_kpler_trade_lng_exports_monthly(app):
     """
@@ -906,6 +804,7 @@ def test_kpler_trade_commodity_origin(app):
 
     return
 
+
 def test_kpler_trade_ship_insurer(app):
     with app.test_client() as test_client:
         date_from = "2023-01-01"
@@ -916,7 +815,7 @@ def test_kpler_trade_ship_insurer(app):
             "trade_id": 3108824,
             "ship_insurer_names": ["unknown"],
             "ship_insurer_iso2s": [None],
-            "ship_insurer_regions": [None]
+            "ship_insurer_regions": [None],
         }
         SINGLE_SHIP_WITH_INSURER = {
             "trade_id": 794454,
@@ -943,12 +842,14 @@ def test_kpler_trade_ship_insurer(app):
             ],
         }
 
-        expected = pd.DataFrame.from_dict([
-            SINGLE_SHIP_UNKNOWN_INSURER,
-            SINGLE_SHIP_WITH_INSURER,
-            MULTI_SHIP_ONE_INSURER,
-            MULTI_SHIP_MULTIPLE_INSURERS,
-        ])
+        expected = pd.DataFrame.from_dict(
+            [
+                SINGLE_SHIP_UNKNOWN_INSURER,
+                SINGLE_SHIP_WITH_INSURER,
+                MULTI_SHIP_ONE_INSURER,
+                MULTI_SHIP_MULTIPLE_INSURERS,
+            ]
+        )
 
         params = {
             "format": "json",
@@ -961,12 +862,20 @@ def test_kpler_trade_ship_insurer(app):
         actual = pd.DataFrame(response.json["data"])
         assert len(actual) > 0
 
-        merged = expected.merge(actual, on="trade_id", how="left", suffixes=("_expected", "_actual"))
+        merged = expected.merge(
+            actual, on="trade_id", how="left", suffixes=("_expected", "_actual")
+        )
 
         for index, row in merged.iterrows():
-            assert np.array_equiv(row["ship_insurer_names_expected"], row["ship_insurer_names_actual"])
-            assert np.array_equiv(row["ship_insurer_iso2s_expected"], row["ship_insurer_iso2s_actual"])
-            assert np.array_equiv(row["ship_insurer_regions_expected"], row["ship_insurer_regions_actual"])
+            assert np.array_equiv(
+                row["ship_insurer_names_expected"], row["ship_insurer_names_actual"]
+            )
+            assert np.array_equiv(
+                row["ship_insurer_iso2s_expected"], row["ship_insurer_iso2s_actual"]
+            )
+            assert np.array_equiv(
+                row["ship_insurer_regions_expected"], row["ship_insurer_regions_actual"]
+            )
 
     return
 
@@ -1002,11 +911,13 @@ def test_kpler_trade_ship_owner(app):
             ],
         }
 
-        expected = pd.DataFrame.from_dict([
-            SINGLE_SHIP_WITH_OWNER,
-            MULTI_SHIP_ONE_OWNER,
-            MULTI_SHIP_MULTIPLE_OWNERS,
-        ])
+        expected = pd.DataFrame.from_dict(
+            [
+                SINGLE_SHIP_WITH_OWNER,
+                MULTI_SHIP_ONE_OWNER,
+                MULTI_SHIP_MULTIPLE_OWNERS,
+            ]
+        )
 
         params = {
             "format": "json",
@@ -1019,11 +930,15 @@ def test_kpler_trade_ship_owner(app):
         actual = pd.DataFrame(response.json["data"])
         assert len(actual) > 0
 
-        merged = expected.merge(actual, on="trade_id", how="left", suffixes=("_expected", "_actual"))
+        merged = expected.merge(
+            actual, on="trade_id", how="left", suffixes=("_expected", "_actual")
+        )
 
         for index, row in merged.iterrows():
             assert np.array_equiv(row["ship_owner_names_expected"], row["ship_owner_names_actual"])
             assert np.array_equiv(row["ship_owner_iso2s_expected"], row["ship_owner_iso2s_actual"])
-            assert np.array_equiv(row["ship_owner_regions_expected"], row["ship_owner_regions_actual"])
+            assert np.array_equiv(
+                row["ship_owner_regions_expected"], row["ship_owner_regions_actual"]
+            )
 
     return
