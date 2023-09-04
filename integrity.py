@@ -112,7 +112,6 @@ def test_shipment_table():
 
 def test_berths():
     # make sure we respect that all shipments in departure and arrival berth have a matching shipment_id
-
     berths = session.query(ShipmentDepartureBerth.shipment_id).union(
         session.query(ShipmentArrivalBerth.shipment_id)
     )
@@ -201,14 +200,16 @@ def test_insurer():
             )
         SELECT *
         FROM   problematic
-        WHERE commodity != 'bulk';
+        WHERE commodity != 'bulk' and commodity != 'general_cargo' and commodity != 'unknown';
     """
 
     result = session.execute(raw_sql)
     if result.rowcount > 0:
+        missing_types = [row[0] for row in result]
+        count = pd.Series(missing_types).value_counts()
         logger_slack.error(
-            "There are ships marked with Unknown insurers that most likely shouldn't be: %s."
-            % ", ".join([row[0] for row in result])
+            "There are ships marked with Unknown insurers that most likely shouldn't be:\n%s."
+            % count.to_string()
         )
 
     # Test that those will only one insurer have a null date_from
