@@ -52,27 +52,15 @@ class PriceResource(Resource):
     )
 
     parser.add_argument(
-        "ship_owner_iso2",
-        action="split",
-        help="iso2(s) of ship owner",
-        required=False,
-        default=base.PRICE_NULLARRAY_CHAR,
+        "ship_owner_iso2", action="split", help="iso2(s) of ship owner", required=False
     )
 
     parser.add_argument(
-        "ship_insurer_iso2",
-        action="split",
-        help="iso2(s) of ship insurer",
-        required=False,
-        default=base.PRICE_NULLARRAY_CHAR,
+        "ship_insurer_iso2", action="split", help="iso2(s) of ship insurer", required=False
     )
 
     parser.add_argument(
-        "destination_iso2",
-        action="split",
-        help="iso2(s) of destination",
-        required=False,
-        default=base.PRICE_NULLARRAY_CHAR,
+        "destination_iso2", action="split", help="iso2(s) of destination", required=False
     )
 
     parser.add_argument(
@@ -104,9 +92,9 @@ class PriceResource(Resource):
         format = params.get("format")
         port_id = params.get("port_id")
         nest_in_data = params.get("nest_in_data")
-        ship_owner_iso2 = params.get("ship_owner_iso2")
-        ship_insurer_iso2 = params.get("ship_insurer_iso2")
-        destination_iso2 = params.get("destination_iso2")
+        ship_owner_iso2 = params.get("ship_owner_iso2", base.PRICE_NULLARRAY_CHAR)
+        ship_insurer_iso2 = params.get("ship_insurer_iso2", base.PRICE_NULLARRAY_CHAR)
+        destination_iso2 = params.get("destination_iso2", base.PRICE_NULLARRAY_CHAR)
 
         # query = Price.query.filter(Price.scenario == scenario)
         query = (
