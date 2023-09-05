@@ -16,8 +16,8 @@ from decouple import config
 REGISTRATION_URL = "https://www.equasis.org/EquasisWeb/public/Registration?fs=ConditionsRegistration"
 RECAPTCHA_SELECTOR="iframe[title=reCAPTCHA]"
 
-START_RANGE = 160
-END_RANGE = 200
+START_RANGE = 327
+END_RANGE = 328
 
 PASSWORD = config('EQUASIS_PASSWORD')
 
@@ -30,9 +30,7 @@ if __name__ == "__main__":
     options.add_argument("--disable-dev-shm-usage")
     options.binary_location = "/sbin/chromium"
 
-    service = Service(ChromeDriverManager().install())
-
-    browser = webdriver.Chrome(service=service, options=options)
+    browser = webdriver.Chrome(service=Service("chromedriver"), options=options)
 
     for i in range(START_RANGE, END_RANGE):
         browser.switch_to.new_window('tab')
