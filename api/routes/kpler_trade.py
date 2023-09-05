@@ -619,7 +619,7 @@ class KplerTradeResource(TemplateResource):
             )
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
-            .join(destination_zone, KplerTrade.arrival_zone_id == destination_zone.id)
+            .outerjoin(destination_zone, KplerTrade.arrival_zone_id == destination_zone.id)
             .outerjoin(
                 CommodityOriginCountry,
                 CommodityOriginCountry.iso2 == commodity_origin_iso2_field,
