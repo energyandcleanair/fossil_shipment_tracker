@@ -8,6 +8,7 @@ from sqlalchemy import any_
 import datetime as dt
 
 import base
+from base import UNKNOWN_INSURER
 from .security import key_required
 from . import routes_api
 from .template import TemplateResource
@@ -331,11 +332,16 @@ class KplerTradeResource(TemplateResource):
         trade_ship = (
             session.query(
                 KplerTrade.id.label("trade_id"),
+                KplerTrade.flow_id,
                 func.unnest(KplerTrade.vessel_imos).label("ship_imo"),
-                KplerTrade.departure_date_utc,
             )
-            .order_by(KplerTrade.id, KplerTrade.vessel_imos)
-            .cte(name="trade_ship")
+            .order_by(
+                KplerTrade.id,
+                KplerTrade.flow_id,
+                KplerTrade.vessel_imos
+            )
+            .cte("trade_ship")
+            .prefix_with("MATERIALIZED")
         )
 
         # Commodity used for pricing
@@ -384,25 +390,25 @@ class KplerTradeResource(TemplateResource):
             else_=origin_zone.country_iso2,
         ).label("commodity_origin_iso2")
 
-        # This makes querying regions in multiple
-        # places possible.
-        regions = (
-            session.query(Country.iso2.label("iso2"), func.unnest(Country.regions).label("region"))
-            .order_by(Country.iso2)
-            .cte(name="regions")
-        )
-
         insurance_buffer_days = 14
+
 
         # We get the earliest (but starting before the
         # departure date) insurance per trade's ship.
         voyage_insurer = (
             session.query(
-                trade_ship.c.trade_id.label("trade_id"),
-                trade_ship.c.ship_imo.label("ship_imo"),
-                Company.name.label("name"),
-                Company.country_iso2.label("iso2"),
-                regions.c.region.label("region"),
+                KplerTrade.id.label("trade_id"),
+                KplerTrade.flow_id,
+                trade_ship.c.ship_imo,
+                func.coalesce(Company.name, "unknown").label("name"),
+                func.coalesce(Company.country_iso2, "unknown").label("iso2"),
+                func.coalesce(Country.region, "unknown").label("region"),
+            )
+            .outerjoin(trade_ship,
+                sa.and_(
+                    KplerTrade.id == trade_ship.c.trade_id,
+                    KplerTrade.flow_id == trade_ship.c.flow_id,
+                )
             )
             .outerjoin(
                 ShipInsurer,
@@ -410,30 +416,45 @@ class KplerTradeResource(TemplateResource):
                     ShipInsurer.ship_imo == trade_ship.c.ship_imo,
                     sa.or_(
                         ShipInsurer.date_from
-                        <= trade_ship.c.departure_date_utc
-                        + dt.timedelta(days=insurance_buffer_days),
+                            <= KplerTrade.departure_date_utc
+                                + dt.timedelta(days=insurance_buffer_days),
                         ShipInsurer.date_from == None,
                     ),
                 ),
             )
             .outerjoin(Company, ShipInsurer.company_id == Company.id)
-            .outerjoin(regions, Company.country_iso2 == regions.c.iso2)
-            .distinct(trade_ship.c.trade_id, trade_ship.c.ship_imo)
-            .order_by(
-                trade_ship.c.trade_id, trade_ship.c.ship_imo, nullslast(ShipInsurer.date_from)
+            .outerjoin(Country, Company.country_iso2 == Country.iso2)
+            .distinct(
+                KplerTrade.id,
+                KplerTrade.flow_id,
+                trade_ship.c.ship_imo
             )
-            .cte(name="voyage_insurer")
+            .order_by(
+                KplerTrade.id,
+                KplerTrade.flow_id,
+                trade_ship.c.ship_imo,
+                nullslast(ShipInsurer.date_from),
+            )
+            .cte("voyage_insurer")
+            .prefix_with("MATERIALIZED")
         )
 
         # We get the earliest (but starting before the
         # departure date) owner per trade's ship.
         voyage_owner = (
             session.query(
-                trade_ship.c.trade_id,
+                KplerTrade.id.label("trade_id"),
+                KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
-                Company.name.label("name"),
-                Company.country_iso2.label("iso2"),
-                regions.c.region.label("region"),
+                func.coalesce(Company.name, "unknown").label("name"),
+                func.coalesce(Company.country_iso2, "unknown").label("iso2"),
+                func.coalesce(Country.region, "unknown").label("region"),
+            )
+            .outerjoin(trade_ship,
+                sa.and_(
+                    KplerTrade.id == trade_ship.c.trade_id,
+                    KplerTrade.flow_id == trade_ship.c.flow_id,
+                )
             )
             .outerjoin(
                 ShipOwner,
@@ -441,20 +462,27 @@ class KplerTradeResource(TemplateResource):
                     ShipOwner.ship_imo == trade_ship.c.ship_imo,
                     sa.or_(
                         ShipOwner.date_from
-                        <= trade_ship.c.departure_date_utc
+                        <= KplerTrade.departure_date_utc
                         + dt.timedelta(days=insurance_buffer_days),
                         ShipOwner.date_from == None,
                     ),
                 ),
             )
             .outerjoin(Company, ShipOwner.company_id == Company.id)
-            .outerjoin(regions, Company.country_iso2 == regions.c.iso2)
+            .outerjoin(Country, Company.country_iso2 == Country.iso2)
             .distinct(
-                trade_ship.c.trade_id,
+                KplerTrade.id,
+                KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
             )
-            .order_by(trade_ship.c.trade_id, trade_ship.c.ship_imo, nullslast(ShipOwner.date_from))
-            .cte(name="voyage_owner")
+            .order_by(
+                KplerTrade.id,
+                KplerTrade.flow_id,
+                trade_ship.c.ship_imo,
+                nullslast(ShipOwner.date_from)
+            )
+            .cte("voyage_owner")
+            .prefix_with("MATERIALIZED")
         )
 
         # We need a separate query to get the best matching
@@ -463,9 +491,18 @@ class KplerTradeResource(TemplateResource):
         # that is capped, if applicable).
         trade_ship_price = (
             session.query(
-                KplerTrade.id.label("trade_id"), trade_ship.c.ship_imo, Price.id.label("price_id")
+                KplerTrade.id.label("trade_id"),
+                KplerTrade.flow_id,
+                trade_ship.c.ship_imo,
+                Price.scenario,
+                Price.id.label("price_id"),
             )
-            .outerjoin(trade_ship, KplerTrade.id == trade_ship.c.trade_id)
+            .outerjoin(trade_ship,
+                sa.and_(
+                    KplerTrade.id == trade_ship.c.trade_id,
+                    KplerTrade.flow_id == trade_ship.c.flow_id,
+                )
+            )
             .join(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .outerjoin(Commodity, commodity_id_field == Commodity.id)
             .outerjoin(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
@@ -473,15 +510,17 @@ class KplerTradeResource(TemplateResource):
             .outerjoin(
                 voyage_insurer,
                 sa.and_(
-                    voyage_insurer.c.trade_id == trade_ship.c.trade_id,
+                    voyage_insurer.c.trade_id == KplerTrade.id,
+                    voyage_insurer.c.flow_id == KplerTrade.flow_id,
                     voyage_insurer.c.ship_imo == trade_ship.c.ship_imo,
                 ),
             )
             .outerjoin(
                 voyage_owner,
                 sa.and_(
-                    voyage_owner.c.trade_id == trade_ship.c.trade_id,
-                    voyage_insurer.c.ship_imo == trade_ship.c.ship_imo,
+                    voyage_owner.c.trade_id == KplerTrade.id,
+                    voyage_owner.c.flow_id == KplerTrade.flow_id,
+                    voyage_owner.c.ship_imo == trade_ship.c.ship_imo,
                 ),
             )
             .join(
@@ -506,63 +545,133 @@ class KplerTradeResource(TemplateResource):
             )
             .distinct(
                 KplerTrade.id,
+                KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
-                Price.scenario,
-                Price.commodity,
+                Price.scenario
             )
             .order_by(
                 KplerTrade.id,
+                KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
                 Price.scenario,
-                Price.commodity,
                 Price.destination_iso2s,
                 Price.ship_insurer_iso2s,
                 Price.ship_owner_iso2s,
             )
-            .cte(name="trade_ship_price")
+            .cte("trade_ship_price")
+            .prefix_with("MATERIALIZED")
+        )
+
+        trade_price = (
+            session.query(
+                KplerTrade.id.label("trade_id"),
+                KplerTrade.flow_id,
+                Price.id.label("price_id")
+            )
+            .outerjoin(
+                trade_ship_price,
+                sa.and_(
+                    KplerTrade.id == trade_ship_price.c.trade_id,
+                    KplerTrade.flow_id == trade_ship_price.c.flow_id
+                )
+            )
+            .join(
+                Price,
+                trade_ship_price.c.price_id == Price.id
+            )
+            .distinct(
+                KplerTrade.id,
+                KplerTrade.flow_id,
+                Price.scenario,
+            )
+            .order_by(
+                KplerTrade.id,
+                KplerTrade.flow_id,
+                Price.scenario,
+                nullslast(Price.eur_per_tonne)
+            )
+            .cte("trade_price")
+            .prefix_with("MATERIALIZED")
         )
 
         value_eur_field = (KplerTrade.value_tonne * Price.eur_per_tonne).label("value_eur")
 
-        def distinct_array_agg(arg):
-            return func.array_agg(func.distinct(arg))
-
         all_insurers_for_trade = (
             session.query(
                 KplerTrade.id.label("trade_id"),
-                distinct_array_agg(func.coalesce(voyage_insurer.c.name, UNKNOWN_INSURER)).label(
-                    "ship_insurer_names"
-                ),
-                distinct_array_agg(voyage_insurer.c.iso2).label("ship_insurer_iso2s"),
-                distinct_array_agg(voyage_insurer.c.region).label("ship_insurer_regions"),
+                KplerTrade.flow_id,
+                func.array_agg(
+                    func.coalesce(
+                        voyage_insurer.c.name,
+                        UNKNOWN_INSURER
+                    )
+                ).label("ship_insurer_names"),
+                func.array_agg(
+                    voyage_insurer.c.iso2
+                ).label("ship_insurer_iso2s"),
+                func.array_agg(
+                    voyage_insurer.c.region
+                ).label("ship_insurer_regions")
+            )
+            .outerjoin(
+                trade_ship, sa.and_(
+                    KplerTrade.id == trade_ship.c.trade_id,
+                    KplerTrade.flow_id == trade_ship.c.flow_id,
+                )
             )
             .outerjoin(
                 voyage_insurer,
                 sa.and_(
                     voyage_insurer.c.trade_id == KplerTrade.id,
-                    voyage_insurer.c.ship_imo == sa.any_(KplerTrade.vessel_imos),
+                    voyage_insurer.c.flow_id == KplerTrade.flow_id,
+                    voyage_insurer.c.ship_imo == trade_ship.c.ship_imo,
                 ),
             )
-            .group_by(KplerTrade.id, KplerTrade.vessel_imos)
-            .subquery()
+            .group_by(
+                KplerTrade.id,
+                KplerTrade.flow_id,
+            )
+            .cte("all_insurers_for_trade")
+            .prefix_with("MATERIALIZED")
         )
 
         all_owners_for_trade = (
             session.query(
                 KplerTrade.id.label("trade_id"),
-                distinct_array_agg(voyage_owner.c.name).label("ship_owner_names"),
-                distinct_array_agg(voyage_owner.c.iso2).label("ship_owner_iso2s"),
-                distinct_array_agg(voyage_owner.c.region).label("ship_owner_regions"),
+                KplerTrade.flow_id,
+                func.array_agg(
+                    func.coalesce(
+                        voyage_owner.c.name,
+                        UNKNOWN_INSURER
+                    )
+                ).label("ship_owner_names"),
+                func.array_agg(
+                    voyage_owner.c.iso2
+                ).label("ship_owner_iso2s"),
+                func.array_agg(
+                    voyage_owner.c.region
+                ).label("ship_owner_regions")
+            )
+            .outerjoin(
+                trade_ship, sa.and_(
+                    KplerTrade.id == trade_ship.c.trade_id,
+                    KplerTrade.flow_id == trade_ship.c.flow_id,
+                )
             )
             .outerjoin(
                 voyage_owner,
                 sa.and_(
                     voyage_owner.c.trade_id == KplerTrade.id,
-                    voyage_owner.c.ship_imo == sa.any_(KplerTrade.vessel_imos),
-                ),
+                    voyage_owner.c.flow_id == KplerTrade.flow_id,
+                    voyage_owner.c.ship_imo == trade_ship.c.ship_imo,
+                )
             )
-            .group_by(KplerTrade.id, KplerTrade.vessel_imos)
-            .subquery()
+            .group_by(
+                KplerTrade.id,
+                KplerTrade.flow_id
+            )
+            .cte("all_owners_for_trade")
+            .prefix_with("MATERIALIZED")
         )
 
         query = (
@@ -630,19 +739,31 @@ class KplerTradeResource(TemplateResource):
             )
             .join(Commodity, commodity_id_field == Commodity.id)
             .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
-            .join(all_insurers_for_trade, KplerTrade.id == all_insurers_for_trade.c.trade_id)
-            .join(all_owners_for_trade, KplerTrade.id == all_owners_for_trade.c.trade_id)
             .join(
-                trade_ship_price,
+                all_insurers_for_trade,
                 sa.and_(
-                    KplerTrade.id == trade_ship_price.c.trade_id,
-                    trade_ship_price.c.ship_imo == func.any(KplerTrade.vessel_imos),
+                    KplerTrade.id == all_insurers_for_trade.c.trade_id,
+                    KplerTrade.flow_id == all_insurers_for_trade.c.flow_id
+                )
+            )
+            .join(
+                all_owners_for_trade,
+                sa.and_(
+                    KplerTrade.id == all_owners_for_trade.c.trade_id,
+                    KplerTrade.flow_id == all_owners_for_trade.c.flow_id,
+                )
+            )
+            .join(
+                trade_price,
+                sa.and_(
+                    KplerTrade.id == trade_price.c.trade_id,
+                    KplerTrade.flow_id == trade_price.c.flow_id,
                 ),
             )
             .join(
                 Price,
                 sa.and_(
-                    trade_ship_price.c.price_id == Price.id,
+                    trade_price.c.price_id == Price.id,
                     pricing_commodity_id_field == Price.commodity,
                 ),
             )
@@ -650,17 +771,8 @@ class KplerTradeResource(TemplateResource):
             .order_by(
                 KplerTrade.id,
                 KplerTrade.flow_id,
-                KplerTrade.product_id,
                 Price.scenario,
-                Currency.currency,
-                nullslast(Price.eur_per_tonne),
-            )
-            .distinct(
-                KplerTrade.id,
-                KplerTrade.flow_id,
-                KplerTrade.product_id,
-                Price.scenario,
-                Currency.currency,
+                Currency.currency
             )
         )
 

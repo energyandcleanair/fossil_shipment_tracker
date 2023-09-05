@@ -814,20 +814,20 @@ def test_kpler_trade_ship_insurer(app):
         SINGLE_SHIP_UNKNOWN_INSURER = {
             "trade_id": 3108824,
             "ship_insurer_names": ["unknown"],
-            "ship_insurer_iso2s": [None],
-            "ship_insurer_regions": [None],
+            "ship_insurer_iso2s": ["unknown"],
+            "ship_insurer_regions": ["unknown"]
         }
         SINGLE_SHIP_WITH_INSURER = {
             "trade_id": 794454,
             "ship_insurer_names": ["North of England P&I Association"],
             "ship_insurer_iso2s": ["GB"],
-            "ship_insurer_regions": ["Global"],
+            "ship_insurer_regions": ["United Kingdom"],
         }
         MULTI_SHIP_ONE_INSURER = {
             "trade_id": 17145711,
             "ship_insurer_names": ["Assuranceforeningen Gard - Norway"],
             "ship_insurer_iso2s": ["NO"],
-            "ship_insurer_regions": ["Global"],
+            "ship_insurer_regions": ["Others"],
         }
         MULTI_SHIP_MULTIPLE_INSURERS = {
             "trade_id": 17069592,
@@ -835,9 +835,9 @@ def test_kpler_trade_ship_insurer(app):
                 "Britannia Steamship insurance Association Ld",
                 "UK P&I Club",
             ],
-            "ship_insurer_iso2s": ["GB"],
+            "ship_insurer_iso2s": ["GB", "GB"],
             "ship_insurer_regions": [
-                "Global",
+                "United Kingdom",
                 "United Kingdom",
             ],
         }
@@ -890,24 +890,24 @@ def test_kpler_trade_ship_owner(app):
             "trade_id": 804124,
             "ship_owner_names": ["CORAL ENERGY SHIPPING BV"],
             "ship_owner_iso2s": ["NO"],
-            "ship_owner_regions": ["Global"],
+            "ship_owner_regions": ["Others"],
         }
         MULTI_SHIP_ONE_OWNER = {
             "trade_id": 16468265,
             "ship_owner_names": ["ARAB MARITIME PETROLEUM TRANS"],
             "ship_owner_iso2s": ["KW"],
-            "ship_owner_regions": ["Global", "Others"],
+            "ship_owner_regions": ["Others"],
         }
         MULTI_SHIP_MULTIPLE_OWNERS = {
             "trade_id": 794079,
             "ship_owner_names": [
-                "HAI FENG 1716 LTD",
                 "HAI KUO SHIPPING 1605 LTD",
+                "HAI FENG 1716 LTD",
             ],
             "ship_owner_iso2s": ["GR", "NO"],
             "ship_owner_regions": [
-                "EU28",
-                "Global",
+                "EU",
+                "Others",
             ],
         }
 
