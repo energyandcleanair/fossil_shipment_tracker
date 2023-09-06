@@ -813,24 +813,28 @@ def test_kpler_trade_ship_insurer(app):
         # Confirmed all ships of these against the original P&I providers.
         SINGLE_SHIP_UNKNOWN_INSURER = {
             "trade_id": 3108824,
+            "vessel_imos": ['9563536'],
             "ship_insurer_names": ["unknown"],
             "ship_insurer_iso2s": ["unknown"],
             "ship_insurer_regions": ["unknown"]
         }
         SINGLE_SHIP_WITH_INSURER = {
             "trade_id": 794454,
+            "vessel_imos": ['9253703'],
             "ship_insurer_names": ["North of England P&I Association"],
             "ship_insurer_iso2s": ["GB"],
             "ship_insurer_regions": ["United Kingdom"],
         }
         MULTI_SHIP_ONE_INSURER = {
             "trade_id": 17145711,
-            "ship_insurer_names": ["Assuranceforeningen Gard - Norway"],
-            "ship_insurer_iso2s": ["NO"],
-            "ship_insurer_regions": ["Others"],
+            "vessel_imos": ['9417892', '9730086'],
+            "ship_insurer_names": ["Assuranceforeningen Gard - Norway", "Assuranceforeningen Gard - Norway"],
+            "ship_insurer_iso2s": ["NO", "NO"],
+            "ship_insurer_regions": ["Others", "Others"],
         }
         MULTI_SHIP_MULTIPLE_INSURERS = {
             "trade_id": 17069592,
+            "vessel_imos": ['9831816', '9907718'],
             "ship_insurer_names": [
                 "Britannia Steamship insurance Association Ld",
                 "UK P&I Club",
@@ -867,6 +871,9 @@ def test_kpler_trade_ship_insurer(app):
         )
 
         for index, row in merged.iterrows():
+            assert np.array_equiv(
+                row["vessel_imos_expected"], row["vessel_imos_actual"]
+            )
             assert np.array_equiv(
                 row["ship_insurer_names_expected"], row["ship_insurer_names_actual"]
             )
