@@ -4,6 +4,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import case
 from sqlalchemy import nullslast
 from sqlalchemy import any_
+from sqlalchemy import true
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 
 import datetime as dt
@@ -327,6 +328,17 @@ class KplerTradeResource(TemplateResource):
 
         price_date = func.date_trunc("day", KplerTrade.departure_date_utc)
 
+        unnested_vessels = (
+            func.unnest(KplerTrade.vessel_imos)
+            .table_valued(
+                "ship_imo",
+                with_ordinality="ship_order",
+                name="ships",
+                joins_implicitly=False
+            )
+            .render_derived()
+        )
+
         # This gives us the vessel IMOs as a table
         # to make other queries possible. We sort
         # to get the best performance.
@@ -334,32 +346,17 @@ class KplerTradeResource(TemplateResource):
             session.query(
                 KplerTrade.id.label("trade_id"),
                 KplerTrade.flow_id,
-                func.unnest(KplerTrade.vessel_imos).label("ship_imo"),
+                unnested_vessels.c.ship_order,
+                unnested_vessels.c.ship_imo,
             )
+            .select_from(KplerTrade)
+            .join(unnested_vessels, true())
             .order_by(
                 KplerTrade.id,
-                KplerTrade.flow_id
+                KplerTrade.flow_id,
+                unnested_vessels.c.ship_order
             )
             .cte("trade_ship")
-            .prefix_with("MATERIALIZED")
-        )
-
-        sorted_vessels = (
-            session.query(
-                trade_ship.c.trade_id.label("trade_id"),
-                trade_ship.c.flow_id,
-                func.array_agg(
-                    aggregate_order_by(
-                        trade_ship.c.ship_imo,
-                        trade_ship.c.ship_imo
-                    )
-                ).label("vessel_imos"),
-            )
-            .group_by(
-                trade_ship.c.trade_id,
-                trade_ship.c.flow_id
-            )
-            .cte("sorted_vessels")
             .prefix_with("MATERIALIZED")
         )
 
@@ -419,6 +416,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.id.label("trade_id"),
                 KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
+                trade_ship.c.ship_order,
                 func.coalesce(Company.name, "unknown").label("name"),
                 func.coalesce(Company.country_iso2, "unknown").label("iso2"),
                 func.coalesce(Country.region, "unknown").label("region"),
@@ -465,6 +463,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.id.label("trade_id"),
                 KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
+                trade_ship.c.ship_order,
                 func.coalesce(Company.name, "unknown").label("name"),
                 func.coalesce(Company.country_iso2, "unknown").label("iso2"),
                 func.coalesce(Country.region, "unknown").label("region"),
@@ -625,19 +624,19 @@ class KplerTradeResource(TemplateResource):
                             voyage_insurer.c.name,
                             UNKNOWN_INSURER
                         ),
-                        voyage_insurer.c.ship_imo
+                        voyage_insurer.c.ship_order
                     )
                 ).label("ship_insurer_names"),
                 func.array_agg(
                     aggregate_order_by(
                         voyage_insurer.c.iso2,
-                        voyage_insurer.c.ship_imo
+                        voyage_insurer.c.ship_order
                     )
                 ).label("ship_insurer_iso2s"),
                 func.array_agg(
                     aggregate_order_by(
                         voyage_insurer.c.region,
-                        voyage_insurer.c.ship_imo
+                        voyage_insurer.c.ship_order
                     )
                 ).label("ship_insurer_regions")
             )
@@ -673,19 +672,19 @@ class KplerTradeResource(TemplateResource):
                             voyage_owner.c.name,
                             UNKNOWN_INSURER
                         ),
-                        voyage_owner.c.ship_imo
+                        voyage_owner.c.ship_order
                     )
                 ).label("ship_owner_names"),
                 func.array_agg(
                     aggregate_order_by(
                         voyage_owner.c.iso2,
-                        voyage_owner.c.ship_imo
+                        voyage_owner.c.ship_order
                     )
                 ).label("ship_owner_iso2s"),
                 func.array_agg(
                     aggregate_order_by(
                         voyage_owner.c.region,
-                        voyage_owner.c.ship_imo
+                        voyage_owner.c.ship_order
                     )
                 ).label("ship_owner_regions")
             )
@@ -753,8 +752,7 @@ class KplerTradeResource(TemplateResource):
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
                 Price.commodity.label("pricing_commodity"),
-                # This forces the order to be the same as insurers and owners.
-                sorted_vessels.c.vessel_imos,
+                KplerTrade.vessel_imos,
                 KplerTrade.buyer_names,
                 KplerTrade.seller_names,
                 all_insurers_for_trade.c.ship_insurer_names,
@@ -804,13 +802,6 @@ class KplerTradeResource(TemplateResource):
                     trade_price.c.price_id == Price.id,
                     pricing_commodity_id_field == Price.commodity,
                 ),
-            )
-            .join(
-                sorted_vessels,
-                sa.and_(
-                    KplerTrade.id == sorted_vessels.c.trade_id,
-                    KplerTrade.flow_id == sorted_vessels.c.flow_id,
-                )
             )
             .outerjoin(Currency, Currency.date == price_date)
             .order_by(

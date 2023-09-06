@@ -834,10 +834,10 @@ def test_kpler_trade_ship_insurer(app):
         }
         MULTI_SHIP_MULTIPLE_INSURERS = {
             "trade_id": 17069592,
-            "vessel_imos": ['9831816', '9907718'],
+            "vessel_imos": ['9907718', '9831816'],
             "ship_insurer_names": [
-                "Britannia Steamship insurance Association Ld",
                 "UK P&I Club",
+                "Britannia Steamship insurance Association Ld",
             ],
             "ship_insurer_iso2s": ["GB", "GB"],
             "ship_insurer_regions": [
