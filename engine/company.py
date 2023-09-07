@@ -54,13 +54,34 @@ def update(imo=None, force_unknown=False):
     # given the importance for price caps and bans
 
     max_age = {
-        base.CRUDE_OIL: 3,
-        base.OIL_PRODUCTS: 3,
-        base.OIL_OR_CHEMICAL: 3,
-        base.LNG: 3,
-        base.LPG: 3,
-        base.COAL: 15,
-        base.BULK: 15,
+        base.CRUDE_OIL: {
+            "known": 30,
+            "unknown": 3
+        },
+        base.OIL_PRODUCTS: {
+            "known": 30,
+            "unknown": 3
+        },
+        base.OIL_OR_CHEMICAL: {
+            "known": 30,
+            "unknown": 3
+        },
+        base.LNG: {
+            "known": 30,
+            "unknown": 3
+        },
+        base.LPG: {
+            "known": 30,
+            "unknown": 3
+        },
+        base.COAL: {
+            "known": 30,
+            "unknown": 15
+        },
+        base.BULK: {
+            "known": 30,
+            "unknown": 15
+        },
     }
 
     for commodity, max_age in max_age.items():
@@ -68,7 +89,8 @@ def update(imo=None, force_unknown=False):
         update_info_from_equasis(
             imo=imo,
             commodities=to_list(commodity),
-            last_updated=dt.datetime.now() - dt.timedelta(days=max_age),
+            last_updated_known=dt.datetime.now() - dt.timedelta(days=max_age["known"]),
+            last_updated_unknown=dt.datetime.now() - dt.timedelta(days=max_age["unknown"]),
             force_unknown=force_unknown,
         )
 
@@ -189,7 +211,8 @@ def build_filter_query():
 
 def update_info_from_equasis(
     commodities=None,
-    last_updated=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
+    last_updated_known=dt.date.today() - dt.timedelta(days=base.REFRESH_KNOWN_COMPANY_DAYS),
+    last_updated_unknown=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
     departure_date_from=None,
     imo=None,
     departure_port_id=None,
@@ -208,6 +231,7 @@ def update_info_from_equasis(
         session.query(
             Ship.imo,
             ShipInsurer.company_raw_name,
+            ShipInsurer.date_from,
             ShipInsurer.updated_on.label("last_updated")
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
@@ -239,7 +263,17 @@ def update_info_from_equasis(
         )
         .filter(
             sa.or_(
-                imo_query.c.last_updated <= last_updated,
+                sa.and_(
+                    imo_query.c.last_updated <= last_updated_unknown,
+                    sa.or_(
+                        imo_query.c.company_raw_name == base.UNKNOWN_INSURER,
+                        imo_query.c.date_from <= dt.date.today()
+                    )
+                ),
+                sa.and_(
+                    imo_query.c.last_updated <= last_updated_known,
+                    imo_query.c.company_raw_name != base.UNKNOWN_INSURER
+                ),
                 imo_query.c.last_updated == None,
                 sa.and_(force_unknown, imo_query.c.company_raw_name == base.UNKNOWN_INSURER),
             )

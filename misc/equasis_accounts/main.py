@@ -1,3 +1,4 @@
+import sys
 from time import sleep
 
 from selenium import webdriver
@@ -16,19 +17,26 @@ from decouple import config
 REGISTRATION_URL = "https://www.equasis.org/EquasisWeb/public/Registration?fs=ConditionsRegistration"
 RECAPTCHA_SELECTOR="iframe[title=reCAPTCHA]"
 
-START_RANGE = 327
-END_RANGE = 328
 
 PASSWORD = config('EQUASIS_PASSWORD')
 
 if __name__ == "__main__":
-    print("Creating accounts")
+
+    if (len(sys.argv) != 3):
+        print("Error: incorrect usage - wrong number of args.")
+        print("Usage: main.py <range-start> <range-end>")
+        sys.exit(1)
+
+    START_RANGE = int(sys.argv[1])
+    END_RANGE = int(sys.argv[2])
+
+    print(f"Creating accounts {START_RANGE} to {END_RANGE}")
 
     options = webdriver.ChromeOptions()
     options.add_argument("ignore-certificate-errors")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.binary_location = "/sbin/chromium"
+    options.binary_location = "/usr/bin/google-chrome"
 
     browser = webdriver.Chrome(service=Service("chromedriver"), options=options)
 
