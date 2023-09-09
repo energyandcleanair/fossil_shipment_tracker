@@ -314,26 +314,42 @@ def find_ships_that_need_updating(
 
     imo_query = imo_query.subquery()
 
+    unknown_and_not_updated_recently = sa.and_(
+        imo_query.c.last_updated <= last_updated_unknown,
+        imo_query.c.company_raw_name == base.UNKNOWN_INSURER
+    )
+
+    known_and_not_updated_recently = sa.and_(
+        imo_query.c.last_updated <= last_updated_known,
+        imo_query.c.company_raw_name != base.UNKNOWN_INSURER
+    )
+
+    doesnt_exist = sa.and_(
+        imo_query.c.last_updated == None,
+        imo_query.c.checked_on == None
+    )
+
+    exists_but_not_checked_today = sa.and_(
+        imo_query.c.last_updated == None,
+        imo_query.c.checked_on <= dt.date.today() - dt.timedelta(days=1)
+    )
+
+    unknown_and_were_forcing_an_update = sa.and_(
+        force_unknown,
+        imo_query.c.company_raw_name == base.UNKNOWN_INSURER
+    )
+
     imo_query = (
         session.query(
             imo_query
         )
         .filter(
             sa.or_(
-                # Unknown and not checked recently
-                sa.and_(
-                    imo_query.c.last_updated <= last_updated_unknown,
-                    imo_query.c.company_raw_name == base.UNKNOWN_INSURER
-                ),
-                # Known and not checked recently
-                sa.and_(
-                    imo_query.c.last_updated <= last_updated_known,
-                    imo_query.c.company_raw_name != base.UNKNOWN_INSURER
-                ),
-                # Never been updated or doesn't have an entry.
-                imo_query.c.last_updated == None,
-                # If we want to force unknown to be updated.
-                sa.and_(force_unknown, imo_query.c.company_raw_name == base.UNKNOWN_INSURER),
+                doesnt_exist,
+                unknown_and_not_updated_recently,
+                known_and_not_updated_recently,
+                exists_but_not_checked_today,
+                unknown_and_were_forcing_an_update
             )
         )
     )
@@ -455,6 +471,13 @@ def update_ship_insurer(imo, equasis_insurers):
                         insurer_raw_name=insurer_raw_name,
                         insurer_raw_date_from=insurer_raw_date_from
                     )
+    else:
+        logger.info("Couldn't find insurers for %s, marking as checked" % (imo))
+        insurer = get_latest_insurer(imo)
+        if insurer:
+            update_checked_date(insurer)
+        else:
+            create_unknown_insurer(imo)
 
 def get_matching_insurer(
     ship_imo=None,
@@ -503,6 +526,22 @@ def build_new_insurer(
         company_id=find_or_create_company_id(raw_name=company_raw_name),
         date_from=date_from_,
     )
+
+def update_checked_date(imo, insurer):
+    insurer.checked_on = dt.datetime.now()
+    try:
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        logger.warning("Failed to update insurer checked date for ship %s" % (imo))
+
+def create_unknown_insurer(imo):
+    unknown_insurer = build_new_insurer(
+        ship_imo=imo,
+        company_raw_name=base.UNKNOWN_INSURER
+    )
+    unknown_insurer.updated_on = None
+    unknown_insurer.checked_on = dt.datetime.now()
 
 def get_latest_insurer(imo):
     return (

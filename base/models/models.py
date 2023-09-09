@@ -410,8 +410,9 @@ class ShipInsurer(Base):
         ForeignKey(DB_TABLE_COMPANY + ".id", onupdate="CASCADE"),
         nullable=False,
     )  # Link to cleaned list of companies
-    updated_on = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_on = Column(DateTime, server_default=func.now())
     created_at = Column(DateTime, server_default=func.now())
+    checked_on = Column(DateTime, server_default=func.now())
 
     __tablename__ = DB_TABLE_SHIP_INSURER
     __table_args__ = (
