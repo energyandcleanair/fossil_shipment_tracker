@@ -225,6 +225,63 @@ def update_info_from_equasis(
     :return:
     """
 
+    imos = find_ships_that_need_updating( 
+        commodities=commodities,
+        last_updated_known=last_updated_known,
+        last_updated_unknown=last_updated_unknown,
+        departure_date_from=departure_date_from,
+        imo=imo,
+        departure_port_id=departure_port_id,
+        departure_port_iso2=departure_port_iso2,
+        force_unknown=force_unknown,
+    )
+
+    ntries = 3
+
+    if len(imos) == 0:
+        return
+
+    equasis = Equasis()
+
+    for imo in tqdm(imos):
+        itry = 0
+        equasis_infos = None
+
+        while equasis_infos is None and itry <= ntries:
+            itry += 1
+            try:
+                imo_equasis = imo.replace("NOTFOUND_", "")
+                equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
+            except requests.exceptions.HTTPError as e:
+                logger.warning("Failed to get equasis ship info, trying again.")
+            except requests.exceptions.ConnectionError as e:
+                logger.warning("Connection failed, trying again.")
+
+        if equasis_infos is not None:
+            # Update ship record
+            update_ship_record_with_raw_equasis(imo, equasis_infos)
+
+            equasis_insurers = equasis_infos.get("insurers")
+            update_ship_insurer(imo, equasis_insurers)
+
+            # Manager
+            manager_info = equasis_infos.get("manager")
+            update_ship_manager(imo, manager_info)
+
+            # Owner
+            owner_info = equasis_infos.get("owner")
+            update_ship_owner(imo, owner_info)
+
+def find_ships_that_need_updating(
+    commodities=None,
+    last_updated_known=dt.date.today() - dt.timedelta(days=base.REFRESH_KNOWN_COMPANY_DAYS),
+    last_updated_unknown=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
+    departure_date_from=None,
+    imo=None,
+    departure_port_id=None,
+    departure_port_iso2=None,
+    force_unknown=False,
+):
     filter_query = build_filter_query()
 
     imo_query = (
@@ -263,18 +320,19 @@ def update_info_from_equasis(
         )
         .filter(
             sa.or_(
+                # Unknown and not checked recently
                 sa.and_(
                     imo_query.c.last_updated <= last_updated_unknown,
-                    sa.or_(
-                        imo_query.c.company_raw_name == base.UNKNOWN_INSURER,
-                        imo_query.c.date_from <= dt.date.today()
-                    )
+                    imo_query.c.company_raw_name == base.UNKNOWN_INSURER
                 ),
+                # Known and not checked recently
                 sa.and_(
                     imo_query.c.last_updated <= last_updated_known,
                     imo_query.c.company_raw_name != base.UNKNOWN_INSURER
                 ),
+                # Never been updated or doesn't have an entry.
                 imo_query.c.last_updated == None,
+                # If we want to force unknown to be updated.
                 sa.and_(force_unknown, imo_query.c.company_raw_name == base.UNKNOWN_INSURER),
             )
         )
@@ -294,131 +352,17 @@ def update_info_from_equasis(
 
     logger.info(f"{unique_imos_count} ship IMOs to update")
 
-    imos = unique_imos
-    ntries = 3
+    return unique_imos
 
-    if len(imos) == 0:
-        return
-
-    equasis = Equasis()
-
-    for imo in tqdm(imos):
-        itry = 0
-        equasis_infos = None
-
-        while equasis_infos is None and itry <= ntries:
-            itry += 1
-            try:
-                imo_equasis = imo.replace("NOTFOUND_", "")
-                equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
-            except requests.exceptions.HTTPError as e:
-                logger.warning("Failed to get equasis ship info, trying again.")
-            except requests.exceptions.ConnectionError as e:
-                logger.warning("Connection failed, trying again.")
-
-        if equasis_infos is not None:
-            # Update ship record
-            ship = session.query(Ship).filter(Ship.imo == imo).first()
-            others = dict(ship.others) if ship.others else {}
-            others.update({"equasis": equasis_infos})
-            # To convert datetimes to str
-            others = json.loads(json.dumps(others, cls=JsonEncoder))
-            ship.others = others
-            session.commit()
-
-            # Insurer
-            if equasis_infos.get("insurers"):
-                equasis_insurers = equasis_infos.get("insurers")
-
-                for equasis_insurer in equasis_insurers:
-                    insurer_raw_name = equasis_insurer.get("name")
-                    insurer_raw_date_from = equasis_insurer.get("date_from")
-                    # See if exists
-                    insurer = (
-                        session.query(ShipInsurer)
-                        .filter(
-                            ShipInsurer.company_raw_name == insurer_raw_name,
-                            ShipInsurer.ship_imo == imo,
-                        )
-                        .first()
-                    )
-
-                    if not insurer:
-                        # If this is the first time we collect insurer for this ship,
-                        # We assume it has always been this insurer
-                        # This is important because we only start querying a ship insurer
-                        # After we had a departure with it, and so the first insurer
-                        # would always be after the first departure otherwise
-                        has_insurer = (
-                            session.query(ShipInsurer).filter(ShipInsurer.ship_imo == imo).count() > 0
-                        )
-                        date_from_ = insurer_raw_date_from or dt.datetime.now() if has_insurer else None
-                        insurer = ShipInsurer(
-                            company_raw_name=insurer_raw_name,
-                            imo=None,
-                            ship_imo=imo,
-                            company_id=find_or_create_company_id(raw_name=insurer_raw_name),
-                            date_from=date_from_,
-                        )
-                    insurer.updated_on = dt.datetime.now()
-                    if insurer_raw_date_from and insurer.date_from is not None:
-                        # HEURISTIC
-                        # Very important assumption about equasis: we only update the date_from if it is not null
-                        # It may happen indeed that it was the same insurer before the inception date
-                        # and that the contract was only renewed
-                        insurer.date_from = insurer_raw_date_from
-                    session.add(insurer)
-                    try:
-                        session.commit()
-                    except IntegrityError as e:
-                        session.rollback()
-                        logger.warning("Failed to add insurer %s for ship %s" % (insurer_raw_name, imo))
-
-            # Manager
-            manager_info = equasis_infos.get("manager")
-            if manager_info:
-                manager_raw_name = manager_info.get("name")
-                manager_address = manager_info.get("address")
-                manager_imo = manager_info.get("imo")
-                manager_date_from = manager_info.get("date_from")
+def update_ship_owner(imo, owner_info):
+    if owner_info:
+        owner_raw_name = owner_info.get("name")
+        owner_address = owner_info.get("address")
+        owner_imo = owner_info.get("imo")
+        owner_date_from = owner_info.get("date_from")
 
                 # See if exists
-                manager = (
-                    session.query(ShipManager)
-                    .filter(
-                        ShipManager.company_raw_name == manager_raw_name,
-                        ShipManager.imo == manager_imo,
-                        ShipManager.ship_imo == imo,
-                        ShipManager.date_from == manager_date_from,
-                    )
-                    .first()
-                )
-                if not manager:
-                    manager = ShipManager(
-                        company_raw_name=manager_raw_name,
-                        ship_imo=imo,
-                        imo=manager_imo,
-                        date_from=manager_date_from,
-                        company_id=find_or_create_company_id(
-                            raw_name=manager_raw_name,
-                            imo=manager_imo,
-                            address=manager_address,
-                        ),
-                    )
-                manager.updated_on = dt.datetime.now()
-                session.add(manager)
-                session.commit()
-
-            # Owner
-            owner_info = equasis_infos.get("owner")
-            if owner_info:
-                owner_raw_name = owner_info.get("name")
-                owner_address = owner_info.get("address")
-                owner_imo = owner_info.get("imo")
-                owner_date_from = owner_info.get("date_from")
-
-                # See if exists
-                owner = (
+        owner = (
                     session.query(ShipOwner)
                     .filter(
                         ShipOwner.company_raw_name == owner_raw_name,
@@ -427,8 +371,8 @@ def update_info_from_equasis(
                     )
                     .first()
                 )
-                if not owner:
-                    owner = ShipOwner(
+        if not owner:
+            owner = ShipOwner(
                         company_raw_name=owner_raw_name,
                         ship_imo=imo,
                         imo=owner_imo,
@@ -439,19 +383,158 @@ def update_info_from_equasis(
                             address=owner_address,
                         ),
                     )
-                owner.updated_on = dt.datetime.now()
+        owner.updated_on = dt.datetime.now()
 
                 # Verify we DID find a matching company_id using find_or_create_company_id otherwise we will have an
                 # integrity error
-                if owner.company_id is not None:
-                    session.add(owner)
-                    session.commit()
-                else:
-                    logger.warning(
+        if owner.company_id is not None:
+            session.add(owner)
+            session.commit()
+        else:
+            logger.warning(
                         "Failed to find/create company_id for company {}, ship_imo {}.".format(
                             owner.company_raw_name, owner.ship_imo
                         )
                     )
+
+def update_ship_manager(imo, manager_info):
+    if manager_info:
+        manager_raw_name = manager_info.get("name")
+        manager_address = manager_info.get("address")
+        manager_imo = manager_info.get("imo")
+        manager_date_from = manager_info.get("date_from")
+
+                # See if exists
+        manager = (
+                    session.query(ShipManager)
+                    .filter(
+                        ShipManager.company_raw_name == manager_raw_name,
+                        ShipManager.imo == manager_imo,
+                        ShipManager.ship_imo == imo,
+                        ShipManager.date_from == manager_date_from,
+                    )
+                    .first()
+                )
+        if not manager:
+            manager = ShipManager(
+                        company_raw_name=manager_raw_name,
+                        ship_imo=imo,
+                        imo=manager_imo,
+                        date_from=manager_date_from,
+                        company_id=find_or_create_company_id(
+                            raw_name=manager_raw_name,
+                            imo=manager_imo,
+                            address=manager_address,
+                        ),
+                    )
+        manager.updated_on = dt.datetime.now()
+        session.add(manager)
+        session.commit()
+
+def update_ship_insurer(imo, equasis_insurers):
+    if equasis_insurers:
+        for equasis_insurer in equasis_insurers:
+            insurer_raw_name = equasis_insurer.get("name")
+            insurer_raw_date_from = equasis_insurer.get("date_from")
+
+            insurer = get_matching_insurer(
+                        ship_imo=imo,
+                        insurer_raw_name=insurer_raw_name
+                    )
+
+            if not insurer:
+                insurer = build_new_insurer(
+                            ship_imo=imo,
+                            company_raw_name=insurer_raw_name,
+                            company_raw_date_from=insurer_raw_date_from
+                        )
+                    
+            update_insurer(
+                        insurer=insurer,
+                        imo=imo,
+                        insurer_raw_name=insurer_raw_name,
+                        insurer_raw_date_from=insurer_raw_date_from
+                    )
+
+def get_matching_insurer(
+    ship_imo=None,
+    company_raw_name=None,
+):
+    return (
+        session.query(ShipInsurer)
+        .filter(
+            ShipInsurer.company_raw_name == company_raw_name,
+            ShipInsurer.ship_imo == ship_imo,
+        )
+        .first()
+    )
+
+def update_ship_record_with_raw_equasis(
+    ship_imo=None,
+    equasis_infos=None,
+): 
+    ship = session.query(Ship).filter(Ship.imo == ship_imo).first()
+    others = dict(ship.others) if ship.others else {}
+    others.update({"equasis": equasis_infos})
+    # To convert datetimes to str
+    others = json.loads(json.dumps(others, cls=JsonEncoder))
+    ship.others = others
+    session.commit()
+
+def build_new_insurer(
+    ship_imo=None,
+    company_raw_name=None,
+    company_raw_date_from=None,
+):
+    
+    # If this is the first time we collect insurer for this ship,
+    # We assume it has always been this insurer
+    # This is important because we only start querying a ship insurer
+    # After we had a departure with it, and so the first insurer
+    # would always be after the first departure otherwise
+    has_insurer = (
+        session.query(ShipInsurer).filter(ShipInsurer.ship_imo == ship_imo).count() > 0
+    )
+    date_from_ = company_raw_date_from or dt.datetime.now() if has_insurer else None
+    return ShipInsurer(
+        company_raw_name=company_raw_name,
+        imo=None,
+        ship_imo=ship_imo,
+        company_id=find_or_create_company_id(raw_name=company_raw_name),
+        date_from=date_from_,
+    )
+
+def get_latest_insurer(imo):
+    return (
+        session.query(ShipInsurer)
+            .filter(
+                ShipInsurer.ship_imo == imo
+            )
+            .distinct(ShipInsurer.c.ship_imo)
+            .order_by(ShipInsurer.c.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
+            .first()
+    )
+
+def update_insurer(
+        imo=None,
+        insurer_raw_name=None,
+        insurer_raw_date_from=None,
+        insurer=None
+):
+    insurer.updated_on = dt.datetime.now()
+    insurer.checked_on = dt.datetime.now()
+    if insurer_raw_date_from and insurer.date_from is not None:
+                        # HEURISTIC
+                        # Very important assumption about equasis: we only update the date_from if it is not null
+                        # It may happen indeed that it was the same insurer before the inception date
+                        # and that the contract was only renewed
+        insurer.date_from = insurer_raw_date_from
+    session.add(insurer)
+    try:
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        logger.warning("Failed to add insurer %s for ship %s" % (insurer_raw_name, imo))
 
 
 def fill_country():
