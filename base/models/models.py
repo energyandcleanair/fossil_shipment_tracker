@@ -413,6 +413,7 @@ class ShipInsurer(Base):
     updated_on = Column(DateTime, server_default=func.now())
     created_at = Column(DateTime, server_default=func.now())
     checked_on = Column(DateTime, server_default=func.now())
+    consecutive_failures = Column(BigInteger, nullable=False, default=0)
 
     __tablename__ = DB_TABLE_SHIP_INSURER
     __table_args__ = (

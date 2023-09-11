@@ -4,6 +4,8 @@ import pandas as pd
 import datetime as dt
 from sqlalchemy import func
 from sqlalchemy import nullslast
+from sqlalchemy.dialects.postgresql import INTERVAL
+from sqlalchemy.sql.functions import concat
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from difflib import SequenceMatcher
@@ -32,7 +34,7 @@ from base.models import (
     Ship,
     Port,
 )
-from engine.equasis import Equasis
+from engine.company.equasis import Equasis
 
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
@@ -89,8 +91,8 @@ def update(imo=None, force_unknown=False):
         update_info_from_equasis(
             imo=imo,
             commodities=to_list(commodity),
-            last_updated_known=dt.datetime.now() - dt.timedelta(days=max_age["known"]),
-            last_updated_unknown=dt.datetime.now() - dt.timedelta(days=max_age["unknown"]),
+            known_update_period=max_age["known"],
+            unknown_update_period=max_age["unknown"],
             force_unknown=force_unknown,
         )
 
@@ -211,8 +213,8 @@ def build_filter_query():
 
 def update_info_from_equasis(
     commodities=None,
-    last_updated_known=dt.date.today() - dt.timedelta(days=base.REFRESH_KNOWN_COMPANY_DAYS),
-    last_updated_unknown=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
+    known_update_period=30,
+    unknown_update_period=3,
     departure_date_from=None,
     imo=None,
     departure_port_id=None,
@@ -227,8 +229,8 @@ def update_info_from_equasis(
 
     imos = find_ships_that_need_updating( 
         commodities=commodities,
-        last_updated_known=last_updated_known,
-        last_updated_unknown=last_updated_unknown,
+        known_update_period=known_update_period,
+        unknown_update_period=unknown_update_period,
         departure_date_from=departure_date_from,
         imo=imo,
         departure_port_id=departure_port_id,
@@ -239,6 +241,7 @@ def update_info_from_equasis(
     ntries = 3
 
     if len(imos) == 0:
+        logger.info("No ships to update for %s" % (','.join(commodities)))
         return
 
     equasis = Equasis()
@@ -271,11 +274,13 @@ def update_info_from_equasis(
             # Owner
             owner_info = equasis_infos.get("owner")
             update_ship_owner(imo, owner_info)
+        else:
+            logger.log("Failed to get response from equasis")
 
 def find_ships_that_need_updating(
     commodities=None,
-    last_updated_known=dt.date.today() - dt.timedelta(days=base.REFRESH_KNOWN_COMPANY_DAYS),
-    last_updated_unknown=dt.date.today() - dt.timedelta(days=base.REFRESH_COMPANY_DAYS),
+    known_update_period=30,
+    unknown_update_period=3,
     departure_date_from=None,
     imo=None,
     departure_port_id=None,
@@ -289,7 +294,9 @@ def find_ships_that_need_updating(
             Ship.imo,
             ShipInsurer.company_raw_name,
             ShipInsurer.date_from,
-            ShipInsurer.updated_on.label("last_updated")
+            ShipInsurer.checked_on,
+            ShipInsurer.updated_on.label("last_updated"),
+            ShipInsurer.consecutive_failures
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
         .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
@@ -314,27 +321,68 @@ def find_ships_that_need_updating(
 
     imo_query = imo_query.subquery()
 
-    unknown_and_not_updated_recently = sa.and_(
-        imo_query.c.last_updated <= last_updated_unknown,
-        imo_query.c.company_raw_name == base.UNKNOWN_INSURER
+    from sqlalchemy.sql import case
+
+    # We use an exponential backoff to define the ignore period.
+    # It will take a minimum of 256 days of checking to get to
+    # the maximum of 90 days.
+    backoff_base = 1.5
+    backoff_limit = 90
+    ignore_period = case(
+        (
+            func.power(backoff_base, imo_query.c.consecutive_failures) <= backoff_limit,
+            func.power(backoff_base, imo_query.c.consecutive_failures)
+        ),
+        else_=backoff_limit
+    )
+    ignore_date = func.now() - func.cast(
+        concat(ignore_period, ' DAYS'),
+        INTERVAL
+    )
+    # This backoff period is only if we get a response from equasis
+    # but that doesn't include any data
+    not_in_backoff_period = sa.or_(
+        imo_query.c.checked_on <= ignore_date,
+        imo_query.c.checked_on == None
     )
 
-    known_and_not_updated_recently = sa.and_(
-        imo_query.c.last_updated <= last_updated_known,
-        imo_query.c.company_raw_name != base.UNKNOWN_INSURER
+    check_known_date = func.now() - func.cast(
+        # Distribute the known a bit with a random to prevent a single day build up.
+        concat(known_update_period - (func.random() * 6 - 3), ' DAYS'),
+        INTERVAL
+    )
+    check_unknown_date = func.now() - func.cast(
+        concat(unknown_update_period, ' DAYS'),
+        INTERVAL
     )
 
-    doesnt_exist = sa.and_(
+    not_yet_searched = sa.and_(
         imo_query.c.last_updated == None,
         imo_query.c.checked_on == None
     )
 
-    exists_but_not_checked_today = sa.and_(
+    never_found_and_not_updated_in_backoff_period = sa.and_(
         imo_query.c.last_updated == None,
-        imo_query.c.checked_on <= dt.date.today() - dt.timedelta(days=1)
+        not_in_backoff_period
     )
 
-    unknown_and_were_forcing_an_update = sa.and_(
+    unknown_and_needs_update = sa.and_(
+        imo_query.c.last_updated <= check_unknown_date,
+        imo_query.c.company_raw_name == base.UNKNOWN_INSURER
+    )
+
+    known_and_needs_update = sa.and_(
+        imo_query.c.last_updated <= check_known_date,
+        imo_query.c.company_raw_name != base.UNKNOWN_INSURER
+    )
+
+    expected_insurance_expiry_and_needs_update = sa.and_(
+        imo_query.c.date_from <= dt.date.today() - dt.timedelta(days=11*30),
+        imo_query.c.last_updated <= check_unknown_date,
+        imo_query.c.company_raw_name != base.UNKNOWN_INSURER
+    )
+
+    forced_unknown_update = sa.and_(
         force_unknown,
         imo_query.c.company_raw_name == base.UNKNOWN_INSURER
     )
@@ -345,11 +393,12 @@ def find_ships_that_need_updating(
         )
         .filter(
             sa.or_(
-                doesnt_exist,
-                unknown_and_not_updated_recently,
-                known_and_not_updated_recently,
-                exists_but_not_checked_today,
-                unknown_and_were_forcing_an_update
+                not_yet_searched,
+                never_found_and_not_updated_in_backoff_period,
+                unknown_and_needs_update,
+                known_and_needs_update,
+                expected_insurance_expiry_and_needs_update,
+                forced_unknown_update
             )
         )
     )
@@ -359,7 +408,7 @@ def find_ships_that_need_updating(
     results = pd.DataFrame(imos_results)
 
     if len(results) == 0:
-        return
+        return pd.DataFrame()
 
     results = results[~results.imo.str.match("_v", case=False)]
 
@@ -454,9 +503,9 @@ def update_ship_insurer(imo, equasis_insurers):
             insurer_raw_date_from = equasis_insurer.get("date_from")
 
             insurer = get_matching_insurer(
-                        ship_imo=imo,
-                        insurer_raw_name=insurer_raw_name
-                    )
+                    ship_imo=imo,
+                    company_raw_name=insurer_raw_name
+                )
 
             if not insurer:
                 insurer = build_new_insurer(
@@ -464,7 +513,7 @@ def update_ship_insurer(imo, equasis_insurers):
                             company_raw_name=insurer_raw_name,
                             company_raw_date_from=insurer_raw_date_from
                         )
-                    
+
             update_insurer(
                         insurer=insurer,
                         imo=imo,
@@ -473,11 +522,12 @@ def update_ship_insurer(imo, equasis_insurers):
                     )
     else:
         logger.info("Couldn't find insurers for %s, marking as checked" % (imo))
+
         insurer = get_latest_insurer(imo)
-        if insurer:
-            update_checked_date(insurer)
-        else:
-            create_unknown_insurer(imo)
+        if not insurer:
+            insurer = create_unknown_insurer(imo)
+
+        update_failed_insurer(imo, insurer)
 
 def get_matching_insurer(
     ship_imo=None,
@@ -509,7 +559,7 @@ def build_new_insurer(
     company_raw_name=None,
     company_raw_date_from=None,
 ):
-    
+
     # If this is the first time we collect insurer for this ship,
     # We assume it has always been this insurer
     # This is important because we only start querying a ship insurer
@@ -527,9 +577,11 @@ def build_new_insurer(
         date_from=date_from_,
     )
 
-def update_checked_date(imo, insurer):
+def update_failed_insurer(imo, insurer):
     insurer.checked_on = dt.datetime.now()
+    insurer.consecutive_failures += 1
     try:
+        session.add(insurer)
         session.commit()
     except IntegrityError as e:
         session.rollback()
@@ -542,6 +594,23 @@ def create_unknown_insurer(imo):
     )
     unknown_insurer.updated_on = None
     unknown_insurer.checked_on = dt.datetime.now()
+    try:
+        session.add(unknown_insurer)
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        logger.warning("Failed to create unknown insurer checked date for ship %s" % (imo))
+
+    # reset updated on
+    unknown_insurer.updated_on = None
+    try:
+        session.add(unknown_insurer)
+        session.commit()
+    except IntegrityError as e:
+        session.rollback()
+        logger.warning("Failed to reset updated on date for unknown insurer checked date for ship %s" % (imo))
+
+    return unknown_insurer
 
 def get_latest_insurer(imo):
     return (
@@ -549,8 +618,8 @@ def get_latest_insurer(imo):
             .filter(
                 ShipInsurer.ship_imo == imo
             )
-            .distinct(ShipInsurer.c.ship_imo)
-            .order_by(ShipInsurer.c.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
+            .distinct(ShipInsurer.ship_imo)
+            .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
             .first()
     )
 
@@ -562,6 +631,7 @@ def update_insurer(
 ):
     insurer.updated_on = dt.datetime.now()
     insurer.checked_on = dt.datetime.now()
+    insurer.consecutive_failures = 0
     if insurer_raw_date_from and insurer.date_from is not None:
                         # HEURISTIC
                         # Very important assumption about equasis: we only update the date_from if it is not null
