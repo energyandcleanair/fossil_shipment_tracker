@@ -23,13 +23,6 @@ class GardInsuranceScraper(InsuranceScraper):
         url = "https://lov.gard.no/Home/Search?searchbar={}".format(imo)
         response = self.session.get(url)
 
-        data = {
-            "imo": imo,
-            "name": "bbc",
-            "date_from": None,
-            "date_to": None,
-        }
-
         if response.status_code != 200:
             status_code = response.status_code
             logger.info(f"Failed to find date for {imo}: site returned status code {status_code}")
@@ -46,7 +39,7 @@ class GardInsuranceScraper(InsuranceScraper):
 
         if not header:
             logger.info(f"Failed to find date for {imo}: could not find blue cards")
-            return data
+            return None
 
         table = header.parent.find_next_sibling("div")
 
