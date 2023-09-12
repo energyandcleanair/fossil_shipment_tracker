@@ -287,6 +287,9 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.commodity_equivalent,
                 subquery.c.commodity_equivalent_group,
             ],
+            "commodity_equivalent_group": [
+                subquery.c.commodity_equivalent_group,
+            ],
             "currency": [subquery.c.currency],
             "origin_date": [func.date_trunc("day", subquery.c.origin_date_utc).label("date")],
             "origin_month": [func.date_trunc("month", subquery.c.origin_date_utc).label("month")],
@@ -301,6 +304,14 @@ class KplerTradeResource(TemplateResource):
                 func.extract("year", subquery.c.destination_date_utc).label("year")
             ],
             "pricing_scenario": [subquery.c.pricing_scenario],
+            "ship_insurer_country": [
+                subquery.c.ship_insurer_iso2s,
+                subquery.c.ship_insurer_regions,
+            ],
+            "ship_owner_country": [
+                subquery.c.ship_owner_iso2s,
+                subquery.c.ship_owner_regions,
+            ],
         }
 
     def get_agg_value_cols(self, subquery):
@@ -645,12 +656,14 @@ class KplerTradeResource(TemplateResource):
                     aggregate_order_by(voyage_owner.c.iso2, voyage_owner.c.ship_order)
                 ).label("ship_owner_iso2s"),
                 func.array_agg(
-                    aggregate_order_by(voyage_owner.c.region, voyage_owner.c.ship_order)
-                ).label("ship_owner_regions"),
+                    aggregate_order_by(
+                        voyage_owner.c.region,
+                        voyage_owner.c.ship_order
+                    )
+                ).label("ship_owner_regions")
             )
             .outerjoin(
-                trade_ship,
-                sa.and_(
+                trade_ship, sa.and_(
                     KplerTrade.id == trade_ship.c.trade_id,
                     KplerTrade.flow_id == trade_ship.c.flow_id,
                 ),
@@ -661,11 +674,15 @@ class KplerTradeResource(TemplateResource):
                     voyage_owner.c.trade_id == KplerTrade.id,
                     voyage_owner.c.flow_id == KplerTrade.flow_id,
                     voyage_owner.c.ship_imo == trade_ship.c.ship_imo,
-                ),
+                )
             )
-            .group_by(KplerTrade.id, KplerTrade.flow_id)
+            .group_by(
+                KplerTrade.id,
+                KplerTrade.flow_id
+            )
             .cte("all_owners_for_trade")
             .prefix_with("MATERIALIZED")
+            .subquery()
         )
 
         query = (
