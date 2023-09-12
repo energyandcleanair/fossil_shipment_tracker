@@ -11,7 +11,7 @@ with last_update as (
 )
 
 update kpler_flow
-set is_valid = updated_on_max - updated_on < '15 minutes'
+set is_valid = updated_on_max - updated_on < '2 hours'
 from last_update
 where kpler_flow.from_zone_id = last_update.from_zone_id
 and kpler_flow.from_split = last_update.from_split
@@ -27,7 +27,7 @@ with last_update as (
 )
 
 update kpler_trade
-set is_valid = is_valid AND (updated_on_max - updated_on < '15 minutes')
+set is_valid = is_valid AND (updated_on_max - updated_on < '2 hours')
 from last_update
 where kpler_trade.id = last_update.id;
 
@@ -43,7 +43,7 @@ with last_update as (
 )
 
 update kpler_trade
-set is_valid = (is_valid) and (updated_on_max - updated_on < '15 minutes')
+set is_valid = (is_valid) and (updated_on_max - updated_on < '2 hours')
 from last_update
 where kpler_trade.flow_id = last_update.flow_id
 and kpler_trade.departure_date_utc = last_update.departure_date_utc
@@ -60,7 +60,7 @@ with last_update as (
 )
 
 update kpler_trade
-set is_valid = (is_valid) and (updated_on_max - updated_on < '15 minutes')
+set is_valid = (is_valid) and (updated_on_max - updated_on < '2 hours')
 from last_update
 where kpler_trade.flow_id = last_update.flow_id
 and kpler_trade.departure_date_utc = last_update.departure_date_utc
@@ -76,7 +76,7 @@ with last_update as (
 )
 
 update kpler_trade
-set is_valid = (is_valid) and (updated_on_max - updated_on < '15 minutes')
+set is_valid = (is_valid) and (updated_on_max - updated_on < '2 hours')
 from last_update
 where kpler_trade.flow_id = last_update.flow_id
 and kpler_trade.departure_date_utc = last_update.departure_date_utc
@@ -93,7 +93,7 @@ with last_update as (
 )
 
 update kpler_trade
-set is_valid = (is_valid) and (updated_on_max - updated_on < '15 minutes')
+set is_valid = (is_valid) and (updated_on_max - updated_on < '2 hours')
 from last_update
 where kpler_trade.flow_id = last_update.flow_id
 and kpler_trade.departure_date_utc = last_update.departure_date_utc
@@ -110,7 +110,7 @@ with last_update as (
 )
 
 update kpler_trade
-set is_valid = (is_valid) and (updated_on_max - updated_on < '15 minutes')
+set is_valid = (is_valid) and (updated_on_max - updated_on < '2 hours')
 from last_update
 where kpler_trade.flow_id = last_update.flow_id
 and kpler_trade.departure_date_utc = last_update.departure_date_utc
@@ -124,7 +124,7 @@ with last_update as (
 )
 
 update kpler_trade
-set is_valid = (is_valid) and (updated_on_max - updated_on < '15 minutes')
+set is_valid = (is_valid) and (updated_on_max - updated_on < '2 hours')
 from last_update
 where kpler_trade.departure_zone_id = last_update.departure_zone_id
 and kpler_trade.arrival_zone_id = last_update.arrival_zone_id
