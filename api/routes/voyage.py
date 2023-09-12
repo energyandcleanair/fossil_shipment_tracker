@@ -799,6 +799,10 @@ class VoyageResource(Resource):
                 )
             ).subquery()
 
+            ship_insurer_field = func.coalesce(
+                ShipInsurer.date_from_insurer, ShipInsurer.date_from_equasis
+            ).label("date_from")
+
             # Add Insurer
             shipments_combined = (
                 session.query(
@@ -809,17 +813,17 @@ class VoyageResource(Resource):
                     ShipInsurer,
                     sa.and_(
                         sa.or_(
-                            ShipInsurer.date_from <= shipments_combined.c.departure_date_utc,
+                            ship_insurer_field <= shipments_combined.c.departure_date_utc,
                             # Adding a buffer because in many instances
                             # we collected insurance company after the shipment had been detected
                             # TODO IMPROVE
                             sa.and_(
-                                ShipInsurer.date_from
+                                ship_insurer_field
                                 <= shipments_combined.c.departure_date_utc
                                 + dt.timedelta(days=buffer_days),
                                 ShipInsurer.company_raw_name != base.UNKNOWN_INSURER,
                             ),
-                            ShipInsurer.date_from == None,
+                            ship_insurer_field == None,
                         ),
                         ShipInsurer.ship_imo == shipments_combined.c.departure_ship_imo,
                     ),
@@ -828,7 +832,7 @@ class VoyageResource(Resource):
                 .order_by(
                     shipments_combined.c.shipment_id,
                     ShipInsurer.ship_imo,
-                    nullslast(ShipInsurer.date_from.desc()),
+                    nullslast(ship_insurer_field.desc()),
                 )
             ).subquery()
 

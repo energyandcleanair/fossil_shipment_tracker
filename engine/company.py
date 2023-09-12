@@ -35,40 +35,20 @@ from base.models import (
 )
 from engine.company_scraper import Equasis, CompanyImoScraper
 
+
 def update(imo=None, force_unknown=False):
     logger_slack.info("=== Company update ===")
     # For crude oil and oil products, force a daily refresh
     # given the importance for price caps and bans
 
     max_age = {
-        base.CRUDE_OIL: {
-            "known": 30,
-            "unknown": 3
-        },
-        base.OIL_PRODUCTS: {
-            "known": 30,
-            "unknown": 3
-        },
-        base.OIL_OR_CHEMICAL: {
-            "known": 30,
-            "unknown": 3
-        },
-        base.LNG: {
-            "known": 30,
-            "unknown": 3
-        },
-        base.LPG: {
-            "known": 30,
-            "unknown": 3
-        },
-        base.COAL: {
-            "known": 30,
-            "unknown": 15
-        },
-        base.BULK: {
-            "known": 30,
-            "unknown": 15
-        },
+        base.CRUDE_OIL: {"known": 30, "unknown": 3},
+        base.OIL_PRODUCTS: {"known": 30, "unknown": 3},
+        base.OIL_OR_CHEMICAL: {"known": 30, "unknown": 3},
+        base.LNG: {"known": 30, "unknown": 3},
+        base.LPG: {"known": 30, "unknown": 3},
+        base.COAL: {"known": 30, "unknown": 15},
+        base.BULK: {"known": 30, "unknown": 15},
     }
 
     for commodity, max_age in max_age.items():
@@ -138,6 +118,7 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
 
     return company_id
 
+
 def build_filter_query():
 
     departure_ships = (
@@ -147,23 +128,17 @@ def build_filter_query():
             Departure.port_id.label("port_id"),
             Port.iso2.label("port_iso2"),
             Ship.commodity.label("commodity"),
-            sa.sql.expression.literal("departure").label("source")
+            sa.sql.expression.literal("departure").label("source"),
         )
-        .outerjoin(
-            Port, Departure.port_id == Port.id
-        )
-        .outerjoin(
-            Ship, Ship.imo == Departure.ship_imo
-        )
+        .outerjoin(Port, Departure.port_id == Port.id)
+        .outerjoin(Ship, Ship.imo == Departure.ship_imo)
     )
 
     commodity_id_field = (
         "kpler_"
         + sa.func.replace(
             sa.func.replace(
-                sa.func.lower(
-                    func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)
-                ),
+                sa.func.lower(func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)),
                 " ",
                 "_",
             ),
@@ -179,22 +154,17 @@ def build_filter_query():
             KplerZone.port_id.label("port_id"),
             KplerZone.country_iso2.label("port_iso2"),
             Commodity.equivalent_id.label("commodity"),
-            sa.sql.expression.literal("kpler").label("source")
+            sa.sql.expression.literal("kpler").label("source"),
         )
-        .outerjoin(
-            KplerZone, KplerTrade.departure_zone_id == KplerZone.id
-        )
-        .outerjoin(
-            KplerProduct, KplerTrade.product_id == KplerProduct.id
-        )
-        .outerjoin(
-            Commodity, commodity_id_field == Commodity.id
-        )
+        .outerjoin(KplerZone, KplerTrade.departure_zone_id == KplerZone.id)
+        .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
+        .outerjoin(Commodity, commodity_id_field == Commodity.id)
     )
 
     filter_query = kpler_ships.union(departure_ships).subquery()
 
     return filter_query
+
 
 def update_info_from_equasis(
     commodities=None,
@@ -212,7 +182,7 @@ def update_info_from_equasis(
     :return:
     """
 
-    imos = find_ships_that_need_updating( 
+    imos = find_ships_that_need_updating(
         commodities=commodities,
         known_update_period=known_update_period,
         unknown_update_period=unknown_update_period,
@@ -226,7 +196,7 @@ def update_info_from_equasis(
     ntries = 3
 
     if len(imos) == 0:
-        logger.info("No ships to update for %s" % (','.join(commodities)))
+        logger.info("No ships to update for %s" % (",".join(commodities)))
         return
 
     equasis = Equasis()
@@ -262,6 +232,7 @@ def update_info_from_equasis(
         else:
             logger.info("Failed to get response from equasis")
 
+
 def find_ships_that_need_updating(
     commodities=None,
     known_update_period=30,
@@ -278,10 +249,12 @@ def find_ships_that_need_updating(
         session.query(
             Ship.imo,
             ShipInsurer.company_raw_name,
-            ShipInsurer.date_from,
+            func.coalesce(ShipInsurer.date_from_insurer, ShipInsurer.date_from_equasis).label(
+                "date_from"
+            ),
             ShipInsurer.checked_on,
             ShipInsurer.updated_on.label("last_updated"),
-            ShipInsurer.consecutive_failures
+            ShipInsurer.consecutive_failures,
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
         .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
@@ -316,72 +289,56 @@ def find_ships_that_need_updating(
     ignore_period = case(
         (
             func.power(backoff_base, imo_query.c.consecutive_failures) <= backoff_limit,
-            func.power(backoff_base, imo_query.c.consecutive_failures)
+            func.power(backoff_base, imo_query.c.consecutive_failures),
         ),
-        else_=backoff_limit
+        else_=backoff_limit,
     )
-    ignore_date = func.now() - func.cast(
-        concat(ignore_period, ' DAYS'),
-        INTERVAL
-    )
+    ignore_date = func.now() - func.cast(concat(ignore_period, " DAYS"), INTERVAL)
     # This backoff period is only if we get a response from equasis
     # but that doesn't include any data
     not_in_backoff_period = sa.or_(
-        imo_query.c.checked_on <= ignore_date,
-        imo_query.c.checked_on == None
+        imo_query.c.checked_on <= ignore_date, imo_query.c.checked_on == None
     )
 
     check_known_date = func.now() - func.cast(
         # Distribute the known a bit with a random to prevent a single day build up.
-        concat(known_update_period - (func.random() * 6 - 3), ' DAYS'),
-        INTERVAL
+        concat(known_update_period - (func.random() * 6 - 3), " DAYS"),
+        INTERVAL,
     )
-    check_unknown_date = func.now() - func.cast(
-        concat(unknown_update_period, ' DAYS'),
-        INTERVAL
-    )
+    check_unknown_date = func.now() - func.cast(concat(unknown_update_period, " DAYS"), INTERVAL)
 
-    not_yet_searched = sa.and_(
-        imo_query.c.last_updated == None,
-        imo_query.c.checked_on == None
-    )
+    not_yet_searched = sa.and_(imo_query.c.last_updated == None, imo_query.c.checked_on == None)
 
     unknown_and_needs_update = sa.and_(
         imo_query.c.last_updated <= check_unknown_date,
-        imo_query.c.company_raw_name == base.UNKNOWN_INSURER
+        imo_query.c.company_raw_name == base.UNKNOWN_INSURER,
     )
 
     known_and_needs_update = sa.and_(
         imo_query.c.last_updated <= check_known_date,
-        imo_query.c.company_raw_name != base.UNKNOWN_INSURER
+        imo_query.c.company_raw_name != base.UNKNOWN_INSURER,
     )
 
     expected_insurance_expiry_and_needs_update = sa.and_(
-        imo_query.c.date_from <= dt.date.today() - dt.timedelta(days=11*30),
+        imo_query.c.date_from <= dt.date.today() - dt.timedelta(days=11 * 30),
         imo_query.c.last_updated <= check_unknown_date,
-        imo_query.c.company_raw_name != base.UNKNOWN_INSURER
+        imo_query.c.company_raw_name != base.UNKNOWN_INSURER,
     )
 
     forced_unknown_update = sa.and_(
-        force_unknown,
-        imo_query.c.company_raw_name == base.UNKNOWN_INSURER
+        force_unknown, imo_query.c.company_raw_name == base.UNKNOWN_INSURER
     )
 
-    imo_query = (
-        session.query(
-            imo_query
-        )
-        .filter(
-            sa.and_(
-                not_in_backoff_period,
-                sa.or_(
-                    not_yet_searched,
-                    unknown_and_needs_update,
-                    known_and_needs_update,
-                    expected_insurance_expiry_and_needs_update,
-                    forced_unknown_update
-                )
-            )
+    imo_query = session.query(imo_query).filter(
+        sa.and_(
+            not_in_backoff_period,
+            sa.or_(
+                not_yet_searched,
+                unknown_and_needs_update,
+                known_and_needs_update,
+                expected_insurance_expiry_and_needs_update,
+                forced_unknown_update,
+            ),
         )
     )
 
@@ -401,6 +358,7 @@ def find_ships_that_need_updating(
 
     return unique_imos
 
+
 def update_ship_owner(imo, owner_info):
     if owner_info:
         owner_raw_name = owner_info.get("name")
@@ -408,41 +366,42 @@ def update_ship_owner(imo, owner_info):
         owner_imo = owner_info.get("imo")
         owner_date_from = owner_info.get("date_from")
 
-                # See if exists
+        # See if exists
         owner = (
-                    session.query(ShipOwner)
-                    .filter(
-                        ShipOwner.company_raw_name == owner_raw_name,
-                        ShipOwner.ship_imo == imo,
-                        ShipOwner.date_from == owner_date_from,
-                    )
-                    .first()
-                )
+            session.query(ShipOwner)
+            .filter(
+                ShipOwner.company_raw_name == owner_raw_name,
+                ShipOwner.ship_imo == imo,
+                ShipOwner.date_from == owner_date_from,
+            )
+            .first()
+        )
         if not owner:
             owner = ShipOwner(
-                        company_raw_name=owner_raw_name,
-                        ship_imo=imo,
-                        imo=owner_imo,
-                        date_from=owner_date_from,
-                        company_id=find_or_create_company_id(
-                            raw_name=owner_raw_name,
-                            imo=owner_imo,
-                            address=owner_address,
-                        ),
-                    )
+                company_raw_name=owner_raw_name,
+                ship_imo=imo,
+                imo=owner_imo,
+                date_from=owner_date_from,
+                company_id=find_or_create_company_id(
+                    raw_name=owner_raw_name,
+                    imo=owner_imo,
+                    address=owner_address,
+                ),
+            )
         owner.updated_on = dt.datetime.now()
 
-                # Verify we DID find a matching company_id using find_or_create_company_id otherwise we will have an
-                # integrity error
+        # Verify we DID find a matching company_id using find_or_create_company_id otherwise we will have an
+        # integrity error
         if owner.company_id is not None:
             session.add(owner)
             session.commit()
         else:
             logger.warning(
-                        "Failed to find/create company_id for company {}, ship_imo {}.".format(
-                            owner.company_raw_name, owner.ship_imo
-                        )
-                    )
+                "Failed to find/create company_id for company {}, ship_imo {}.".format(
+                    owner.company_raw_name, owner.ship_imo
+                )
+            )
+
 
 def update_ship_manager(imo, manager_info):
     if manager_info:
@@ -451,32 +410,33 @@ def update_ship_manager(imo, manager_info):
         manager_imo = manager_info.get("imo")
         manager_date_from = manager_info.get("date_from")
 
-                # See if exists
+        # See if exists
         manager = (
-                    session.query(ShipManager)
-                    .filter(
-                        ShipManager.company_raw_name == manager_raw_name,
-                        ShipManager.imo == manager_imo,
-                        ShipManager.ship_imo == imo,
-                        ShipManager.date_from == manager_date_from,
-                    )
-                    .first()
-                )
+            session.query(ShipManager)
+            .filter(
+                ShipManager.company_raw_name == manager_raw_name,
+                ShipManager.imo == manager_imo,
+                ShipManager.ship_imo == imo,
+                ShipManager.date_from == manager_date_from,
+            )
+            .first()
+        )
         if not manager:
             manager = ShipManager(
-                        company_raw_name=manager_raw_name,
-                        ship_imo=imo,
-                        imo=manager_imo,
-                        date_from=manager_date_from,
-                        company_id=find_or_create_company_id(
-                            raw_name=manager_raw_name,
-                            imo=manager_imo,
-                            address=manager_address,
-                        ),
-                    )
+                company_raw_name=manager_raw_name,
+                ship_imo=imo,
+                imo=manager_imo,
+                date_from=manager_date_from,
+                company_id=find_or_create_company_id(
+                    raw_name=manager_raw_name,
+                    imo=manager_imo,
+                    address=manager_address,
+                ),
+            )
         manager.updated_on = dt.datetime.now()
         session.add(manager)
         session.commit()
+
 
 def update_ship_insurer(imo, equasis_insurers):
     if equasis_insurers:
@@ -484,24 +444,21 @@ def update_ship_insurer(imo, equasis_insurers):
             insurer_raw_name = equasis_insurer.get("name")
             insurer_raw_date_from = equasis_insurer.get("date_from")
 
-            insurer = get_matching_insurer(
-                    ship_imo=imo,
-                    company_raw_name=insurer_raw_name
-                )
+            insurer = get_matching_insurer(ship_imo=imo, company_raw_name=insurer_raw_name)
 
             if not insurer:
                 insurer = build_new_insurer(
-                            ship_imo=imo,
-                            company_raw_name=insurer_raw_name,
-                            company_raw_date_from=insurer_raw_date_from
-                        )
+                    ship_imo=imo,
+                    company_raw_name=insurer_raw_name,
+                    company_raw_date_from=insurer_raw_date_from,
+                )
 
             update_insurer(
-                        insurer=insurer,
-                        imo=imo,
-                        insurer_raw_name=insurer_raw_name,
-                        insurer_raw_date_from=insurer_raw_date_from
-                    )
+                insurer=insurer,
+                imo=imo,
+                insurer_raw_name=insurer_raw_name,
+                insurer_raw_date_from=insurer_raw_date_from,
+            )
     else:
         logger.info("Couldn't find insurers for %s, marking as checked" % (imo))
 
@@ -511,41 +468,30 @@ def update_ship_insurer(imo, equasis_insurers):
 
         update_failed_insurer(imo, insurer)
 
+
 def get_matching_insurer(
     ship_imo=None,
     company_raw_name=None,
 ):
     latest_insurers = (
-        session
-            .query(
-                ShipInsurer.id
-            )
-            .distinct(
-                ShipInsurer.ship_imo
-            )
-            .order_by(
-                ShipInsurer.ship_imo,
-                nullslast(ShipInsurer.date_from.desc())
-            )
-            .subquery()
+        session.query(ShipInsurer.id)
+        .distinct(ShipInsurer.ship_imo)
+        .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.date_from.desc()))
+        .subquery()
     )
 
     return (
         session.query(ShipInsurer)
-        .join(
-            latest_insurers, ShipInsurer.id == latest_insurers.c.id
-        )
-        .filter(
-            ShipInsurer.ship_imo == ship_imo,
-            ShipInsurer.company_raw_name == company_raw_name
-        )
+        .join(latest_insurers, ShipInsurer.id == latest_insurers.c.id)
+        .filter(ShipInsurer.ship_imo == ship_imo, ShipInsurer.company_raw_name == company_raw_name)
         .first()
     )
+
 
 def update_ship_record_with_raw_equasis(
     ship_imo=None,
     equasis_infos=None,
-): 
+):
     ship = session.query(Ship).filter(Ship.imo == ship_imo).first()
     others = dict(ship.others) if ship.others else {}
     others.update({"equasis": equasis_infos})
@@ -553,6 +499,7 @@ def update_ship_record_with_raw_equasis(
     others = json.loads(json.dumps(others, cls=JsonEncoder))
     ship.others = others
     session.commit()
+
 
 def build_new_insurer(
     ship_imo=None,
@@ -565,17 +512,16 @@ def build_new_insurer(
     # This is important because we only start querying a ship insurer
     # After we had a departure with it, and so the first insurer
     # would always be after the first departure otherwise
-    has_insurer = (
-        session.query(ShipInsurer).filter(ShipInsurer.ship_imo == ship_imo).count() > 0
-    )
+    has_insurer = session.query(ShipInsurer).filter(ShipInsurer.ship_imo == ship_imo).count() > 0
     date_from_ = company_raw_date_from or dt.datetime.now() if has_insurer else None
     return ShipInsurer(
         company_raw_name=company_raw_name,
         imo=None,
         ship_imo=ship_imo,
         company_id=find_or_create_company_id(raw_name=company_raw_name),
-        date_from=date_from_,
+        date_from_equasis=date_from_,
     )
+
 
 def update_failed_insurer(imo, insurer):
     insurer.checked_on = dt.datetime.now()
@@ -587,11 +533,9 @@ def update_failed_insurer(imo, insurer):
         session.rollback()
         logger.warning("Failed to update insurer checked date for ship %s" % (imo))
 
+
 def create_unknown_insurer(imo):
-    unknown_insurer = build_new_insurer(
-        ship_imo=imo,
-        company_raw_name=base.UNKNOWN_INSURER
-    )
+    unknown_insurer = build_new_insurer(ship_imo=imo, company_raw_name=base.UNKNOWN_INSURER)
     unknown_insurer.updated_on = None
     unknown_insurer.checked_on = dt.datetime.now()
     try:
@@ -608,36 +552,33 @@ def create_unknown_insurer(imo):
         session.commit()
     except IntegrityError as e:
         session.rollback()
-        logger.warning("Failed to reset updated on date for unknown insurer checked date for ship %s" % (imo))
+        logger.warning(
+            "Failed to reset updated on date for unknown insurer checked date for ship %s" % (imo)
+        )
 
     return unknown_insurer
+
 
 def get_latest_insurer(imo):
     return (
         session.query(ShipInsurer)
-            .filter(
-                ShipInsurer.ship_imo == imo
-            )
-            .distinct(ShipInsurer.ship_imo)
-            .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
-            .first()
+        .filter(ShipInsurer.ship_imo == imo)
+        .distinct(ShipInsurer.ship_imo)
+        .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
+        .first()
     )
 
-def update_insurer(
-        imo=None,
-        insurer_raw_name=None,
-        insurer_raw_date_from=None,
-        insurer=None
-):
+
+def update_insurer(imo=None, insurer_raw_name=None, insurer_raw_date_from=None, insurer=None):
     insurer.updated_on = dt.datetime.now()
     insurer.checked_on = dt.datetime.now()
     insurer.consecutive_failures = 0
     if insurer_raw_date_from and insurer.date_from is not None:
-                        # HEURISTIC
-                        # Very important assumption about equasis: we only update the date_from if it is not null
-                        # It may happen indeed that it was the same insurer before the inception date
-                        # and that the contract was only renewed
-        insurer.date_from = insurer_raw_date_from
+        # HEURISTIC
+        # Very important assumption about equasis: we only update the date_from if it is not null
+        # It may happen indeed that it was the same insurer before the inception date
+        # and that the contract was only renewed
+        insurer.date_from_equasis = insurer_raw_date_from
     session.add(insurer)
     try:
         session.commit()
@@ -873,4 +814,3 @@ def fill_using_imo_website():
             logger.warning(
                 "Failed to parse correct information from IMO website for {}.".format(company.imo)
             )
-

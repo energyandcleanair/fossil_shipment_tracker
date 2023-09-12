@@ -28,13 +28,17 @@ known_insurers = {
     # 206: AmericanSteamshipInsuranceScraper(),
 }
 
+
 def update():
-    
+
     logger_slack.info("=== Update insurance dates ===")
     all_insurance_to_update = get_all_insurance_to_update()
 
-    for insurance_to_update in tqdm(all_insurance_to_update.itertuples(), total=all_insurance_to_update.shape[0]):
+    for insurance_to_update in tqdm(
+        all_insurance_to_update.itertuples(), total=all_insurance_to_update.shape[0]
+    ):
         update_insurance(insurance_to_update)
+
 
 def update_insurance(insurance):
     id = insurance.id
@@ -44,66 +48,57 @@ def update_insurance(insurance):
     scraper = known_insurers[company_id]
     date = scraper.get_insurance_start_date_for_ship(imo)
 
-    if (date != None):
-        db_insurance = (
-                session
-                    .query(ShipInsurer)
-                    .filter(
-                        ShipInsurer.id == id
-                    )
-                    .first()
-            )
+    if date != None:
+        db_insurance = session.query(ShipInsurer).filter(ShipInsurer.id == id).first()
 
-        db_insurance.date_from_insurance = date
+        db_insurance.date_from_insurer = date
         db_insurance.updated_on_insurer = dt.datetime.now()
         session.add(db_insurance)
         session.commit()
 
+
 def get_all_insurance_to_update():
 
     latest_insurance_subquery = (
-        session
-            .query(
-                ShipInsurer.id,
-                ShipInsurer.ship_imo,
-                ShipInsurer.company_id,
-                ShipInsurer.date_from,
-                ShipInsurer.updated_on_insurer,
-            )
-            .distinct(
-                ShipInsurer.ship_imo
-            )
-            .order_by(
-                ShipInsurer.ship_imo,
-                nullslast(ShipInsurer.date_from.desc()),
-            )
-            .subquery()
+        session.query(
+            ShipInsurer.id,
+            ShipInsurer.ship_imo,
+            ShipInsurer.company_id,
+            ShipInsurer.date_from,
+            ShipInsurer.updated_on_insurer,
+        )
+        .distinct(ShipInsurer.ship_imo)
+        .order_by(
+            ShipInsurer.ship_imo,
+            nullslast(ShipInsurer.date_from.desc()),
+        )
+        .subquery()
     )
 
     query_response_ships_to_update = (
-        session
-            .query(
-                latest_insurance_subquery.c.id,
-                latest_insurance_subquery.c.ship_imo,
-                latest_insurance_subquery.c.company_id,
-                latest_insurance_subquery.c.date_from,
+        session.query(
+            latest_insurance_subquery.c.id,
+            latest_insurance_subquery.c.ship_imo,
+            latest_insurance_subquery.c.company_id,
+            latest_insurance_subquery.c.date_from,
+        )
+        .where(
+            sa.and_(
+                latest_insurance_subquery.c.company_id.in_(known_insurers.keys()),
+                # We don't want to set the date where we want to preserve "from
+                # the beginning of time" entries.
+                latest_insurance_subquery.c.date_from != None,
+                # We don't want to update entries that are too old. Use 1 year as a
+                # cut off.
+                latest_insurance_subquery.c.date_from > dt.datetime.now() - dt.timedelta(days=365),
+                sa.or_(
+                    latest_insurance_subquery.c.updated_on_insurer
+                    < dt.datetime.now() - dt.timedelta(days=30),
+                    latest_insurance_subquery.c.updated_on_insurer == None,
+                ),
             )
-            .where(
-                sa.and_(
-                    latest_insurance_subquery.c.company_id.in_(known_insurers.keys()),
-                    # We don't want to set the date where we want to preserve "from
-                    # the beginning of time" entries.
-                    latest_insurance_subquery.c.date_from != None,
-                    # We don't want to update entries that are too old. Use 1 year as a
-                    # cut off.
-                    latest_insurance_subquery.c.date_from > dt.datetime.now() - dt.timedelta(days = 365),
-                    sa.or_(
-                        latest_insurance_subquery.c.updated_on_insurer < dt.datetime.now() - dt.timedelta(days = 30),
-                        latest_insurance_subquery.c.updated_on_insurer == None
-                    )
-                )
-            )
-            .all()
+        )
+        .all()
     )
 
     insurance = pd.DataFrame(query_response_ships_to_update)
