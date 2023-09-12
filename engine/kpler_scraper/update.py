@@ -14,6 +14,8 @@ from base.models import (
 )
 from base.db_utils import upsert
 from base.db import session, engine
+from base.logger import logger_slack, slacker, notify_engineers
+
 from base.logger import logger
 
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
@@ -67,28 +69,33 @@ def update(
     add_unknown_only=False,
 ):
 
-    update_flows(
-        date_from=date_from,
-        date_to=date_to,
-        platforms=platforms,
-        origin_iso2s=origin_iso2s,
-        from_splits=from_splits,
-        to_splits=to_splits,
-        ignore_if_copy_failed=ignore_if_copy_failed,
-        use_brute_force=use_brute_force,
-        add_unknown=add_unknown,
-        add_unknown_only=add_unknown_only,
-    )
+    try:
+        update_flows(
+            date_from=date_from,
+            date_to=date_to,
+            platforms=platforms,
+            origin_iso2s=origin_iso2s,
+            from_splits=from_splits,
+            to_splits=to_splits,
+            ignore_if_copy_failed=ignore_if_copy_failed,
+            use_brute_force=use_brute_force,
+            add_unknown=add_unknown,
+            add_unknown_only=add_unknown_only,
+        )
 
-    update_trades(
-        date_from=date_from,
-        date_to=date_to,
-        platforms=platforms,
-        origin_iso2s=origin_iso2s,
-        ignore_if_copy_failed=ignore_if_copy_failed,
-    )
+        update_trades(
+            date_from=date_from,
+            date_to=date_to,
+            platforms=platforms,
+            origin_iso2s=origin_iso2s,
+            ignore_if_copy_failed=ignore_if_copy_failed,
+        )
 
-    update_is_valid()
+        update_is_valid()
+
+    except Exception as e:
+        logger_slack.error("Kpler update failed: %s" % (str(e),))
+        notify_engineers("Please check error")
 
 
 def update_is_valid():
