@@ -19,18 +19,17 @@ known_insurers = {
     22: WestOfEnglandInsuranceScraper(),
     4: StandardClubInsuranceScraper(),
     6: GardInsuranceScraper(),
+    206: AmericanSteamshipInsuranceScraper(),
     # 1: SteamshipMutualUnderwritingInsuranceScraper(),
     # 11: NorthOfEnglandPiInsuranceScraper(),
     # 19: BritanniaSteamshipInsuranceScraper(),
     # 27: SkuldInsuranceScraper(),
     # 42: LondonPiInsuranceScraper(),
     # 109: SverigesAngfartysInsuranceScraper(),
-    # 206: AmericanSteamshipInsuranceScraper(),
 }
 
 
 def update():
-
     logger_slack.info("=== Update insurance dates ===")
     all_insurance_to_update = get_all_insurance_to_update()
 
@@ -58,7 +57,6 @@ def update_insurance(insurance):
 
 
 def get_all_insurance_to_update():
-
     latest_insurance_subquery = (
         session.query(
             ShipInsurer.id,
