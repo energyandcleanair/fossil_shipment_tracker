@@ -17,8 +17,8 @@ from base.models import ShipInsurer
 
 known_insurers = {
     22: WestOfEnglandInsuranceScraper(),
-    # 6: GardInsuranceScraper(),
-    # 4: CharlesTaylorInsuranceScraper(),
+    4: StandardClubInsuranceScraper(),
+    6: GardInsuranceScraper(),
     # 1: SteamshipMutualUnderwritingInsuranceScraper(),
     # 11: NorthOfEnglandPiInsuranceScraper(),
     # 19: BritanniaSteamshipInsuranceScraper(),
@@ -105,8 +105,6 @@ def get_all_insurance_to_update():
             )
             .all()
     )
-
-    print(query_response_ships_to_update)
 
     insurance = pd.DataFrame(query_response_ships_to_update)
     return insurance
