@@ -1,0 +1,12 @@
+from engine.insurance_scraper.insurance_scraper import *
+from engine.insurance_scraper.is_american_steamship import *
+from engine.insurance_scraper.is_britannia_steamship import *
+from engine.insurance_scraper.is_standard_club import *
+from engine.insurance_scraper.is_gard import *
+from engine.insurance_scraper.is_london_pi import *
+from engine.insurance_scraper.is_north_of_england_pi import *
+from engine.insurance_scraper.is_skuld import *
+from engine.insurance_scraper.is_steamship_mutual_underwriting import *
+from engine.insurance_scraper.is_sveriges_angfartys import *
+from engine.insurance_scraper.is_west_of_england import *
+
