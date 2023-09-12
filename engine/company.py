@@ -533,11 +533,28 @@ def get_matching_insurer(
     ship_imo=None,
     company_raw_name=None,
 ):
+
+    latest_insurers = (
+        session
+            .query(
+                ShipInsurer
+            )
+            .distinct(
+                ShipInsurer.ship_imo
+            )
+            .order_by(
+                ShipInsurer.ship_imo,
+                nullslast(ShipInsurer.date_from.desc())
+            )
+            .subquery()
+    )
+
     return (
         session.query(ShipInsurer)
         .filter(
-            ShipInsurer.company_raw_name == company_raw_name,
+            ShipInsurer.id.in_(latest_insurers.c.id),
             ShipInsurer.ship_imo == ship_imo,
+            ShipInsurer.company_raw_name == company_raw_name
         )
         .first()
     )
