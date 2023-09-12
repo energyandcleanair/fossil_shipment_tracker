@@ -1,9 +1,9 @@
-from datetime import date
-from insurance_scraper import InsuranceScraper
+from datetime import datetime
+from engine.insurance_scraper.insurance_scraper import InsuranceScraper
 
 class SverigesAngfartysInsuranceScraper(InsuranceScraper):
     def __init__(self) -> None:
         super().__init__()
     
-    def get_imo_date(self, imo: str) -> date:
-        return (imo, None)
+    def get_insurance_start_date_for_ship(self, imo: str) -> datetime:
+        return None

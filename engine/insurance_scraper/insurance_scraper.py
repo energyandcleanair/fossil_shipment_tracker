@@ -1,5 +1,5 @@
-from  datetime import date
+from  datetime import datetime
 
 class InsuranceScraper:
-    def get_imo_date(self, imo: str) -> date:
+    def get_insurance_start_date_for_ship(self, imo: str) -> datetime:
         pass
