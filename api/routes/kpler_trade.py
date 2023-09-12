@@ -4,6 +4,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import case
 from sqlalchemy import nullslast
 from sqlalchemy import any_
+from flask_restx import inputs
 from sqlalchemy import true
 from sqlalchemy.dialects.postgresql import aggregate_order_by
 
@@ -104,7 +105,7 @@ class KplerTradeResource(TemplateResource):
 
     parser.add_argument(
         "exclude_within_country",
-        type=bool,
+        type=inputs.boolean,
         help="exclude trades within the same country",
         default=True,
     )

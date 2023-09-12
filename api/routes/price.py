@@ -92,9 +92,11 @@ class PriceResource(Resource):
         format = params.get("format")
         port_id = params.get("port_id")
         nest_in_data = params.get("nest_in_data")
-        ship_owner_iso2 = params.get("ship_owner_iso2", base.PRICE_NULLARRAY_CHAR)
-        ship_insurer_iso2 = params.get("ship_insurer_iso2", base.PRICE_NULLARRAY_CHAR)
-        destination_iso2 = params.get("destination_iso2", base.PRICE_NULLARRAY_CHAR)
+        # This isn't great as it prevents us from passing an actual None as argument
+        # TODO find a cleaner way
+        ship_owner_iso2 = params.get("ship_owner_iso2") or base.PRICE_NULLARRAY_CHAR
+        ship_insurer_iso2 = params.get("ship_insurer_iso2") or base.PRICE_NULLARRAY_CHAR
+        destination_iso2 = params.get("destination_iso2") or base.PRICE_NULLARRAY_CHAR
 
         # query = Price.query.filter(Price.scenario == scenario)
         query = (
