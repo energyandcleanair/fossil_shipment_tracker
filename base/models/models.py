@@ -404,6 +404,7 @@ class ShipInsurer(Base):
         String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"), nullable=False
     )
     date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
+    date_from_insurer = Column(DateTime(timezone=False))
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
     company_id = Column(
         BigInteger,
@@ -411,6 +412,7 @@ class ShipInsurer(Base):
         nullable=False,
     )  # Link to cleaned list of companies
     updated_on = Column(DateTime, server_default=func.now())
+    updated_on_insurer = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
     checked_on = Column(DateTime, server_default=func.now())
     consecutive_failures = Column(BigInteger, nullable=False, default=0)
