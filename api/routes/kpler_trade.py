@@ -402,6 +402,10 @@ class KplerTradeResource(TemplateResource):
 
         insurance_buffer_days = 14
 
+        ship_insurer_field = func.coalesce(
+            ShipInsurer.date_from_insurer, ShipInsurer.date_from_equasis
+        )
+
         # We get the earliest (but starting before the
         # departure date) insurance per trade's ship.
         voyage_insurer = (
@@ -426,9 +430,9 @@ class KplerTradeResource(TemplateResource):
                 sa.and_(
                     ShipInsurer.ship_imo == trade_ship.c.ship_imo,
                     sa.or_(
-                        ShipInsurer.date_from
+                        ship_insurer_field
                         <= KplerTrade.departure_date_utc + dt.timedelta(days=insurance_buffer_days),
-                        ShipInsurer.date_from == None,
+                        ship_insurer_field == None,
                     ),
                 ),
             )
@@ -439,7 +443,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.id,
                 KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
-                nullslast(ShipInsurer.date_from),
+                nullslast(ship_insurer_field),
             )
             .cte("voyage_insurer")
             .prefix_with("MATERIALIZED")

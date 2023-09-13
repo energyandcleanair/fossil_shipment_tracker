@@ -405,6 +405,7 @@ class ShipInsurer(Base):
     )
     date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
     date_from_insurer = Column(DateTime(timezone=False))
+    date_from_equasis = Column(DateTime(timezone=False))
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
     company_id = Column(
         BigInteger,

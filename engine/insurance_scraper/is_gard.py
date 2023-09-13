@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from base.logger import logger
 
+
 class GardInsuranceScraper(InsuranceScraper):
     def __init__(self) -> None:
         self.session = Session()
@@ -19,16 +20,8 @@ class GardInsuranceScraper(InsuranceScraper):
         super().__init__()
 
     def get_insurance_start_date_for_ship(self, imo: str) -> datetime:
-
         url = "https://lov.gard.no/Home/Search?searchbar={}".format(imo)
         response = self.session.get(url)
-
-        data = {
-            "imo": imo,
-            "name": "bbc",
-            "date_from": None,
-            "date_to": None,
-        }
 
         if response.status_code != 200:
             status_code = response.status_code
@@ -46,7 +39,7 @@ class GardInsuranceScraper(InsuranceScraper):
 
         if not header:
             logger.info(f"Failed to find date for {imo}: could not find blue cards")
-            return data
+            return None
 
         table = header.parent.find_next_sibling("div")
 
@@ -61,7 +54,7 @@ class GardInsuranceScraper(InsuranceScraper):
                 if name == "BBC":
                     splits = date.split("Valid from")[-1]
                     dateFrom, _ = splits.split("to")
-                    return datetime.strptime(dateFrom.strip(), '%m/%d/%Y')
+                    return datetime.strptime(dateFrom.strip(), "%m/%d/%Y")
 
         logger.info("Failed to find date for {imo}: no BBC in list")
         return None

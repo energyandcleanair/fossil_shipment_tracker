@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from base.logger import logger
 
+
 class StandardClubInsuranceScraper(InsuranceScraper):
     def __init__(self) -> None:
         self.session = Session()
@@ -20,12 +21,14 @@ class StandardClubInsuranceScraper(InsuranceScraper):
 
     def get_insurance_start_date_for_ship(self, imo: str) -> datetime:
         url = "https://www.standard-club.com/ship-list/?tx_llcatalog_pi%5Bfilters%5D%5Bkeywords_ships%5D={}".format(
-                imo
+            imo
         )
         response = self.session.get(url, verify=False)
 
         if response.status_code != 200:
-            logger.info(f"Failed to get date for {imo}: recieved {response.status_code} from server")
+            logger.info(
+                f"Failed to get date for {imo}: recieved {response.status_code} from server"
+            )
             return None
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -51,7 +54,9 @@ class StandardClubInsuranceScraper(InsuranceScraper):
         table_list = last_tr.find("ul")
 
         if not table_list:
-            logger.info(f"Failed to get date for {imo}: could not find any insurance for ship in ship entry")
+            logger.info(
+                f"Failed to get date for {imo}: could not find any insurance for ship in ship entry"
+            )
             return None
 
         documents = table_list.find_all("li")
