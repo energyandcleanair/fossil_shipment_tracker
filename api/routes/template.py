@@ -479,11 +479,11 @@ class TemplateResource(Resource):
             df[col] = df[col].apply(tuple)
         return df, list_columns
 
-    def unhash_df(self, df, list_columns):
+    def unhash_df(self, result, list_columns):
         # Unhash the dataframe
         for col in list_columns:
-            df[col] = df[col].apply(list)
-        return df
+            result[col] = result[col].apply(list)
+        return result
 
     def spread_currencies(self, result):
         # We simply want to pivot across currencies

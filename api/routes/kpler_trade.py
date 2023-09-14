@@ -1,12 +1,17 @@
-from sqlalchemy import func
 import sqlalchemy as sa
+from sqlalchemy import (
+    func,
+    case,
+    cast,
+    nullslast,
+    any_,
+    true,
+    String,
+)
 from sqlalchemy.orm import aliased
-from sqlalchemy import case
-from sqlalchemy import nullslast
-from sqlalchemy import any_
+from sqlalchemy.dialects.postgresql import aggregate_order_by, array, ARRAY, array_agg
+
 from flask_restx import inputs
-from sqlalchemy import true
-from sqlalchemy.dialects.postgresql import aggregate_order_by
 
 import datetime as dt
 
@@ -287,6 +292,9 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.commodity_equivalent,
                 subquery.c.commodity_equivalent_group,
             ],
+            "commodity_equivalent_name": [
+                subquery.c.commodity_equivalent_name,
+            ],
             "commodity_equivalent_group": [
                 subquery.c.commodity_equivalent_group,
             ],
@@ -312,6 +320,7 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.ship_owner_iso2s,
                 subquery.c.ship_owner_regions,
             ],
+            "ownership_sanction_coverage": [subquery.c.ownership_sanction_coverage],
         }
 
     def get_agg_value_cols(self, subquery):
@@ -331,7 +340,6 @@ class KplerTradeResource(TemplateResource):
         return self.get_from_params(params)
 
     def initial_query(self, params=None):
-
         origin_zone = aliased(KplerZone)
         destination_zone = aliased(KplerZone)
         CommodityEquivalent = aliased(Commodity)
@@ -606,16 +614,16 @@ class KplerTradeResource(TemplateResource):
             session.query(
                 KplerTrade.id.label("trade_id"),
                 KplerTrade.flow_id,
-                func.array_agg(
+                array_agg(
                     aggregate_order_by(
                         func.coalesce(voyage_insurer.c.name, UNKNOWN_INSURER),
                         voyage_insurer.c.ship_order,
                     )
                 ).label("ship_insurer_names"),
-                func.array_agg(
+                array_agg(
                     aggregate_order_by(voyage_insurer.c.iso2, voyage_insurer.c.ship_order)
                 ).label("ship_insurer_iso2s"),
-                func.array_agg(
+                array_agg(
                     aggregate_order_by(voyage_insurer.c.region, voyage_insurer.c.ship_order)
                 ).label("ship_insurer_regions"),
             )
@@ -646,24 +654,22 @@ class KplerTradeResource(TemplateResource):
             session.query(
                 KplerTrade.id.label("trade_id"),
                 KplerTrade.flow_id,
-                func.array_agg(
+                array_agg(
                     aggregate_order_by(
                         func.coalesce(voyage_owner.c.name, UNKNOWN_INSURER),
                         voyage_owner.c.ship_order,
                     )
                 ).label("ship_owner_names"),
-                func.array_agg(
-                    aggregate_order_by(voyage_owner.c.iso2, voyage_owner.c.ship_order)
-                ).label("ship_owner_iso2s"),
-                func.array_agg(
-                    aggregate_order_by(
-                        voyage_owner.c.region,
-                        voyage_owner.c.ship_order
-                    )
-                ).label("ship_owner_regions")
+                array_agg(aggregate_order_by(voyage_owner.c.iso2, voyage_owner.c.ship_order)).label(
+                    "ship_owner_iso2s"
+                ),
+                array_agg(
+                    aggregate_order_by(voyage_owner.c.region, voyage_owner.c.ship_order)
+                ).label("ship_owner_regions"),
             )
             .outerjoin(
-                trade_ship, sa.and_(
+                trade_ship,
+                sa.and_(
                     KplerTrade.id == trade_ship.c.trade_id,
                     KplerTrade.flow_id == trade_ship.c.flow_id,
                 ),
@@ -674,16 +680,45 @@ class KplerTradeResource(TemplateResource):
                     voyage_owner.c.trade_id == KplerTrade.id,
                     voyage_owner.c.flow_id == KplerTrade.flow_id,
                     voyage_owner.c.ship_imo == trade_ship.c.ship_imo,
-                )
+                ),
             )
-            .group_by(
-                KplerTrade.id,
-                KplerTrade.flow_id
-            )
+            .group_by(KplerTrade.id, KplerTrade.flow_id)
             .cte("all_owners_for_trade")
             .prefix_with("MATERIALIZED")
-            .subquery()
         )
+
+        g7 = ["CA", "FR", "DE", "IT", "JP", "GB", "US"]
+
+        array_of_nulls_same_length_as_owners = sa.sql.expression.literal_column(
+            "array_fill(NULL::varchar, array[array_length(all_owners_for_trade.ship_owner_iso2s, 1)])"
+        )
+
+        def string_array(values):
+            return cast(array(values), ARRAY(String))
+
+        ownership_sanction_coverage_field = case(
+            (
+                sa.or_(
+                    all_owners_for_trade.c.ship_owner_regions.contains(string_array(["EU"])),
+                    all_owners_for_trade.c.ship_owner_iso2s.overlap(string_array(g7)),
+                    all_insurers_for_trade.c.ship_insurer_regions.contains(string_array(["EU"])),
+                    all_insurers_for_trade.c.ship_insurer_iso2s.overlap(string_array(g7)),
+                ),
+                "Owned and / or insured in EU & G7",
+            ),
+            (
+                all_insurers_for_trade.c.ship_insurer_iso2s.contains(string_array(["NO"])),
+                "Insured in Norway",
+            ),
+            (
+                sa.and_(
+                    func.array_length(all_owners_for_trade.c.ship_owner_iso2s, 1) > 0,
+                    all_owners_for_trade.c.ship_owner_iso2s != array_of_nulls_same_length_as_owners,
+                ),
+                "Others",
+            ),
+            else_="Unknown",
+        ).label("ownership_sanction_coverage")
 
         query = (
             session.query(
@@ -736,6 +771,7 @@ class KplerTradeResource(TemplateResource):
                 all_owners_for_trade.c.ship_owner_names,
                 all_owners_for_trade.c.ship_owner_iso2s,
                 all_owners_for_trade.c.ship_owner_regions,
+                ownership_sanction_coverage_field,
             )
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
@@ -788,7 +824,6 @@ class KplerTradeResource(TemplateResource):
         return query
 
     def filter(self, query, params=None):
-
         origin_iso2 = params.get("origin_iso2")
         origin_port_name = params.get("origin_port_name")
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
