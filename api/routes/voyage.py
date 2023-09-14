@@ -915,7 +915,7 @@ class VoyageResource(Resource):
             session=session, grouping_name=commodity_grouping
         )
 
-        g7 = ["CA", "FR", "DE", "IT", "JP", "GB", "US"]
+        g7 = base.G7_ISO2S
 
         ownership_sanction_coverage_field = case(
             (

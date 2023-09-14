@@ -108,6 +108,7 @@ REFRESH_KNOWN_COMPANY_DAYS = 30
 PRICE_NULLARRAY_CHAR = sa.sql.expression.literal_column("array[NULL::varchar]")
 PRICE_NULLARRAY_INT = sa.sql.expression.literal_column("array[NULL::bigint]")
 
+G7_ISO2S = ["CA", "FR", "DE", "IT", "JP", "GB", "US"]
 
 EU27_ISO2S = [
     "AT",

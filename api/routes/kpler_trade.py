@@ -687,7 +687,7 @@ class KplerTradeResource(TemplateResource):
             .prefix_with("MATERIALIZED")
         )
 
-        g7 = ["CA", "FR", "DE", "IT", "JP", "GB", "US"]
+        g7 = base.G7_ISO2S
 
         array_of_nulls_same_length_as_owners = sa.sql.expression.literal_column(
             "array_fill(NULL::varchar, array[array_length(all_owners_for_trade.ship_owner_iso2s, 1)])"
