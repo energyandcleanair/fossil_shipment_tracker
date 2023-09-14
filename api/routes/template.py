@@ -202,6 +202,9 @@ class TemplateResource(Resource):
         # if date_cols:
         #     result = result.sort_values(date_cols)
 
+        # Hash i.e. convert list to tuples so that pandas can hash
+        result, list_columns = self.hash_df(result)
+
         # Rolling average
         result = self.roll_average(
             result=result, aggregate_by=aggregate_by, rolling_days=rolling_days
@@ -209,6 +212,9 @@ class TemplateResource(Resource):
 
         # Spread currencies
         result = self.spread_currencies(result=result)
+
+        # Unhash
+        result = self.unhash_df(result=result, list_columns=list_columns)
 
         # Sort results
         result = self.sort_result(result=result, sort_by=sort_by, aggregate_by=aggregate_by)
@@ -461,6 +467,24 @@ class TemplateResource(Resource):
 
         return result
 
+    def hash_df(self, df):
+        # Create a hashable version
+        # find columns that are list and convert them to tuple
+        list_columns = [
+            col
+            for col in df.columns
+            if any(df[col].notna()) and isinstance(df.loc[df[col].notna(), col].iloc[0], list)
+        ]
+        for col in list_columns:
+            df[col] = df[col].apply(tuple)
+        return df, list_columns
+
+    def unhash_df(self, result, list_columns):
+        # Unhash the dataframe
+        for col in list_columns:
+            result[col] = result[col].apply(list)
+        return result
+
     def spread_currencies(self, result):
         # We simply want to pivot across currencies
         # But pandas need clean non-null and hashable data, hence this whole function...
@@ -470,17 +494,6 @@ class TemplateResource(Resource):
 
         # Replace nan with None
         result.replace({np.nan: None}, inplace=True)
-
-        # Create a hashable version
-        # find columns that are list and convert them to tuple
-        list_columns = [
-            col
-            for col in result.columns
-            if any(result[col].notna())
-            and isinstance(result.loc[result[col].notna(), col].iloc[0], list)
-        ]
-        for col in list_columns:
-            result[col] = result[col].apply(tuple)
 
         # Round all value_ columns to prevent pivoting error when there is an epsilon diff
         # Observed on kpler_trade once
@@ -497,10 +510,6 @@ class TemplateResource(Resource):
             .unstack(-1)
             .reset_index()
         )
-
-        # Recreate lists
-        for col in list_columns:
-            result[col] = result[col].apply(list)
 
         # Quick sanity check
         len_after = len(result)

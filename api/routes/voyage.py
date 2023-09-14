@@ -919,6 +919,23 @@ class VoyageResource(Resource):
             session=session, grouping_name=commodity_grouping
         )
 
+        g7 = base.G7_ISO2S
+
+        ownership_sanction_coverage_field = case(
+            (
+                sa.or_(
+                    ShipOwnerCountry.region == "EU",
+                    ShipOwnerCountry.iso2.in_(g7),
+                    ShipInsurerCountry.region == "EU",
+                    ShipInsurerCountry.iso2.in_(g7),
+                ),
+                "Owned and / or insured in EU & G7",
+            ),
+            (ShipInsurerCountry.iso2 == "NO", "Insured in Norway"),
+            (ShipOwnerCountry.iso2 != None, "Others"),
+            else_="Unknown",
+        ).label("ownership_sanction_coverage")
+
         # Query with joined information
         shipments_rich = (
             session.query(
@@ -999,6 +1016,7 @@ class VoyageResource(Resource):
                 ShipInsurerCountry.iso2.label("ship_insurer_iso2"),
                 ShipInsurerCountry.name.label("ship_insurer_country"),
                 ShipInsurerCountry.region.label("ship_insurer_region"),
+                ownership_sanction_coverage_field,
                 value_tonne_field.label("value_tonne_unweighted"),
                 value_m3_field.label("value_m3_unweighted"),
                 value_eur_field.label("value_eur_unweighted"),
@@ -1582,6 +1600,7 @@ class VoyageResource(Resource):
             "ship_insurer_region": [subquery.c.ship_insurer_region],
             "ship_manager_region": [subquery.c.ship_manager_region],
             "ship_owner_region": [subquery.c.ship_owner_region],
+            "ownership_sanction_coverage": [subquery.c.ownership_sanction_coverage],
         }
 
         if any([x not in aggregateby_cols_dict for x in aggregate_by]):
