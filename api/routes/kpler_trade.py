@@ -103,8 +103,22 @@ class KplerTradeResource(TemplateResource):
     parser.add_argument(
         "date_from",
         type=str,
-        help="start date (format 2020-01-01)",
+        help="filter where trade departs after date",
         default="2020-01-01",
+        required=False,
+    )
+    parser.add_argument(
+        "departure_date_from",
+        type=str,
+        help="filter where trade departs after date",
+        default=None,
+        required=False,
+    )
+    parser.add_argument(
+        "arrival_date_from",
+        type=str,
+        help="filter where trade arrives after date",
+        default=None,
         required=False,
     )
 
@@ -131,7 +145,27 @@ class KplerTradeResource(TemplateResource):
         default=["EUR", "USD"],
     )
 
-    parser.add_argument("date_to", type=str, help="End date", default=None, required=False)
+    parser.add_argument(
+        "date_to",
+        type=str,
+        help="filter where trade departs before date",
+        default=None,
+        required=False,
+    )
+    parser.add_argument(
+        "departure_date_to",
+        type=str,
+        help="filter where trade departs before date",
+        default=None,
+        required=False,
+    )
+    parser.add_argument(
+        "arrival_date_to",
+        type=str,
+        help="filter where trade arrives before date",
+        default=None,
+        required=False,
+    )
 
     parser.add_argument(
         "grade",
@@ -846,7 +880,11 @@ class KplerTradeResource(TemplateResource):
         commodity_equivalent = params.get("commodity_equivalent")
 
         date_from = params.get("date_from")
+        departure_date_from = params.get("departure_date_from")
+        arrival_date_from = params.get("arrival_date_from")
         date_to = params.get("date_to")
+        departure_date_to = params.get("departure_date_to")
+        arrival_date_to = params.get("arrival_date_to")
         platform = params.get("platform")
         pricing_scenario = params.get("pricing_scenario")
         currency = params.get("currency")
@@ -865,10 +903,25 @@ class KplerTradeResource(TemplateResource):
 
         if date_from:
             query = query.filter(KplerTrade.departure_date_utc >= str(to_datetime(date_from)))
+        if departure_date_from:
+            query = query.filter(
+                KplerTrade.departure_date_utc >= str(to_datetime(departure_date_from))
+            )
+        if arrival_date_from:
+            query = query.filter(KplerTrade.arrival_date_utc >= str(to_datetime(arrival_date_from)))
 
         if date_to:
             query = query.filter(
                 func.date_trunc("day", KplerTrade.departure_date_utc) <= to_datetime(date_to)
+            )
+        if departure_date_to:
+            query = query.filter(
+                func.date_trunc("day", KplerTrade.departure_date_utc)
+                <= to_datetime(departure_date_to)
+            )
+        if arrival_date_to:
+            query = query.filter(
+                func.date_trunc("day", KplerTrade.arrival_date_utc) <= to_datetime(arrival_date_to)
             )
 
         if pricing_scenario:
