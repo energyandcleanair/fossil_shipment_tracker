@@ -20,35 +20,40 @@ from api.routes.overland import PipelineFlowResource
 from api.routes.counter_last import RussiaCounterLastResource
 
 
+class IntegrityFailure:
+    def __init__(self, message: str, info: object):
+        self.message = message
+        self.info = info
+
+    def tostring(self):
+        return f"{self.message}: {self.info}"
+
+
 def check():
+    failures = []
+
     logger_slack.info("Checking integrity: shipment, portcall and berth relationship.")
+    failures += test_shipment_table()
+    failures += test_shipment_portcall_integrity()
+    failures += test_portcall_relationship()
+    failures += test_berths()
 
+    logger_slack.info("Checking integrity: counter, voyage and pricing")
     try:
-        test_shipment_table()
-        test_shipment_portcall_integrity()
-        test_portcall_relationship()
-        test_berths()
-    except AssertionError:
-        logger_slack.error("Failed integrity: shipment, portcall and berth relationship.")
-        notify_engineers("Please check error")
-        raise
-
-    try:
-        logger_slack.info("Checking integrity: counter, voyage and pricing")
         test_counter.test_counter_against_voyage(app)
         test_counter.test_pricing_gt0(app)
-    except AssertionError:
-        logger_slack.error("Failed integrity: counter, voyage and pricing.")
-        notify_engineers("Please check error")
-        raise
+    except AssertionError as e:
+        failures += IntegrityFailure(message="Counter tests failed", info={"error": e})
 
-    try:
-        logger_slack.info("Checking integrity: insurer data")
-        test_insurer()
-    except AssertionError:
-        logger_slack.error("Failed integrity: insurer data")
+    logger_slack.info("Checking integrity: insurer data")
+    failures += test_insurer()
+
+    if len(failures) > 0:
+        failure_info = "".join(
+            map(lambda failure: f"\n - {failure.message}: {failure.info}", failures)
+        )
+        logger_slack.error(f"Failed integrity check: {failure_info}")
         notify_engineers("Please check error")
-        raise
 
 
 def test_shipment_portcall_integrity():
@@ -69,10 +74,19 @@ def test_shipment_portcall_integrity():
         .all()
     )
 
-    assert len(shipments) == 5
+    if len(shipments) != 5:
+        return [
+            IntegrityFailure(
+                "Expected 5 shipments but got a different number", {"n_shipments": len(shipments)}
+            )
+        ]
+    else:
+        return []
 
 
 def test_shipment_table():
+    failures = []
+
     # check that the shipment table respect unique departures and arrivals
 
     shipments = session.query(
@@ -87,7 +101,21 @@ def test_shipment_table():
         [s.shipment_id for s in shipments.all()],
     )
 
-    assert len(arrivals) == len(set(arrivals)) and len(departures) == len(set(departures))
+    if len(arrivals) != len(set(arrivals)):
+        failures.append(
+            IntegrityFailure(
+                message="Duplicate arrivals found",
+                info={"all_arrivals": len(arrivals), "arrivals_set": len(set(arrivals))},
+            )
+        )
+
+    if len(departures) != len(set(departures)):
+        failures.append(
+            IntegrityFailure(
+                message="Duplicate departures found",
+                info={"all_departures": len(departures), "departures_set": len(set(departures))},
+            )
+        )
 
     # check that no departure/arrival is references in STS shipments and non-STS shipments
 
@@ -103,11 +131,31 @@ def test_shipment_table():
         [s.shipment_id for s in shipments_sts.all()],
     )
 
-    assert not list(set(departures_sts) & set(departures)) and not list(
-        set(arrivals_sts) & set(arrivals)
-    )
+    if list(set(arrivals_sts) & set(arrivals)):
+        failures.append(
+            IntegrityFailure(
+                message="Overlap in arrivals between arrivals and arrivals with STS",
+                info={"overlap": len(list(set(arrivals_sts) & set(arrivals)))},
+            )
+        )
 
-    assert not (list(set(shipment_ids) & set(shipment_ids_sts)))
+    if list(set(departures_sts) & set(departures)):
+        failures.append(
+            IntegrityFailure(
+                message="Overlap in departures between departures and departures with STS",
+                info={"overlap": len(list(set(departures_sts) & set(departures)))},
+            )
+        )
+
+    if list(set(shipment_ids) & set(shipment_ids_sts)):
+        failures.append(
+            IntegrityFailure(
+                message="Overlap in shipments between shipments and shipments with STS",
+                info={"overlap": len(list(set(shipment_ids) & set(shipment_ids_sts)))},
+            )
+        )
+
+    return failures
 
 
 def test_berths():
@@ -121,13 +169,28 @@ def test_berths():
         s.id for s in shipments.all()
     ]
 
-    assert len(set(berth_shipment_ids) & set(shipment_ids)) == len(berth_shipment_ids)
+    if len(set(berth_shipment_ids) & set(shipment_ids)) != len(berth_shipment_ids):
+        return [
+            IntegrityFailure(
+                message="Wrong number of departure/arrival berths found",
+                info={
+                    "set_of_all_births_and_shipments": len(
+                        set(berth_shipment_ids) & set(shipment_ids)
+                    ),
+                    "all_berth_shipment_ids": len(berth_shipment_ids),
+                },
+            )
+        ]
+    else:
+        return []
 
 
 def test_portcall_relationship():
     # verify we have a 1:1 relationship with departures/arrivals and portcall
     # note - departure/arrivals can appear multiple times in the shipment with sts table, but only one portcall should
     # always be linked with departure/arrival
+
+    failures = []
 
     non_sts_shipments = (
         session.query(
@@ -143,9 +206,23 @@ def test_portcall_relationship():
         d.departure_portcall_id for d in non_sts_shipments if d.departure_portcall_id is not None
     ], [a.arrival_portcall_id for a in non_sts_shipments if a.arrival_portcall_id is not None]
 
-    assert len(departure_portcall_ids) == len(set(departure_portcall_ids)) and len(
-        arrival_portcall_ids
-    ) == len(set(arrival_portcall_ids))
+    if len(departure_portcall_ids) != len(set(departure_portcall_ids)):
+        failures.append(
+            IntegrityFailure(
+                message="Duplicate departure portcalls found for non-STS shipments",
+                info={
+                    "n_duplicates": len(departure_portcall_ids) - len(set(departure_portcall_ids))
+                },
+            )
+        )
+
+    if len(arrival_portcall_ids) != len(set(arrival_portcall_ids)):
+        failures.append(
+            IntegrityFailure(
+                message="Duplicate arrival portcalls found for non-STS shipments",
+                info={"n_duplicates": len(arrival_portcall_ids) - len(set(arrival_portcall_ids))},
+            )
+        )
 
     sts_shipments = (
         session.query(
@@ -161,9 +238,31 @@ def test_portcall_relationship():
         d.departure_portcall_id for d in sts_shipments if d.departure_portcall_id is not None
     ], [a.arrival_portcall_id for a in sts_shipments if a.arrival_portcall_id is not None]
 
-    assert not len(set(departure_portcall_ids_sts) & set(departure_portcall_ids)) and not len(
-        set(arrival_portcall_ids_sts) & set(arrival_portcall_ids)
-    )
+    if len(set(departure_portcall_ids_sts) & set(departure_portcall_ids)):
+        failures.append(
+            [
+                IntegrityFailure(
+                    message="Duplicate departure portcalls found for STS shipments",
+                    info={
+                        "n_duplicates": len(
+                            set(departure_portcall_ids_sts) & set(departure_portcall_ids)
+                        )
+                    },
+                )
+            ]
+        )
+
+    if len(set(arrival_portcall_ids_sts) & set(arrival_portcall_ids)):
+        failures.append(
+            IntegrityFailure(
+                message="Duplicate arrival portcalls found for STS shipments",
+                info={
+                    "n_duplicates": len(set(arrival_portcall_ids_sts) & set(arrival_portcall_ids))
+                },
+            )
+        )
+
+    return failures
 
 
 def test_insurer():
@@ -172,6 +271,8 @@ def test_insurer():
     and at a later date, then found again.
     Note that this will only work after we had a successful scraping
     """
+
+    failures = []
 
     raw_sql = """
     WITH unknown
@@ -206,10 +307,13 @@ def test_insurer():
     result = session.execute(raw_sql)
     if result.rowcount > 0:
         missing_types = [row[0] for row in result]
-        count = pd.Series(missing_types).value_counts()
-        logger_slack.error(
-            "There are ships marked with Unknown insurers that most likely shouldn't be:\n%s."
-            % count.to_string()
+        counts = pd.Series(missing_types).value_counts()
+        counts_info = ", ".join(pd.DataFrame(counts).apply(lambda a: f"{a.name}: {a[0]}", axis=1))
+        failures.append(
+            IntegrityFailure(
+                message="There are ships marked with Unknown insurers that most likely shouldn't be",
+                info={"count": counts_info},
+            )
         )
 
     # Test that those will only one insurer have a null date_from
@@ -221,11 +325,13 @@ def test_insurer():
     wrong_date_from = session.execute(raw_sql)
     # Count how many rows there are
     if wrong_date_from.rowcount > 0:
-        logger_slack.error(
-            "There are insurers with date_from = NULL even though these are the only ones identified: %s"
-            % ", ".join([row[0] for row in wrong_date_from])
+        failures.append(
+            IntegrityFailure(
+                message="There are insurers with date_from = NULL even though these are the only ones identified",
+                info={"wrong_date_from": ", ".join([row[0] for row in wrong_date_from])},
+            )
         )
-    assert wrong_date_from.rowcount == 0
+    return failures
 
 
 def test_trade_platform():
