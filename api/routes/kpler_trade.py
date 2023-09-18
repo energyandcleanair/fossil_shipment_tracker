@@ -103,21 +103,21 @@ class KplerTradeResource(TemplateResource):
     parser.add_argument(
         "date_from",
         type=str,
-        help="filter where trade departs from origin after date",
+        help="filter where trade departs from origin on or after date",
         default="2020-01-01",
         required=False,
     )
     parser.add_argument(
         "origin_date_from",
         type=str,
-        help="filter where trade departs from origin after date",
+        help="filter where trade departs from origin on or after date",
         default=None,
         required=False,
     )
     parser.add_argument(
         "destination_date_from",
         type=str,
-        help="filter where trade arrives at destination after date",
+        help="filter where trade arrives at destination on or after date",
         default=None,
         required=False,
     )
