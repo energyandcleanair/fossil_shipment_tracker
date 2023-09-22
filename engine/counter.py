@@ -208,6 +208,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
             columns={
                 "commodity_equivalent": "commodity",
                 "commodity_equivalent_group": "commodity_group",
+                "destination_date": "date",
             },
             inplace=True,
         )

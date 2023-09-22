@@ -191,7 +191,7 @@ class KplerTradeResource(TemplateResource):
 
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date"]
-    value_cols = ["value_tonne", "value_m3", "value_eur", "value_currency"]
+    value_cols = ["value_tonne", "value_m3", "value_gas_m3", "value_eur", "value_currency"]
 
     pivot_dependencies = {
         "grade": ["commodity", "group", "family", "commodity_equivalent"],
@@ -299,11 +299,13 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.commodity_equivalent_group,
             ],
             "currency": [subquery.c.currency],
-            "origin_date": [func.date_trunc("day", subquery.c.origin_date_utc).label("date")],
+            "origin_date": [
+                func.date_trunc("day", subquery.c.origin_date_utc).label("origin_date")
+            ],
             "origin_month": [func.date_trunc("month", subquery.c.origin_date_utc).label("month")],
             "origin_year": [func.extract("year", subquery.c.origin_date_utc).label("year")],
             "destination_date": [
-                func.date_trunc("day", subquery.c.destination_date_utc).label("date")
+                func.date_trunc("day", subquery.c.destination_date_utc).label("destination_date")
             ],
             "destination_month": [
                 func.date_trunc("month", subquery.c.destination_date_utc).label("month")
@@ -327,6 +329,7 @@ class KplerTradeResource(TemplateResource):
         return [
             func.sum(subquery.c.value_tonne).label("value_tonne"),
             func.sum(subquery.c.value_m3).label("value_m3"),
+            func.sum(subquery.c.value_gas_m3).label("value_gas_m3"),
             func.sum(subquery.c.value_eur).label("value_eur"),
             func.sum(subquery.c.value_currency).label("value_currency"),
             # func.sum(subquery.c.value_energy).label("value_energy"),
@@ -762,6 +765,7 @@ class KplerTradeResource(TemplateResource):
                 Price.scenario.label("pricing_scenario"),
                 KplerTrade.value_tonne,
                 KplerTrade.value_m3,
+                KplerTrade.value_gas_m3,
                 value_eur_field,
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
