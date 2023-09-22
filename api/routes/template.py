@@ -473,7 +473,7 @@ class TemplateResource(Resource):
         list_columns = [
             col
             for col in df.columns
-            if any(df[col].notna()) and isinstance(df.loc[df[col].notna(), col].iloc[0], list)
+            if any(df[col].notna()) and any(df[col].apply(lambda x: type(x) == list))
         ]
         for col in list_columns:
             df[col] = df[col].apply(tuple)
@@ -494,6 +494,16 @@ class TemplateResource(Resource):
 
         # Replace nan with None
         result.replace({np.nan: None}, inplace=True)
+
+        # Create a hashable version
+        # find columns that are list and convert them to tuple
+        list_columns = [
+            col
+            for col in result.columns
+            if any(result[col].notna()) and any(result[col].apply(lambda x: type(x) == list))
+        ]
+        for col in list_columns:
+            result[col] = result[col].apply(tuple)
 
         # Round all value_ columns to prevent pivoting error when there is an epsilon diff
         # Observed on kpler_trade once
