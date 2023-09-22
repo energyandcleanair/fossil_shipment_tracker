@@ -33,7 +33,7 @@ from .update_flow import update_flows
 def update_full():
     return update(
         date_from=-30,
-        origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG"],
+        origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG", "QA", "US", "DZ", "NO"],
         from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
         to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     )
