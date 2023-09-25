@@ -131,7 +131,6 @@ class KplerProductScraper:
             headers = {"Authorization": f"Bearer {self.token}"}
             offset = 0
             ids = []
-            print(platform)
             while offset == 0 or len(r.json()) > 0:
                 print(offset)
                 r = self.session.get(url, headers=headers, params={"size": 1000, "from": offset})
