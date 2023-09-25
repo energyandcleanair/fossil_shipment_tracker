@@ -978,4 +978,12 @@ def test_kpler_trade_steps(app):
         trade = pd.DataFrame(response.json["data"])
         assert len(trade) > 0  # Not all cou
 
-        assert set(trade.columns) >= set(["steps_zone_ids", "steps_zone_names", "steps_zone_iso2s"])
+        assert set(trade.columns) >= set(
+            [
+                "steps_zone_ids",
+                "steps_zone_names",
+                "steps_zone_iso2s",
+                "step_zone_countries",
+                "steps_zone_regions",
+            ]
+        )
