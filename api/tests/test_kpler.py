@@ -813,28 +813,31 @@ def test_kpler_trade_ship_insurer(app):
         # Confirmed all ships of these against the original P&I providers.
         SINGLE_SHIP_UNKNOWN_INSURER = {
             "trade_id": 3108824,
-            "vessel_imos": ['9563536'],
+            "vessel_imos": ["9563536"],
             "ship_insurer_names": ["unknown"],
             "ship_insurer_iso2s": ["unknown"],
-            "ship_insurer_regions": ["unknown"]
+            "ship_insurer_regions": ["unknown"],
         }
         SINGLE_SHIP_WITH_INSURER = {
             "trade_id": 794454,
-            "vessel_imos": ['9253703'],
+            "vessel_imos": ["9253703"],
             "ship_insurer_names": ["North of England P&I Association"],
             "ship_insurer_iso2s": ["GB"],
             "ship_insurer_regions": ["United Kingdom"],
         }
         MULTI_SHIP_ONE_INSURER = {
             "trade_id": 17145711,
-            "vessel_imos": ['9417892', '9730086'],
-            "ship_insurer_names": ["Assuranceforeningen Gard - Norway", "Assuranceforeningen Gard - Norway"],
+            "vessel_imos": ["9417892", "9730086"],
+            "ship_insurer_names": [
+                "Assuranceforeningen Gard - Norway",
+                "Assuranceforeningen Gard - Norway",
+            ],
             "ship_insurer_iso2s": ["NO", "NO"],
             "ship_insurer_regions": ["Others", "Others"],
         }
         MULTI_SHIP_MULTIPLE_INSURERS = {
             "trade_id": 17069592,
-            "vessel_imos": ['9907718', '9831816'],
+            "vessel_imos": ["9907718", "9831816"],
             "ship_insurer_names": [
                 "UK P&I Club",
                 "Britannia Steamship insurance Association Ld",
@@ -871,9 +874,7 @@ def test_kpler_trade_ship_insurer(app):
         )
 
         for index, row in merged.iterrows():
-            assert np.array_equiv(
-                row["vessel_imos_expected"], row["vessel_imos_actual"]
-            )
+            assert np.array_equiv(row["vessel_imos_expected"], row["vessel_imos_actual"])
             assert np.array_equiv(
                 row["ship_insurer_names_expected"], row["ship_insurer_names_actual"]
             )
@@ -949,3 +950,32 @@ def test_kpler_trade_ship_owner(app):
             )
 
     return
+
+
+def test_kpler_trade_steps(app):
+    """
+    Test values against manually collected ones
+    :param app:
+    :return:
+    """
+    import country_converter as coco
+
+    cc = coco.CountryConverter()
+
+    with app.test_client() as test_client:
+
+        params = {
+            "format": "json",
+            "date_from": "2023-07-01",
+            "date_to": "2023-07-31",
+            "origin_iso2": ",".join(["RU"]),
+            "commodity_equivalent": ",".join(["lng"]),
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        trade = pd.DataFrame(response.json["data"])
+        assert len(trade) > 0  # Not all cou
+
+        assert set(trade.columns) >= set(["steps_zone_ids", "steps_zone_names", "steps_zone_iso2s"])

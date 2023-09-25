@@ -11,7 +11,7 @@ class KplerTradeScraper(KplerScraper):
     def __init__(self):
         super().__init__()
 
-    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=False):
+    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=True):
 
         if sts_only:
             operational_filter = "shipToShip"
@@ -272,6 +272,9 @@ class KplerTradeScraper(KplerScraper):
         # Vessels
         trade["vessel_ids"] = [y.get("id") for y in trade_raw.get("vessels")]
         trade["vessel_imos"] = [y.get("imo") for y in trade_raw.get("vessels")]
+
+        # Steps i.e. StS
+        trade["steps_zone_ids"] = [y.get("zone").get("id") for y in trade_raw.get("steps")] or None
 
         # Flows
         flows = self._parse_trade_flows(trade_raw)
