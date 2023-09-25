@@ -18,7 +18,6 @@ def update_trades(
     _platforms = scraper.platforms if platforms is None else platforms
 
     for platform in _platforms:
-        print(platform)
         trades, vessels, zones, products = scraper.get_trades(
             platform=platform, from_iso2=origin_iso2s, date_from=date_from
         )
