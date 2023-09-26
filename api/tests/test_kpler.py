@@ -941,7 +941,7 @@ def test_kpler_trade_ship_owner(app):
 
 def test_kpler_trade_steps(app):
     with app.test_client() as test_client:
-        # Confirmed in equasis
+        # Confirmed in Kpler
         TRADE_WITH_NO_STEPS = {
             "trade_id": 826036,
             "step_zone_ids": [],
