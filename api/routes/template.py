@@ -476,13 +476,13 @@ class TemplateResource(Resource):
             if any(df[col].notna()) and any(df[col].apply(lambda x: type(x) == list))
         ]
         for col in list_columns:
-            df[col] = df[col].apply(tuple)
+            df[col] = df[col].apply(lambda x: tuple(x) if x is not None else None)
         return df, list_columns
 
     def unhash_df(self, result, list_columns):
         # Unhash the dataframe
         for col in list_columns:
-            result[col] = result[col].apply(list)
+            result[col] = result[col].apply(lambda x: list(x) if x is not None else None)
         return result
 
     def spread_currencies(self, result):
