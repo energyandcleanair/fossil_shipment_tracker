@@ -385,44 +385,44 @@ class KplerTradeResource(TemplateResource):
             .prefix_with("MATERIALIZED")
         )
 
-        unnested_steps_zones = (
-            func.unnest(KplerTrade.steps_zone_ids)
+        unnested_step_zones = (
+            func.unnest(KplerTrade.step_zone_ids)
             .table_valued(
-                "steps_zone_id",
-                with_ordinality="steps_zone_order",
-                name="steps_zone",
+                "step_zone_id",
+                with_ordinality="step_zone_order",
+                name="step_zone",
                 joins_implicitly=False,
             )
             .render_derived()
         )
 
-        trade_steps_zones = (
+        trade_step_zones = (
             session.query(
                 KplerTrade.id.label("trade_id"),
                 KplerTrade.flow_id,
                 array_agg(
                     aggregate_order_by(
                         KplerZone.name,
-                        unnested_steps_zones.c.steps_zone_order,
+                        unnested_step_zones.c.step_zone_order,
                     )
-                ).label("steps_zone_names"),
+                ).label("step_zone_names"),
                 array_agg(
                     aggregate_order_by(
                         KplerZone.country_iso2,
-                        unnested_steps_zones.c.steps_zone_order,
+                        unnested_step_zones.c.step_zone_order,
                     )
-                ).label("steps_zone_iso2s"),
+                ).label("step_zone_iso2s"),
                 array_agg(
-                    aggregate_order_by(Country.region, unnested_steps_zones.c.steps_zone_order)
-                ).label("steps_zone_regions"),
+                    aggregate_order_by(Country.region, unnested_step_zones.c.step_zone_order)
+                ).label("step_zone_regions"),
             )
             .select_from(KplerTrade)
-            .join(unnested_steps_zones, true())
-            .outerjoin(KplerZone, unnested_steps_zones.c.steps_zone_id == KplerZone.id)
+            .join(unnested_step_zones, true())
+            .outerjoin(KplerZone, unnested_step_zones.c.step_zone_id == KplerZone.id)
             .outerjoin(Country, KplerZone.country_iso2 == Country.iso2)
             .group_by(KplerTrade.id, KplerTrade.flow_id)
             .order_by(KplerTrade.id, KplerTrade.flow_id)
-            .cte("trade_steps_zones")
+            .cte("trade_step_zones")
             .prefix_with("MATERIALIZED")
         )
 
@@ -827,14 +827,14 @@ class KplerTradeResource(TemplateResource):
                 all_owners_for_trade.c.ship_owner_iso2s,
                 all_owners_for_trade.c.ship_owner_regions,
                 ownership_sanction_coverage_field,
-                func.coalesce(KplerTrade.steps_zone_ids, integer_array([])).label("step_zone_ids"),
-                func.coalesce(trade_steps_zones.c.steps_zone_names, string_array([])).label(
+                func.coalesce(KplerTrade.step_zone_ids, integer_array([])).label("step_zone_ids"),
+                func.coalesce(trade_step_zones.c.step_zone_names, string_array([])).label(
                     "step_zone_names"
                 ),
-                func.coalesce(trade_steps_zones.c.steps_zone_iso2s, string_array([])).label(
+                func.coalesce(trade_step_zones.c.step_zone_iso2s, string_array([])).label(
                     "step_zone_iso2s"
                 ),
-                func.coalesce(trade_steps_zones.c.steps_zone_regions, string_array([])).label(
+                func.coalesce(trade_step_zones.c.step_zone_regions, string_array([])).label(
                     "step_zone_regions"
                 ),
             )
@@ -881,10 +881,10 @@ class KplerTradeResource(TemplateResource):
             )
             .outerjoin(Currency, Currency.date == price_date)
             .outerjoin(
-                trade_steps_zones,
+                trade_step_zones,
                 sa.and_(
-                    KplerTrade.id == trade_steps_zones.c.trade_id,
-                    KplerTrade.flow_id == trade_steps_zones.c.flow_id,
+                    KplerTrade.id == trade_step_zones.c.trade_id,
+                    KplerTrade.flow_id == trade_step_zones.c.flow_id,
                 ),
             )
             .order_by(KplerTrade.id, KplerTrade.flow_id, Price.scenario, Currency.currency)

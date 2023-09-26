@@ -274,7 +274,7 @@ class KplerTradeScraper(KplerScraper):
         trade["vessel_imos"] = [y.get("imo") for y in trade_raw.get("vessels")]
 
         # Steps i.e. StS
-        trade["steps_zone_ids"] = [y.get("zone").get("id") for y in trade_raw.get("steps")] or None
+        trade["step_zone_ids"] = [y.get("zone").get("id") for y in trade_raw.get("steps")] or None
 
         # Flows
         flows = self._parse_trade_flows(trade_raw)

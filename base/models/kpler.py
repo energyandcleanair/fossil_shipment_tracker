@@ -124,7 +124,7 @@ class KplerTrade(Base):
     vessel_ids = Column(ARRAY(Integer))
     vessel_imos = Column(ARRAY(String))
 
-    steps_zone_ids = Column(ARRAY(String))
+    step_zone_ids = Column(ARRAY(String))
 
     buyer_ids = Column(ARRAY(Integer))
     buyer_names = Column(ARRAY(String))
@@ -132,7 +132,7 @@ class KplerTrade(Base):
     seller_ids = Column(ARRAY(Integer))
     seller_names = Column(ARRAY(String))
 
-    steps_zone_ids = Column(ARRAY(Integer))
+    step_zone_ids = Column(ARRAY(Integer))
 
     product_id = Column(Integer, primary_key=True)
     value_tonne = Column(Numeric)
