@@ -7,6 +7,7 @@ from sqlalchemy import (
     any_,
     true,
     String,
+    Integer,
 )
 from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import aggregate_order_by, array, ARRAY, array_agg
@@ -38,6 +39,14 @@ from base.models import (
     ShipOwner,
 )
 from base.utils import to_datetime, to_list, intersect, df_to_json
+
+
+def string_array(values):
+    return cast(array(values), ARRAY(String))
+
+
+def integer_array(values):
+    return cast(array(values), ARRAY(Integer))
 
 
 @routes_api.route("/v1/kpler_trade", strict_slashes=False)
@@ -376,6 +385,47 @@ class KplerTradeResource(TemplateResource):
             .prefix_with("MATERIALIZED")
         )
 
+        unnested_steps_zones = (
+            func.unnest(KplerTrade.steps_zone_ids)
+            .table_valued(
+                "steps_zone_id",
+                with_ordinality="steps_zone_order",
+                name="steps_zone",
+                joins_implicitly=False,
+            )
+            .render_derived()
+        )
+
+        trade_steps_zones = (
+            session.query(
+                KplerTrade.id.label("trade_id"),
+                KplerTrade.flow_id,
+                array_agg(
+                    aggregate_order_by(
+                        KplerZone.name,
+                        unnested_steps_zones.c.steps_zone_order,
+                    )
+                ).label("steps_zone_names"),
+                array_agg(
+                    aggregate_order_by(
+                        KplerZone.country_iso2,
+                        unnested_steps_zones.c.steps_zone_order,
+                    )
+                ).label("steps_zone_iso2s"),
+                array_agg(
+                    aggregate_order_by(Country.region, unnested_steps_zones.c.steps_zone_order)
+                ).label("steps_zone_regions"),
+            )
+            .select_from(KplerTrade)
+            .join(unnested_steps_zones, true())
+            .outerjoin(KplerZone, unnested_steps_zones.c.steps_zone_id == KplerZone.id)
+            .outerjoin(Country, KplerZone.country_iso2 == Country.iso2)
+            .group_by(KplerTrade.id, KplerTrade.flow_id)
+            .order_by(KplerTrade.id, KplerTrade.flow_id)
+            .cte("trade_steps_zones")
+            .prefix_with("MATERIALIZED")
+        )
+
         # Commodity used for pricing
         commodity_id_field = (
             "kpler_"
@@ -700,9 +750,6 @@ class KplerTradeResource(TemplateResource):
             "array_fill(NULL::varchar, array[array_length(all_owners_for_trade.ship_owner_iso2s, 1)])"
         )
 
-        def string_array(values):
-            return cast(array(values), ARRAY(String))
-
         ownership_sanction_coverage_field = case(
             (
                 sa.or_(
@@ -780,6 +827,16 @@ class KplerTradeResource(TemplateResource):
                 all_owners_for_trade.c.ship_owner_iso2s,
                 all_owners_for_trade.c.ship_owner_regions,
                 ownership_sanction_coverage_field,
+                func.coalesce(KplerTrade.steps_zone_ids, integer_array([])).label("step_zone_ids"),
+                func.coalesce(trade_steps_zones.c.steps_zone_names, string_array([])).label(
+                    "step_zone_names"
+                ),
+                func.coalesce(trade_steps_zones.c.steps_zone_iso2s, string_array([])).label(
+                    "step_zone_iso2s"
+                ),
+                func.coalesce(trade_steps_zones.c.steps_zone_regions, string_array([])).label(
+                    "step_zone_regions"
+                ),
             )
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
@@ -823,6 +880,13 @@ class KplerTradeResource(TemplateResource):
                 ),
             )
             .outerjoin(Currency, Currency.date == price_date)
+            .outerjoin(
+                trade_steps_zones,
+                sa.and_(
+                    KplerTrade.id == trade_steps_zones.c.trade_id,
+                    KplerTrade.flow_id == trade_steps_zones.c.flow_id,
+                ),
+            )
             .order_by(KplerTrade.id, KplerTrade.flow_id, Price.scenario, Currency.currency)
         )
 
@@ -862,7 +926,7 @@ class KplerTradeResource(TemplateResource):
             query = query.filter(KplerTrade.id.in_(to_list(trade_ids)))
 
         if grade:
-            query = query.filter(KplerTrade.grade_name.in_(to_list(grade)))
+            query = query.filter(KplerProduct.grade_name.in_(to_list(grade)))
 
         if platform:
             query = query.filter(KplerTrade.platform.in_(to_list(platform)))
