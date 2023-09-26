@@ -2,6 +2,8 @@ import pandas as pd
 import json
 import numpy as np
 import re
+from collections.abc import Iterable
+
 
 from . import routes_api
 from flask_restx import inputs
@@ -475,14 +477,33 @@ class TemplateResource(Resource):
             for col in df.columns
             if any(df[col].notna()) and any(df[col].apply(lambda x: type(x) == list))
         ]
+
+        def to_tuple_if_iterable(x):
+            if x is None:
+                return None
+            if np.isscalar(x):
+                if pd.isna(x):
+                    return None
+                return x
+            if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+                return tuple(x)
+            return x
+
         for col in list_columns:
-            df[col] = df[col].apply(lambda x: tuple(x) if x is not None else None)
+            df[col] = df[col].apply(to_tuple_if_iterable)
         return df, list_columns
 
     def unhash_df(self, result, list_columns):
         # Unhash the dataframe
+        def to_list_if_iterable(x):
+            if x is None or (np.isscalar(x) and pd.isna(x)):
+                return None
+            if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+                return list(x)
+            return x
+
         for col in list_columns:
-            result[col] = result[col].apply(lambda x: list(x) if x is not None else None)
+            result[col] = result[col].apply(to_list_if_iterable)
         return result
 
     def spread_currencies(self, result):
