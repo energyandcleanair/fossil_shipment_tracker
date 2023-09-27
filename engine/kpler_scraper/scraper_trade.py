@@ -342,6 +342,9 @@ class KplerTradeScraper(KplerScraper):
             get_nested(trade_raw, "portCallDestination", "zone", warn=False),
         ]
 
+        # Adding steps
+        zones += [y.get("zone") for y in trade_raw.get("steps")]
+
         result = []
         for zone in zones:
             if not zone:
@@ -384,6 +387,8 @@ class KplerTradeScraper(KplerScraper):
                 country_zone["country_iso2"] = primary_zone["country_iso2"]
                 result.append(country_zone)
 
+        # Remove duplicates
+        result = [dict(t) for t in {tuple(d.items()) for d in result}]
         return result
 
     def _parse_trade_products(self, flow, platform) -> (List[dict]):
