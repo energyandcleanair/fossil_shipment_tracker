@@ -11,7 +11,7 @@ class KplerTradeScraper(KplerScraper):
     def __init__(self):
         super().__init__()
 
-    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=False):
+    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=True):
 
         if sts_only:
             operational_filter = "shipToShip"
@@ -273,6 +273,9 @@ class KplerTradeScraper(KplerScraper):
         trade["vessel_ids"] = [y.get("id") for y in trade_raw.get("vessels")]
         trade["vessel_imos"] = [y.get("imo") for y in trade_raw.get("vessels")]
 
+        # Steps i.e. StS
+        trade["step_zone_ids"] = [y.get("zone").get("id") for y in trade_raw.get("steps")] or None
+
         # Flows
         flows = self._parse_trade_flows(trade_raw)
 
@@ -339,6 +342,9 @@ class KplerTradeScraper(KplerScraper):
             get_nested(trade_raw, "portCallDestination", "zone", warn=False),
         ]
 
+        # Adding steps
+        zones += [y.get("zone") for y in trade_raw.get("steps")]
+
         result = []
         for zone in zones:
             if not zone:
@@ -381,6 +387,8 @@ class KplerTradeScraper(KplerScraper):
                 country_zone["country_iso2"] = primary_zone["country_iso2"]
                 result.append(country_zone)
 
+        # Remove duplicates
+        result = [dict(t) for t in {tuple(d.items()) for d in result}]
         return result
 
     def _parse_trade_products(self, flow, platform) -> (List[dict]):

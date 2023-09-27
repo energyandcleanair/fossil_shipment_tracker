@@ -18,11 +18,13 @@ def update_trades(
     _platforms = scraper.platforms if platforms is None else platforms
 
     for platform in _platforms:
-        trades, vessels, zones, products = scraper.get_trades(
-            platform=platform, from_iso2=origin_iso2s, date_from=date_from
-        )
+        for from_iso2 in origin_iso2s:
+            # To prevent memory issues, we do it one country at a time
+            trades, vessels, zones, products = scraper.get_trades(
+                platform=platform, from_iso2=from_iso2, date_from=date_from
+            )
 
-        # upload_products(products, ignore_if_copy_failed=ignore_if_copy_failed)
-        upload_zones(zones, ignore_if_copy_failed=ignore_if_copy_failed)
-        upload_vessels(vessels, ignore_if_copy_failed=ignore_if_copy_failed)
-        upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
+            # upload_products(products, ignore_if_copy_failed=ignore_if_copy_failed)
+            upload_zones(zones, ignore_if_copy_failed=ignore_if_copy_failed)
+            upload_vessels(vessels, ignore_if_copy_failed=ignore_if_copy_failed)
+            upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)

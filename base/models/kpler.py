@@ -107,40 +107,32 @@ class KplerTrade(Base):
 
     departure_date_utc = Column(DateTime, nullable=False)
     departure_zone_id = Column(Integer, nullable=False)
-    # departure_zone_name = Column(String)
     departure_installation_id = Column(Integer)
     departure_installation_name = Column(String)
     departure_berth_id = Column(Integer)
     departure_berth_name = Column(String)
-    # departure_port_id = Column(Integer)
-    # departure_port_name = Column(String)
-    # departure_country_id = Column(Integer)
-    # departure_country_name = Column(String)
-    # departure_iso2 = Column(String)
     departure_sts = Column(Boolean)
 
     arrival_date_utc = Column(DateTime)
     arrival_zone_id = Column(Integer)
-    # arrival_zone_name = Column(String)
     arrival_installation_id = Column(Integer)
     arrival_installation_name = Column(String)
     arrival_berth_id = Column(Integer)
     arrival_berth_name = Column(String)
-    # arrival_port_id = Column(Integer)
-    # arrival_port_name = Column(String)
-    # arrival_country_id = Column(Integer)
-    # arrival_country_name = Column(String)
-    # arrival_iso2 = Column(String)
     arrival_sts = Column(Boolean)
 
     vessel_ids = Column(ARRAY(Integer))
     vessel_imos = Column(ARRAY(String))
+
+    step_zone_ids = Column(ARRAY(String))
 
     buyer_ids = Column(ARRAY(Integer))
     buyer_names = Column(ARRAY(String))
 
     seller_ids = Column(ARRAY(Integer))
     seller_names = Column(ARRAY(String))
+
+    step_zone_ids = Column(ARRAY(Integer))
 
     product_id = Column(Integer, primary_key=True)
     value_tonne = Column(Numeric)

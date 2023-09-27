@@ -12,7 +12,6 @@ from base.env import get_env
 
 
 def test_kpler_v1_pricing(app):
-
     with app.test_client() as test_client:
         # Test that the join with pricing doesn't remove flows
         # To do so, we query both from the api and directly from the flow table
@@ -124,7 +123,6 @@ def test_kpler_v1(app):
 
 
 def test_kpler_v1_key(app):
-
     with app.test_client() as test_client:
         # Test that the join with pricing doesn't remove flows
         # To do so, we query both from the api and directly from the flow table
@@ -167,7 +165,6 @@ def test_kpler_crude_export(app):
     manual_values.rename(columns={"date": "month"}, inplace=True)
 
     with app.test_client() as test_client:
-
         params = {
             "format": "json",
             "date_from": "2022-01-01",
@@ -245,7 +242,6 @@ def test_kpler_gasoline_export(app):
     manual_values.rename(columns={"date": "month"}, inplace=True)
 
     with app.test_client() as test_client:
-
         params = {
             "format": "json",
             "date_from": "2022-01-01",
@@ -495,9 +491,7 @@ def test_kpler_trade_no_duplicates(app):
 
 
 def test_kpler_trade_pricing(app):
-
     with app.test_client() as test_client:
-
         ID__FLOWS_1__SHIPS_1 = {
             "trade_id": 18583808,
             "flows": 1,
@@ -613,7 +607,6 @@ def test_kpler_crude_export_byport(app):
     :return:
     """
     with app.test_client() as test_client:
-
         params = {
             "format": "json",
             "date_from": "2023-04-01",
@@ -641,7 +634,6 @@ def test_kpler_crude_export_byport(app):
 
 
 def test_kpler_wrong_arg(app):
-
     with app.test_client() as test_client:
         # Test that it returns an error if a wrong argument is given
         # We force this so that old queries with e.g. product argument
@@ -652,7 +644,6 @@ def test_kpler_wrong_arg(app):
 
 
 def test_kpler_v1_commodity_origin(app):
-
     with app.test_client() as test_client:
         # Test that the join with pricing doesn't remove flows
         # To do so, we query both from the api and directly from the flow table
@@ -676,7 +667,6 @@ def test_kpler_v1_commodity_origin(app):
 
 
 def test_kpler_south_korea(app):
-
     with app.test_client() as test_client:
         params = {
             "format": "json",
@@ -695,7 +685,6 @@ def test_kpler_south_korea(app):
 
 
 def test_kpler_urals_espo(app):
-
     with app.test_client() as test_client:
         params = {
             "format": "json",
@@ -732,9 +721,7 @@ def test_kpler_urals_espo(app):
 
 
 def test_flow_equals_trade(app):
-
     with app.test_client() as test_client:
-
         date_from = "2023-01-01"
         date_to = "2023-01-31"
 
@@ -813,28 +800,31 @@ def test_kpler_trade_ship_insurer(app):
         # Confirmed all ships of these against the original P&I providers.
         SINGLE_SHIP_UNKNOWN_INSURER = {
             "trade_id": 3108824,
-            "vessel_imos": ['9563536'],
+            "vessel_imos": ["9563536"],
             "ship_insurer_names": ["unknown"],
             "ship_insurer_iso2s": ["unknown"],
-            "ship_insurer_regions": ["unknown"]
+            "ship_insurer_regions": ["unknown"],
         }
         SINGLE_SHIP_WITH_INSURER = {
             "trade_id": 794454,
-            "vessel_imos": ['9253703'],
+            "vessel_imos": ["9253703"],
             "ship_insurer_names": ["North of England P&I Association"],
             "ship_insurer_iso2s": ["GB"],
             "ship_insurer_regions": ["United Kingdom"],
         }
         MULTI_SHIP_ONE_INSURER = {
             "trade_id": 17145711,
-            "vessel_imos": ['9417892', '9730086'],
-            "ship_insurer_names": ["Assuranceforeningen Gard - Norway", "Assuranceforeningen Gard - Norway"],
+            "vessel_imos": ["9417892", "9730086"],
+            "ship_insurer_names": [
+                "Assuranceforeningen Gard - Norway",
+                "Assuranceforeningen Gard - Norway",
+            ],
             "ship_insurer_iso2s": ["NO", "NO"],
             "ship_insurer_regions": ["Others", "Others"],
         }
         MULTI_SHIP_MULTIPLE_INSURERS = {
             "trade_id": 17069592,
-            "vessel_imos": ['9907718', '9831816'],
+            "vessel_imos": ["9907718", "9831816"],
             "ship_insurer_names": [
                 "UK P&I Club",
                 "Britannia Steamship insurance Association Ld",
@@ -871,9 +861,7 @@ def test_kpler_trade_ship_insurer(app):
         )
 
         for index, row in merged.iterrows():
-            assert np.array_equiv(
-                row["vessel_imos_expected"], row["vessel_imos_actual"]
-            )
+            assert np.array_equiv(row["vessel_imos_expected"], row["vessel_imos_actual"])
             assert np.array_equiv(
                 row["ship_insurer_names_expected"], row["ship_insurer_names_actual"]
             )
@@ -946,6 +934,66 @@ def test_kpler_trade_ship_owner(app):
             assert np.array_equiv(row["ship_owner_iso2s_expected"], row["ship_owner_iso2s_actual"])
             assert np.array_equiv(
                 row["ship_owner_regions_expected"], row["ship_owner_regions_actual"]
+            )
+
+    return
+
+
+def test_kpler_trade_steps(app):
+    with app.test_client() as test_client:
+        # Confirmed in Kpler
+        TRADE_WITH_NO_STEPS = {
+            "trade_id": 826036,
+            "step_zone_ids": [],
+            "step_zone_names": [],
+            "step_zone_iso2s": [],
+            "step_zone_regions": [],
+        }
+        TRADE_WITH_ONE_STEP = {
+            "trade_id": 845515,
+            "step_zone_ids": [2357],
+            "step_zone_names": ["Donges"],
+            "step_zone_iso2s": ["FR"],
+            "step_zone_regions": ["EU"],
+        }
+        TRADE_WITH_MULTIPLE_STEP = {
+            "trade_id": 18858707,
+            "step_zone_ids": [2697, 5580],
+            # Order should match steps.
+            "step_zone_names": ["Alpha Zone Light.", "PAL Light."],
+            "step_zone_iso2s": ["UY", "US"],
+            "step_zone_regions": ["Others", "United States"],
+        }
+
+        expected = pd.DataFrame.from_dict(
+            [
+                TRADE_WITH_NO_STEPS,
+                TRADE_WITH_ONE_STEP,
+                TRADE_WITH_MULTIPLE_STEP,
+            ]
+        )
+
+        params = {
+            "format": "json",
+            "trade_ids": ",".join(str(x) for x in expected["trade_id"].tolist()),
+            "api_key": get_env("API_KEY"),
+        }
+
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        actual = pd.DataFrame(response.json["data"])
+        assert len(actual) > 0
+
+        merged = expected.merge(
+            actual, on="trade_id", how="left", suffixes=("_expected", "_actual")
+        )
+
+        for index, row in merged.iterrows():
+            assert np.array_equiv(row["step_zone_ids_expected"], row["step_zone_ids_actual"])
+            assert np.array_equiv(row["step_zone_names_expected"], row["step_zone_names_actual"])
+            assert np.array_equiv(row["step_zone_iso2s_expected"], row["step_zone_iso2s_actual"])
+            assert np.array_equiv(
+                row["step_zone_regions_expected"], row["step_zone_regions_actual"]
             )
 
     return
