@@ -12,6 +12,7 @@ from base.models import (
     DB_TABLE_KPLER_TRADE,
     DB_TABLE_KPLER_ZONE,
     DB_TABLE_KPLER_VESSEL,
+    DB_TABLE_KPLER_INSTALLATION,
 )
 from base.db_utils import upsert
 from base.db import session, engine
@@ -132,6 +133,38 @@ def upload_zones(zones, ignore_if_copy_failed=False):
             else:
                 logger.info("Some rows already exist. Upserting instead")
                 upsert(zones, DB_TABLE_KPLER_ZONE, DB_TABLE_KPLER_ZONE + "_pkey")
+
+
+def upload_installations(installations, ignore_if_copy_failed=False):
+
+    # Ensure this is a pandas dataframe
+    if not isinstance(installations, pd.DataFrame):
+        installations = pd.DataFrame(installations)
+
+    if len(installations) == 0:
+        return None
+
+    installations = installations.drop_duplicates(subset=["id"])
+    # Drop installations with id = None
+    installations = installations[~pd.isnull(installations.id)]
+    if len(installations) > 0:
+        try:
+            installations.to_sql(
+                DB_TABLE_KPLER_INSTALLATION,
+                con=engine,
+                if_exists="append",
+                index=False,
+            )
+        except sa.exc.IntegrityError:
+            if ignore_if_copy_failed:
+                logger.info("Some rows already exist. Skipping")
+            else:
+                logger.info("Some rows already exist. Upserting instead")
+                upsert(
+                    installations,
+                    DB_TABLE_KPLER_INSTALLATION,
+                    DB_TABLE_KPLER_INSTALLATION + "_pkey",
+                )
 
 
 def upload_vessels(vessels, ignore_if_copy_failed=False):

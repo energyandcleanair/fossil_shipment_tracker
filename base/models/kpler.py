@@ -26,6 +26,7 @@ from . import DB_TABLE_KPLER_VESSEL
 from . import DB_TABLE_KPLER_TRADE
 from . import DB_TABLE_KPLER_TRADE_FLOW
 from . import DB_TABLE_KPLER_ZONE
+from . import DB_TABLE_KPLER_INSTALLATION
 
 
 class KplerFlow(Base):
@@ -194,3 +195,13 @@ class KplerZone(Base):
     country_iso2 = Column(String)
 
     __tablename__ = DB_TABLE_KPLER_ZONE
+
+
+class KplerInstallation(Base):
+    id = Column(BigInteger, primary_key=True)
+    name = Column(String)
+    fullname = Column(String)
+    type = Column(String)
+    port_id = Column(BigInteger)
+
+    __tablename__ = DB_TABLE_KPLER_INSTALLATION

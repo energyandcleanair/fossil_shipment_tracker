@@ -20,7 +20,7 @@ def update_trades(
     for platform in _platforms:
         for from_iso2 in origin_iso2s:
             # To prevent memory issues, we do it one country at a time
-            trades, vessels, zones, products = scraper.get_trades(
+            trades, vessels, zones, products, installations = scraper.get_trades(
                 platform=platform, from_iso2=from_iso2, date_from=date_from
             )
 
@@ -28,3 +28,4 @@ def update_trades(
             upload_zones(zones, ignore_if_copy_failed=ignore_if_copy_failed)
             upload_vessels(vessels, ignore_if_copy_failed=ignore_if_copy_failed)
             upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
+            upload_installations(installations, ignore_if_copy_failed=ignore_if_copy_failed)
