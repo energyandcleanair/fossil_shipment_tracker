@@ -22,6 +22,7 @@ class KplerTradeScraper(KplerScraper):
         vessels = []
         zones = []
         products = []
+        installations = []
 
         for current_iso2 in to_list(from_iso2):
             date_from = to_datetime(date_from)
@@ -57,13 +58,16 @@ class KplerTradeScraper(KplerScraper):
                         break
 
             for x in tqdm(trades_raw):
-                trades_, vessels_, zones_, products_ = self._parse_trade(x, platform=platform)
+                trades_, vessels_, zones_, products_, installations_ = self._parse_trade(
+                    x, platform=platform
+                )
                 trades.extend(trades_)
                 vessels.extend(vessels_)
                 zones.extend(zones_)
                 products.extend(products_)
+                installations.extend(installations_)
 
-        return trades, vessels, zones, products
+        return trades, vessels, zones, products, installations
 
     def get_trades_raw(
         self,
@@ -391,6 +395,39 @@ class KplerTradeScraper(KplerScraper):
         result = [dict(t) for t in {tuple(d.items()) for d in result}]
         return result
 
+    def _parse_trade_installations(self, trade_raw) -> (List[dict]):
+        """
+        Extract all possible information from trade_raw about zones,
+        be it berth, port, or country
+        :param trade_raw:
+        :return:
+        """
+
+        if not trade_raw:
+            return []
+
+        installations = [
+            get_nested(trade_raw, "portCallOrigin", "installation", warn=False),
+            get_nested(trade_raw, "portCallDestination", "installation", warn=False),
+        ]
+
+        result = []
+        for installation_raw in installations:
+            if not installation_raw:
+                continue
+
+            installation = {}
+            installation["id"] = installation_raw.get("id")
+            installation["name"] = installation_raw.get("name")
+            installation["fullname"] = installation_raw.get("fullname")
+            installation["type"] = installation_raw.get("type")
+            installation["port_id"] = (installation_raw.get("port") or {}).get("id")
+            result.append(installation)
+
+        # Remove duplicates
+        result = [dict(t) for t in {tuple(d.items()) for d in result}]
+        return result
+
     def _parse_trade_products(self, flow, platform) -> (List[dict]):
 
         if not flow:
@@ -421,13 +458,13 @@ class KplerTradeScraper(KplerScraper):
 
         vessels = self._parse_trade_vessels(vessels=get_nested(trade_raw, "vessels"))
         zones = self._parse_trade_zones(trade_raw=trade_raw)
-
+        installations = self._parse_trade_installations(trade_raw=trade_raw)
         product_ids = set([x.get("product_id") for x in trades])
         products = [
             KplerProductScraper.get_parsed_infos(platform=platform, id=x) for x in product_ids
         ]
 
-        return trades, vessels, zones, products
+        return trades, vessels, zones, products, installations
 
     def _country_name_to_iso2(self, country_name):
         return self.cc.convert(country_name, to="ISO2") if country_name else None
