@@ -796,6 +796,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.arrival_date_utc.label("destination_date_utc"),
                 KplerTrade.arrival_installation_id.label("destination_installation_id"),
                 KplerTrade.arrival_installation_name.label("destination_installation_name"),
+                destination_zone.id.label("destination_zone_id"),
                 destination_zone.name.label("destination_zone_name"),
                 destination_zone.name.label("destination_zone_type"),
                 destination_zone.port_id.label("destination_port_id"),
