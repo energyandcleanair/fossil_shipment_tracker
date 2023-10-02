@@ -11,7 +11,7 @@ class KplerTradeScraper(KplerScraper):
     def __init__(self):
         super().__init__()
 
-    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=True):
+    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=False):
 
         if sts_only:
             operational_filter = "shipToShip"
