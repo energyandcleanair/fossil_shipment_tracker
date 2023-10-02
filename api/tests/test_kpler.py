@@ -191,35 +191,35 @@ def test_kpler_crude_export(app):
         trade = trade.rename(columns={"origin_month": "month"})
         assert len(trade) > 0  # Not all cou
 
-        # Remove timezone from both data_dt.month and manual_values.month
-        flow["month"] = pd.to_datetime(flow["month"]).dt.tz_localize(None)
-        trade["month"] = pd.to_datetime(trade["month"]).dt.tz_localize(None)
-        manual_values["month"] = manual_values["month"].dt.tz_localize(None)
-        # Merge
-        merge = (
-            manual_values[["origin_iso2", "month", "value_tonne"]]
-            .merge(
-                trade[["origin_iso2", "month", "value_tonne"]],
-                how="left",
-                on=["origin_iso2", "month"],
-                suffixes=("_manual", "_trade"),
-            )
-            .merge(
-                flow[["origin_iso2", "month", "value_tonne"]].rename(
-                    columns={"value_tonne": "value_tonne_flow"}
-                ),
-                how="left",
-                on=["origin_iso2", "month"],
-            )
+    # Remove timezone from both data_dt.month and manual_values.month
+    flow["month"] = pd.to_datetime(flow["month"]).dt.tz_localize(None)
+    trade["month"] = pd.to_datetime(trade["month"]).dt.tz_localize(None)
+    manual_values["month"] = manual_values["month"].dt.tz_localize(None)
+    # Merge
+    merge = (
+        manual_values[["origin_iso2", "month", "value_tonne"]]
+        .merge(
+            trade[["origin_iso2", "month", "value_tonne"]],
+            how="left",
+            on=["origin_iso2", "month"],
+            suffixes=("_manual", "_trade"),
         )
+        .merge(
+            flow[["origin_iso2", "month", "value_tonne"]].rename(
+                columns={"value_tonne": "value_tonne_flow"}
+            ),
+            how="left",
+            on=["origin_iso2", "month"],
+        )
+    )
 
-        # Remove rows where both value_tonne_flow and value_tonne_trade are NaN
-        merge = merge[~(merge.value_tonne_flow.isna() & merge.value_tonne_trade.isna())]
+    # Remove rows where both value_tonne_flow and value_tonne_trade are NaN
+    merge = merge[~(merge.value_tonne_flow.isna() & merge.value_tonne_trade.isna())]
 
-        merge["ok_flow"] = np.isclose(merge.value_tonne_flow, merge.value_tonne_manual, rtol=4e-2)
-        merge["ok_trade"] = np.isclose(merge.value_tonne_trade, merge.value_tonne_manual, rtol=4e-2)
-        merge["ok"] = merge["ok_flow"] & merge["ok_trade"]
-        assert all(merge.ok)
+    merge["ok_flow"] = np.isclose(merge.value_tonne_flow, merge.value_tonne_manual, rtol=4e-2)
+    merge["ok_trade"] = np.isclose(merge.value_tonne_trade, merge.value_tonne_manual, rtol=4e-2)
+    merge["ok"] = merge["ok_flow"] & merge["ok_trade"]
+    assert all(merge.ok)
 
 
 def test_kpler_gasoline_export(app):
