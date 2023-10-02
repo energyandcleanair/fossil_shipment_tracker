@@ -198,6 +198,22 @@ class KplerTradeResource(TemplateResource):
         required=False,
     )
 
+    parser.add_argument(
+        "origin_installation_ids",
+        type=int,
+        action="split",
+        default=None,
+        help="filters where origin_installation_id is any of the provided",
+    )
+
+    parser.add_argument(
+        "destination_installation_ids",
+        type=int,
+        action="split",
+        default=None,
+        help="filters where destination_installation_id is any of the provided",
+    )
+
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date"]
     value_cols = ["value_tonne", "value_m3", "value_gas_m3", "value_eur", "value_currency"]
@@ -927,6 +943,9 @@ class KplerTradeResource(TemplateResource):
         buyer = params.get("buyer")
         seller = params.get("seller")
 
+        origin_installation_ids = params.get("origin_installation_ids")
+        destination_installation_ids = params.get("destination_installation_ids")
+
         if trade_ids:
             query = query.filter(KplerTrade.id.in_(to_list(trade_ids)))
 
@@ -955,6 +974,16 @@ class KplerTradeResource(TemplateResource):
 
         if seller:
             query = query.filter(KplerTrade.seller_names.overlap(to_list(seller)))
+
+        if origin_installation_ids:
+            query = query.filter(
+                KplerTrade.departure_installation_id.in_(to_list(origin_installation_ids))
+            )
+
+        if destination_installation_ids:
+            query = query.filter(
+                KplerTrade.arrival_installation_id.in_(to_list(destination_installation_ids))
+            )
 
         subquery = query.subquery()
         query = session.query(subquery)
