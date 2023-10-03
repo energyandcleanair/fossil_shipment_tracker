@@ -120,7 +120,6 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
 
 
 def build_filter_query():
-
     departure_ships = (
         session.query(
             Departure.ship_imo.label("ship_imo"),
@@ -445,7 +444,6 @@ def update_ship_insurer(imo, equasis_insurers):
             insurer_raw_date_from = equasis_insurer.get("date_from")
 
             insurer = get_matching_insurer(ship_imo=imo, company_raw_name=insurer_raw_name)
-
             if not insurer:
                 insurer = build_new_insurer(
                     ship_imo=imo,
@@ -453,12 +451,22 @@ def update_ship_insurer(imo, equasis_insurers):
                     company_raw_date_from=insurer_raw_date_from,
                 )
 
-            update_insurer(
-                insurer=insurer,
-                imo=imo,
-                insurer_raw_name=insurer_raw_name,
-                insurer_raw_date_from=insurer_raw_date_from,
+            consecutive_unknowns = (
+                insurer.company_raw_name == base.UNKNOWN_INSURER
+                and insurer_raw_name == base.UNKNOWN_INSURER
             )
+
+            if not consecutive_unknowns:
+                update_insurer(
+                    insurer=insurer,
+                    imo=imo,
+                    insurer_raw_name=insurer_raw_name,
+                    insurer_raw_date_from=insurer_raw_date_from,
+                )
+            else:
+                logger.info(f"Multiple consecutive unknown insurer {imo}, marking as checked")
+                update_failed_insurer(imo, insurer)
+
     else:
         logger.info("Couldn't find insurers for %s, marking as checked" % (imo))
 
@@ -506,7 +514,6 @@ def build_new_insurer(
     company_raw_name=None,
     company_raw_date_from=None,
 ):
-
     # If this is the first time we collect insurer for this ship,
     # We assume it has always been this insurer
     # This is important because we only start querying a ship insurer
@@ -525,6 +532,9 @@ def build_new_insurer(
 
 def update_failed_insurer(imo, insurer):
     insurer.checked_on = dt.datetime.now()
+    if insurer.consecutive_failures == None:
+        insurer.consecutive_failures = 0
+
     insurer.consecutive_failures += 1
     try:
         session.add(insurer)
