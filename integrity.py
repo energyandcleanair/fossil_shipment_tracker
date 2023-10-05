@@ -196,7 +196,7 @@ def test_insurer():
          WHERE  ( k.date_from < u.date_from
                    OR k.date_from IS NULL )
                 AND ( k.updated_on > u.updated_on )
-                AND u.updated_on - u.date_from < '21 days'
+                AND u.updated_on - u.date_from < '100 days'
             )
         SELECT *
         FROM   problematic
