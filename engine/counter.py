@@ -25,7 +25,7 @@ except ImportError:
 import base
 
 
-def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
+def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
     """
     Fill counter
     :return:
@@ -274,15 +274,22 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0):
         result.loc[result.pricing_scenario == PRICING_DEFAULT], version=version
     )
 
-    if not ok:
+    if not ok and not force:
         logger_slack.error(
             "[ERROR] New global counter %s: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check."
             % (version, global_new / 1e9, global_old / 1e9)
         )
     else:
         logger_slack.info(
-            "[COUNTER UPDATE] New global counter %s: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)"
-            % (version, global_new / 1e9, global_old / 1e9, eu_new / 1e9, eu_old / 1e9)
+            "[COUNTER UPDATE%s] New global counter %s: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)"
+            % (
+                " - FORCED" if force else "",
+                version,
+                global_new / 1e9,
+                global_old / 1e9,
+                eu_new / 1e9,
+                eu_old / 1e9,
+            )
         )
 
         result.drop(["commodity_destination_region", "commodity_group"], axis=1, inplace=True)
