@@ -199,8 +199,8 @@ class TemplateResource(Resource):
                 mimetype="application/json",
             )
 
-        # Sort by date first
-        # date_cols = intersection(self.date_cols, result.columns)
+        # # Sort by date first
+        # date_cols = intersect(self.date_cols, result.columns)
         # if date_cols:
         #     result = result.sort_values(date_cols)
 
@@ -253,63 +253,77 @@ class TemplateResource(Resource):
         return response
 
     def roll_average(self, result, aggregate_by, rolling_days):
+        # Early exit if we're not doing rolling days
+        if rolling_days is None:
+            return result
+
+        found_any_date_cols = intersect(self.date_cols, result.columns)
+
+        special_date_cols = ["date_without_year", "year"]
+        found_special_date_cols = intersect(special_date_cols, result.columns)
+
+        # If we're trying to roll and we can't find a date column, raise an error.
+        if len(found_any_date_cols) == 0 and len(found_special_date_cols) != 2:
+            raise RuntimeError("No matching columns for rolling average")
+
+        # We default to the first found date column but then use an aggregated one if found
+        # as it's more likely we're going to want to do the rolling on that date.
+        found_aggregate_date_cols = intersect(
+            intersect(self.date_cols, aggregate_by), result.columns
+        )
+        date_column = found_any_date_cols[0]
+        if len(found_aggregate_date_cols) > 0:
+            date_column = found_aggregate_date_cols[0]
+
+        # For the special date column, we need to recreate the date.
+        overwrite_date_column = "_temp_date"
         remove_date = False
-        date_column = "date"
-
-        if rolling_days is not None:
-            if not "date" in result.columns:
-                # Special case: if we did aggregate by date_without_year and year
-                # Then we need to add date again, do the rolling average
-                # and remove date
-                if len(intersect(["date_without_year", "year"], result.columns)) == 2:
-                    year = result.year.astype(str)
-                    month_day = result.date_without_year.dt.strftime("%m%d")
-                    result[date_column] = pd.to_datetime(
-                        year + month_day, format="%Y%m%d", errors="coerce"
-                    )
-                    remove_date = True
-                else:
-                    # No date information
-                    return result
-
-            result = result[~pd.isna(result.date)]
-            min_date = result["date"].min()
-            max_date = result["date"].max()  # change your date here
-            daterange = pd.date_range(min_date, max_date).rename("date")
-
-            result["date"] = pd.to_datetime(result["date"]).dt.floor(
-                "D"
-            )  # Should have been done already
-            result_rolled = (
-                result.groupby(
-                    [x for x in result.columns if x not in (self.date_cols + self.value_cols)],
-                    dropna=False,
-                )[[date_column] + self.value_cols]
-                .apply(
-                    lambda x: x.set_index("date")
-                    .resample("D")
-                    .sum()
-                    .reindex(daterange)
-                    .fillna(0)
-                    .rolling(rolling_days, min_periods=rolling_days)
-                    .mean()
-                )
-                .reset_index()
+        if len(found_special_date_cols) == 2:
+            year = result.year.astype(str)
+            month_day = result.date_without_year.dt.strftime("%m%d")
+            result[overwrite_date_column] = pd.to_datetime(
+                year + month_day, format="%Y%m%d", errors="coerce"
             )
+            date_column = overwrite_date_column
 
-            # Add columns that may have disappeared e.g. date_without_year, year, month
-            result = pd.merge(
-                result_rolled,
-                result[intersect(self.date_cols, result.columns)].drop_duplicates(),
+        result = result[~pd.isna(result[date_column])]
+        min_date = result[date_column].min()
+        max_date = result[date_column].max()
+        daterange = pd.date_range(min_date, max_date).rename(date_column)
+
+        result[date_column] = pd.to_datetime(result[date_column]).dt.floor(
+            "D"
+        )  # Should have been done already
+        result_rolled = (
+            result.groupby(
+                [x for x in result.columns if x not in (self.date_cols + self.value_cols)],
+                dropna=False,
+            )[[date_column] + self.value_cols]
+            .apply(
+                lambda x: x.set_index(date_column)
+                .resample("D")
+                .sum()
+                .reindex(daterange)
+                .fillna(0)
+                .rolling(rolling_days, min_periods=rolling_days)
+                .mean()
             )
+            .reset_index()
+        )
 
-            result["date"] = pd.to_datetime(result["date"])
+        # Add columns that may have disappeared e.g. date_without_year, year, month
+        result = pd.merge(
+            result_rolled,
+            result[intersect(self.date_cols, result.columns)].drop_duplicates(),
+        )
 
-            if remove_date:
-                result = result.drop("date", axis=1)
+        result[date_column] = pd.to_datetime(result[date_column])
 
-            # Sort by date
-            result = result.sort_values(intersect(self.date_cols, result.columns))
+        if remove_date:
+            result = result.drop(date_column, axis=1)
+
+        # Sort by date
+        result = result.sort_values(intersect(self.date_cols, result.columns))
 
         return result
 

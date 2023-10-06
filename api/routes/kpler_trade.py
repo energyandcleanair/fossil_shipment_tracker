@@ -215,7 +215,7 @@ class KplerTradeResource(TemplateResource):
     )
 
     must_group_by = ["currency", "pricing_scenario"]
-    date_cols = ["date"]
+    date_cols = ["date", "origin_date", "destination_date"]
     value_cols = ["value_tonne", "value_m3", "value_gas_m3", "value_eur", "value_currency"]
 
     pivot_dependencies = {

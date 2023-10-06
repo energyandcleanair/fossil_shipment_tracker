@@ -145,6 +145,7 @@ class ChartDepartureOwnership(Resource):
         commodity_origin_iso2 = params_chart.get("commodity_origin_iso2")
         commodity_destination_iso2 = params_chart.get("commodity_destination_iso2")
         use_kpler = params_chart.get("use_kpler")
+        departure_date_from = params_chart.get("departure_date_from")
 
         aggregate_by_sanction_groups = [
             "ownership_sanction_coverage",
@@ -181,7 +182,7 @@ class ChartDepartureOwnership(Resource):
                 "commodity_origin_iso2": commodity_origin_iso2,
                 "commodity_destination_iso2_not": commodity_origin_iso2,
                 "commodity_destination_iso2": commodity_destination_iso2,
-                # 'date_from': '2022-01-01',
+                "date_from": departure_date_from,
                 "pricing_scenario": [base.PRICING_DEFAULT],
                 "departure_port_area": departure_port_area,
                 # 'sort_by': ['value_tonne'],
@@ -306,7 +307,7 @@ class ChartDepartureOwnership(Resource):
 
         response = KplerTradeResource().get_from_params(params_kpler)
         data = pd.DataFrame(response.json["data"])
-        data["departure_date"] = pd.to_datetime(data.date).dt.date
+        data["departure_date"] = pd.to_datetime(data.origin_date).dt.date
         data["commodity_group_name"] = data["commodity_equivalent_name"]
         return data
 
