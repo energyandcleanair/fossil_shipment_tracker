@@ -403,7 +403,6 @@ class ShipInsurer(Base):
     ship_imo = Column(
         String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"), nullable=False
     )
-    date_from = Column(DateTime(timezone=False))  # Most likely null, not indicated by Equasis
     date_from_insurer = Column(DateTime(timezone=False))
     date_from_equasis = Column(DateTime(timezone=False))
     company_raw_name = Column(String, nullable=False)  # Name indicated by Equasis
@@ -752,7 +751,6 @@ class PipelineFlow(Base):
 
 
 class Counter(Base):
-
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     commodity = Column(String, ForeignKey(DB_TABLE_COMMODITY + ".id"), nullable=False)
     destination_iso2 = Column(String, ForeignKey(DB_TABLE_COUNTRY + ".iso2"))
@@ -994,7 +992,6 @@ class Flaring(Base):
 
 
 class ApiKey(Base):
-
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     key = Column(String)
     user_id = Column(BigInteger)

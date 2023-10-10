@@ -319,7 +319,7 @@ def find_ships_that_need_updating(
     )
 
     expected_insurance_expiry_and_needs_update = sa.and_(
-        imo_query.c.date_from <= dt.date.today() - dt.timedelta(days=11 * 30),
+        imo_query.c.date_from_equasis <= dt.date.today() - dt.timedelta(days=11 * 30),
         imo_query.c.last_updated <= check_unknown_date,
         imo_query.c.company_raw_name != base.UNKNOWN_INSURER,
     )
@@ -484,7 +484,7 @@ def get_matching_insurer(
     latest_insurers = (
         session.query(ShipInsurer.id)
         .distinct(ShipInsurer.ship_imo)
-        .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.date_from.desc()))
+        .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.date_from_equais.desc()))
         .subquery()
     )
 
@@ -583,7 +583,7 @@ def update_insurer(imo=None, insurer_raw_name=None, insurer_raw_date_from=None, 
     insurer.updated_on = dt.datetime.now()
     insurer.checked_on = dt.datetime.now()
     insurer.consecutive_failures = 0
-    if insurer_raw_date_from and insurer.date_from is not None:
+    if insurer_raw_date_from and insurer.date_from_equasis is not None:
         # HEURISTIC
         # Very important assumption about equasis: we only update the date_from if it is not null
         # It may happen indeed that it was the same insurer before the inception date
