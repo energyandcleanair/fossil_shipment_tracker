@@ -62,13 +62,13 @@ def get_all_insurance_to_update():
             ShipInsurer.id,
             ShipInsurer.ship_imo,
             ShipInsurer.company_id,
-            ShipInsurer.date_from,
+            ShipInsurer.date_from_equasis,
             ShipInsurer.updated_on_insurer,
         )
         .distinct(ShipInsurer.ship_imo)
         .order_by(
             ShipInsurer.ship_imo,
-            nullslast(ShipInsurer.date_from.desc()),
+            nullslast(ShipInsurer.date_from_equasis.desc()),
         )
         .subquery()
     )
@@ -78,17 +78,18 @@ def get_all_insurance_to_update():
             latest_insurance_subquery.c.id,
             latest_insurance_subquery.c.ship_imo,
             latest_insurance_subquery.c.company_id,
-            latest_insurance_subquery.c.date_from,
+            latest_insurance_subquery.c.date_from_equasis,
         )
         .where(
             sa.and_(
                 latest_insurance_subquery.c.company_id.in_(known_insurers.keys()),
                 # We don't want to set the date where we want to preserve "from
                 # the beginning of time" entries.
-                latest_insurance_subquery.c.date_from != None,
+                latest_insurance_subquery.c.date_from_equasis != None,
                 # We don't want to update entries that are too old. Use 1 year as a
                 # cut off.
-                latest_insurance_subquery.c.date_from > dt.datetime.now() - dt.timedelta(days=365),
+                latest_insurance_subquery.c.date_from_equasis
+                > dt.datetime.now() - dt.timedelta(days=365),
                 sa.or_(
                     latest_insurance_subquery.c.updated_on_insurer
                     < dt.datetime.now() - dt.timedelta(days=30),
