@@ -319,7 +319,7 @@ def find_ships_that_need_updating(
     )
 
     expected_insurance_expiry_and_needs_update = sa.and_(
-        imo_query.c.date_from_equasis <= dt.date.today() - dt.timedelta(days=11 * 30),
+        imo_query.c.date_from <= dt.date.today() - dt.timedelta(days=11 * 30),
         imo_query.c.last_updated <= check_unknown_date,
         imo_query.c.company_raw_name != base.UNKNOWN_INSURER,
     )
