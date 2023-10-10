@@ -328,18 +328,20 @@ def find_ships_that_need_updating(
         force_unknown, imo_query.c.company_raw_name == base.UNKNOWN_INSURER
     )
 
-    imo_query = session.query(imo_query).filter(
-        sa.and_(
-            not_in_backoff_period,
-            sa.or_(
-                not_yet_searched,
-                unknown_and_needs_update,
-                known_and_needs_update,
-                expected_insurance_expiry_and_needs_update,
-                forced_unknown_update,
-            ),
-        )
+    in_selected_imos_to_update = False if not imo else imo_query.c.imo.in_(to_list(imo))
+
+    needs_update = sa.and_(
+        not_in_backoff_period,
+        sa.or_(
+            not_yet_searched,
+            unknown_and_needs_update,
+            known_and_needs_update,
+            expected_insurance_expiry_and_needs_update,
+            forced_unknown_update,
+        ),
     )
+
+    imo_query = session.query(imo_query).filter(sa.or_(needs_update, in_selected_imos_to_update))
 
     imos_results = imo_query.all()
 
