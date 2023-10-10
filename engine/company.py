@@ -444,15 +444,28 @@ def update_ship_insurer(imo, equasis_insurers):
             insurer_raw_date_from = equasis_insurer.get("date_from")
 
             insurer = get_matching_insurer(ship_imo=imo, company_raw_name=insurer_raw_name)
-            if not insurer:
+            insurer_already_exists = bool(insurer)
+
+            first_time_insurer = (
+                session.query(ShipInsurer).filter(ShipInsurer.ship_imo == imo).count() == 0
+            )
+            # If it's the first insurer, we enter an empty date_from insurer first.
+            if first_time_insurer:
+                insert_first_time_insurer(imo, insurer_raw_name)
+
+            # Then, if there was no matching insurer, we create a new one with the actual date from.
+            # This means we can keep track of the dates of the insurance.
+            if not insurer_already_exists:
                 insurer = build_new_insurer(
                     ship_imo=imo,
                     company_raw_name=insurer_raw_name,
                     company_raw_date_from=insurer_raw_date_from,
                 )
 
+            # We keep track of consecutive unknowns so that we can mark failures.
             consecutive_unknowns = (
-                insurer.company_raw_name == base.UNKNOWN_INSURER
+                insurer_already_exists
+                and insurer.company_raw_name == base.UNKNOWN_INSURER
                 and insurer_raw_name == base.UNKNOWN_INSURER
             )
 
@@ -477,23 +490,55 @@ def update_ship_insurer(imo, equasis_insurers):
         update_failed_insurer(imo, insurer)
 
 
-def get_matching_insurer(
-    ship_imo=None,
-    company_raw_name=None,
-):
-    latest_insurers = (
-        session.query(ShipInsurer.id)
-        .distinct(ShipInsurer.ship_imo)
-        .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.date_from_equais.desc()))
-        .subquery()
+def insert_first_time_insurer(imo, insurer_raw_name):
+    # If this is the first time we collect insurer for this ship,
+    # We assume it has always been this insurer
+    # This is important because we only start querying a ship insurer
+    # After we had a departure with it, and so the first insurer
+    # would always be after the first departure otherwise
+    empty_date_from_insurer = build_new_insurer(
+        ship_imo=imo, company_raw_name=insurer_raw_name, company_raw_date_from=None
+    )
+    update_insurer(
+        insurer=empty_date_from_insurer,
+        imo=imo,
+        insurer_raw_name=insurer_raw_name,
+        insurer_raw_date_from=None,
     )
 
-    return (
-        session.query(ShipInsurer)
-        .join(latest_insurers, ShipInsurer.id == latest_insurers.c.id)
-        .filter(ShipInsurer.ship_imo == ship_imo, ShipInsurer.company_raw_name == company_raw_name)
-        .first()
-    )
+
+def get_matching_insurer(ship_imo=None, company_raw_name=None, date_from=None):
+    # If it's not an unknown insurer, we want to find an exact match on date and name
+    # so we don't update old ones.
+    if company_raw_name != base.UNKNOWN_INSURER:
+        return (
+            session.query(ShipInsurer)
+            .filter(
+                ShipInsurer.ship_imo == ship_imo,
+                ShipInsurer.company_raw_name == company_raw_name,
+                ShipInsurer.date_from_equasis == date_from,
+            )
+            .first()
+        )
+
+    # If it's an unknown insurer, we only want to find a matching one if it's the latest,
+    # as we don't want to mark an old unknown period as updated recently.
+    else:
+        latest_insurers = (
+            session.query(ShipInsurer.id)
+            .distinct(ShipInsurer.ship_imo)
+            .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.date_from_equasis.desc()))
+            .subquery()
+        )
+
+        return (
+            session.query(ShipInsurer)
+            .join(latest_insurers, ShipInsurer.id == latest_insurers.c.id)
+            .filter(
+                ShipInsurer.ship_imo == ship_imo, ShipInsurer.company_raw_name == company_raw_name
+            )
+            .first()
+        )
 
 
 def update_ship_record_with_raw_equasis(
@@ -509,24 +554,13 @@ def update_ship_record_with_raw_equasis(
     session.commit()
 
 
-def build_new_insurer(
-    ship_imo=None,
-    company_raw_name=None,
-    company_raw_date_from=None,
-):
-    # If this is the first time we collect insurer for this ship,
-    # We assume it has always been this insurer
-    # This is important because we only start querying a ship insurer
-    # After we had a departure with it, and so the first insurer
-    # would always be after the first departure otherwise
-    has_insurer = session.query(ShipInsurer).filter(ShipInsurer.ship_imo == ship_imo).count() > 0
-    date_from_ = company_raw_date_from or dt.datetime.now() if has_insurer else None
+def build_new_insurer(ship_imo=None, company_raw_name=None, company_raw_date_from=None):
     return ShipInsurer(
         company_raw_name=company_raw_name,
         imo=None,
         ship_imo=ship_imo,
         company_id=find_or_create_company_id(raw_name=company_raw_name),
-        date_from_equasis=date_from_,
+        date_from_equasis=company_raw_date_from,
     )
 
 
