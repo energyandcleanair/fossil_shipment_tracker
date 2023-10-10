@@ -14,7 +14,7 @@ from base.models import (
 )
 from api.tests import test_counter
 from api.app import app
-from base.logger import logger_slack, slacker, notify_engineers
+from base.logger import logger_slack, logger, slacker, notify_engineers
 from api.routes.voyage import VoyageResource
 from api.routes.overland import PipelineFlowResource
 from api.routes.counter_last import RussiaCounterLastResource
@@ -184,19 +184,19 @@ def test_insurer():
          WHERE  company_raw_name != 'unknown'),
      problematic
      AS (SELECT s.commodity,
-                u.updated_on - u.date_from,
+                u.updated_on - u.date_from_equasis,
                 u.*,
-                k.date_from,
+                k.date_from_equasis,
                 k.updated_on
          FROM   unknown u
                 LEFT JOIN known k
                        ON u.ship_imo = k.ship_imo
                 LEFT JOIN ship s
                        ON s.imo = u.ship_imo
-         WHERE  ( k.date_from < u.date_from
-                   OR k.date_from IS NULL )
+         WHERE  ( k.date_from_equasis < u.date_from_equasis
+                   OR k.date_from_equasis IS NULL )
                 AND ( k.updated_on > u.updated_on )
-                AND u.updated_on - u.date_from < '100 days'
+                AND u.updated_on - u.date_from_equasis < '100 days'
             )
         SELECT *
         FROM   problematic
@@ -211,10 +211,11 @@ def test_insurer():
             "There are ships marked with Unknown insurers that most likely shouldn't be:\n%s."
             % count.to_string()
         )
+        logger_slack.info(f"Unknown insurers query:\n {raw_sql}")
 
     # Test that those will only one insurer have a null date_from
     raw_sql = """
-        WITH count as (select ship_imo, min(date_from), count(*) from ship_insurer group by 1)
+        WITH count as (select ship_imo, min(date_from_equasis), count(*) from ship_insurer group by 1)
         SELECT * from count where count = 1 and min is not null
         """
 
@@ -222,7 +223,7 @@ def test_insurer():
     # Count how many rows there are
     if wrong_date_from.rowcount > 0:
         logger_slack.error(
-            "There are insurers with date_from = NULL even though these are the only ones identified: %s"
+            "There are insurers with date_from_equasis = NULL even though these are the only ones identified: %s"
             % ", ".join([row[0] for row in wrong_date_from])
         )
     assert wrong_date_from.rowcount == 0
