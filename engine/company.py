@@ -442,45 +442,53 @@ def update_ship_manager(imo, manager_info):
 def update_ship_insurer(imo, equasis_insurers):
     if equasis_insurers:
         for equasis_insurer in equasis_insurers:
-            insurer_raw_name = equasis_insurer.get("name")
-            insurer_raw_date_from = equasis_insurer.get("date_from")
-
-            insurer = get_matching_insurer(ship_imo=imo, company_raw_name=insurer_raw_name)
-            insurer_already_exists = bool(insurer)
-
+            # If it's the first insurer, we enter an empty date_from insurer first.
             first_time_insurer = (
                 session.query(ShipInsurer).filter(ShipInsurer.ship_imo == imo).count() == 0
             )
-            # If it's the first insurer, we enter an empty date_from insurer first.
             if first_time_insurer:
                 insert_first_time_insurer(imo, insurer_raw_name)
 
-            # Then, if there was no matching insurer, we create a new one with the actual date from.
-            # This means we can keep track of the dates of the insurance.
-            if not insurer_already_exists:
-                insurer = build_new_insurer(
-                    ship_imo=imo,
-                    company_raw_name=insurer_raw_name,
-                    company_raw_date_from=insurer_raw_date_from,
-                )
+            insurer_raw_name = equasis_insurer.get("name")
+            insurer_raw_date_from = (
+                equasis_insurer.get("date_from")
+                if equasis_insurer.get("date_from")
+                else dt.datetime.now()
+            )
 
-            # We keep track of consecutive unknowns so that we can mark failures.
+            insurer = get_matching_insurer(
+                ship_imo=imo, company_raw_name=insurer_raw_name, date_from=insurer_raw_date_from
+            )
+
+            insurer_already_exists = bool(insurer)
+            new_record_for_ship = not insurer_already_exists
             consecutive_unknowns = (
                 insurer_already_exists
                 and insurer.company_raw_name == base.UNKNOWN_INSURER
                 and insurer_raw_name == base.UNKNOWN_INSURER
             )
+            would_overwrite_null_date_from = (
+                # If there was an insurer but it has an unknown date_from_equasis
+                insurer_already_exists
+                and insurer.date_from_equasis == None
+            )
 
-            if not consecutive_unknowns:
+            if consecutive_unknowns:
+                update_failed_insurer(imo, insurer)
+                logger.info(f"Multiple consecutive unknown insurer {imo}, marking as checked")
+
+            elif new_record_for_ship or would_overwrite_null_date_from:
+                insert_new_insurer_record(
+                    imo, company_name=insurer_raw_name, date_from=insurer_raw_date_from
+                )
+
+            else:
                 update_insurer(
                     insurer=insurer,
                     imo=imo,
                     insurer_raw_name=insurer_raw_name,
                     insurer_raw_date_from=insurer_raw_date_from,
                 )
-            else:
-                logger.info(f"Multiple consecutive unknown insurer {imo}, marking as checked")
-                update_failed_insurer(imo, insurer)
 
     else:
         logger.info("Couldn't find insurers for %s, marking as checked" % (imo))
@@ -506,6 +514,19 @@ def insert_first_time_insurer(imo, insurer_raw_name):
         imo=imo,
         insurer_raw_name=insurer_raw_name,
         insurer_raw_date_from=None,
+    )
+
+
+def insert_new_insurer_record(imo, company_name=None, date_from=None):
+    update_insurer(
+        insurer=build_new_insurer(
+            ship_imo=imo,
+            company_raw_name=company_name,
+            company_raw_date_from=date_from,
+        ),
+        imo=imo,
+        insurer_raw_name=company_name,
+        insurer_raw_date_from=date_from,
     )
 
 
@@ -619,12 +640,14 @@ def update_insurer(imo=None, insurer_raw_name=None, insurer_raw_date_from=None, 
     insurer.updated_on = dt.datetime.now()
     insurer.checked_on = dt.datetime.now()
     insurer.consecutive_failures = 0
-    if insurer_raw_date_from and insurer.date_from_equasis is not None:
-        # HEURISTIC
-        # Very important assumption about equasis: we only update the date_from if it is not null
-        # It may happen indeed that it was the same insurer before the inception date
-        # and that the contract was only renewed
-        insurer.date_from_equasis = insurer_raw_date_from
+
+    trying_to_update_null_date = (
+        insurer_raw_date_from is not None and insurer.date_from_equasis is None
+    )
+
+    # This shouldn't happen but we want to guarantee that.
+    assert not (trying_to_update_null_date)
+
     session.add(insurer)
     try:
         session.commit()
