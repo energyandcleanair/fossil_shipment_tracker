@@ -531,7 +531,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.id,
                 KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
-                nullslast(ship_insurer_field),
+                nullslast(ship_insurer_field.desc()),
             )
             .cte("voyage_insurer")
             .prefix_with("MATERIALIZED")
@@ -578,7 +578,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.id,
                 KplerTrade.flow_id,
                 trade_ship.c.ship_imo,
-                nullslast(ShipOwner.date_from),
+                nullslast(ShipOwner.date_from.desc()),
             )
             .cte("voyage_owner")
             .prefix_with("MATERIALIZED")

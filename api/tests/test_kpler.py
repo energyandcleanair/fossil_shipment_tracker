@@ -794,9 +794,6 @@ def test_kpler_trade_commodity_origin(app):
 
 def test_kpler_trade_ship_insurer(app):
     with app.test_client() as test_client:
-        date_from = "2023-01-01"
-        date_to = "2023-01-31"
-
         # Confirmed all ships of these against the original P&I providers.
         SINGLE_SHIP_UNKNOWN_INSURER = {
             "trade_id": 3108824,
@@ -835,6 +832,13 @@ def test_kpler_trade_ship_insurer(app):
                 "United Kingdom",
             ],
         }
+        SHIP_WAS_INSURED_NOW_NOT = {
+            "trade_id": 18554905,
+            "vessel_imos": ["9259745"],
+            "ship_insurer_names": ["unknown"],
+            "ship_insurer_iso2s": ["unknown"],
+            "ship_insurer_regions": ["unknown"],
+        }
 
         expected = pd.DataFrame.from_dict(
             [
@@ -842,6 +846,7 @@ def test_kpler_trade_ship_insurer(app):
                 SINGLE_SHIP_WITH_INSURER,
                 MULTI_SHIP_ONE_INSURER,
                 MULTI_SHIP_MULTIPLE_INSURERS,
+                SHIP_WAS_INSURED_NOW_NOT,
             ]
         )
 
