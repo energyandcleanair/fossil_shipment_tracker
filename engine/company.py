@@ -442,19 +442,19 @@ def update_ship_manager(imo, manager_info):
 def update_ship_insurer(imo, equasis_insurers):
     if equasis_insurers:
         for equasis_insurer in equasis_insurers:
-            # If it's the first insurer, we enter an empty date_from insurer first.
-            first_time_insurer = (
-                session.query(ShipInsurer).filter(ShipInsurer.ship_imo == imo).count() == 0
-            )
-            if first_time_insurer:
-                insert_first_time_insurer(imo, insurer_raw_name)
-
             insurer_raw_name = equasis_insurer.get("name")
             insurer_raw_date_from = (
                 equasis_insurer.get("date_from")
                 if equasis_insurer.get("date_from")
                 else dt.datetime.now()
             )
+
+            # If it's the first insurer, we enter an empty date_from insurer first.
+            first_time_insurer = (
+                session.query(ShipInsurer).filter(ShipInsurer.ship_imo == imo).count() == 0
+            )
+            if first_time_insurer:
+                insert_first_time_insurer(imo, insurer_raw_name)
 
             insurer = get_matching_insurer(
                 ship_imo=imo, company_raw_name=insurer_raw_name, date_from=insurer_raw_date_from

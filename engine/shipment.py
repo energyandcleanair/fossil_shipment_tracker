@@ -26,7 +26,7 @@ def rebuild(date_from="2021-01-01"):
     update(date_from=date_from)
 
 
-def update(date_from="2021-01-01"):
+def update(date_from="2021-01-01", skip_chart=False):
     logger_slack.info("=== Shipment update ===")
 
     with open("engine/shipment_refresh_sts.sql", "r") as file:
@@ -41,7 +41,8 @@ def update(date_from="2021-01-01"):
     )
     execute_statement(sql_content, print_result=True, slack_result=True)
 
-    send_diagnostic_chart()
+    if not skip_chart:
+        send_diagnostic_chart()
 
     # # Create a shipment for each dangling departure
     # # and complete it for each arrival
