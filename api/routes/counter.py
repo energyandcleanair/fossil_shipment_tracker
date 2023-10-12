@@ -12,7 +12,7 @@ from sqlalchemy import case
 from operator import attrgetter
 
 from . import routes_api, postcompute
-from base import PRICING_DEFAULT
+from base import PRICING_DEFAULT, COUNTER_VERSION_DEFAULT
 from base.logger import logger
 from base.db import session
 from base.models import Counter, Country, Currency, PriceScenario
@@ -24,7 +24,6 @@ from .commodity import get_subquery as get_commodity_subquery
 class RussiaCounterResource(Resource):
     @staticmethod
     def get_aggregateby_cols(subquery=None):
-
         aggregate_cols_dict = {
             "currency": ["currency"],
             "pricing_scenario": [
@@ -262,7 +261,10 @@ class RussiaCounterResource(Resource):
     parser.add_argument("language", type=str, help="en or ua", default="en", required=False)
 
     parser.add_argument(
-        "version", help="Which counter version to use", type=str, default=base.COUNTER_VERSION0
+        "version",
+        help="Which counter version to use (v0=MarineTraffic/Datalastic, v1=Kpler Flows, v2=Kpler Trades)",
+        type=str,
+        default=COUNTER_VERSION_DEFAULT,
     )
 
     @routes_api.expect(parser)

@@ -8,6 +8,7 @@ from flask_restx import Resource, reqparse
 
 
 import base
+from base import CHARTS_USE_KPLER_DEFAULT
 from base.logger import logger
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
@@ -130,7 +131,9 @@ class ChartDepartureOwnership(Resource):
         default=None,
     )
 
-    parser.add_argument("use_kpler", help="Whether to use Kpler or MT", type=bool, default=False)
+    parser.add_argument(
+        "use_kpler", help="Whether to use Kpler or MT", type=bool, default=CHARTS_USE_KPLER_DEFAULT
+    )
 
     @routes_api.expect(parser)
     def get(self):
