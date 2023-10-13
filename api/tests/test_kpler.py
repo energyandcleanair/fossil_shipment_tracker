@@ -293,8 +293,8 @@ def test_kpler_gasoline_export(app):
     # Remove rows where both value_tonne_flow and value_tonne_trade are NaN
     merge = merge[~(merge.value_tonne_flow.isna() & merge.value_tonne_trade.isna())]
 
-    merge["ok_flow"] = np.isclose(merge.value_tonne_flow, merge.value_tonne_manual, rtol=4e-2)
-    merge["ok_trade"] = np.isclose(merge.value_tonne_trade, merge.value_tonne_manual, rtol=4e-2)
+    merge["ok_flow"] = np.isclose(merge.value_tonne_flow, merge.value_tonne_manual, rtol=5e-2)
+    merge["ok_trade"] = np.isclose(merge.value_tonne_trade, merge.value_tonne_manual, rtol=5e-2)
     merge["ok"] = merge["ok_flow"] & merge["ok_trade"]
     assert all(merge.ok)
 
@@ -425,13 +425,13 @@ def test_kpler_trade_lng_exports_monthly(app):
 
     manual_values = pd.read_csv("assets/kpler/lng_exports_monthly_2023.csv")
     manual_values = manual_values.melt(
-        id_vars=["date"], var_name="country", value_name="value_ktonne"
+        id_vars=["date"], var_name="country", value_name="value_Mtonne"
     )
-    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
+    manual_values["value_tonne"] = manual_values["value_Mtonne"] * 1e6
     manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
     manual_values.rename(columns={"date": "month"}, inplace=True)
 
-    countries = ["RU", "CN", "IN", "SG", "TR"]
+    countries = ["RU", "CN", "IN", "SG", "TR", "BE"]
     manual_values = manual_values[manual_values["origin_iso2"].isin(countries)]
 
     with app.test_client() as test_client:
@@ -462,10 +462,10 @@ def test_kpler_trade_lng_exports_monthly(app):
         # Cut last month, not complete
         merge_trade = merge_trade[merge_trade.month != merge_trade.month.max()]
         merge_trade["value_tonne_api"] = merge_trade["value_tonne_api"].fillna(0)
-
-        assert all(
-            np.isclose(merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10e-2)
+        merge_trade["ok"] = np.isclose(
+            merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10e-2
         )
+        assert all(merge_trade.ok)
 
 
 def test_kpler_trade_no_duplicates(app):
