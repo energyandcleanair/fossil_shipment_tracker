@@ -233,6 +233,8 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
             "pricing_scenario",
         ]
     ]
+    # TODO Check why we have some na dates
+    result = result[~pd.isna(result.date)]
     result["date"] = pd.to_datetime(result["date"]).dt.floor("D")  # Should have been done already
     result = (
         result.groupby(
