@@ -9,7 +9,7 @@ from flask_restx import Resource, reqparse
 import base
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
-from routes.charts.voyage_data_proxy import get_voyages
+from .voyage_data_proxy import get_voyages
 from .. import routes_api, ns_charts
 from ..voyage import VoyageResource
 
