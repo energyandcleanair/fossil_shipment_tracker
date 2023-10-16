@@ -53,6 +53,13 @@ class ChartTotalPayments(Resource):
         default="json",
     )
 
+    parser.add_argument(
+        "version",
+        help="Which counter version to use (v0=MarineTraffic/Datalastic, v1=Kpler Flows, v2=Kpler Trades)",
+        type=str,
+        default=base.COUNTER_VERSION_DEFAULT,
+    )
+
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterResource.parser.parse_args()
@@ -75,7 +82,6 @@ class ChartTotalPayments(Resource):
                 "nest_in_data": True,
                 "destination_region": None,
                 "limit": None,
-                "version": base.COUNTER_VERSION0,
             }
         )
 

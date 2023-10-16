@@ -15,7 +15,6 @@ from ..counter import RussiaCounterResource
 
 @ns_charts.route("/v0/chart/monthly_payments", strict_slashes=False)
 class ChartMonthlyPayments(Resource):
-
     parser = reqparse.RequestParser()
 
     parser.add_argument(
@@ -78,9 +77,15 @@ class ChartMonthlyPayments(Resource):
         default="json",
     )
 
+    parser.add_argument(
+        "version",
+        help="Which counter version to use (v0=MarineTraffic/Datalastic, v1=Kpler Flows, v2=Kpler Trades)",
+        type=str,
+        default=base.COUNTER_VERSION_DEFAULT,
+    )
+
     @routes_api.expect(parser)
     def get(self):
-
         params = RussiaCounterResource.parser.parse_args()
         params_chart = ChartMonthlyPayments.parser.parse_args()
         format = params_chart.get("format")
@@ -122,9 +127,7 @@ class ChartMonthlyPayments(Resource):
 
         if add_total_region:
             data_global = (
-                data.groupby(["month", "variable"])[["Oil", "Coal", "Gas"]]
-                .sum()
-                .reset_index()
+                data.groupby(["month", "variable"])[["Oil", "Coal", "Gas"]].sum().reset_index()
             )
 
             data_global["destination_region"] = "Total"
@@ -133,9 +136,7 @@ class ChartMonthlyPayments(Resource):
 
         # Then only can filter region
         if destination_region:
-            data = data[
-                data.destination_region.isin(to_list(destination_region + ["Total"]))
-            ]
+            data = data[data.destination_region.isin(to_list(destination_region + ["Total"]))]
 
         # Sort by region
         data["Total"] = data.Coal + data.Oil + data.Gas
@@ -147,12 +148,9 @@ class ChartMonthlyPayments(Resource):
         )
         data = regions.merge(data).drop("Total", axis=1)
 
-        return self.build_response(
-            result=data, format=format, nest_in_data=nest_in_data
-        )
+        return self.build_response(result=data, format=format, nest_in_data=nest_in_data)
 
     def build_response(self, result, format, nest_in_data):
-
         result.replace({np.nan: None}, inplace=True)
 
         # If bulk and departure berth is coal, replace commodity with coal
@@ -160,9 +158,7 @@ class ChartMonthlyPayments(Resource):
             return Response(
                 response=result.to_csv(index=False),
                 mimetype="text/csv",
-                headers={
-                    "Content-disposition": "attachment; filename=chart_monthly_payments.csv"
-                },
+                headers={"Content-disposition": "attachment; filename=chart_monthly_payments.csv"},
             )
 
         if format == "json":
@@ -171,13 +167,9 @@ class ChartMonthlyPayments(Resource):
                     {"data": result.to_dict(orient="records")}, cls=JsonEncoder
                 )
             else:
-                resp_content = json.dumps(
-                    result.to_dict(orient="records"), cls=JsonEncoder
-                )
+                resp_content = json.dumps(result.to_dict(orient="records"), cls=JsonEncoder)
 
-            return Response(
-                response=resp_content, status=200, mimetype="application/json"
-            )
+            return Response(response=resp_content, status=200, mimetype="application/json")
 
         return Response(
             response="Unknown format. Should be either csv or json",
