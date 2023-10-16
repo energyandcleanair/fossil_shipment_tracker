@@ -147,7 +147,6 @@ class ChartDepartureDestination(Resource):
         pivot_value = params_chart.get("pivot_value")
         departure_date_from = params_chart.get("departure_date_from")
         language = params_chart.get("language")
-        aggregate_by = params_chart.get("aggregate_by")
         use_kpler = params_chart.get("use_kpler")
 
         params.update(**params_chart)
@@ -322,7 +321,7 @@ class ChartDepartureDestination(Resource):
             data_overland = None
 
         # Get voyages
-        data_voyage = get_voyages(params, aggregate_by=aggregate_by, use_kpler=use_kpler)
+        data_voyage = get_voyages(params, use_kpler=use_kpler)
         if not data_voyage.empty:
             data_voyage = remove_coal_to_eu(data_voyage)
             data_voyage["departure_date"] = pd.to_datetime(data_voyage.departure_date)

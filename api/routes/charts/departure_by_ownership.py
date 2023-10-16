@@ -196,7 +196,7 @@ class ChartDepartureOwnership(Resource):
             }
         )
 
-        data = get_voyages(params, use_kpler=use_kpler, aggregate_by=aggregate_by)
+        data = get_voyages(params, use_kpler=use_kpler)
         data["departure_date"] = pd.to_datetime(data.departure_date).dt.date
 
         def translate(data, language):
