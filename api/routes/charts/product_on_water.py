@@ -9,6 +9,7 @@ from flask_restx import Resource, reqparse
 import base
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
+from routes.charts.voyage_data_proxy import get_voyages
 from .. import routes_api, ns_charts
 from ..voyage import VoyageResource
 
@@ -103,6 +104,13 @@ class ChartProductOnWater(Resource):
         default="json",
     )
 
+    parser.add_argument(
+        "use_kpler",
+        help="Whether to use Kpler or MT",
+        type=bool,
+        default=base.CHARTS_USE_KPLER_DEFAULT,
+    )
+
     recode_commodity = {
         "coal": "Coal",
         "coal_rail_road": "Coal",
@@ -135,13 +143,13 @@ class ChartProductOnWater(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-
         params = VoyageResource.parser.parse_args()
         params_chart = ChartProductOnWater.parser.parse_args()
         format = params_chart.get("format")
         language = params_chart.get("language")
         nest_in_data = params_chart.get("nest_in_data")
         pivot_value = params_chart.get("pivot_value")
+        use_kpler = params_chart.get("use_kpler")
 
         params.update(**params_chart)
         params.update(
@@ -168,8 +176,7 @@ class ChartProductOnWater(Resource):
 
             return data
 
-        response = VoyageResource().get_from_params(params)
-        data = pd.DataFrame(response.json["data"])
+        data = get_voyages(params, use_kpler=use_kpler)
 
         data["arrival_detected_date"] = pd.to_datetime(data["arrival_detected_date"])
         data["arrival_detected_date"].fillna(
@@ -244,7 +251,6 @@ class ChartProductOnWater(Resource):
         result = pd.concat(result)
 
         def pivot_data(data, variable):
-
             # Add the variable for transparency sake
             data["variable"] = variable
             result = (
@@ -289,7 +295,6 @@ class ChartProductOnWater(Resource):
         return data
 
     def build_response(self, result, format, nest_in_data):
-
         result.replace({np.nan: None}, inplace=True)
 
         # If bulk and departure berth is coal, replace commodity with coal
