@@ -957,19 +957,14 @@ class VoyageResource(Resource):
         if map_unconfirmed_region_eu_to_unknown:
             destination_region_field = case(
                 (
-                    sa.or_(
-                        sa.and_(
+                    sa.and_(
+                        sa.or_(
                             shipments_combined.c.shipment_status == "ongoing",
-                            commodity_subquery.c.group_name == "Crude oil",
-                            DestinationCountry.region == "EU",
-                            destination_iso2_field != "BG",
-                        ),
-                        sa.and_(
                             Departure.date_utc > "2022-12-05",
-                            commodity_subquery.c.group_name == "Crude oil",
-                            DestinationCountry.region == "EU",
-                            destination_iso2_field != "BG",
                         ),
+                        commodity_subquery.c.group_name == "Crude oil",
+                        DestinationCountry.region == "EU",
+                        destination_iso2_field != "BG",
                     ),
                     "Unknown",
                 ),
