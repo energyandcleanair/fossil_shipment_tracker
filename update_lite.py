@@ -46,14 +46,15 @@ def update():
     position.update(date_from=dt.date.today() - dt.timedelta(days=90))
     destination.update()
     berth.update()
-    #sts.update(date_from=dt.date.today() - dt.timedelta(days=90))
+    # sts.update(date_from=dt.date.today() - dt.timedelta(days=90))
     entsog.update(date_from=-21, nodata_error_date_from=-4)
     rscript.update()
     trajectory.update()
     flaring.update()
-    #alert.update()
+    # alert.update()
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)
+    counter.update(version=base.COUNTER_VERSION2)
     integrity.check()
     return
 

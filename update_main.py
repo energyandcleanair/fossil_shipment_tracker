@@ -55,6 +55,7 @@ def update():
     alert.update()
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)
+    counter.update(version=base.COUNTER_VERSION2)
     backuper.update()
     integrity.check()
     return
