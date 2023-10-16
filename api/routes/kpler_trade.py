@@ -100,6 +100,13 @@ class KplerTradeResource(TemplateResource):
         action="split",
         default=None,
     )
+    parser.add_argument(
+        "destination_iso2_not",
+        action="split",
+        help="countries(s) of destination to exclude e.g. RU",
+        required=False,
+        default=None,
+    )
 
     parser.add_argument(
         "destination_region",
@@ -214,6 +221,14 @@ class KplerTradeResource(TemplateResource):
         help="filters where destination_installation_id is any of the provided",
     )
 
+    parser.add_argument(
+        "map_unconfirmed_region_eu_to_unknown",
+        type=bool,
+        help="Maps destination region to unknown if the destination of the EU is not likely.",
+        required=False,
+        default=False,
+    )
+
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date", "origin_date", "destination_date"]
     value_cols = ["value_tonne", "value_m3", "value_gas_m3", "value_eur", "value_currency"]
@@ -299,29 +314,43 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.group,
                 subquery.c.family,
                 subquery.c.commodity_equivalent,
+                subquery.c.commodity_equivalent_name,
                 subquery.c.commodity_equivalent_group,
+                subquery.c.commodity_equivalent_group_name,
             ],
             "commodity": [
                 subquery.c.commodity,
                 subquery.c.group,
                 subquery.c.family,
                 subquery.c.commodity_equivalent,
+                subquery.c.commodity_equivalent_name,
                 subquery.c.commodity_equivalent_group,
+                subquery.c.commodity_equivalent_group_name,
             ],
             "group": [
                 subquery.c.group,
-                subquery.c.commodity_equivalent,
                 subquery.c.commodity_equivalent_group,
+                subquery.c.commodity_equivalent_group_name,
             ],
             "commodity_equivalent": [
                 subquery.c.commodity_equivalent,
+                subquery.c.commodity_equivalent_name,
                 subquery.c.commodity_equivalent_group,
+                subquery.c.commodity_equivalent_group_name,
             ],
             "commodity_equivalent_name": [
+                subquery.c.commodity_equivalent,
                 subquery.c.commodity_equivalent_name,
+                subquery.c.commodity_equivalent_group,
+                subquery.c.commodity_equivalent_group_name,
             ],
             "commodity_equivalent_group": [
                 subquery.c.commodity_equivalent_group,
+                subquery.c.commodity_equivalent_group_name,
+            ],
+            "commodity_equivalent_group_name": [
+                subquery.c.commodity_equivalent_group,
+                subquery.c.commodity_equivalent_group_name,
             ],
             "currency": [subquery.c.currency],
             "origin_date": [
@@ -348,6 +377,7 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.ship_owner_regions,
             ],
             "ownership_sanction_coverage": [subquery.c.ownership_sanction_coverage],
+            "status": [subquery.c.status],
         }
 
     def get_agg_value_cols(self, subquery):
@@ -375,6 +405,8 @@ class KplerTradeResource(TemplateResource):
         CommodityDestinationCountry = aliased(Country)
 
         price_date = func.date_trunc("day", KplerTrade.departure_date_utc)
+
+        map_unconfirmed_region_eu_to_unknown = params.get("map_unconfirmed_region_eu_to_unknown")
 
         unnested_vessels = (
             func.unnest(KplerTrade.vessel_imos)
@@ -790,6 +822,24 @@ class KplerTradeResource(TemplateResource):
             else_="Unknown",
         ).label("ownership_sanction_coverage")
 
+        destination_region_field = CommodityDestinationCountry.region.label("destination_region")
+        if map_unconfirmed_region_eu_to_unknown:
+            destination_region_field = case(
+                (
+                    sa.and_(
+                        sa.or_(
+                            KplerTrade.status == "ongoing",
+                            KplerTrade.departure_date_utc > "2022-12-05",
+                        ),
+                        CommodityEquivalent.name == "Crude oil",
+                        CommodityDestinationCountry.region == "EU",
+                        destination_zone.country_iso2 != "BG",
+                    ),
+                    "Unknown",
+                ),
+                else_=CommodityDestinationCountry.region,
+            ).label("destination_region")
+
         query = (
             session.query(
                 # Renaming everything in terms of "origin" and "destination"
@@ -819,7 +869,7 @@ class KplerTradeResource(TemplateResource):
                 destination_zone.port_name.label("destination_port_name"),
                 destination_zone.country_name.label("destination_country"),
                 destination_zone.country_iso2.label("destination_iso2"),
-                CommodityDestinationCountry.region.label("destination_region"),
+                destination_region_field,
                 destination_zone.country_name.label("commodity_destination_country"),
                 destination_zone.country_iso2.label("commodity_destination_iso2"),
                 CommodityDestinationCountry.region.label("commodity_destination_region"),
@@ -830,6 +880,7 @@ class KplerTradeResource(TemplateResource):
                 Commodity.equivalent_id.label("commodity_equivalent"),  # For filtering
                 CommodityEquivalent.name.label("commodity_equivalent_name"),
                 CommodityEquivalent.group.label("commodity_equivalent_group"),
+                CommodityEquivalent.group_name.label("commodity_equivalent_group_name"),
                 Price.scenario.label("pricing_scenario"),
                 KplerTrade.value_tonne,
                 KplerTrade.value_m3,
@@ -921,6 +972,7 @@ class KplerTradeResource(TemplateResource):
         origin_port_name = params.get("origin_port_name")
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
         destination_iso2 = params.get("destination_iso2")
+        destination_iso2_not = params.get("destination_iso2_not")
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
         destination_port_name = params.get("destination_port_name")
         destination_region = params.get("destination_region")
@@ -1001,6 +1053,8 @@ class KplerTradeResource(TemplateResource):
 
         if destination_iso2:
             query = query.filter(subquery.c.destination_iso2.in_(to_list(destination_iso2)))
+        if destination_iso2_not:
+            query = query.filter(subquery.c.destination_iso2.notin_(to_list(destination_iso2_not)))
 
         if commodity:
             query = query.filter(subquery.c.commodity.in_(to_list(commodity)))

@@ -13,8 +13,8 @@ from base.logger import logger
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from .. import routes_api, ns_charts
-from ..voyage import VoyageResource
-from ..kpler_trade import KplerTradeResource
+
+from .voyage_data_proxy import get_voyages
 
 
 @ns_charts.route("/v0/chart/departure_by_ownership", strict_slashes=False)
@@ -196,7 +196,8 @@ class ChartDepartureOwnership(Resource):
             }
         )
 
-        data = self.get_voyages(params, use_kpler=use_kpler, aggregate_by=aggregate_by)
+        data = get_voyages(params, use_kpler=use_kpler, aggregate_by=aggregate_by)
+        data["departure_date"] = pd.to_datetime(data.departure_date).dt.date
 
         def translate(data, language):
             if language != "en":
@@ -291,34 +292,3 @@ class ChartDepartureOwnership(Resource):
             status=HTTPStatus.BAD_REQUEST,
             mimetype="application/json",
         )
-
-    def get_voyages(self, params, aggregate_by, use_kpler=False):
-        if use_kpler:
-            return self.get_voyages_kpler(params, aggregate_by)
-        else:
-            return self.get_voyages_mt(params, aggregate_by)
-
-    def get_voyages_kpler(self, params, aggregate_by):
-        params_kpler = params.copy()
-        params_kpler["commodity_equivalent"] = params_kpler["commodity"]
-        params_kpler["commodity"] = None
-        corr = {
-            "departure_date": "origin_date",
-            "commodity_group": "commodity_equivalent_name",
-        }
-        params_kpler["aggregate_by"] = [corr.get(x, x) for x in aggregate_by]
-
-        response = KplerTradeResource().get_from_params(params_kpler)
-        data = pd.DataFrame(response.json["data"])
-        data["departure_date"] = pd.to_datetime(data.origin_date).dt.date
-        data["commodity_group_name"] = data["commodity_equivalent_name"]
-        return data
-
-    def get_voyages_mt(self, params, aggregate_by):
-        params_voyages = params.copy()
-        params_voyages["aggregate_by"] = aggregate_by
-
-        response = VoyageResource().get_from_params(params_voyages)
-        data = pd.DataFrame(response.json["data"])
-        data["departure_date"] = pd.to_datetime(data.departure_date).dt.date
-        return data

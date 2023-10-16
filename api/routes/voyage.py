@@ -241,6 +241,13 @@ class VoyageResource(Resource):
         default=None,
     )
     parser.add_argument(
+        "destination_iso2_not",
+        action="split",
+        help="countries(s) of destination to exclude e.g. RU",
+        required=False,
+        default=None,
+    )
+    parser.add_argument(
         "destination_region",
         action="split",
         help="region(s) of destination e.g. EU,Turkey",
@@ -426,6 +433,14 @@ class VoyageResource(Resource):
         default=None,
     )
 
+    parser.add_argument(
+        "map_unconfirmed_region_eu_to_unknown",
+        type=bool,
+        help="Maps destination region to unknown if the destination of the EU is not likely.",
+        required=False,
+        default=False,
+    )
+
     @routes_api.expect(parser)
     def get(self):
         params = VoyageResource.parser.parse_args()
@@ -462,6 +477,7 @@ class VoyageResource(Resource):
         departure_port_area = params.get("departure_port_area")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
+        destination_iso2_not = params.get("destination_iso2_not")
         commodity_destination_iso2 = params.get("commodity_destination_iso2")
         commodity_destination_iso2_not = params.get("commodity_destination_iso2_not")
         commodity_destination_region = params.get("commodity_destination_region")
@@ -485,6 +501,7 @@ class VoyageResource(Resource):
         arrival_year = params.get("arrival_year")
 
         pricing_scenario = params.get("pricing_scenario")
+        map_unconfirmed_region_eu_to_unknown = params.get("map_unconfirmed_region_eu_to_unknown")
 
         ship_imo = params.get("ship_imo")
         aggregate_by = params.get("aggregate_by")
@@ -936,6 +953,29 @@ class VoyageResource(Resource):
             else_="Unknown",
         ).label("ownership_sanction_coverage")
 
+        destination_region_field = DestinationCountry.region.label("destination_region")
+        if map_unconfirmed_region_eu_to_unknown:
+            destination_region_field = case(
+                (
+                    sa.or_(
+                        sa.and_(
+                            shipments_combined.c.shipment_status == "ongoing",
+                            commodity_subquery.c.group_name == "Crude oil",
+                            DestinationCountry.region == "EU",
+                            destination_iso2_field != "BG",
+                        ),
+                        sa.and_(
+                            Departure.date_utc > "2022-12-05",
+                            commodity_subquery.c.group_name == "Crude oil",
+                            DestinationCountry.region == "EU",
+                            destination_iso2_field != "BG",
+                        ),
+                    ),
+                    "Unknown",
+                ),
+                else_=DestinationCountry.region,
+            ).label("destination_region")
+
         # Query with joined information
         shipments_rich = (
             session.query(
@@ -978,7 +1018,7 @@ class VoyageResource(Resource):
                 Destination.name.label("destination_name"),
                 destination_iso2_field,
                 DestinationCountry.name.label("destination_country"),
-                DestinationCountry.region.label("destination_region"),
+                destination_region_field,
                 shipments_combined.c.shipment_destination_names.label("destination_names"),
                 shipments_combined.c.shipment_destination_dates.label("destination_dates"),
                 shipments_combined.c.shipment_destination_iso2s.label("destination_iso2s"),
@@ -1303,10 +1343,14 @@ class VoyageResource(Resource):
             shipments_rich = shipments_rich.filter(
                 destination_iso2_field.in_(to_list(destination_iso2))
             )
+        if destination_iso2_not:
+            query = shipments_rich.filter(
+                destination_iso2_field.notin_(to_list(destination_iso2_not))
+            )
 
         if destination_region is not None:
             shipments_rich = shipments_rich.filter(
-                DestinationCountry.region.in_(to_list(destination_region))
+                destination_region_field.in_(to_list(destination_region))
             )
 
         if commodity_origin_iso2 is not None:
@@ -1453,7 +1497,17 @@ class VoyageResource(Resource):
                 subquery.c.commodity_group,
                 subquery.c.commodity_group_name,
             ],
+            "commodity_name": [
+                subquery.c.commodity,
+                subquery.c.commodity_name,
+                subquery.c.commodity_group,
+                subquery.c.commodity_group_name,
+            ],
             "commodity_group": [
+                subquery.c.commodity_group,
+                subquery.c.commodity_group_name,
+            ],
+            "commodity_group_name": [
                 subquery.c.commodity_group,
                 subquery.c.commodity_group_name,
             ],

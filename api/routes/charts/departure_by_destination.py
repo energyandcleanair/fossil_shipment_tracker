@@ -10,12 +10,15 @@ from flask_restx import Resource, reqparse
 
 
 import base
+from base import CHARTS_USE_KPLER_DEFAULT
 from base.encoder import JsonEncoder
 from base.utils import to_list
 from .. import postcompute
 from .. import routes_api, ns_charts
 from ..voyage import VoyageResource
 from ..overland import PipelineFlowResource
+
+from .voyage_data_proxy import get_voyages
 
 
 @ns_charts.route("/v0/chart/departure_by_destination", strict_slashes=False)
@@ -71,7 +74,7 @@ class ChartDepartureDestination(Resource):
         "aggregate_by",
         type=str,
         action="split",
-        default=["destination_country", "commodity", "departure_date", "status"],
+        default=["destination_country", "commodity_group_name", "departure_date", "status"],
         help="which variables to aggregate by. Could be any of commodity, type, destination_region, date",
     )
 
@@ -124,6 +127,10 @@ class ChartDepartureDestination(Resource):
         default="json",
     )
 
+    parser.add_argument(
+        "use_kpler", help="Whether to use Kpler or MT", type=bool, default=CHARTS_USE_KPLER_DEFAULT
+    )
+
     @routes_api.expect(parser)
     def get(self):
         params = VoyageResource.parser.parse_args()
@@ -140,8 +147,8 @@ class ChartDepartureDestination(Resource):
         pivot_value = params_chart.get("pivot_value")
         departure_date_from = params_chart.get("departure_date_from")
         language = params_chart.get("language")
-        rolling_days = params_chart.get("rolling_days")
         aggregate_by = params_chart.get("aggregate_by")
+        use_kpler = params_chart.get("use_kpler")
 
         params.update(**params_chart)
         params.update(
@@ -151,13 +158,13 @@ class ChartDepartureDestination(Resource):
                 "use_eu": True,
                 "commodity_origin_iso2": "RU",
                 "commodity_destination_iso2_not": "RU",
+                "destination_iso2_not": "RU",
                 "date_to": None,
                 "departure_date_to": date_to,
                 "commodity": None if add_total_commodity else commodity,
                 # 'date_from': '2022-01-01',
                 "pricing_scenario": [base.PRICING_DEFAULT],
                 # 'sort_by': ['value_tonne'],
-                "rolling_days": None,
                 "currency": "EUR",
                 "keep_zeros": True,
                 "format": "json",
@@ -169,12 +176,11 @@ class ChartDepartureDestination(Resource):
         params_overland.update(
             **{
                 "commodity_origin_iso2": "RU",
-                "aggregate_by": ["destination_country", "commodity", "date"],
+                "aggregate_by": ["destination_country", "commodity_group_name", "date"],
                 "date_from": departure_date_from,
                 "date_to": date_to,
                 "commodity": None if add_total_commodity else commodity,
                 "pricing_scenario": [base.PRICING_DEFAULT],
-                "rolling_days": rolling_days,
                 "currency": "EUR",
                 "keep_zeros": True,
                 "format": "json",
@@ -201,11 +207,11 @@ class ChartDepartureDestination(Resource):
                         & ~data.destination_iso2.isin(exclude_countries)
                         & (data.destination_region != "Unknown")
                     ]
-                    .groupby(["commodity_group", "destination_country"])
+                    .groupby(["commodity_group_name", "destination_country"])
                     .value_tonne.sum()
                     .reset_index()
                     .sort_values("value_tonne", ascending=False)
-                    .groupby(["commodity_group"])
+                    .groupby(["commodity_group_name"])
                     .head(n)
                 )
 
@@ -231,7 +237,6 @@ class ChartDepartureDestination(Resource):
             data = (
                 data.groupby(
                     [
-                        "commodity_group",
                         "commodity_group_name",
                         "region",
                         "departure_date",
@@ -260,13 +265,13 @@ class ChartDepartureDestination(Resource):
             data["variable"] = pivot_value
             result = (
                 data.groupby(
-                    ["region", "departure_date", "commodity_group", "variable"],
+                    ["region", "departure_date", "commodity_group_name", "variable"],
                     dropna=False,
                 )[pivot_value]
                 .sum()
                 .reset_index()
                 .pivot_table(
-                    index=["commodity_group", "departure_date", "variable"],
+                    index=["commodity_group_name", "departure_date", "variable"],
                     columns=[pivot_by],
                     values=pivot_value,
                     sort=False,
@@ -301,21 +306,9 @@ class ChartDepartureDestination(Resource):
             value_cols = [c for c in data.columns if re.match("value", c)]
             data_global = data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
 
-            data_global["commodity_group"] = "Total"
-            data_global["commodity"] = "Total"
+            data_global["commodity_group_name"] = "Total"
 
             data = pd.concat([data, data_global])
-            return data
-
-        def group_commodities(data):
-            # And regroup by commodity_group
-            groupby_cols = [
-                c
-                for c in data.columns
-                if c not in ["commodity", "commodity_name"] and not re.match("value", c)
-            ]
-            value_cols = [c for c in data.columns if re.match("value", c)]
-            data = data.groupby(groupby_cols, dropna=False)[value_cols].sum().reset_index()
             return data
 
         # Get overland
@@ -329,49 +322,21 @@ class ChartDepartureDestination(Resource):
             data_overland = None
 
         # Get voyages
-        response_voyage = VoyageResource().get_from_params(params)
-        if response_voyage.status_code == 200:
-            data_voyage = pd.DataFrame(response_voyage.json["data"])
-            data_voyage = data_voyage[data_voyage.destination_iso2 != "RU"]
+        data_voyage = get_voyages(params, aggregate_by=aggregate_by, use_kpler=use_kpler)
+        if not data_voyage.empty:
             data_voyage = remove_coal_to_eu(data_voyage)
             data_voyage["departure_date"] = pd.to_datetime(data_voyage.departure_date)
+
             data_voyage.replace({base.UNKNOWN: "Unknown"}, inplace=True)
-            # Also remove shipments to EU since 2022-12-05 until we can verify these are correct/breaking sanctions
-            # Any ongoing shipments do not show as to EU - this can look misleading so set them as unknown
-            data_voyage["destination_region"] = np.where(
-                (
-                    (data_voyage["status"] == "ongoing")
-                    & (data_voyage["commodity_group_name"] == "Crude oil")
-                    & (data_voyage["destination_region"] == "EU")
-                    & (data_voyage["destination_iso2"] != "BG")
-                )
-                | (
-                    (data_voyage["destination_region"] == "EU")
-                    & (data_voyage["commodity_group_name"] == "Crude oil")
-                    & (data_voyage["destination_iso2"] != "BG")
-                    & (data_voyage["departure_date"] > "2022-12-05")
-                ),
-                "Unknown",
-                data_voyage["destination_region"],
-            )
-
-            data_voyage = data_voyage.drop(["status", "ship_dwt", "count"], axis=1)
-            data_voyage = VoyageResource().roll_average(
-                result=data_voyage, aggregate_by=aggregate_by, rolling_days=rolling_days
-            )
-        else:
-            # Happens when no voyage commodity selected
-            data_voyage = None
-
         data = pd.concat([data_overland, data_voyage])
         data["departure_date"] = pd.to_datetime(data["departure_date"]).dt.date
+
         if add_total_commodity:
             data = add_total(data)
             if commodity:
                 data = data[data.commodity.isin(to_list(commodity) + ["Total"])]
 
         data = group_countries(data, country_grouping)
-        data = group_commodities(data)
         if pivot_by is not None and pivot_by != "":
             data = pivot_data(data, pivot_by=pivot_by, pivot_value=pivot_value)
         data = self.postcompute(data, params=params)

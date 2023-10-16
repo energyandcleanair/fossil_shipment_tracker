@@ -14,7 +14,6 @@ from . import routes_api
 
 @routes_api.route("/v0/commodity", methods=["GET"], strict_slashes=False)
 class CommodityResource(Resource):
-
     parser = reqparse.RequestParser()
     parser.add_argument(
         "nest_in_data",
@@ -32,7 +31,6 @@ class CommodityResource(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-
         params = CommodityResource.parser.parse_args()
         format = params.get("format")
         nest_in_data = params.get("nest_in_data")
@@ -81,8 +79,8 @@ def get_subquery(session, grouping_name=None):
             Commodity.transport,
             Commodity.name,
             Commodity.pricing_commodity,
-            Commodity.alternative_groups[grouping_name].label("group"),
-            Commodity.alternative_groups[grouping_name].label("group_name"),
+            Commodity.alternative_groups[grouping_name].astext.label("group"),
+            Commodity.alternative_groups[grouping_name].astext.label("group_name"),
         ).subquery()
 
 
