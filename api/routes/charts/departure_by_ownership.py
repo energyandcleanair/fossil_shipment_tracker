@@ -12,6 +12,7 @@ from base import CHARTS_USE_KPLER_DEFAULT
 from base.logger import logger
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
+from ..voyage import VoyageResource
 from .. import routes_api, ns_charts
 
 from .voyage_data_proxy import get_voyages
