@@ -74,7 +74,10 @@ def get_voyages_kpler(params):
     for voyage_name, trade_name in KPLER_COLUMNS_RENAMED.items():
         if trade_name in data.columns:
             data[voyage_name] = data[trade_name]
-            data[trade_name] = None
+
+    for _, trade_name in KPLER_COLUMNS_RENAMED.items():
+        if trade_name in data.columns:
+            data.drop(trade_name, axis=1)
 
     return data
 
