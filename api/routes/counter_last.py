@@ -103,7 +103,7 @@ class RussiaCounterLastResource(Resource):
         "version",
         help="Which counter version to use",
         type=str,
-        default=base.COUNTER_VERSION0,
+        default=base.COUNTER_VERSION_DEFAULT,
     )
 
     @routes_api.expect(parser)
