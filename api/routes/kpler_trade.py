@@ -447,22 +447,6 @@ class KplerTradeResource(TemplateResource):
 
         map_unconfirmed_region_eu_to_unknown = params.get("map_unconfirmed_region_eu_to_unknown")
 
-        # Commodity used for pricing
-        commodity_id_field = (
-            "kpler_"
-            + sa.func.replace(
-                sa.func.replace(
-                    sa.func.lower(
-                        func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)
-                    ),
-                    " ",
-                    "_",
-                ),
-                "/",
-                "_",
-            )
-        ).label("commodity")
-
         commodity_origin_iso2_field = case(
             [
                 (KplerProduct.grade_name.in_(["CPC Kazakhstan", "KEBCO"]), "KZ"),
@@ -567,8 +551,6 @@ class KplerTradeResource(TemplateResource):
                 CommodityDestinationCountry,
                 CommodityDestinationCountry.iso2 == destination_zone.country_iso2,
             )
-            .join(Commodity, commodity_id_field == Commodity.id)
-            .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
             .join(
                 KplerTradeComputed,
                 sa.and_(
@@ -578,6 +560,8 @@ class KplerTradeResource(TemplateResource):
                     KplerTradeComputed.eur_per_tonne != None,
                 ),
             )
+            .join(Commodity, KplerTradeComputed.kpler_product_commodity_id == Commodity.id)
+            .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
             .outerjoin(Currency, Currency.date == price_date)
             .order_by(
                 KplerTrade.id,

@@ -153,8 +153,10 @@ class TemplateResource(Resource):
         agg_value_cols = self.get_agg_value_cols(subquery=subquery)
 
         if any([x not in agg_cols_dict for x in aggregate_by]):
+            missing = ",".join(filter(lambda x: x not in agg_cols_dict, aggregate_by))
+            selection = ",".join(agg_cols_dict.keys())
             logger.warning(
-                "aggregate_by can only be a selection of %s" % (",".join(agg_cols_dict.keys()))
+                f"aggregate_by contained {missing} but can only be a selection of {selection}"
             )
             aggregate_by = [x for x in aggregate_by if x in agg_cols_dict]
 
@@ -213,7 +215,7 @@ class TemplateResource(Resource):
         )
 
         # Spread currencies
-        result = self.spread_currencies(result=result)
+        result = self.spread_currencies(result=result, prehashed=True)
 
         # Unhash
         result = self.unhash_df(result=result, list_columns=list_columns)
@@ -520,25 +522,27 @@ class TemplateResource(Resource):
             result[col] = result[col].apply(to_list_if_iterable)
         return result
 
-    def spread_currencies(self, result):
+    def spread_currencies(self, result, prehashed=False):
         # We simply want to pivot across currencies
         # But pandas need clean non-null and hashable data, hence this whole function...
         len_before = len(result)
         n_currencies = len(result.currency.unique())
+
         result["currency"] = "value_" + result.currency.str.lower()
 
         # Replace nan with None
         result.replace({np.nan: None}, inplace=True)
 
-        # Create a hashable version
-        # find columns that are list and convert them to tuple
-        list_columns = [
-            col
-            for col in result.columns
-            if any(result[col].notna()) and any(result[col].apply(lambda x: type(x) == list))
-        ]
-        for col in list_columns:
-            result[col] = result[col].apply(tuple)
+        if not prehashed:
+            # Create a hashable version
+            # find columns that are list and convert them to tuple
+            list_columns = [
+                col
+                for col in result.columns
+                if any(result[col].notna()) and any(result[col].apply(lambda x: type(x) == list))
+            ]
+            for col in list_columns:
+                result[col] = result[col].apply(tuple)
 
         # Round all value_ columns to prevent pivoting error when there is an epsilon diff
         # Observed on kpler_trade once

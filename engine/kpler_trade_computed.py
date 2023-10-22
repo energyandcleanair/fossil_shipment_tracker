@@ -96,18 +96,15 @@ def fetch_data(date_from: None, date_to: None):
     )
 
     # Commodity used for pricing
-    commodity_id_field = (
-        "kpler_"
-        + sa.func.replace(
-            sa.func.replace(
-                sa.func.lower(func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)),
-                " ",
-                "_",
-            ),
-            "/",
+    commodity_id_field = "kpler_" + sa.func.replace(
+        sa.func.replace(
+            sa.func.lower(func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)),
+            " ",
             "_",
-        )
-    ).label("commodity")
+        ),
+        "/",
+        "_",
+    )
 
     pricing_commodity_id_field = case(
         [
@@ -465,6 +462,8 @@ def fetch_data(date_from: None, date_to: None):
             KplerTrade.id.label("trade_id"),
             KplerTrade.flow_id,
             KplerTrade.product_id,
+            # We only want to set this if there's a matching commodity
+            Commodity.id.label("kpler_product_commodity_id"),
             Price.scenario.label("pricing_scenario"),
             Price.commodity.label("pricing_commodity"),
             Price.eur_per_tonne,
