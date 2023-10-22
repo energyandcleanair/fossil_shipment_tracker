@@ -19,6 +19,7 @@ from engine import flaring
 from engine import sts
 from engine import backuper
 from engine import kpler_scraper
+from engine import kpler_trade_computed
 
 import integrity
 import base
@@ -27,7 +28,6 @@ import datetime as dt
 
 
 def update():
-
     # integrity.check()
     # portcall.update_departures(departure_port_iso2=['RU'],
     #                           date_from=-14,
@@ -38,6 +38,7 @@ def update():
     # arrival.update(date_from=dt.date.today() - dt.timedelta(days=90), departure_port_iso2=['RU'])
     currency.update()
     kpler_scraper.update_lite()
+    kpler_trade_computed.update()
 
     # company.update()
     # mtevents.update(date_from=dt.date.today() - dt.timedelta(days=90))

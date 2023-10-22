@@ -27,6 +27,7 @@ from . import DB_TABLE_KPLER_TRADE
 from . import DB_TABLE_KPLER_TRADE_FLOW
 from . import DB_TABLE_KPLER_ZONE
 from . import DB_TABLE_KPLER_INSTALLATION
+from . import DB_TABLE_KPLER_TRADE_COMPUTED
 
 
 class KplerFlow(Base):
@@ -99,7 +100,6 @@ class KplerVessel(Base):
 
 
 class KplerTrade(Base):
-
     id = Column(BigInteger, primary_key=True)
     flow_id = Column(BigInteger, primary_key=True)
 
@@ -153,6 +153,39 @@ class KplerTrade(Base):
     )
 
     __tablename__ = DB_TABLE_KPLER_TRADE
+
+
+class KplerTradeComputed(Base):
+    trade_id = Column(
+        ForeignKey(DB_TABLE_KPLER_TRADE + ".id"),
+        primary_key=True,
+    )
+    flow_id = Column(ForeignKey(DB_TABLE_KPLER_TRADE + ".flow_id"), primary_key=True)
+    product_id = Column(ForeignKey(DB_TABLE_KPLER_TRADE + ".product_id"), primary_key=True)
+
+    eur_per_tonne = Column(Numeric)
+    pricing_scenario = Column(String)
+    pricing_commodity = Column(String)
+    ship_insurer_names = Column(ARRAY(String))
+    ship_insurer_iso2s = Column(ARRAY(String))
+    ship_insurer_regions = Column(ARRAY(String))
+    ship_owner_names = Column(ARRAY(String))
+    ship_owner_iso2s = Column(ARRAY(String))
+    ship_owner_regions = Column(ARRAY(String))
+    ownership_sanction_coverage = Column(String)
+    step_zone_names = Column(ARRAY(String))
+    step_zone_iso2s = Column(ARRAY(String))
+    step_zone_regions = Column(ARRAY(String))
+    step_zone_ids = Column(ARRAY(Numeric))
+
+    __table_args__ = (
+        Index(
+            "kpler_trade_computed_ownership_sanction_coverage_idx", "ownership_sanction_coverage"
+        ),
+        Index("kpler_trade_computed_pricing_scenario_idx", "pricing_scenario"),
+    )
+
+    __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED
 
 
 class KplerTradeFlow(Base):

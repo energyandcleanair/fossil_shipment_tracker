@@ -1,4 +1,4 @@
-from engine import company, insurance
+from engine import company, insurance, kpler_trade_computed, counter
 import integrity
 import base
 
@@ -6,6 +6,10 @@ import base
 def update():
     company.update()
     insurance.update()
+    kpler_trade_computed.update()
+    counter.update()
+    counter.update(version=base.COUNTER_VERSION1)
+    counter.update(version=base.COUNTER_VERSION2)
     integrity.check()
     return
 
