@@ -558,19 +558,26 @@ def build_pagination_periods(earliest_date=None, more_data_date=None):
 
 
 def update():
-    earliest_date = session.query(func.min(KplerTrade.departure_date_utc)).first()[0]
-    more_data_date = dt.date(2016, 1, 1)
+    logger_slack.info("Updating kpler computed table")
+    try:
+        earliest_date = session.query(func.min(KplerTrade.departure_date_utc)).first()[0]
+        more_data_date = dt.date(2016, 1, 1)
 
-    periods = build_pagination_periods(earliest_date=earliest_date, more_data_date=more_data_date)
+        periods = build_pagination_periods(
+            earliest_date=earliest_date, more_data_date=more_data_date
+        )
 
-    to_insert = pd.DataFrame()
+        to_insert = pd.DataFrame()
 
-    for start, end in tqdm(periods, unit="period"):
-        to_insert = pd.concat([to_insert, fetch_data(date_from=start, date_to=end)])
+        for start, end in tqdm(periods, unit="period"):
+            to_insert = pd.concat([to_insert, fetch_data(date_from=start, date_to=end)])
 
-    print(len(to_insert))
+        print(len(to_insert))
 
-    KplerTradeComputed.query.delete()
-    session.commit()
-    to_insert.to_sql(DB_TABLE_KPLER_TRADE_COMPUTED, con=engine, if_exists="append", index=False)
-    session.commit()
+        KplerTradeComputed.query.delete()
+        session.commit()
+        to_insert.to_sql(DB_TABLE_KPLER_TRADE_COMPUTED, con=engine, if_exists="append", index=False)
+        session.commit()
+    except Exception as e:
+        logger_slack.error(f"Updating kpler computed table failed: {e}")
+        raise e
