@@ -14,6 +14,7 @@ KPLER_COMMODITY_FILTER_CONVERSION = {
 
 # voyage: trade
 KPLER_COLUMNS_RENAMED = {
+    "departure_date_from": "origin_date_from",
     "departure_date": "origin_date",
     "commodity": "commodity_equivalent",
     "commodity_name": "commodity_equivalent_name",
@@ -60,6 +61,9 @@ def get_voyages_kpler(params):
 
     if params_kpler["aggregate_by"]:
         params_kpler["aggregate_by"] = [get_kpler_name(col) for col in params_kpler["aggregate_by"]]
+
+    if params_kpler["select"]:
+        params_kpler["select"] = [get_kpler_name(col) for col in params_kpler["select"]]
 
     response = KplerTradeResource().get_from_params(params_kpler)
     if response.status_code != 200:

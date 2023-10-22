@@ -159,6 +159,7 @@ class ChartDepartureDestination(Resource):
                 "commodity_destination_iso2_not": "RU",
                 "destination_iso2_not": "RU",
                 "date_to": None,
+                "departure_date_from": departure_date_from,
                 "departure_date_to": date_to,
                 "commodity": None if add_total_commodity else commodity,
                 # 'date_from': '2022-01-01',
@@ -169,6 +170,16 @@ class ChartDepartureDestination(Resource):
                 "format": "json",
                 "nest_in_data": True,
                 "pivot_by": None,
+                "select": [
+                    "departure_date",
+                    "commodity_group_name",
+                    "destination_country",
+                    "destination_iso2",
+                    "destination_region",
+                    "commodity_group_name",
+                    "value_tonne",
+                    "value_eur",
+                ],
             }
         )
 
@@ -294,7 +305,7 @@ class ChartDepartureDestination(Resource):
         def remove_coal_to_eu(data, date_stop=dt.date(2022, 8, 11)):
             data.loc[
                 (data.destination_region == "EU")
-                & (data.commodity_group.str.lower() == "coal")
+                & (data.commodity_group_name.str.lower() == "coal")
                 & (pd.to_datetime(data.departure_date) >= pd.to_datetime(date_stop)),
                 ["value_eur", "value_tonne"],
             ] = 0
