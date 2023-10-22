@@ -5,7 +5,10 @@ from ..voyage import VoyageResource
 from ..kpler_trade import KplerTradeResource
 
 # voyage: trade
-KPLER_PARAMS_RENAMED = {"commodity": "commodity_equivalent"}
+KPLER_PARAMS_RENAMED = {
+    "commodity": "commodity_equivalent",
+    "departure_date_from": "origin_date_from",
+}
 
 # voyage: trade
 KPLER_COMMODITY_FILTER_CONVERSION = {
@@ -14,7 +17,6 @@ KPLER_COMMODITY_FILTER_CONVERSION = {
 
 # voyage: trade
 KPLER_COLUMNS_RENAMED = {
-    "departure_date_from": "origin_date_from",
     "departure_date": "origin_date",
     "commodity": "commodity_equivalent",
     "commodity_name": "commodity_equivalent_name",
