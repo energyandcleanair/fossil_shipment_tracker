@@ -436,6 +436,10 @@ class PipelineFlowResource(Resource):
             ],
             "currency": [subquery.c.currency],
             "commodity": [subquery.c.commodity, subquery.c.commodity_group],
+            "commodity_group_name": [
+                subquery.c.commodity_group,
+                subquery.c.commodity_group_name,
+            ],
             "commodity_group": [
                 subquery.c.commodity_group,
                 subquery.c.commodity_group_name,
@@ -489,7 +493,6 @@ class PipelineFlowResource(Resource):
         return query
 
     def roll_average(self, result, aggregate_by, rolling_days):
-
         date_column = "date"
 
         if date_column in result.columns:
