@@ -31,6 +31,7 @@ jobs:
     - name: 'Create env file'
       run: |
         echo "${{ secrets.ENV_FILE }}" > .env
+        echo "${{ secrets.ENV_FILE }}" > ./api/.env
     - name: Test with pytest
       working-directory: ./api/
       run: |
