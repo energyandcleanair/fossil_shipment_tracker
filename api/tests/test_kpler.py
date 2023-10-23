@@ -820,15 +820,15 @@ def test_kpler_trade_ship_insurer(app):
             "ship_insurer_regions": ["Others", "Others"],
         }
         MULTI_SHIP_MULTIPLE_INSURERS = {
-            "trade_id": 17069592,
-            "vessel_imos": ["9907718", "9831816"],
+            "trade_id": 14623765,
+            "vessel_imos": ["9518907", "9432048"],
             "ship_insurer_names": [
-                "UK P&I Club",
-                "Britannia Steamship insurance Association Ld",
+                "Assuranceforeningen Gard - Norway",
+                "North of England P&I Association",
             ],
-            "ship_insurer_iso2s": ["GB", "GB"],
+            "ship_insurer_iso2s": ["NO", "GB"],
             "ship_insurer_regions": [
-                "United Kingdom",
+                "Others",
                 "United Kingdom",
             ],
         }
@@ -882,15 +882,12 @@ def test_kpler_trade_ship_insurer(app):
 
 def test_kpler_trade_ship_owner(app):
     with app.test_client() as test_client:
-        date_from = "2023-01-01"
-        date_to = "2023-01-31"
-
         # Confirmed in equasis
         SINGLE_SHIP_WITH_OWNER = {
-            "trade_id": 804124,
-            "ship_owner_names": ["CORAL ENERGY SHIPPING BV"],
-            "ship_owner_iso2s": ["NO"],
-            "ship_owner_regions": ["Others"],
+            "trade_id": 14251765,
+            "ship_owner_names": ["XIANG T117 HK INTERNATIONAL"],
+            "ship_owner_iso2s": ["KR"],
+            "ship_owner_regions": ["South Korea"],
         }
         MULTI_SHIP_ONE_OWNER = {
             "trade_id": 16468265,
@@ -962,12 +959,12 @@ def test_kpler_trade_steps(app):
             "step_zone_regions": ["EU"],
         }
         TRADE_WITH_MULTIPLE_STEP = {
-            "trade_id": 18858707,
-            "step_zone_ids": [2697, 5580],
+            "trade_id": 16301452,
+            "step_zone_ids": [3099, 2793],
             # Order should match steps.
-            "step_zone_names": ["Alpha Zone Light.", "PAL Light."],
-            "step_zone_iso2s": ["UY", "US"],
-            "step_zone_regions": ["Others", "United States"],
+            "step_zone_names": ["Kalamata Light.", "Lome Light."],
+            "step_zone_iso2s": ["GR", "TG"],
+            "step_zone_regions": ["EU", "Others"],
         }
 
         expected = pd.DataFrame.from_dict(
