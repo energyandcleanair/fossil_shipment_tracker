@@ -31,14 +31,14 @@ jobs:
     - name: Test with pytest
       working-directory: ./api/
       env:
-        project_id: ${{ vars.PROJECT_ID }}
-        environment: ${{ vars.ENVIRONMENT }}
+        PROJECT_ID: ${{ vars.PROJECT_ID }}
+        ENVIRONMENT: ${{ vars.ENVIRONMENT }}
 
-        db_url_production: ${{ secrets.DB_URL_PRODUCTION }}
+        DB_URL_PRODUCTION: ${{ secrets.DB_URL_PRODUCTION }}
 
-        pghost_production: ${{ secrets.PGHOST_PRODUCTION }}
-        pgport_production: ${{ secrets.PGPORT_PRODUCTION }}
-        pguser_production: ${{ secrets.PGUSER_PRODUCTION }}
-        pgpassword_production: ${{ secrets.PGPASSWORD_PRODUCTION }}
+        PGHOST_PRODUCTION: ${{ secrets.PGHOST_PRODUCTION }}
+        PGPORT_PRODUCTION: ${{ secrets.PGPORT_PRODUCTION }}
+        PGUSER_PRODUCTION: ${{ secrets.PGUSER_PRODUCTION }}
+        PGPASSWORD_PRODUCTION: ${{ secrets.PGPASSWORD_PRODUCTION }}
       run: |
         pytest -c ./tests/pytest.ini -v

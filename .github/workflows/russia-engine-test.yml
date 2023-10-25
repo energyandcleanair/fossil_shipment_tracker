@@ -30,30 +30,28 @@ jobs:
         pip install -r requirements.txt
     - name: Test with pytest
       env:
-        project_id: ${{ vars.PROJECT_ID }}
-        environment: ${{ vars.ENVIRONMENT }}
+        PROJECT_ID: ${{ vars.PROJECT_ID }}
+        ENVIRONMENT: ${{ vars.ENVIRONMENT }}
 
-        db_url_production: ${{ secrets.DB_URL_PRODUCTION }}
+        DB_URL_PRODUCTION: ${{ secrets.DB_URL_PRODUCTION }}
 
-        pghost_production: ${{ secrets.PGHOST_PRODUCTION }}
-        pgport_production: ${{ secrets.PGPORT_PRODUCTION }}
-        pguser_production: ${{ secrets.PGUSER_PRODUCTION }}
-        pgpassword_production: ${{ secrets.PGPASSWORD_PRODUCTION }}
+        PGHOST_PRODUCTION: ${{ secrets.PGHOST_PRODUCTION }}
+        PGPORT_PRODUCTION: ${{ secrets.PGPORT_PRODUCTION }}
+        PGUSER_PRODUCTION: ${{ secrets.PGUSER_PRODUCTION }}
+        PGPASSWORD_PRODUCTION: ${{ secrets.PGPASSWORD_PRODUCTION }}
 
-        key_marinetraffic_ev01: ${{ secrets.KEY_MARINETRAFFIC_EV01 }}
-        key_marinetraffic_vi01: ${{ secrets.KEY_MARINETRAFFIC_VI01 }}
-        key_marinetraffic_vd02: ${{ secrets.KEY_MARINETRAFFIC_VD02 }}
-        key_marinetraffic_ev02: ${{ secrets.KEY_MARINETRAFFIC_EV02 }}
-        key_marinetraffic_ps01: ${{ secrets.KEY_MARINETRAFFIC_PS01 }}
-        key_marinetraffic_ev01_call_based: ${{ secrets.KEY_MARINETRAFFIC_EV01_CALL_BASED }}
+        KEY_MARINETRAFFIC_EV01: ${{ secrets.KEY_MARINETRAFFIC_EV01 }}
+        KEY_MARINETRAFFIC_VI01: ${{ secrets.KEY_MARINETRAFFIC_VI01 }}
+        KEY_MARINETRAFFIC_VD02: ${{ secrets.KEY_MARINETRAFFIC_VD02 }}
+        KEY_MARINETRAFFIC_EV02: ${{ secrets.KEY_MARINETRAFFIC_EV02 }}
+        KEY_MARINETRAFFIC_PS01: ${{ secrets.KEY_MARINETRAFFIC_PS01 }}
+        KEY_MARINETRAFFIC_EV01_CALL_BASED: ${{ secrets.KEY_MARINETRAFFIC_EV01_CALL_BASED }}
 
-        key_datalastic: ${{ secrets.KEY_DATALASTIC }}
+        KEY_DATALASTIC: ${{ secrets.KEY_DATALASTIC }}
 
-        equasis_password: ${{ secrets.EQUASIS_PASSWORD }}
-        equasis_account_range_start: ${{ vars.EQUASIS_ACCOUNT_RANGE_START }}
-        equasis_account_range_end: ${{ vars.EQUASIS_ACCOUNT_RANGE_END }}
-
-
+        EQUASIS_PASSWORD: ${{ secrets.EQUASIS_PASSWORD }}
+        EQUASIS_ACCOUNT_RANGE_START: ${{ vars.EQUASIS_ACCOUNT_RANGE_START }}
+        EQUASIS_ACCOUNT_RANGE_END: ${{ vars.EQUASIS_ACCOUNT_RANGE_END }}
 
       run: |
         pytest -c ./engine/tests/pytest.ini -v
