@@ -27,11 +27,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create env file
-        run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
-          echo "${{ secrets.ENV_FILE }}" > ./api/.env
-
       - name: Run tests
         working-directory: ./api/
         run: python -m pytest -c ./tests/pytest.ini -v
