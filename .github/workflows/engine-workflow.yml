@@ -29,3 +29,26 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -c ./engine/tests/pytest.ini -v
+        env:
+          PROJECT_ID: ${{ vars.PROJECT_ID }}
+          ENVIRONMENT: ${{ vars.ENVIRONMENT }}
+
+          DB_URL_PRODUCTION: ${{ secrets.DB_URL_PRODUCTION }}
+
+          PGHOST_PRODUCTION: ${{ secrets.PGHOST_PRODUCTION }}
+          PGPORT_PRODUCTION: ${{ secrets.PGPORT_PRODUCTION }}
+          PGUSER_PRODUCTION: ${{ secrets.PGUSER_PRODUCTION }}
+          PGPASSWORD_PRODUCTION: ${{ secrets.PGPASSWORD_PRODUCTION }}
+
+          KEY_MARINETRAFFIC_EV01: ${{ secrets.KEY_MARINETRAFFIC_EV01 }}
+          KEY_MARINETRAFFIC_VI01: ${{ secrets.KEY_MARINETRAFFIC_VI01 }}
+          KEY_MARINETRAFFIC_VD02: ${{ secrets.KEY_MARINETRAFFIC_VD02 }}
+          KEY_MARINETRAFFIC_EV02: ${{ secrets.KEY_MARINETRAFFIC_EV02 }}
+          KEY_MARINETRAFFIC_PS01: ${{ secrets.KEY_MARINETRAFFIC_PS01 }}
+          KEY_MARINETRAFFIC_EV01_CALL_BASED: ${{ secrets.KEY_MARINETRAFFIC_EV01_CALL_BASED }}
+
+          KEY_DATALASTIC: ${{ secrets.KEY_DATALASTIC }}
+
+          EQUASIS_PASSWORD: ${{ secrets.EQUASIS_PASSWORD }}
+          EQUASIS_ACCOUNT_RANGE_START: ${{ vars.EQUASIS_ACCOUNT_RANGE_START }}
+          EQUASIS_ACCOUNT_RANGE_END: ${{ vars.EQUASIS_ACCOUNT_RANGE_END }}
