@@ -31,8 +31,8 @@ jobs:
     - name: Test with pytest
       working-directory: ./api/
       env:
-        project_id: ${{ secrets.PROJECT_ID }}
-        environment: $ENVIRONMENT
+        project_id: ${{ vars.PROJECT_ID }}
+        environment: ${{ vars.ENVIRONMENT }}
 
         db_url_production: ${{ secrets.DB_URL_PRODUCTION }}
 

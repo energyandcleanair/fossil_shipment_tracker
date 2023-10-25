@@ -30,8 +30,8 @@ jobs:
         pip install -r requirements.txt
     - name: Test with pytest
       env:
-        project_id: ${{ secrets.PROJECT_ID }}
-        environment: $ENVIRONMENT
+        project_id: ${{ vars.PROJECT_ID }}
+        environment: ${{ vars.ENVIRONMENT }}
 
         db_url_production: ${{ secrets.DB_URL_PRODUCTION }}
 
@@ -50,8 +50,8 @@ jobs:
         key_datalastic: ${{ secrets.KEY_DATALASTIC }}
 
         equasis_password: ${{ secrets.EQUASIS_PASSWORD }}
-        equasis_account_range_start: $EQUASIS_ACCOUNT_RANGE_START
-        equasis_account_range_end: $EQUASIS_ACCOUNT_RANGE_END
+        equasis_account_range_start: ${{ vars.EQUASIS_ACCOUNT_RANGE_START }}
+        equasis_account_range_end: ${{ vars.EQUASIS_ACCOUNT_RANGE_END }}
 
 
 
