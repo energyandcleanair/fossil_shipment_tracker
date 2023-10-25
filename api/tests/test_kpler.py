@@ -10,6 +10,8 @@ from base.models import KplerFlow
 from base.db import session
 from base.env import get_env
 
+percent = 1e-2
+
 
 def test_kpler_v1_pricing(app):
     with app.test_client() as test_client:
@@ -216,8 +218,12 @@ def test_kpler_crude_export(app):
     # Remove rows where both value_tonne_flow and value_tonne_trade are NaN
     merge = merge[~(merge.value_tonne_flow.isna() & merge.value_tonne_trade.isna())]
 
-    merge["ok_flow"] = np.isclose(merge.value_tonne_flow, merge.value_tonne_manual, rtol=4e-2)
-    merge["ok_trade"] = np.isclose(merge.value_tonne_trade, merge.value_tonne_manual, rtol=4e-2)
+    merge["ok_flow"] = np.isclose(
+        merge.value_tonne_flow, merge.value_tonne_manual, rtol=4 * percent
+    )
+    merge["ok_trade"] = np.isclose(
+        merge.value_tonne_trade, merge.value_tonne_manual, rtol=4 * percent
+    )
     merge["ok"] = merge["ok_flow"] & merge["ok_trade"]
     assert all(merge.ok)
 
@@ -276,25 +282,29 @@ def test_kpler_gasoline_export(app):
     merge = (
         manual_values[["origin_iso2", "month", "value_tonne"]]
         .merge(
-            trade[["origin_iso2", "month", "value_tonne"]],
-            how="left",
-            on=["origin_iso2", "month"],
-            suffixes=("_manual", "_trade"),
-        )
-        .merge(
             flow[["origin_iso2", "month", "value_tonne"]].rename(
                 columns={"value_tonne": "value_tonne_flow"}
             ),
             how="left",
             on=["origin_iso2", "month"],
         )
+        .merge(
+            trade[["origin_iso2", "month", "value_tonne"]],
+            how="left",
+            on=["origin_iso2", "month"],
+            suffixes=("_manual", "_trade"),
+        )
     )
 
     # Remove rows where both value_tonne_flow and value_tonne_trade are NaN
     merge = merge[~(merge.value_tonne_flow.isna() & merge.value_tonne_trade.isna())]
 
-    merge["ok_flow"] = np.isclose(merge.value_tonne_flow, merge.value_tonne_manual, rtol=5e-2)
-    merge["ok_trade"] = np.isclose(merge.value_tonne_trade, merge.value_tonne_manual, rtol=5e-2)
+    merge["ok_flow"] = np.isclose(
+        merge.value_tonne_flow, merge.value_tonne_manual, rtol=5 * percent
+    )
+    merge["ok_trade"] = np.isclose(
+        merge.value_tonne_trade, merge.value_tonne_manual, rtol=5 * percent
+    )
     merge["ok"] = merge["ok_flow"] & merge["ok_trade"]
     assert all(merge.ok)
 
@@ -341,7 +351,7 @@ def test_kpler_diesel_exports(app):
             suffixes=("_api", "_manual"),
         )
 
-        assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=5e-2))
+        assert all(np.isclose(merge.value_tonne_api, merge.value_tonne_manual, rtol=5 * percent))
 
 
 def test_kpler_flow_lng_exports_monthly(app):
@@ -400,7 +410,7 @@ def test_kpler_flow_lng_exports_monthly(app):
         )
         assert all(
             np.isclose(
-                merge_flow_agg.value_tonne_api, merge_flow_agg.value_tonne_manual, rtol=10e-2
+                merge_flow_agg.value_tonne_api, merge_flow_agg.value_tonne_manual, rtol=10 * percent
             )
         )
 
@@ -408,7 +418,9 @@ def test_kpler_flow_lng_exports_monthly(app):
         idx = merge_flow.origin_iso2 == "RU"
         assert all(
             np.isclose(
-                merge_flow[idx].value_tonne_api, merge_flow[idx].value_tonne_manual, rtol=1e-2
+                merge_flow[idx].value_tonne_api,
+                merge_flow[idx].value_tonne_manual,
+                rtol=1 * percent,
             )
         )
 
@@ -425,9 +437,9 @@ def test_kpler_trade_lng_exports_monthly(app):
 
     manual_values = pd.read_csv("assets/kpler/lng_exports_monthly_2023.csv")
     manual_values = manual_values.melt(
-        id_vars=["date"], var_name="country", value_name="value_Mtonne"
+        id_vars=["date"], var_name="country", value_name="value_ktonne"
     )
-    manual_values["value_tonne"] = manual_values["value_Mtonne"] * 1e6
+    manual_values["value_tonne"] = manual_values["value_ktonne"] * 1e3
     manual_values["origin_iso2"] = manual_values["country"].map(lambda x: cc.convert(x, to="ISO2"))
     manual_values.rename(columns={"date": "month"}, inplace=True)
 
@@ -463,7 +475,7 @@ def test_kpler_trade_lng_exports_monthly(app):
         merge_trade = merge_trade[merge_trade.month != merge_trade.month.max()]
         merge_trade["value_tonne_api"] = merge_trade["value_tonne_api"].fillna(0)
         merge_trade["ok"] = np.isclose(
-            merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10e-2
+            merge_trade.value_tonne_api, merge_trade.value_tonne_manual, rtol=10 * percent
         )
         assert all(merge_trade.ok)
 
@@ -630,7 +642,7 @@ def test_kpler_crude_export_byport(app):
         )
         # Merge
 
-        assert np.isclose(data_df.value_tonne.sum(), 21.17e6, rtol=1e-2)
+        assert np.isclose(data_df.value_tonne.sum(), 21.17e6, rtol=1 * percent)
 
 
 def test_kpler_wrong_arg(app):
@@ -706,8 +718,12 @@ def test_kpler_urals_espo(app):
             .agg({"value_tonne": "sum", "value_eur": "sum"})
             .reset_index()
         )
-        assert all(np.isclose(api_by_type.value_tonne, api_by_type.value_tonne[0], rtol=5e-2))
-        assert not all(np.isclose(api_by_type.value_eur, api_by_type.value_eur[0], rtol=1e-3))
+        assert all(
+            np.isclose(api_by_type.value_tonne, api_by_type.value_tonne[0], rtol=5 * percent)
+        )
+        assert not all(
+            np.isclose(api_by_type.value_eur, api_by_type.value_eur[0], rtol=1 * percent)
+        )
         assert set(api.pricing_commodity.unique()) >= set(["crude_oil_espo", "crude_oil_urals"])
         assert all(api.groupby("pricing_commodity").value_tonne.sum() > 0)
         assert all(api.groupby("pricing_commodity").value_eur.sum() > 0)
@@ -749,8 +765,8 @@ def test_flow_equals_trade(app):
         trade = pd.DataFrame(response.json["data"])
         assert len(trade) > 0  # Not all cou
 
-        assert np.isclose(flow.value_tonne.sum(), trade.value_tonne.sum(), rtol=1e-3)
-        assert np.isclose(flow.value_eur.sum(), trade.value_eur.sum(), rtol=10e-2)
+        assert np.isclose(flow.value_tonne.sum(), trade.value_tonne.sum(), rtol=0.1 * percent)
+        assert np.isclose(flow.value_eur.sum(), trade.value_eur.sum(), rtol=2 * percent)
 
     return
 
