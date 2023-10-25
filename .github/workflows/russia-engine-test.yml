@@ -29,5 +29,31 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     - name: Test with pytest
+      env:
+        project_id: ${{ secrets.PROJECT_ID }}
+        environment: $ENVIRONMENT
+
+        db_url_production: ${{ secrets.DB_URL_PRODUCTION }}
+
+        pghost_production: ${{ secrets.PGHOST_PRODUCTION }}
+        pgport_production: ${{ secrets.PGPORT_PRODUCTION }}
+        pguser_production: ${{ secrets.PGUSER_PRODUCTION }}
+        pgpassword_production: ${{ secrets.PGPASSWORD_PRODUCTION }}
+
+        key_marinetraffic_ev01: ${{ secrets.KEY_MARINETRAFFIC_EV01 }}
+        key_marinetraffic_vi01: ${{ secrets.KEY_MARINETRAFFIC_VI01 }}
+        key_marinetraffic_vd02: ${{ secrets.KEY_MARINETRAFFIC_VD02 }}
+        key_marinetraffic_ev02: ${{ secrets.KEY_MARINETRAFFIC_EV02 }}
+        key_marinetraffic_ps01: ${{ secrets.KEY_MARINETRAFFIC_PS01 }}
+        key_marinetraffic_ev01_call_based: ${{ secrets.KEY_MARINETRAFFIC_EV01_CALL_BASED }}
+
+        key_datalastic: ${{ secrets.KEY_DATALASTIC }}
+
+        equasis_password: ${{ secrets.EQUASIS_PASSWORD }}
+        equasis_account_range_start: $EQUASIS_ACCOUNT_RANGE_START
+        equasis_account_range_end: $EQUASIS_ACCOUNT_RANGE_END
+
+
+
       run: |
         pytest -c ./engine/tests/pytest.ini -v
