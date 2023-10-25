@@ -33,6 +33,7 @@ jobs:
       env:
         PROJECT_ID: ${{ vars.PROJECT_ID }}
         ENVIRONMENT: ${{ vars.ENVIRONMENT }}
+        API_KEY: ${{ secrets.API_KEY }}
 
         DB_URL_PRODUCTION: ${{ secrets.DB_URL_PRODUCTION }}
 
