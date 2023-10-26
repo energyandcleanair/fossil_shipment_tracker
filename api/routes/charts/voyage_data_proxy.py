@@ -5,7 +5,10 @@ from ..voyage import VoyageResource
 from ..kpler_trade import KplerTradeResource
 
 # voyage: trade
-KPLER_PARAMS_RENAMED = {"commodity": "commodity_equivalent"}
+KPLER_PARAMS_RENAMED = {
+    "commodity": "commodity_equivalent",
+    "departure_date_from": "origin_date_from",
+}
 
 # voyage: trade
 KPLER_COMMODITY_FILTER_CONVERSION = {
@@ -60,6 +63,9 @@ def get_voyages_kpler(params):
 
     if params_kpler["aggregate_by"]:
         params_kpler["aggregate_by"] = [get_kpler_name(col) for col in params_kpler["aggregate_by"]]
+
+    if params_kpler["select"]:
+        params_kpler["select"] = [get_kpler_name(col) for col in params_kpler["select"]]
 
     response = KplerTradeResource().get_from_params(params_kpler)
     if response.status_code != 200:

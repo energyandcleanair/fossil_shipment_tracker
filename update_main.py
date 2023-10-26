@@ -19,6 +19,7 @@ from engine import flaring
 from engine import sts
 from engine import backuper
 from engine import kpler_scraper
+from engine import kpler_trade_computed
 
 import integrity
 import base
@@ -52,6 +53,7 @@ def update():
     # trajectory.update()
     # flaring.update()
     kpler_scraper.update_full()
+    kpler_trade_computed.update()
     alert.update()
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)

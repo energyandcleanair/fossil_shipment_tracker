@@ -28,10 +28,18 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    - name: 'Create env file'
-      run: |
-        echo "${{ secrets.ENV_FILE }}" > .env
     - name: Test with pytest
       working-directory: ./api/
+      env:
+        PROJECT_ID: ${{ vars.PROJECT_ID }}
+        ENVIRONMENT: ${{ vars.ENVIRONMENT }}
+        API_KEY: ${{ secrets.API_KEY }}
+
+        DB_URL_PRODUCTION: ${{ secrets.DB_URL_PRODUCTION }}
+
+        PGHOST_PRODUCTION: ${{ secrets.PGHOST_PRODUCTION }}
+        PGPORT_PRODUCTION: ${{ secrets.PGPORT_PRODUCTION }}
+        PGUSER_PRODUCTION: ${{ secrets.PGUSER_PRODUCTION }}
+        PGPASSWORD_PRODUCTION: ${{ secrets.PGPASSWORD_PRODUCTION }}
       run: |
         pytest -c ./tests/pytest.ini -v

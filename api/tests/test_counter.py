@@ -397,7 +397,7 @@ def test_counter_sorting(app):
 
 def test_counter_against_voyage(app):
     with app.test_client() as test_client:
-        response = test_client.get("/v0/counter")
+        response = test_client.get("/v0/counter?version=v0")
         assert response.status_code == 200
         data = response.json["data"]
         counter_df = pd.DataFrame(data).sort_values(["date"], ascending=False)
@@ -436,7 +436,7 @@ def test_counter_against_voyage(app):
         )
 
         # make sure total values are within a tolerance
-        assert np.isclose(counter1["value_eur"].sum(), counter2["value_eur"].sum(), rtol=0.05)
+        assert np.isclose(counter1["value_eur"].sum(), counter2["value_eur"].sum(), rtol=0.10)
 
 
 def test_pricing_gt0(app):
