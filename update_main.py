@@ -1,25 +1,16 @@
-from engine import port
-from engine import portcall
-from engine import departure
-from engine import arrival
-from engine import shipment
-from engine import trajectory
-from engine import position
-from engine import destination
-from engine import berth
-from engine import ship
-from engine import currency
-from engine import rscript
-from engine import counter
-from engine import entsog
-from engine import alert
-from engine import company
-from engine import mtevents
-from engine import flaring
-from engine import sts
-from engine import backuper
-from engine import kpler_scraper
-from engine import kpler_trade_computed
+from engine import (
+    portcall,
+    departure,
+    arrival,
+    shipment,
+    position,
+    ship,
+    counter,
+    alert,
+    backuper,
+    kpler_scraper,
+    kpler_trade_computed,
+)
 
 import integrity
 import base
