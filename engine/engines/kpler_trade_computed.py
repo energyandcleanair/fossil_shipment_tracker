@@ -1,4 +1,4 @@
-from ... import base
+import base
 
 from functools import reduce
 from sqlalchemy import (
@@ -24,11 +24,11 @@ import pandas as pd
 
 import datetime as dt
 
-from ...base.db import session, engine
-from ...base.logger import logger_slack
+from base.db import session, engine
+from base.logger import logger_slack
 from engine.insurance_scraper import *
 
-from ...base.models import (
+from base.models import (
     KplerFlow,
     KplerProduct,
     Country,
@@ -43,9 +43,9 @@ from ...base.models import (
     ShipOwner,
 )
 
-from ...base.models import DB_TABLE_KPLER_TRADE_COMPUTED
+from base.models import DB_TABLE_KPLER_TRADE_COMPUTED
 
-from ...base import UNKNOWN_INSURER
+from base import UNKNOWN_INSURER
 
 
 def string_array(values):

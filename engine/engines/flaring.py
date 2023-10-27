@@ -36,14 +36,14 @@ from tqdm import tqdm
 from geoalchemy2 import Geometry
 from sqlalchemy import func
 
-from ...base.env import get_env
-from ...base.db import session
-from ...base.db_utils import upsert
-from ...base.logger import logger, logger_slack
-from ...base.models import DB_TABLE_FLARING_FACILITY, DB_TABLE_FLARING
-from ...base.models import FlaringFacility, Flaring
-from ...base.utils import to_datetime
-from ...base.utils import update_geometry_from_wkb
+from base.env import get_env
+from base.db import session
+from base.db_utils import upsert
+from base.logger import logger, logger_slack
+from base.models import DB_TABLE_FLARING_FACILITY, DB_TABLE_FLARING
+from base.models import FlaringFacility, Flaring
+from base.utils import to_datetime
+from base.utils import update_geometry_from_wkb
 
 
 def update(date_from="2015-01-01", date_to=-2, missing_dates_only=True, fill_facilities=False):

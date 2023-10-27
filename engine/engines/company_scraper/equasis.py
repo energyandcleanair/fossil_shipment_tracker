@@ -3,10 +3,10 @@ from bs4 import BeautifulSoup
 import datetime as dt
 import pandas as pd
 import re
-from .... import base
-from ....base.env import get_env
-from ....base.logger import logger_slack, logger
-from ....base.utils import to_list
+import base
+from base.env import get_env
+from base.logger import logger_slack, logger
+from base.utils import to_list
 from decouple import config
 
 ACCOUNT_START_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_START", "1"))

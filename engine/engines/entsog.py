@@ -38,14 +38,14 @@ from tqdm import tqdm
 
 tqdm.pandas()
 
-from ... import base
-from ...base.db import engine
-from ...base.db import session
-from ...base.logger import logger, logger_slack
-from ...base.utils import to_list, to_datetime
-from ...base.db_utils import upsert
-from ...base.models import DB_TABLE_ENTSOGFLOW, DB_TABLE_ENTSOGFLOW_RAW, EntsogFlow, EntsogFlowRaw
-from ...base.db_utils import upsert
+import base
+from base.db import engine
+from base.db import session
+from base.logger import logger, logger_slack
+from base.utils import to_list, to_datetime
+from base.db_utils import upsert
+from base.models import DB_TABLE_ENTSOGFLOW, DB_TABLE_ENTSOGFLOW_RAW, EntsogFlow, EntsogFlowRaw
+from base.db_utils import upsert
 
 
 s = requests.Session()

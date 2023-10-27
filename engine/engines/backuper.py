@@ -4,12 +4,12 @@ import os
 from google.cloud import storage
 import pyreadr
 
-from ... import base
-from ...base.logger import logger_slack
-from ...base.env import get_env
-from ...api.routes.overland import PipelineFlowResource
-from ...api.routes.voyage import VoyageResource
-from ...api.routes.counter import RussiaCounterResource
+import base
+from base.logger import logger_slack
+from base.env import get_env
+from api.routes.overland import PipelineFlowResource
+from api.routes.voyage import VoyageResource
+from api.routes.counter import RussiaCounterResource
 
 
 def update(bucket="russia_fossil_tracker", folder="backup"):

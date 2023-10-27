@@ -1,7 +1,7 @@
 import sqlalchemy as sa
 import pandas as pd
-from ..base.db import session
-from ..base.models import (
+from base.db import session
+from base.models import (
     ShipmentWithSTS,
     Shipment,
     ShipmentArrivalBerth,
@@ -9,9 +9,9 @@ from ..base.models import (
     Departure,
     Arrival,
 )
-from ..api.tests import test_counter
-from ..api.app import app
-from ..base.logger import logger_slack, logger, slacker, notify_engineers
+from api.tests import test_counter
+from api.app import app
+from base.logger import logger_slack, logger, slacker, notify_engineers
 
 
 def check():

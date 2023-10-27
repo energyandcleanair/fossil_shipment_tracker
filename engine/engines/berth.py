@@ -6,11 +6,11 @@ import sqlalchemy as sa
 import datetime as dt
 from geoalchemy2 import Geometry
 
-from ... import base
-from ...base.db import session, engine
-from ...base.logger import logger, logger_slack
-from ...base.db_utils import upsert
-from ...base.models import (
+import base
+from base.db import session, engine
+from base.logger import logger, logger_slack
+from base.db_utils import upsert
+from base.models import (
     Berth,
     Port,
     Shipment,
@@ -20,13 +20,13 @@ from ...base.models import (
     Arrival,
     Departure,
 )
-from ...base.models import (
+from base.models import (
     DB_TABLE_BERTH,
     DB_TABLE_SHIPMENTARRIVALBERTH,
     DB_TABLE_SHIPMENTDEPARTUREBERTH,
 )
-from ...base.utils import to_list
-from ...base.utils import update_geometry_from_wkb
+from base.utils import to_list
+from base.utils import update_geometry_from_wkb
 from engine import port
 from engine.shipment import return_combined_shipments
 

@@ -1,4 +1,4 @@
-from ... import base
+import base
 
 from tqdm import tqdm
 
@@ -10,10 +10,10 @@ import pandas as pd
 
 import datetime as dt
 
-from ...base.db import session
-from ...base.logger import logger_slack
+from base.db import session
+from base.logger import logger_slack
 from engine.insurance_scraper import *
-from ...base.models import ShipInsurer
+from base.models import ShipInsurer
 
 known_insurers = {
     22: WestOfEnglandInsuranceScraper(),

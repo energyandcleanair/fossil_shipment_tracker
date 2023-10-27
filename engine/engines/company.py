@@ -10,16 +10,16 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from difflib import SequenceMatcher
 
-from ... import base
+import base
 import json
 
-from ...base.db_utils import execute_statement
-from ...base.encoder import JsonEncoder
-from ...base.utils import to_list
-from ...base.db import session
-from ...base.env import get_env
-from ...base.logger import logger, logger_slack
-from ...base.models import (
+from base.db_utils import execute_statement
+from base.encoder import JsonEncoder
+from base.utils import to_list
+from base.db import session
+from base.env import get_env
+from base.logger import logger, logger_slack
+from base.models import (
     Commodity,
     Departure,
     ShipInsurer,

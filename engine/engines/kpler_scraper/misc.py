@@ -1,6 +1,6 @@
 import sqlalchemy as sa
-from ....base.logger import logger
-from .... import base
+from base.logger import logger
+import base
 
 
 def get_split_name(split):

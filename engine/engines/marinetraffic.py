@@ -9,12 +9,12 @@ from requests.adapters import HTTPAdapter, Retry
 import urllib.parse
 from tqdm import tqdm
 
-from ... import base
-from ...base.db import session
-from ...base.logger import logger
-from ...base.env import get_env
-from ...base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall, Event, Position
-from ...base.utils import to_datetime, latlon_to_point
+import base
+from base.db import session
+from base.logger import logger
+from base.env import get_env
+from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall, Event, Position
+from base.utils import to_datetime, latlon_to_point
 
 MOVETYPE_DEPARTURE = 1
 MOVETYPE_ARRIVAL = 0

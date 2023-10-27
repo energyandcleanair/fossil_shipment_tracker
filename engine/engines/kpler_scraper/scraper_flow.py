@@ -4,8 +4,8 @@ import urllib3
 import pandas as pd
 from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
-from ....base.utils import to_datetime, to_list
-from ....base.logger import logger
+from base.utils import to_datetime, to_list
+from base.logger import logger
 
 from misc import get_split_name
 from scraper import KplerScraper

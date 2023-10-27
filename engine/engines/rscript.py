@@ -3,7 +3,7 @@
 # We use our Python/R capacity in the air pollution containers. Not ideal...
 
 import requests
-from ...base.logger import logger_slack, slacker, notify_engineers
+from base.logger import logger_slack, slacker, notify_engineers
 
 
 def update():

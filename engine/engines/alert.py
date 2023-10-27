@@ -8,9 +8,9 @@ from sqlalchemy import case
 from sqlalchemy.dialects.postgresql import ARRAY, BIGINT, VARCHAR
 from sqlalchemy import cast, Text
 
-from ... import base
-from ...base.db import session
-from ...base.models import (
+import base
+from base.db import session
+from base.models import (
     AlertInstance,
     Ship,
     Country,
@@ -25,10 +25,10 @@ from ...base.models import (
     Departure,
     Arrival,
 )
-from ...base.utils import to_list, to_datetime
-from ...base.logger import logger_slack
+from base.utils import to_list, to_datetime
+from base.logger import logger_slack
 
-from ...api.app import mail
+from api.app import mail
 from flask_mail import Message
 
 
@@ -487,7 +487,7 @@ def send_emails(emails_df):
 
 
 def send_email(recipient_email, shipment_count, content_txt, config_name, content_html, **kwargs):
-    from ...api.app import app
+    from api.app import app
 
     with app.app_context():
         msg = Message(

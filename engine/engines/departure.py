@@ -1,12 +1,12 @@
 import datetime as dt
 
-from ...base.db import session
-from ...base.utils import to_datetime, to_list
-from ... import base
-from ...base.logger import logger_slack
+from base.db import session
+from base.utils import to_datetime, to_list
+import base
+from base.logger import logger_slack
 import sqlalchemy as sa
 from sqlalchemy import func
-from ...base.models import (
+from base.models import (
     PortCall,
     Departure,
     Arrival,

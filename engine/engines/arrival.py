@@ -5,15 +5,15 @@ from sqlalchemy.types import DateTime, VARCHAR, String
 from sqlalchemy.sql.expression import cast
 from tqdm import tqdm
 
-from ... import base
+import base
 from engine import departure
 from engine import portcall
 from engine import shipment
 from engine.marinetraffic import Marinetraffic
-from ...base.logger import logger_slack
-from ...base.db import session
-from ...base.models import Arrival, Shipment, ShipmentWithSTS, Ship, MarineTrafficCall, Departure
-from ...base.utils import to_list, to_datetime
+from base.logger import logger_slack
+from base.db import session
+from base.models import Arrival, Shipment, ShipmentWithSTS, Ship, MarineTrafficCall, Departure
+from base.utils import to_list, to_datetime
 
 
 def get_dangling_arrivals():

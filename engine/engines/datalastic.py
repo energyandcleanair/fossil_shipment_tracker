@@ -2,13 +2,13 @@ import requests
 import json
 import datetime as dt
 
-from ... import base
-from ...base.db import session
-from ...base.utils import latlon_to_point
-from ...base.utils import to_datetime
-from ...base.env import get_env
-from ...base.logger import logger
-from ...base.models import Ship, Position, Port
+import base
+from base.db import session
+from base.utils import latlon_to_point
+from base.utils import to_datetime
+from base.env import get_env
+from base.logger import logger
+from base.models import Ship, Position, Port
 
 from sqlalchemy.exc import IntegrityError
 

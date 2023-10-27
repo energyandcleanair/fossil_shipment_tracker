@@ -4,14 +4,14 @@ import sqlalchemy as sa
 from tqdm import tqdm
 from sqlalchemy import func
 
-from ...base.logger import logger
-from ...base.db import session
-from ...base.db_utils import upsert
-from ...base.models import Port
-from ...base.models import DB_TABLE_PORT
+from base.logger import logger
+from base.db import session
+from base.db_utils import upsert
+from base.models import Port
+from base.models import DB_TABLE_PORT
 from engine.datalastic import Datalastic
 from geoalchemy2 import Geometry
-from ...base.utils import update_geometry_from_wkb
+from base.utils import update_geometry_from_wkb
 
 
 def count():
@@ -132,7 +132,7 @@ def fill():
     )
 
     # (JUST FILLING GEOMETRY)
-    from ...base.models import PortCall
+    from base.models import PortCall
     import sqlalchemy as sa
 
     missing_ports = (

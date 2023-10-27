@@ -1,5 +1,5 @@
 import datetime as dt
-from ....base.utils import to_datetime
+from base.utils import to_datetime
 from .scraper_trade import KplerTradeScraper
 from .upload import *
 

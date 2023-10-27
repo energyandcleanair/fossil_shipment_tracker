@@ -1,12 +1,12 @@
 import pandas as pd
 import geopandas as gpd
 
-from ...base.logger import logger
-from ...base.db import session
-from ...base.db_utils import upsert
-from ...base.models import Country
-from ...base.models import DB_TABLE_COUNTRY
-from ... import base
+from base.logger import logger
+from base.db import session
+from base.db_utils import upsert
+from base.models import Country
+from base.models import DB_TABLE_COUNTRY
+import base
 
 
 def fill():

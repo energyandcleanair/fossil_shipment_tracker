@@ -19,10 +19,10 @@ import numpy as np
 import pygeos
 
 
-from ... import base
-from ...base.db import session
-from ...base.logger import logger_slack
-from ...base.models import (
+import base
+from base.db import session
+from base.logger import logger_slack
+from base.models import (
     Ship,
     Departure,
     Shipment,
@@ -33,8 +33,8 @@ from ...base.models import (
     ShipmentWithSTS,
     Event,
 )
-from ...base.utils import to_list, to_datetime, update_geometry_from_wkb
-from ...base.models import (
+from base.utils import to_list, to_datetime, update_geometry_from_wkb
+from base.models import (
     Ship,
     Departure,
     Shipment,
@@ -45,8 +45,8 @@ from ...base.models import (
     Berth,
     ShipmentArrivalBerth,
 )
-from ...base.db_utils import execute_statement, upsert
-from ...base.models import DB_TABLE_POSITION
+from base.db_utils import execute_statement, upsert
+from base.models import DB_TABLE_POSITION
 from engine.datalastic import Datalastic
 from engine.shipment import return_combined_shipments
 

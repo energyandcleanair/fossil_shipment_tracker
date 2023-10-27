@@ -1,12 +1,12 @@
 import pandas as pd
 
-from ... import base
-from ...base.db_utils import upsert
-from ...base.utils import to_list
-from ...base.models import DB_TABLE_COMMODITY
-from ...base.models import Commodity
-from ...base import COMMODITY_GROUPING_DEFAULT
-from ...base.db import session
+import base
+from base.db_utils import upsert
+from base.utils import to_list
+from base.models import DB_TABLE_COMMODITY
+from base.models import Commodity
+from base import COMMODITY_GROUPING_DEFAULT
+from base.db import session
 from sqlalchemy.dialects.postgresql import JSONB
 
 
@@ -35,7 +35,7 @@ def fill_kpler_commodities(commodities_df):
     from engine.kpler_scraper import upload_products
 
     kpler_products = KplerProductScraper().get_products_brute()
-    from ...base.models import KplerProduct
+    from base.models import KplerProduct
 
     # kpler_products = pd.read_sql(
     #     KplerProduct.query.statement,

@@ -1,6 +1,6 @@
 from engines import company, insurance, kpler_trade_computed, counter
 import integrity
-from .. import base
+import base
 
 
 def update():

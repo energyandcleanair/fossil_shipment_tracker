@@ -8,18 +8,18 @@ from sqlalchemy import func
 import sqlalchemy as sa
 import re
 
-from ... import base
-from ...base.logger import logger, logger_slack
-from ...base.db import session
-from ...base.db_utils import upsert
-from ...base.db import check_if_table_exists
-from ...base.utils import distance_between_points, to_list, to_datetime
+import base
+from base.logger import logger, logger_slack
+from base.db import session
+from base.db_utils import upsert
+from base.db import check_if_table_exists
+from base.utils import distance_between_points, to_list, to_datetime
 
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
 from engine.ship import fill
 
-from ...base.models import (
+from base.models import (
     MarineTrafficEventType,
     Shipment,
     Departure,
@@ -30,7 +30,7 @@ from ...base.models import (
     Arrival,
     Position,
 )
-from ...base.models import DB_TABLE_MTEVENT_TYPE
+from base.models import DB_TABLE_MTEVENT_TYPE
 
 
 def update(

@@ -4,7 +4,7 @@ from .insurance_scraper import InsuranceScraper
 import requests
 from bs4 import BeautifulSoup
 
-from ....base.logger import logger
+from base.logger import logger
 
 base_url = "https://www.westpandi.com/vessels?search="
 

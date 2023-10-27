@@ -1,11 +1,11 @@
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
-from ...base.db import session, engine
+from base.db import session, engine
 import datetime as dt
-from ... import base
-from ...base.utils import to_datetime
-from ...base.logger import logger_slack
-from ...base.models import (
+import base
+from base.utils import to_datetime
+from base.logger import logger_slack
+from base.models import (
     Ship,
     Departure,
     Shipment,
@@ -22,7 +22,7 @@ from sqlalchemy import func, or_
 from tqdm import tqdm
 from difflib import SequenceMatcher
 import numpy as np
-from ...base.db_utils import execute_statement
+from base.db_utils import execute_statement
 from engine.shipment import return_combined_shipments
 
 
@@ -231,7 +231,7 @@ def update_matching():
         execute_statement(update)
 
     # All those that end with a country name
-    from ...base.models import Country
+    from base.models import Country
 
     country_regex = session.query(
         Country.iso2, ("[\.| |,|_|-|/]{1}" + Country.name + "$").label("regexp")

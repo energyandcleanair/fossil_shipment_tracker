@@ -4,7 +4,7 @@ from .insurance_scraper import InsuranceScraper
 from requests import Session
 from bs4 import BeautifulSoup
 
-from ....base.logger import logger
+from base.logger import logger
 
 import re
 

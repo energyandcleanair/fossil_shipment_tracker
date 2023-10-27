@@ -8,10 +8,10 @@ from sqlalchemy.orm import aliased
 import datetime as dt
 from fiona.drvsupport import supported_drivers
 
-from ... import base
-from ...base.logger import logger, logger_slack
-from ...base.db import session
-from ...base.models import (
+import base
+from base.logger import logger, logger_slack
+from base.db import session
+from base.models import (
     ShipmentWithSTS,
     PortCall,
     Departure,
@@ -22,14 +22,14 @@ from ...base.models import (
     Arrival,
     Ship,
 )
-from ...base.models import (
+from base.models import (
     DB_TABLE_STS_LOCATIONS,
     DB_TABLE_STSDEPARTURELOCATION,
     DB_TABLE_STSARRIVALLOCATION,
 )
 
-from ...base.utils import update_geometry_from_wkb, to_list
-from ...base.db_utils import upsert
+from base.utils import update_geometry_from_wkb, to_list
+from base.db_utils import upsert
 
 from engine import portcall, mtevents
 

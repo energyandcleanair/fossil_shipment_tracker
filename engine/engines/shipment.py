@@ -7,12 +7,12 @@ import tempfile
 import os
 
 from engine import departure
-from ...base.db_utils import execute_statement
-from ...base.utils import to_list, to_datetime
-from ...base.logger import logger_slack, slacker
+from base.db_utils import execute_statement
+from base.utils import to_list, to_datetime
+from base.logger import logger_slack, slacker
 from slack_sdk.errors import SlackApiError
-from ...base.models import Shipment, ShipmentWithSTS
-from ...base import PRICING_DEFAULT
+from base.models import Shipment, ShipmentWithSTS
+from base import PRICING_DEFAULT
 
 
 def rebuild(date_from="2021-01-01"):
@@ -97,7 +97,7 @@ def return_combined_shipments(session, columns=None):
 
 
 def send_diagnostic_chart():
-    from ...api.routes.voyage import VoyageResource
+    from api.routes.voyage import VoyageResource
 
     params = {
         "aggregate_by": ["departure_date", "status", "commodity"],

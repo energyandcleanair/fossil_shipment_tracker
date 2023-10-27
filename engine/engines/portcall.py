@@ -5,17 +5,17 @@ from tqdm import tqdm
 from sqlalchemy import func
 
 
-from ... import base
-from ...base.logger import logger, logger_slack, slacker, notify_engineers
-from ...base.db import session
-from ...base.db_utils import upsert
-from ...base.utils import to_datetime, to_list, collapse_dates, remove_dates
+import base
+from base.logger import logger, logger_slack, slacker, notify_engineers
+from base.db import session
+from base.db_utils import upsert
+from base.utils import to_datetime, to_list, collapse_dates, remove_dates
 from engine import ship
 from engine import port
 from engine.marinetraffic import Marinetraffic
 from engine.datalastic import Datalastic
 
-from ...base.models import (
+from base.models import (
     PortCall,
     Port,
     Ship,
@@ -25,7 +25,7 @@ from ...base.models import (
     Departure,
     Arrival,
 )
-from ...base.models import DB_TABLE_PORTCALL
+from base.models import DB_TABLE_PORTCALL
 
 from engine.marinetraffic import MOVETYPE_DEPARTURE, MOVETYPE_ARRIVAL
 

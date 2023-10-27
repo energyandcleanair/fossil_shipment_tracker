@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from ..ship import fill
 
-from ....base.models import (
+from base.models import (
     DB_TABLE_KPLER_PRODUCT,
     DB_TABLE_KPLER_FLOW,
     DB_TABLE_KPLER_TRADE,
@@ -14,9 +14,9 @@ from ....base.models import (
     DB_TABLE_KPLER_VESSEL,
     DB_TABLE_KPLER_INSTALLATION,
 )
-from ....base.db_utils import upsert
-from ....base.db import session, engine
-from ....base.logger import logger
+from base.db_utils import upsert
+from base.db import session, engine
+from base.logger import logger
 
 
 def upload_trades(trades, ignore_if_copy_failed=False):

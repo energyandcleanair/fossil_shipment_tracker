@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from tqdm import tqdm
 
-from .... import base
+import base
 from scraper import *
 from scraper_product import KplerProductScraper
 from misc import get_nested

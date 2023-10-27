@@ -12,7 +12,7 @@ from geoalchemy2.functions import (
     ST_Centroid,
     ST_IsEmpty,
 )
-from ...base.logger import logger_slack, logger
+from base.logger import logger_slack, logger
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.expression import text
 from sqlalchemy import union
@@ -22,14 +22,14 @@ from skimage.graph import MCP_Geometric
 import rasterio as rio
 import shapely
 from shapely.geometry import LineString, MultiLineString
-from ...base.utils import wkb_to_shape
+from base.utils import wkb_to_shape
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 
 
-from ... import base
-from ...base.models import (
+import base
+from base.models import (
     Position,
     Trajectory,
     Port,
@@ -41,12 +41,12 @@ from ...base.models import (
     ShipmentWithSTS,
 )
 from engine import position
-from ...base.db import session
-from ...base.db import engine
-from ...base.utils import to_list, to_datetime
-from ...base.utils import wkb_to_shape, update_geometry_from_wkb
-from ...base.db_utils import upsert
-from ...base.models import DB_TABLE_TRAJECTORY
+from base.db import session
+from base.db import engine
+from base.utils import to_list, to_datetime
+from base.utils import wkb_to_shape, update_geometry_from_wkb
+from base.db_utils import upsert
+from base.models import DB_TABLE_TRAJECTORY
 import pandas as pd
 import geopandas as gpd
 from geoalchemy2 import Geometry

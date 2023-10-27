@@ -5,14 +5,14 @@ from sqlalchemy import func
 import sqlalchemy as sa
 from tqdm import tqdm
 
-from ...base.logger import logger
-from ...base.utils import to_datetime
-from ...base.logger import logger_slack
-from ...base.db import session
-from ...base.db_utils import upsert
-from ...base.models import Country, Currency
-from ...base.models import DB_TABLE_CURRENCY
-from ... import base
+from base.logger import logger
+from base.utils import to_datetime
+from base.logger import logger_slack
+from base.db import session
+from base.db_utils import upsert
+from base.models import Country, Currency
+from base.models import DB_TABLE_CURRENCY
+import base
 
 
 def update(date_from=dt.date(2022, 1, 1), date_to=None, force=False):

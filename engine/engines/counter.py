@@ -3,26 +3,26 @@ import numpy as np
 import json
 import datetime as dt
 
-from ...base.db import session, engine
-from ...base.models import Counter, Port, Country, Berth, Commodity
-from ...base.models import DB_TABLE_COUNTER
-from ...base.utils import to_datetime
-from ...base.logger import logger_slack
-from ...base import PRICING_DEFAULT
-from ...base.db_utils import upsert
+from base.db import session, engine
+from base.models import Counter, Port, Country, Berth, Commodity
+from base.models import DB_TABLE_COUNTER
+from base.utils import to_datetime
+from base.logger import logger_slack
+from base import PRICING_DEFAULT
+from base.db_utils import upsert
 
 try:
-    from ...api.routes.voyage import VoyageResource
-    from ...api.routes.overland import PipelineFlowResource
-    from ...api.routes.kpler_flow import KplerFlowResource
-    from ...api.routes.kpler_trade import KplerTradeResource
+    from api.routes.voyage import VoyageResource
+    from api.routes.overland import PipelineFlowResource
+    from api.routes.kpler_flow import KplerFlowResource
+    from api.routes.kpler_trade import KplerTradeResource
 except ImportError:
     from routes.voyage import VoyageResource
     from routes.overland import PipelineFlowResource
     from routes.kpler_flow import KplerFlowResource
     from routes.kpler_trade import KplerTradeResource
 
-from ... import base
+import base
 
 
 def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):

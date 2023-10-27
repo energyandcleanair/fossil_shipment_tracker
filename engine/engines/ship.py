@@ -1,12 +1,12 @@
 from tqdm import tqdm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
-from ... import base
+import base
 import json
 
-from ...base.db import session
-from ...base.logger import logger
-from ...base.models import (
+from base.db import session
+from base.logger import logger
+from base.models import (
     Ship,
     PortCall,
     Departure,
@@ -16,7 +16,7 @@ from ...base.models import (
     MTVoyageInfo,
     Arrival,
 )
-from ...base.utils import to_datetime, to_list
+from base.utils import to_datetime, to_list
 from engine.datalastic import Datalastic
 from engine.marinetraffic import Marinetraffic
 import numpy as np
