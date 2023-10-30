@@ -1,5 +1,5 @@
-from engine.datalastic import Datalastic
-from engine.marinetraffic import Marinetraffic
+from engines.datalastic import Datalastic
+from engines.marinetraffic import Marinetraffic
 from base.db import session, engine
 import datetime as dt
 import base
@@ -23,7 +23,7 @@ from tqdm import tqdm
 from difflib import SequenceMatcher
 import numpy as np
 from base.db_utils import execute_statement
-from engine.shipment import return_combined_shipments
+from engines.shipment import return_combined_shipments
 
 
 def update(date_from=None):

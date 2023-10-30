@@ -26,7 +26,7 @@ import datetime as dt
 
 from base.db import session, engine
 from base.logger import logger_slack
-from engine.insurance_scraper import *
+from engines.insurance_scraper import *
 
 from base.models import (
     KplerFlow,

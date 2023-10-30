@@ -1,10 +1,10 @@
-from typing import List, Dict, Any
+from typing import List
 from tqdm import tqdm
 
 import base
-from scraper import *
-from scraper_product import KplerProductScraper
-from misc import get_nested
+from .scraper import *
+from .scraper_product import KplerProductScraper
+from .misc import get_nested
 
 
 class KplerTradeScraper(KplerScraper):

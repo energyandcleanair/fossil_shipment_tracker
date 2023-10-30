@@ -47,8 +47,8 @@ from base.models import (
 )
 from base.db_utils import execute_statement, upsert
 from base.models import DB_TABLE_POSITION
-from engine.datalastic import Datalastic
-from engine.shipment import return_combined_shipments
+from engines.datalastic import Datalastic
+from engines.shipment import return_combined_shipments
 
 ArrivalPort = aliased(Port)
 

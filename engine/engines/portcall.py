@@ -10,10 +10,10 @@ from base.logger import logger, logger_slack, slacker, notify_engineers
 from base.db import session
 from base.db_utils import upsert
 from base.utils import to_datetime, to_list, collapse_dates, remove_dates
-from engine import ship
-from engine import port
-from engine.marinetraffic import Marinetraffic
-from engine.datalastic import Datalastic
+from engines import ship
+from engines import port
+from engines.marinetraffic import Marinetraffic
+from engines.datalastic import Datalastic
 
 from base.models import (
     PortCall,
@@ -27,7 +27,7 @@ from base.models import (
 )
 from base.models import DB_TABLE_PORTCALL
 
-from engine.marinetraffic import MOVETYPE_DEPARTURE, MOVETYPE_ARRIVAL
+from engines.marinetraffic import MOVETYPE_DEPARTURE, MOVETYPE_ARRIVAL
 
 
 def initial_fill(limit=None):
@@ -188,7 +188,7 @@ def upload_portcalls(portcalls):
                 marinetraffic_id = portcall.others.get("marinetraffic", {}).get("PORT_ID")
 
                 if unlocode is None:
-                    from engine.datalastic import Datalastic
+                    from engines.datalastic import Datalastic
                     from difflib import SequenceMatcher
                     import numpy as np
 

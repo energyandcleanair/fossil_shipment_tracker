@@ -27,8 +27,8 @@ from base.models import (
 )
 from base.utils import to_list
 from base.utils import update_geometry_from_wkb
-from engine import port
-from engine.shipment import return_combined_shipments
+from engines import port
+from engines.shipment import return_combined_shipments
 
 
 def update(shipment_id=None):

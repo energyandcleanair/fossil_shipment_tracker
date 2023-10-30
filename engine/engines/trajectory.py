@@ -40,7 +40,7 @@ from base.models import (
     ShipmentDepartureBerth,
     ShipmentWithSTS,
 )
-from engine import position
+from engines import position
 from base.db import session
 from base.db import engine
 from base.utils import to_list, to_datetime
@@ -50,7 +50,7 @@ from base.models import DB_TABLE_TRAJECTORY
 import pandas as pd
 import geopandas as gpd
 from geoalchemy2 import Geometry
-from engine.shipment import return_combined_shipments
+from engines.shipment import return_combined_shipments
 
 
 def update(

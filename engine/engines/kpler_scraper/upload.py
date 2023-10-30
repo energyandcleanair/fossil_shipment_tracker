@@ -1,5 +1,4 @@
 import datetime as dt
-import json
 import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
@@ -15,7 +14,7 @@ from base.models import (
     DB_TABLE_KPLER_INSTALLATION,
 )
 from base.db_utils import upsert
-from base.db import session, engine
+from base.db import engine
 from base.logger import logger
 
 

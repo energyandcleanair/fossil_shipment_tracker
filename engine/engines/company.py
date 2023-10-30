@@ -33,7 +33,7 @@ from base.models import (
     Ship,
     Port,
 )
-from engine.company_scraper import Equasis, CompanyImoScraper
+from engines.company_scraper import Equasis, CompanyImoScraper
 
 
 def update(imo=None, force_unknown=False):

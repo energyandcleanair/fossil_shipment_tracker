@@ -6,10 +6,10 @@ from sqlalchemy.sql.expression import cast
 from tqdm import tqdm
 
 import base
-from engine import departure
-from engine import portcall
-from engine import shipment
-from engine.marinetraffic import Marinetraffic
+from engines import departure
+from engines import portcall
+from engines import shipment
+from engines.marinetraffic import Marinetraffic
 from base.logger import logger_slack
 from base.db import session
 from base.models import Arrival, Shipment, ShipmentWithSTS, Ship, MarineTrafficCall, Departure

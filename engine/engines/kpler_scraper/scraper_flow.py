@@ -4,13 +4,13 @@ import urllib3
 import pandas as pd
 from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
-from base.utils import to_datetime, to_list
+from base.utils import to_datetime
 from base.logger import logger
 
-from misc import get_split_name
-from scraper import KplerScraper
-from scraper_product import KplerProductScraper
-from kpler_scraper import KPLER_TOTAL
+from .misc import get_split_name
+from .scraper import KplerScraper
+from .scraper_product import KplerProductScraper
+from ..kpler_scraper import KPLER_TOTAL
 
 
 ### IMPORTANT

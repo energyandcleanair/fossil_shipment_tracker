@@ -1,14 +1,10 @@
-import datetime as dt
 import requests
 import urllib3
-import os
 from requests.adapters import HTTPAdapter, Retry
 
-from base.utils import to_datetime, to_list
 from base.logger import logger
 from base.env import get_env
 import pandas as pd
-from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 
 class KplerProductScraper:

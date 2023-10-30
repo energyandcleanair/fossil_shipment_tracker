@@ -9,32 +9,19 @@ import ast
 
 import country_converter as coco
 
-import base
 from base.env import get_env
-from base.utils import to_datetime, to_list
 from base import UNKNOWN_COUNTRY
 from base.models import (
     DB_TABLE_KPLER_PRODUCT,
-    DB_TABLE_KPLER_FLOW,
     KplerVessel,
     KplerProduct,
-    DB_TABLE_KPLER_TRADE,
 )
 from base.db_utils import upsert
-from base.db import session, engine
+from base.db import session
 from base.logger import logger
 import pandas as pd
-from tqdm import tqdm
-import sqlalchemy as sa
 from unidecode import unidecode
 
-from kpler.sdk.configuration import Configuration
-from kpler.sdk import Platform, exceptions
-from kpler.sdk.resources.flows import Flows
-from kpler.sdk.resources.products import Products
-from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
-from kpler.sdk.resources.installations import Installations
-from .misc import get_split_name
 
 KPLER_TOTAL = "Total"
 

@@ -1,30 +1,7 @@
-import datetime as dt
-import json
-import os
-import pandas as pd
-from tqdm import tqdm
-import sqlalchemy as sa
+from base.db import session
+from base.logger import logger_slack, notify_engineers
 
-from base.utils import to_datetime, to_list
-from base import UNKNOWN_COUNTRY
-from base.models import (
-    DB_TABLE_KPLER_PRODUCT,
-    DB_TABLE_KPLER_FLOW,
-    DB_TABLE_KPLER_TRADE,
-)
-from base.db_utils import upsert
-from base.db import session, engine
-from base.logger import logger_slack, slacker, notify_engineers
-
-from base.logger import logger
-
-from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
-
-from .scraper import KplerScraper
-from .scraper_flow import KplerFlowScraper
-from .scraper_trade import KplerTradeScraper
-from .scraper_product import KplerProductScraper
-from .upload import upload_flows, upload_trades
+from kpler.sdk import FlowsSplit
 
 from .update_trade import update_trades
 from .update_flow import update_flows

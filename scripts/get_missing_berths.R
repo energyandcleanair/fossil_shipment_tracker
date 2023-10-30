@@ -90,4 +90,3 @@ berths_sf <- berths %>%
 filepath <- "missing_berths.kml"
 if(file.exists(filepath)) file.remove(filepath)
 sf::st_write(berths_sf, filepath)
-

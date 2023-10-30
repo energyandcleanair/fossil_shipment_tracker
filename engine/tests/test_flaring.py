@@ -1,5 +1,5 @@
 import pandas as pd
-from engine.flaring import *
+from engines.flaring import *
 from base.models import Shipment, Departure
 from base.db import init_db
 

@@ -16,7 +16,7 @@ from base.models import (
     Event,
     ShipmentWithSTS,
 )
-from engine import shipment
+from engines import shipment
 
 
 def get_departures_with_gap_around_arrival(

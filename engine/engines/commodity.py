@@ -30,9 +30,13 @@ def fill():
 
 def fill_kpler_commodities(commodities_df):
     # Add Kpler Products
-    from engine.kpler_scraper import KplerScraper, KplerProductScraper
-    from engine.kpler_scraper import get_product_id, get_commodity_equivalent, get_commodity_pricing
-    from engine.kpler_scraper import upload_products
+    from engines.kpler_scraper import KplerScraper, KplerProductScraper
+    from engines.kpler_scraper import (
+        get_product_id,
+        get_commodity_equivalent,
+        get_commodity_pricing,
+    )
+    from engines.kpler_scraper import upload_products
 
     kpler_products = KplerProductScraper().get_products_brute()
     from base.models import KplerProduct

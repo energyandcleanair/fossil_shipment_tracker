@@ -1,5 +1,5 @@
 import pandas as pd
-from engine.entsog import *
+from engines.entsog import *
 
 
 def test_interconnections():
@@ -18,9 +18,7 @@ def test_bulgaria_greece():
     )
 
     import_de = (
-        flows_import_raw.groupby(
-            ["pointKey", "operatorKey", "pointLabel", "country", "partner"]
-        )
+        flows_import_raw.groupby(["pointKey", "operatorKey", "pointLabel", "country", "partner"])
         .agg(value_bcm=("value", lambda x: np.nansum(x) / base.GCV_KWH_PER_M3 / 1e9))
         .reset_index()
         .sort_values(["value_bcm"], ascending=False)
@@ -34,7 +32,6 @@ def test_bulgaria_greece():
 
 
 def test_get_crossborder_flows():
-
     # flows = update(date_from='2018-01-01',
     #                date_to='2019-12-31',
     #                country_iso2=['AT'])
@@ -65,8 +62,7 @@ def test_get_crossborder_flows():
             date_from="%s-01-01" % (year),
             date_to="%s-12-31" % (year),
             save_intermediary_to_file=True,
-            intermediary_filename="entsog/local/entsog_%s_uploaded_intermediary.csv"
-            % (year),
+            intermediary_filename="entsog/local/entsog_%s_uploaded_intermediary.csv" % (year),
             save_to_file=True,
             remove_pipe_in_pipe=True,
             filename="entsog/local/entsog_%s_uploaded.csv" % (year),

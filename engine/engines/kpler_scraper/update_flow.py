@@ -1,9 +1,9 @@
 import datetime as dt
 import os
 
-from base.utils import to_datetime, to_list
+from base.utils import to_datetime
 from base import UNKNOWN_COUNTRY
-from base.db import session, engine
+from base.db import session
 from base.logger import logger
 import pandas as pd
 from tqdm import tqdm

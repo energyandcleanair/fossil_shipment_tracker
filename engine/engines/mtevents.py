@@ -15,9 +15,9 @@ from base.db_utils import upsert
 from base.db import check_if_table_exists
 from base.utils import distance_between_points, to_list, to_datetime
 
-from engine.datalastic import Datalastic
-from engine.marinetraffic import Marinetraffic
-from engine.ship import fill
+from engines.datalastic import Datalastic
+from engines.marinetraffic import Marinetraffic
+from engines.ship import fill
 
 from base.models import (
     MarineTrafficEventType,

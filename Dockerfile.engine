@@ -1,0 +1,63 @@
+# Share the base version across the multiple layers
+FROM python:3.8-slim-bookworm as base
+
+# Install dependencies, best practice to do this separately so that
+# we decrease the attack surface of the image.
+FROM base as dependencies
+
+WORKDIR /app/engine-deps/
+
+# Setup installation dependencies
+RUN apt-get update
+RUN apt-get install -y \
+  build-essential \
+  libpq-dev
+RUN pip install pipenv
+
+# Install dependencies
+COPY engine/Pipfile* .
+RUN PIPENV_VENV_IN_PROJECT=1 pipenv install --deploy --ignore-pipfile
+
+
+# Build the app
+FROM base as app
+
+# Install runtime dependencies.
+# We use chromium rather than chrome as both the browser and
+# driver are in the package manager and are both compatible.
+RUN apt-get update
+RUN apt-get install -y \
+  libpq-dev \
+  chromium \
+  chromium-driver
+
+WORKDIR /app/engine/
+# Best practice is to create a user so we aren't running as root
+# which can modify files in the image at runtime but we need to
+# give it permissions to write to the cache dir.
+RUN adduser engine  --disabled-password  --disabled-login
+
+COPY --from=dependencies /app/engine-deps/.venv /.venv
+
+# Setup env
+ENV PATH=/.venv/bin/:${PATH}
+ENV PYTHONPATH=${PYTHONPATH}:${PWD}
+ENV PYTHONUNBUFFERED=1
+ENV TQDM_DISABLE=1
+
+# Bring in source
+COPY engine/ .
+# Assets and cache can be writen to the engine
+COPY --chown=engine engine/assets ./assets
+COPY --chown=engine engine/cache ./cache
+COPY base/ ./base
+COPY api/ ./api
+
+# Lower the user permissions so it can't overwrite the code.
+USER engine
+RUN mkdir -p ./assets/kpler
+
+# Set the entry point to the pipenv python so we can just
+# define the run that we want to do (for example,
+# run/update_company.)
+ENTRYPOINT ["python"]

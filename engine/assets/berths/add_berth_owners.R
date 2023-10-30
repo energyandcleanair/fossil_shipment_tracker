@@ -119,7 +119,3 @@ addBerthData <- function(df, version='v7') {
     select(name, arrival_berth_owner=Owner, arrival_berth_owner_simple=Owner_simple) %>%
     left_join(df, .)
 }
-
-
-
-

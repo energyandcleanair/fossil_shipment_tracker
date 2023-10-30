@@ -17,8 +17,7 @@ from base.models import (
     Arrival,
 )
 from base.utils import to_datetime, to_list
-from engine.datalastic import Datalastic
-from engine.marinetraffic import Marinetraffic
+from engines.datalastic import Datalastic
 import numpy as np
 
 import sqlalchemy as sa
@@ -39,6 +38,9 @@ def collect_mt_for_large_oil_products():
     We trust MT, and recollect MT for 'dubious' ships
     :return:
     """
+
+    from engines.marinetraffic import Marinetraffic
+
     ships = Ship.query.filter(
         Ship.commodity == base.OIL_PRODUCTS,
         Ship.dwt >= 40e3,
@@ -154,7 +156,7 @@ def fill(imos=[], mmsis=[], force=False):
     upload_ships([s for s in ships if (s and s.dwt is not None and s.type is not None)])
 
     # Then with Marinetraffic for those still missing
-    from engine.marinetraffic import Marinetraffic
+    from engines.marinetraffic import Marinetraffic
 
     ships = [Marinetraffic.get_ship(imo=x) for x in get_missing_ships_imos(imos)]
     upload_ships(ships)
@@ -284,6 +286,7 @@ def fix_duplicate_imo(imo=None, handle_versioned=True, handle_not_found=True):
     -------
 
     """
+    from engines.marinetraffic import Marinetraffic
 
     def return_coalesced_data(ships):
         """
@@ -339,6 +342,7 @@ def fix_duplicate_imo(imo=None, handle_versioned=True, handle_not_found=True):
         -------
 
         """
+
         ship_portcalls = PortCall.query.filter(PortCall.ship_imo == old_imo).all()
         ship_mtvoyages = MTVoyageInfo.query.filter(MTVoyageInfo.ship_imo == old_imo).all()
 
@@ -661,7 +665,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
         # others = portcall_ship.others
         found_ship = Datalastic.get_ship(mmsi=mmsi, use_cache=True)
         if not found_ship or not found_ship.imo or found_ship.imo == "0":
-            from engine.marinetraffic import Marinetraffic
+            from engines.marinetraffic import Marinetraffic
 
             found_ship = Marinetraffic.get_ship(mmsi=mmsi, use_cache=True)
 
@@ -749,8 +753,8 @@ def fix_mmsi_imo_discrepancy(date_from=None):
 def fix_not_found():
     ships = Ship.query.filter(Ship.imo.op("~*")("NOTFOUND.*|.*_v.*")).all()
 
-    from engine.marinetraffic import Marinetraffic
-    from engine.datalastic import Datalastic
+    from engines.marinetraffic import Marinetraffic
+    from engines.datalastic import Datalastic
 
     # portcalls = PortCall.query.filter(PortCall.ship_imo.op('~*')('NOTFOUND.*')).all()
 
@@ -812,6 +816,8 @@ def compare_ship_sources(
 
     :return:
     """
+
+    from engines.marinetraffic import Marinetraffic
 
     # Let's use a simplified estimate to find out what our biggest transporters of commodities are
     largest_transporters = (
