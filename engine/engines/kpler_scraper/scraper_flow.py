@@ -117,14 +117,22 @@ class KplerFlowScraper(KplerScraper):
         try:
             r = self.session.post(url, json=params_raw, headers=headers)
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(
+                f"Kpler request failed: {params_raw}. Probably empty",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         # read content to dataframe
         try:
             data = r.json()["series"]
         except requests.exceptions.JSONDecodeError:
-            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(
+                f"Kpler request failed: {params_raw}. Probably empty",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         dfs = []

@@ -86,7 +86,9 @@ class EntsogApi:
                     res["meta"]["count"],
                 )
         except KeyError as e:
-            logger.warning("May have failed for: %s %s" % (url, params))
+            logger.warning(
+                "May have failed for: %s %s" % (url, params), stack_info=True, exc_info=True
+            )
             return None
 
         return res

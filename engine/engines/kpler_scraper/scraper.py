@@ -336,7 +336,11 @@ class KplerScraper:
         try:
             r = self.session.get(url, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
-            logger.warning(f"Kpler request failed: {kpler_vessel_id}.")
+            logger.warning(
+                f"Kpler request failed: {kpler_vessel_id}.",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         response_data = r.json()
@@ -464,7 +468,11 @@ class KplerProductInfo:
         try:
             r = KplerProductInfo.session.get(f"{url}/{id}", headers=headers)
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(f"Kpler request failed")
+            logger.warning(
+                f"Kpler request failed",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         return r.json()

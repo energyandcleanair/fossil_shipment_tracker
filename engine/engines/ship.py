@@ -413,7 +413,7 @@ def fix_duplicate_imo(imo=None, handle_versioned=True, handle_not_found=True):
         try:
             session.commit()
         except sa.exc.IntegrityError as e:
-            logger.info(e)
+            logger.info("Failed to create update ship IMO", stack_info=True, exc_info=True)
             session.rollback()
 
     ships = (
@@ -699,7 +699,11 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                 try:
                     session.commit()
                 except sa.exc.IntegrityError as e:
-                    logger.info(e)
+                    logger.info(
+                        f"Failed to fix imo/mmsi integrity for {imo}/{mmsi}",
+                        stack_info=True,
+                        exc_info=True,
+                    )
                     session.rollback()
 
             if len(existing_ship) == 1:
@@ -716,7 +720,11 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                     try:
                         session.commit()
                     except sa.exc.IntegrityError as e:
-                        logger.info(e)
+                        logger.info(
+                            f"Failed to fix imo/mmsi integrity for {imo}/{mmsi}",
+                            stack_info=True,
+                            exc_info=True,
+                        )
                         session.rollback()
 
                 else:
@@ -737,7 +745,11 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                     try:
                         session.commit()
                     except sa.exc.IntegrityError as e:
-                        logger.info(e)
+                        logger.info(
+                            f"Failed to fix imo/mmsi integrity for {imo}/{mmsi}",
+                            stack_info=True,
+                            exc_info=True,
+                        )
                         session.rollback()
 
             wrong.append(mmsi)

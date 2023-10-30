@@ -70,7 +70,11 @@ def update(
         update_is_valid()
 
     except Exception as e:
-        logger_slack.error("Kpler update failed: %s" % (str(e),))
+        logger_slack.error(
+            f"Kpler update failed",
+            stack_info=True,
+            exc_info=True,
+        )
         notify_engineers("Please check error")
 
 

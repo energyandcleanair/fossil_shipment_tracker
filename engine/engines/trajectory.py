@@ -79,7 +79,11 @@ def update(
         reroute(date_from=date_from, shipment_id=shipment_id)
 
     except Exception as e:
-        logger.info("Failed: %s" % (str(e),))
+        logger.info(
+            "Failed to update trajectories",
+            stack_info=True,
+            exc_info=True,
+        )
         pass
 
 
@@ -583,7 +587,11 @@ def reroute(
             session.commit()
 
         except ValueError as e:
-            logger.warning("Failed to reroute traj")
+            logger.warning(
+                "Failed to reroute traj",
+                stack_info=True,
+                exc_info=True,
+            )
             continue
 
 

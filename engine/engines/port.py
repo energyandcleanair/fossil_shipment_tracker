@@ -52,7 +52,7 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
                     return port.id
                 except sa.exc.IntegrityError as e:
                     if "psycopg2.errors.UniqueViolation" in str(e):
-                        print("Failed to upload port: duplicated port")
+                        logger.warning("Failed to upload port: duplicated port")
                     session.rollback()
                     return None
 

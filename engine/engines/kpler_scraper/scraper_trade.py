@@ -128,7 +128,11 @@ class KplerTradeScraper(KplerScraper):
         try:
             r = requests.get(url, params=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
-            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(
+                f"Kpler request failed: {params_raw}. Probably empty",
+                stack_info=True,
+                exc_info=True,
+            )
             return 0, []
 
         try:
@@ -136,11 +140,17 @@ class KplerTradeScraper(KplerScraper):
         except (json.decoder.JSONDecodeError, requests.JSONDecodeError, requests.RequestException):
             if "Result window is too large" in r.text:
                 logger.warning(
-                    f"Reached the end for Kpler trade. Probably required to split by product even further"
+                    f"Reached the end for Kpler trade. Probably required to split by product even further",
+                    stack_info=True,
+                    exc_info=True,
                 )
                 return 0, []
             else:
-                logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+                logger.warning(
+                    f"Kpler request failed: {params_raw}. Probably empty",
+                    stack_info=True,
+                    exc_info=True,
+                )
                 return 0, []
         return len(trades_raw), trades_raw
 

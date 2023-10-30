@@ -33,7 +33,11 @@ class Equasis:
         try:
             resp = self.session.post(url, headers=headers, data=payload)
         except Exception as e:
-            self._log("Error logging in to equasis.org")
+            logger.error(
+                "Error logging in to equasis.org",
+                stack_info=True,
+                exc_info=True,
+            )
             raise e
 
     def _get_next_crendentials(self):
@@ -41,7 +45,7 @@ class Equasis:
         self.current_credentials_idx += 1
         self.current_credentials_idx %= len(credentials)
         next_credentials = credentials[self.current_credentials_idx]
-        self._log("Trying with email %s" % (next_credentials["username"]))
+        logger.info("Trying with email %s" % (next_credentials["username"]))
         return next_credentials
 
     def _get_all_credentials(self):
@@ -142,10 +146,11 @@ class Equasis:
         try:
             resp = self.session.post(url, headers=headers, data=payload)
         except Exception as e:
-            self._log("Error getting response")
-            raise e
-        except requests.exceptions.HTTPError as e:
-            self._log("HTTP error")
+            logger.info(
+                "Error getting response",
+                stack_info=True,
+                exc_info=True,
+            )
             raise e
 
         if "session has expired" in str(resp.content):
@@ -217,10 +222,11 @@ class Equasis:
         try:
             resp = self.session.post(url, headers=headers, data=payload)
         except Exception as e:
-            self._log("Error getting response")
-            raise e
-        except requests.exceptions.HTTPError as e:
-            self._log("HTTP error")
+            logger.info(
+                "Error getting response",
+                stack_info=True,
+                exc_info=True,
+            )
             raise e
 
         if "session has expired" in str(resp.content):

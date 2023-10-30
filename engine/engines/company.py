@@ -210,9 +210,17 @@ def update_info_from_equasis(
                 imo_equasis = imo.replace("NOTFOUND_", "")
                 equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
             except requests.exceptions.HTTPError as e:
-                logger.warning("Failed to get equasis ship info, trying again.")
+                logger.warning(
+                    "Failed to get equasis ship info, trying again.",
+                    stack_info=True,
+                    exc_info=True,
+                )
             except requests.exceptions.ConnectionError as e:
-                logger.warning("Connection failed, trying again.")
+                logger.warning(
+                    "Connection failed, trying again.",
+                    stack_info=True,
+                    exc_info=True,
+                )
 
         if equasis_infos is not None:
             # Update ship record
@@ -598,7 +606,11 @@ def update_failed_insurer(imo, insurer):
         session.commit()
     except IntegrityError as e:
         session.rollback()
-        logger.warning("Failed to update insurer checked date for ship %s" % (imo))
+        logger.warning(
+            "Failed to update insurer checked date for ship %s" % (imo),
+            stack_info=True,
+            exc_info=True,
+        )
 
 
 def create_unknown_insurer(imo):
@@ -610,7 +622,11 @@ def create_unknown_insurer(imo):
         session.commit()
     except IntegrityError as e:
         session.rollback()
-        logger.warning("Failed to create unknown insurer checked date for ship %s" % (imo))
+        logger.warning(
+            "Failed to create unknown insurer checked date for ship %s" % (imo),
+            stack_info=True,
+            exc_info=True,
+        )
 
     # reset updated on
     unknown_insurer.updated_on = None
@@ -620,7 +636,9 @@ def create_unknown_insurer(imo):
     except IntegrityError as e:
         session.rollback()
         logger.warning(
-            "Failed to reset updated on date for unknown insurer checked date for ship %s" % (imo)
+            "Failed to reset updated on date for unknown insurer checked date for ship %s" % (imo),
+            stack_info=True,
+            exc_info=True,
         )
 
     return unknown_insurer
