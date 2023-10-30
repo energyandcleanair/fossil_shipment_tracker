@@ -578,5 +578,9 @@ def update():
         to_insert.to_sql(DB_TABLE_KPLER_TRADE_COMPUTED, con=engine, if_exists="append", index=False)
         session.commit()
     except Exception as e:
-        logger_slack.error(f"Updating kpler computed table failed: {e}")
+        logger_slack.error(
+            f"Updating kpler computed table failed",
+            stack_info=True,
+            exc_info=True,
+        )
         raise e

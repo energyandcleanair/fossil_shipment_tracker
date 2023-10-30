@@ -63,7 +63,6 @@ def update(
     arrival_port_iso2=None,
     date_from=None,
 ):
-
     logger_slack.info("=== Trajectory update ===")
 
     try:
@@ -80,7 +79,11 @@ def update(
         reroute(date_from=date_from, shipment_id=shipment_id)
 
     except Exception as e:
-        logger.info("Failed: %s" % (str(e),))
+        logger.info(
+            "Failed to update trajectories",
+            stack_info=True,
+            exc_info=True,
+        )
         pass
 
 
@@ -93,7 +96,6 @@ def create_new(
     add_port_location_if_need_be=False,
     arrival_port_iso2=None,
 ):
-
     DepartureBerthPosition = aliased(Position)
     ArrivalBerthPosition = aliased(Position)
     ArrivalPort = aliased(Port)
@@ -315,14 +317,12 @@ def cluster(ordered_positions, buffer_deg=0.005):
 def get_trajectories_over_land(
     date_from=-31, min_land_distance=2, ignore_recent_hours=24, shipment_id=None, commodity=None
 ):
-
     if isinstance(date_from, int):
         last_date = session.query(sa.func.max(Arrival.date_utc)).first()[0]
         date_from = to_datetime(last_date) + dt.timedelta(days=date_from)
         date_from = date_from.strftime("%Y-%m-%d")
 
     with engine.connect() as con:
-
         data = {
             "date_from": date_from,
             "min_land_distance": min_land_distance,
@@ -376,7 +376,6 @@ def get_splitted_traj(trajectory_id):
     """
 
     with engine.connect() as con:
-
         data = {"trajectory_id": trajectory_id}
         statement = text(
             """
@@ -490,7 +489,6 @@ def reroute(
     shipment_id=None,
     commodity=None,
 ):
-
     trajs = get_trajectories_over_land(
         date_from=date_from,
         min_land_distance=min_land_distance,
@@ -502,7 +500,6 @@ def reroute(
     # plt.imshow(img)
 
     for traj in tqdm(trajs):
-
         try:
             # Split segments and only deal with overlapping ones
             segments_df = get_splitted_traj(trajectory_id=traj.id)
@@ -590,7 +587,11 @@ def reroute(
             session.commit()
 
         except ValueError as e:
-            logger.warning("Failed to reroute traj")
+            logger.warning(
+                "Failed to reroute traj",
+                stack_info=True,
+                exc_info=True,
+            )
             continue
 
 

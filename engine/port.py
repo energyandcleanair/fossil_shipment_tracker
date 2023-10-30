@@ -32,14 +32,16 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
     found = session.query(Port.id)
 
     if unlocode:
-        found = found.filter(Port.unlocode==str(unlocode))
+        found = found.filter(Port.unlocode == str(unlocode))
     elif marinetraffic_id:
-        found = found.filter(Port.marinetraffic_id==marinetraffic_id)
+        found = found.filter(Port.marinetraffic_id == marinetraffic_id)
 
     found = found.all()
     if len(found) == 0:
         if add_if_needed and name:
-            ports = Datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id, fuzzy=False)
+            ports = Datalastic.search_ports(
+                name=name, marinetraffic_id=marinetraffic_id, fuzzy=False
+            )
             if ports is not None and len(ports) == 1:
                 port = ports[0]
                 port.unlocode = unlocode
@@ -47,20 +49,25 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
                 try:
                     session.add(port)
                     session.commit()
-                    return(port.id)
+                    return port.id
                 except sa.exc.IntegrityError as e:
                     if "psycopg2.errors.UniqueViolation" in str(e):
-                        print("Failed to upload port: duplicated port")
+                        logger.warning("Failed to upload port: duplicated port")
                     session.rollback()
                     return None
 
-            #TODO Add MT here
+            # TODO Add MT here
 
-        logger.warning("Didn't find any port (unlocode: %s, marinetraffic: %s)" % (unlocode, marinetraffic_id))
+        logger.warning(
+            "Didn't find any port (unlocode: %s, marinetraffic: %s)" % (unlocode, marinetraffic_id)
+        )
         return None
 
     if len(found) > 1:
-        logger.warning("Found more than one port (unlocode: %s, marinetraffic: %s)" %(unlocode, marinetraffic_id))
+        logger.warning(
+            "Found more than one port (unlocode: %s, marinetraffic: %s)"
+            % (unlocode, marinetraffic_id)
+        )
         return None
 
     return found[0][0]
@@ -73,17 +80,18 @@ def add_check_departure_to_anchorage():
     """
     ports_checked = Port.query.filter(Port.check_departure).all()
     for port in tqdm(ports_checked):
-
-        regexps = [port.name + ' ANCH',
-                   port.name.split("-")[0] + ' ANCH',
-                   port.name.replace("'", "") + ' ANCH',
-                   port.name.replace("`", "") + ' ANCH'
-                   ]
+        regexps = [
+            port.name + " ANCH",
+            port.name.split("-")[0] + " ANCH",
+            port.name.replace("'", "") + " ANCH",
+            port.name.replace("`", "") + " ANCH",
+        ]
 
         found = False
         for regexp in regexps:
-            port_anchorages = Port.query.filter(sa.and_(Port.name.op('~*')(regexp),
-                                                       Port.iso2 == port.iso2))
+            port_anchorages = Port.query.filter(
+                sa.and_(Port.name.op("~*")(regexp), Port.iso2 == port.iso2)
+            )
             if port_anchorages.count() > 0:
                 found = True
                 for port_anchorage in port_anchorages.all():
@@ -93,9 +101,7 @@ def add_check_departure_to_anchorage():
         if not found:
             logger.info(f"Didn't find anchorage for port {port.name}")
 
-
-
-    insert_new_port(iso2='IN', marinetraffic_id=21982, name='SIKKA-ANCH')
+    insert_new_port(iso2="IN", marinetraffic_id=21982, name="SIKKA-ANCH")
 
 
 def fill():
@@ -108,24 +114,30 @@ def fill():
     if not "check_arrival" in ports_df.columns:
         ports_df["check_arrival"] = False
 
-    ports_gdf = gpd.GeoDataFrame(ports_df, geometry=gpd.points_from_xy(ports_df.lon, ports_df.lat), crs="EPSG:4326")
+    ports_gdf = gpd.GeoDataFrame(
+        ports_df, geometry=gpd.points_from_xy(ports_df.lon, ports_df.lat), crs="EPSG:4326"
+    )
     ports_gdf.loc[ports_gdf.lon.isnull(), "geometry"] = None
-    ports_gdf = ports_gdf[["unlocode", "name", "iso2", "check_departure", "check_arrival", "geometry"]]
+    ports_gdf = ports_gdf[
+        ["unlocode", "name", "iso2", "check_departure", "check_arrival", "geometry"]
+    ]
     ports_df = pd.DataFrame(ports_gdf)
     ports_df = update_geometry_from_wkb(ports_df, to="wkt")
 
-    upsert(df=ports_df.loc[ports_df.check_departure],
-           table=DB_TABLE_PORT,
-           constraint_name="unique_port",
-           dtype=({'geometry': Geometry('POINT', 4326)}))
+    upsert(
+        df=ports_df.loc[ports_df.check_departure],
+        table=DB_TABLE_PORT,
+        constraint_name="unique_port",
+        dtype=({"geometry": Geometry("POINT", 4326)}),
+    )
 
     # (JUST FILLING GEOMETRY)
     from base.models import PortCall
     import sqlalchemy as sa
 
-    missing_ports = session.query(Port) \
-        .filter(Port.geometry == sa.null()) \
-        .filter(Port.check_departure).all()
+    missing_ports = (
+        session.query(Port).filter(Port.geometry == sa.null()).filter(Port.check_departure).all()
+    )
 
     for m in missing_ports:
         print(m)
@@ -142,8 +154,7 @@ def insert_new_port(iso2, unlocode, name=None, marinetraffic_id=None):
     if name is not None:
         new_ports = Datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id)
     else:
-        new_ports = [Port(**{"unlocode": unlocode,
-                           "iso2": iso2})]
+        new_ports = [Port(**{"unlocode": unlocode, "iso2": iso2})]
 
     for new_port in new_ports:
         session.add(new_port)
@@ -151,15 +162,19 @@ def insert_new_port(iso2, unlocode, name=None, marinetraffic_id=None):
 
 
 def update_area():
-
-    session.query(Port).filter(Port.iso2 == 'RU').update(
-        {'area': sa.case(
-            [(func.ST_X(Port.geometry) > 100, 'Pacific'),
-             (func.ST_Y(Port.geometry) > 62, 'Arctic'),
-             (func.ST_Y(Port.geometry) > 50, 'Baltic'),
-             (func.ST_X(Port.geometry) > 47, 'Caspian Sea'),
-             ],
-            else_='Black sea')},
-        synchronize_session=False)
+    session.query(Port).filter(Port.iso2 == "RU").update(
+        {
+            "area": sa.case(
+                [
+                    (func.ST_X(Port.geometry) > 100, "Pacific"),
+                    (func.ST_Y(Port.geometry) > 62, "Arctic"),
+                    (func.ST_Y(Port.geometry) > 50, "Baltic"),
+                    (func.ST_X(Port.geometry) > 47, "Caspian Sea"),
+                ],
+                else_="Black sea",
+            )
+        },
+        synchronize_session=False,
+    )
 
     session.commit()

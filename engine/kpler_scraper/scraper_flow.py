@@ -12,6 +12,7 @@ from engine.kpler_scraper.scraper import KplerScraper
 from engine.kpler_scraper.scraper_product import KplerProductScraper
 from engine.kpler_scraper import KPLER_TOTAL
 
+
 ### IMPORTANT
 ### Certain country names and to_zone_name are still empty after
 ### scraping, and have been updated manually in the database
@@ -116,14 +117,22 @@ class KplerFlowScraper(KplerScraper):
         try:
             r = self.session.post(url, json=params_raw, headers=headers)
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(
+                f"Kpler request failed: {params_raw}. Probably empty",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         # read content to dataframe
         try:
             data = r.json()["series"]
         except requests.exceptions.JSONDecodeError:
-            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(
+                f"Kpler request failed: {params_raw}. Probably empty",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         dfs = []
@@ -186,7 +195,6 @@ class KplerFlowScraper(KplerScraper):
         date_to=dt.datetime.now(),
         use_brute_force=True,
     ):
-
         if from_zone is None and origin_iso2 is not None:
             if from_split == FlowsSplit.OriginCountries:
                 from_zone = self.get_zone_dict(platform=platform, iso2=origin_iso2)

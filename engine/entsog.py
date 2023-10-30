@@ -86,7 +86,9 @@ class EntsogApi:
                     res["meta"]["count"],
                 )
         except KeyError as e:
-            logger.warning("May have failed for: %s %s" % (url, params))
+            logger.warning(
+                "May have failed for: %s %s" % (url, params), stack_info=True, exc_info=True
+            )
             return None
 
         return res
@@ -132,7 +134,6 @@ class EntsogApi:
 
     @staticmethod
     def get_physical_flows(points, date_from="2019-01-01", date_to=dt.date.today()):
-
         # Exit points
         exit_points = points[points.directionKey == "exit"]
         exit_flows = EntsogApi._get_physical_flows(
@@ -163,7 +164,6 @@ class EntsogApi:
         date_to=dt.date.today(),
         limit=-1,
     ):
-
         url = "https://transparency.entsog.eu/api/v1/operationalData"
 
         if point_key is not None and operator_key is None:
@@ -310,7 +310,6 @@ class EntsogApi:
 class EntsogDb:
     @staticmethod
     def get_physical_flows(points, date_from, date_to):
-
         # Download for all points (probably too much info)
         # and then inner join
         query = session.query(EntsogFlowRaw).filter(
@@ -524,7 +523,6 @@ def get_points(
     use_csv_selection=True,
     must_include_pointkeys=["UGS-00273"],
 ):
-
     opd = EntsogApi.get_operator_point_directions()
 
     # First filters
@@ -637,7 +635,6 @@ def get_flows_raw(
     use_csv_selection=True,
     use_db=False,
 ):
-
     points = get_points(
         country_iso2=country_iso2,
         remove_operators=remove_operators,
@@ -675,7 +672,6 @@ def process_flows_raw(
     save_to_file=False,
     filename=None,
 ):
-
     # Reconcile import and exports
     flows_import = flows_raw[flows_raw.directionKey == "entry"]
     flows_export = flows_raw[flows_raw.directionKey == "exit"]
@@ -885,7 +881,6 @@ def process_flows_raw(
 
 
 def update_db(date_from="2022-01-01", date_to=dt.date.today(), force=False):
-
     # Last date
     if not force:
         date_from = session.query(sa.func.max(EntsogFlowRaw.updated_on)).first()[0] or date_from
@@ -919,7 +914,6 @@ def get_flows(
     save_to_file=False,
     filename=None,
 ):
-
     # ENTSOG API -> ENTSOG DB
     update_db(date_from=date_from, date_to=date_to, force=force)
 

@@ -290,7 +290,6 @@ class KplerScraper:
             return manual_iso2
 
     def get_zone_name(self, platform, id, name=None):
-
         if name is not None:
             return name
 
@@ -350,7 +349,11 @@ class KplerScraper:
         try:
             r = self.session.get(url, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
-            logger.warning(f"Kpler request failed: {kpler_vessel_id}.")
+            logger.warning(
+                f"Kpler request failed: {kpler_vessel_id}.",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         response_data = r.json()
@@ -427,7 +430,6 @@ class KplerScraper:
 
 
 class KplerProductInfo:
-
     cache = {}
     session = requests.Session()
     retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
@@ -479,7 +481,11 @@ class KplerProductInfo:
         try:
             r = KplerProductInfo.session.get(f"{url}/{id}", headers=headers)
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(f"Kpler request failed")
+            logger.warning(
+                f"Kpler request failed",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         return r.json()

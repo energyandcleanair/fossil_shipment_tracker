@@ -143,8 +143,7 @@ def fill(imos=[], mmsis=[], force=False):
     # First with Datalastic - we do check if Datalastic found the ship properly by checking dwt, and refer to
     # MT to retry if it did not
     ships = [
-        Datalastic.get_ship(imo=x, query_if_not_in_cache=True)
-        for x in get_missing_ships_imos(imos)
+        Datalastic.get_ship(imo=x, query_if_not_in_cache=True) for x in get_missing_ships_imos(imos)
     ]
     upload_ships([s for s in ships if (s and s.dwt is not None and s.type is not None)])
 
@@ -186,9 +185,7 @@ def upload_ships(ships):
 
             if len(imo_ships) > 1:
                 logger.warning(
-                    "Please check ship imo {}, we have more than one ship in db.".format(
-                        ship.imo
-                    )
+                    "Please check ship imo {}, we have more than one ship in db.".format(ship.imo)
                 )
             if len(imo_ships) == 1:
                 # add new shop mmsi to existing ship imo
@@ -212,30 +209,24 @@ def ship_to_commodity(ship):
         type = ship.type or ""
         subtype = ship.subtype or ""
         if re.match("Crude oil", type, re.IGNORECASE) or re.match(
-                "Crude oil", subtype, re.IGNORECASE
+            "Crude oil", subtype, re.IGNORECASE
         ):
             commodity = base.CRUDE_OIL
         elif re.match("OIL/CHEMICAL", type, re.IGNORECASE) or re.match(
-                "Oil or chemical", subtype, re.IGNORECASE
+            "Oil or chemical", subtype, re.IGNORECASE
         ):
             commodity = base.OIL_OR_CHEMICAL
         elif re.match("OIL PRODUCTS", type, re.IGNORECASE) or re.match(
-                "Oil products", subtype, re.IGNORECASE
+            "Oil products", subtype, re.IGNORECASE
         ):
             commodity = base.OIL_PRODUCTS
-        elif re.match("LNG", type, re.IGNORECASE) or re.match(
-                "LNG", subtype, re.IGNORECASE
-        ):
+        elif re.match("LNG", type, re.IGNORECASE) or re.match("LNG", subtype, re.IGNORECASE):
             commodity = base.LNG
-        elif re.match("LPG", type, re.IGNORECASE) or re.match(
-                "LPG", subtype, re.IGNORECASE
-        ):
+        elif re.match("LPG", type, re.IGNORECASE) or re.match("LPG", subtype, re.IGNORECASE):
             commodity = base.LPG
         elif re.match("Ore or Oil", subtype, re.IGNORECASE):
             commodity = base.OIL_OR_ORE
-        elif re.match("Bulk", type, re.IGNORECASE) or re.match(
-                "Bulk", subtype, re.IGNORECASE
-        ):
+        elif re.match("Bulk", type, re.IGNORECASE) or re.match("Bulk", subtype, re.IGNORECASE):
             commodity = base.BULK
         elif re.search("cargo", type, re.IGNORECASE):
             commodity = base.GENERAL_CARGO
@@ -278,10 +269,7 @@ def set_commodity(ship):
     return ship
 
 
-def fix_duplicate_imo(
-        imo=None,
-        handle_versioned=True,
-        handle_not_found=True):
+def fix_duplicate_imo(imo=None, handle_versioned=True, handle_not_found=True):
     """
     Verify the ship table - check if there are any identical rows - this could happen with the historic version
     of using '_v*' to iterate ships
@@ -352,9 +340,7 @@ def fix_duplicate_imo(
 
         """
         ship_portcalls = PortCall.query.filter(PortCall.ship_imo == old_imo).all()
-        ship_mtvoyages = MTVoyageInfo.query.filter(
-            MTVoyageInfo.ship_imo == old_imo
-        ).all()
+        ship_mtvoyages = MTVoyageInfo.query.filter(MTVoyageInfo.ship_imo == old_imo).all()
 
         # First let's try and clean up mtvoyage which should not have issues with changes - it is just to make sure
         # mmsi arrays are consistent everywhere
@@ -392,12 +378,8 @@ def fix_duplicate_imo(
                 shipments_to_delete_list = [s.id for s in shipments_to_delete.all()]
 
                 # delete in correct order to respect foreign keys
-                session.query(Shipment).filter(
-                    Shipment.id.in_(shipments_to_delete_list)
-                ).delete()
-                session.query(Departure).filter(
-                    Departure.portcall_id == ship_portcall.id
-                ).delete()
+                session.query(Shipment).filter(Shipment.id.in_(shipments_to_delete_list)).delete()
+                session.query(Departure).filter(Departure.portcall_id == ship_portcall.id).delete()
 
                 session.query(ShipmentDepartureBerth).filter(
                     ShipmentDepartureBerth.shipment_id.in_(shipments_to_delete_list)
@@ -427,14 +409,16 @@ def fix_duplicate_imo(
         try:
             session.commit()
         except sa.exc.IntegrityError as e:
-            logger.info(e)
+            logger.info("Failed to create update ship IMO", stack_info=True, exc_info=True)
             session.rollback()
 
     ships = (
         session.query(
             sa.case(
-                [(Ship.imo.like("%_v%"), sa.func.split_part(Ship.imo, "_", 1)),
-                 (Ship.imo.like("%-%"), sa.func.split_part(Ship.imo, "-", 1))],
+                [
+                    (Ship.imo.like("%_v%"), sa.func.split_part(Ship.imo, "_", 1)),
+                    (Ship.imo.like("%-%"), sa.func.split_part(Ship.imo, "-", 1)),
+                ],
                 else_=sa.null(),
             ).label("imo"),
             sa.case(
@@ -450,10 +434,11 @@ def fix_duplicate_imo(
     ships = session.query(ships).distinct(ships.c.imo, ships.c.mmsi).subquery()
 
     if imo:
-        ships = session.query(ships).filter(sa.or_(
-            ships.c.imo.in_(to_list(imo)),
-            ships.c.old_imo.in_(to_list(imo))
-        )).subquery()
+        ships = (
+            session.query(ships)
+            .filter(sa.or_(ships.c.imo.in_(to_list(imo)), ships.c.old_imo.in_(to_list(imo))))
+            .subquery()
+        )
 
     if not handle_not_found:
         ships = session.query(ships).filter(~ships.c.old_imo.op("~")("NOTFOUND"))
@@ -501,9 +486,9 @@ def fix_duplicate_imo(
 
             # check if existing versions of ships have the same dwt/name/mmsi - in which case we can simplify
             if (
-                    len(set([s.dwt for s in ship_versions])) == 1
-                    and len(names) == 1
-                    and len(mmsis) == 1
+                len(set([s.dwt for s in ship_versions])) == 1
+                and len(names) == 1
+                and len(mmsis) == 1
             ):
                 old_imo = ship_to_keep.imo
 
@@ -541,15 +526,15 @@ def fix_duplicate_imo(
                 if fill(mmsis=[ship.mmsi], force=True):
                     logger.info("Found NOTFOUND ship (mmsi: {}).".format(ship.mmsi))
 
-                    found_ship = (
-                        session.query(Ship).filter(Ship.mmsi.any(ship.mmsi)).first()
-                    )
+                    found_ship = session.query(Ship).filter(Ship.mmsi.any(ship.mmsi)).first()
 
                     update_ship_imo(ship.old_imo, found_ship.imo)
 
                 else:
                     logger.warning(
-                        "Could not find NOTFOUND ship (mmsi: {}). Trying with MT id.".format(ship.mmsi)
+                        "Could not find NOTFOUND ship (mmsi: {}). Trying with MT id.".format(
+                            ship.mmsi
+                        )
                     )
 
                     portcall = PortCall.query.filter(PortCall.ship_imo == ship.old_imo).first()
@@ -693,9 +678,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
 
             if len(existing_ship) == 0:
                 if not found_ship.imo:
-                    n_imo_ships = Ship.query.filter(
-                        Ship.imo.op("~")("unknown" + "[_v]?")
-                    ).count()
+                    n_imo_ships = Ship.query.filter(Ship.imo.op("~")("unknown" + "[_v]?")).count()
                     new_imo = "%s_v%d" % ("unknown", n_imo_ships + 1)
                     found_ship.imo = new_imo
                 session.add(found_ship)
@@ -705,64 +688,64 @@ def fix_mmsi_imo_discrepancy(date_from=None):
                 for ship_portcall in ship_portcalls:
                     ship_portcall.ship_imo = correct_imo
 
-                ship_departures = Departure.query.filter(
-                    Departure.ship_imo == imo
-                ).all()
+                ship_departures = Departure.query.filter(Departure.ship_imo == imo).all()
                 for ship_departure in ship_departures:
                     ship_departure.ship_imo = correct_imo
 
                 try:
                     session.commit()
                 except sa.exc.IntegrityError as e:
-                    logger.info(e)
+                    logger.info(
+                        f"Failed to fix imo/mmsi integrity for {imo}/{mmsi}",
+                        stack_info=True,
+                        exc_info=True,
+                    )
                     session.rollback()
 
             if len(existing_ship) == 1:
                 if existing_ship[0].mmsi == mmsi:
                     # Just need to plug with existing ship
-                    ship_portcalls = PortCall.query.filter(
-                        PortCall.ship_mmsi == mmsi
-                    ).all()
+                    ship_portcalls = PortCall.query.filter(PortCall.ship_mmsi == mmsi).all()
                     for ship_portcall in ship_portcalls:
                         ship_portcall.ship_imo = correct_imo
 
-                    ship_departures = Departure.query.filter(
-                        Departure.ship_imo == imo
-                    ).all()
+                    ship_departures = Departure.query.filter(Departure.ship_imo == imo).all()
                     for ship_departure in ship_departures:
                         ship_departure.ship_imo = correct_imo
 
                     try:
                         session.commit()
                     except sa.exc.IntegrityError as e:
-                        logger.info(e)
+                        logger.info(
+                            f"Failed to fix imo/mmsi integrity for {imo}/{mmsi}",
+                            stack_info=True,
+                            exc_info=True,
+                        )
                         session.rollback()
 
                 else:
-                    n_imo_ships = Ship.query.filter(
-                        Ship.imo.op("~")(correct_imo + "[_v]?")
-                    ).count()
+                    n_imo_ships = Ship.query.filter(Ship.imo.op("~")(correct_imo + "[_v]?")).count()
                     new_imo = "%s_v%d" % (correct_imo, n_imo_ships + 1)
                     found_ship.imo = new_imo
                     session.add(found_ship)
                     session.commit()
 
-                    ship_portcalls = PortCall.query.filter(
-                        PortCall.ship_mmsi == mmsi
-                    ).all()
+                    ship_portcalls = PortCall.query.filter(PortCall.ship_mmsi == mmsi).all()
                     for ship_portcall in ship_portcalls:
                         ship_portcall.ship_imo = new_imo
 
-                    ship_departures = Departure.query.filter(
-                        Departure.ship_imo == imo
-                    ).all()
+                    ship_departures = Departure.query.filter(Departure.ship_imo == imo).all()
                     for ship_departure in ship_departures:
                         ship_departure.ship_imo = new_imo
 
                     try:
                         session.commit()
                     except sa.exc.IntegrityError as e:
-                        logger.info(e)
+                        logger.info(
+                            f"Failed to fix imo/mmsi integrity for {imo}/{mmsi}",
+                            stack_info=True,
+                            exc_info=True,
+                        )
                         session.rollback()
 
             wrong.append(mmsi)
@@ -772,9 +755,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
         #     others_imo = others.get("marinetraffic",{}).get("IMO")
         #     if others_imo and others_imo != found_ship.imo:
         #         print(2)
-    print(
-        f"=== Correct: {len(correct)} | Wrong: {len(wrong)} | Unknown: {len(unknown)} ==="
-    )
+    print(f"=== Correct: {len(correct)} | Wrong: {len(wrong)} | Unknown: {len(unknown)} ===")
 
 
 def fix_not_found():
@@ -813,33 +794,31 @@ def fix_not_found():
 
                 if new_ship and new_ship.name == ship.name:
                     try:
-                        session.query(PortCall).filter(
-                            PortCall.ship_imo == ship.imo
-                        ).update({"ship_imo": new_ship.imo})
+                        session.query(PortCall).filter(PortCall.ship_imo == ship.imo).update(
+                            {"ship_imo": new_ship.imo}
+                        )
                         session.commit()
                     except IntegrityError as e:
                         session.rollback()  # Do manual delete here for now
 
-                    session.query(Departure).filter(
-                        Departure.ship_imo == ship.imo
-                    ).update({"ship_imo": new_ship.imo})
+                    session.query(Departure).filter(Departure.ship_imo == ship.imo).update(
+                        {"ship_imo": new_ship.imo}
+                    )
                     session.commit()
 
                     Ship.query.filter(Ship.imo == ship.imo).delete()
                     session.commit()
                 else:
                     # What to do?
-                    logger.info(
-                        "%s \n vs. \n %s " % (str(new_ship.others), str(ship.others))
-                    )
+                    logger.info("%s \n vs. \n %s " % (str(new_ship.others), str(ship.others)))
 
 
 def compare_ship_sources(
-        dwt_min=None,
-        sample=None,
-        limit=None,
-        reload_marinetraffic=False,
-        commodity=[base.CRUDE_OIL],
+    dwt_min=None,
+    sample=None,
+    limit=None,
+    reload_marinetraffic=False,
+    commodity=[base.CRUDE_OIL],
 ):
     """
 
@@ -857,9 +836,7 @@ def compare_ship_sources(
         .join(Departure, Departure.id == Shipment.departure_id)
         .join(Arrival, Arrival.id == Shipment.arrival_id)
         .join(Ship, Ship.imo == Departure.ship_imo)
-        .filter(
-            Ship.others.has_key("marinetraffic"), ~Ship.others.has_key("datalastic")
-        )
+        .filter(Ship.others.has_key("marinetraffic"), ~Ship.others.has_key("datalastic"))
         .group_by(Ship.imo)
         .order_by(sa.func.sum(Ship.dwt).label("total_dwt").desc())
     )
@@ -868,9 +845,7 @@ def compare_ship_sources(
         largest_transporters = largest_transporters.filter(Ship.dwt > dwt_min)
 
     if commodity:
-        largest_transporters = largest_transporters.filter(
-            Ship.commodity.in_(to_list(commodity))
-        )
+        largest_transporters = largest_transporters.filter(Ship.commodity.in_(to_list(commodity)))
 
     largest_transporters = largest_transporters.all()
 
@@ -895,9 +870,7 @@ def compare_ship_sources(
         if (ship_mt.dwt == ship_dt.dwt) & (ship_mt.commodity == ship_dt.commodity):
             if ship_mt.name != ship_dt.name:
                 logger.info(
-                    "Ship imo {}, names do not match, but dwt and commodity do.".format(
-                        ship_mt.imo
-                    )
+                    "Ship imo {}, names do not match, but dwt and commodity do.".format(ship_mt.imo)
                 )
             matching.append(ship_dt)
         else:
@@ -913,11 +886,7 @@ def compare_ship_sources(
                 )
             )
 
-    logger.info(
-        "Ships are identical for {}% of cases.".format(
-            100 * len(matching) / float(sample)
-        )
-    )
+    logger.info("Ships are identical for {}% of cases.".format(100 * len(matching) / float(sample)))
 
 
 def convert_mminame_cache_to_array(cache_file="cache/datalastic/ships.json"):

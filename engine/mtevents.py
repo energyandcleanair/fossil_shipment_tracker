@@ -103,7 +103,6 @@ def update(
     date_to, date_from = to_datetime(date_to), to_datetime(date_from)
 
     for ship in tqdm(ships.all()):
-
         # convert SQLAlchemy.row object
         ship = ship._asdict()
 
@@ -166,7 +165,6 @@ def get_and_process_ship_events_between_dates(
     date_bounds = []
 
     if not force_rebuild:
-
         # check whether we called this ship imo in the MTCall table and get latest date
         last_event_call = (
             session.query(MarineTrafficCall)
@@ -304,7 +302,6 @@ def get_and_process_ship_events_between_dates(
 
         # Store them in db so that we won't query them
         for event in events:
-
             if not upload_unprocessed_events and event.interacting_ship_imo is None:
                 continue
 
@@ -315,9 +312,17 @@ def get_and_process_ship_events_between_dates(
                     logger.info("Found a missing event")
             except sqlalchemy.exc.IntegrityError as e:
                 if "psycopg2.errors.UniqueViolation" in str(e):
-                    logger.info("Failed to upload event: duplicated event")
+                    logger.info(
+                        "Failed to upload event: duplicated event",
+                        stack_info=True,
+                        exc_info=True,
+                    )
                 else:
-                    logger.info("Failed to upload event: %s" % (str(e),))
+                    logger.info(
+                        "Failed to upload event",
+                        stack_info=True,
+                        exc_info=True,
+                    )
                 session.rollback()
                 continue
 
@@ -484,7 +489,6 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
     int_ships = Datalastic.find_ship(intship_name, fuzzy=True, return_closest=5)
 
     if int_ships is None:
-
         # before returning false, let's try and add in imo locally
         int_ship_imo_local = find_ship_imo_locally(intship_name)
         if int_ship_imo_local is not None:
@@ -629,7 +633,6 @@ def back_fill_ship_position(
     )
 
     for e in tqdm(events.all()):
-
         if not force_rebuild:
             previous_calls = mtcalls.filter(
                 MarineTrafficCall.params["imo"].astext == e.ship_imo

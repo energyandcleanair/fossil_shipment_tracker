@@ -14,6 +14,9 @@ import shutil
 
 import pandas as pd
 
+from base.logger import logger
+
+
 class CompanyImoScraper:
     """
     Class for scrapig IMO/detailed information about ship company registration and address
@@ -49,7 +52,11 @@ class CompanyImoScraper:
                 EC.presence_of_element_located((by, item))
             )
         except TimeoutException:
-            print("Failed to find object...")
+            logger.info(
+                "Failed to find object...",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         if not element:
@@ -156,7 +163,6 @@ class CompanyImoScraper:
                 options.add_argument("--headless")
 
         if not browser:
-
             if not self.service:
                 # Use the system managed chromedriver if available
                 path = shutil.which("chromedriver")

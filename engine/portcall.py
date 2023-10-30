@@ -218,14 +218,20 @@ def upload_portcalls(portcalls):
                     session.rollback()
                     logger.warning(
                         "Failed to add portcall. Probably a problem with port: %s"
-                        % (str(e).split("\n")[0])
+                        % (str(e).split("\n")[0]),
+                        stack_info=True,
+                        exc_info=True,
                     )
                     continue
             else:
                 if "unique_portcall" in str(e):
                     duplicated += 1
                 else:
-                    logger.warning("Failed to add portcall: %s" % (str(e).split("\n")[0]))
+                    logger.warning(
+                        "Failed to add portcall: %s" % (str(e).split("\n")[0]),
+                        stack_info=True,
+                        exc_info=True,
+                    )
                 continue
 
     if duplicated:
@@ -580,7 +586,11 @@ def update_departures(
                     {messages['uploaded']} uploaded, {messages['missing']} missing, {messages['duplicated']} duplicated, {messages['failed']} failed"""
                 )
     except Exception as e:
-        logger_slack.error("Departure update failed")
+        logger_slack.error(
+            "Departure update failed",
+            stack_info=True,
+            exc_info=True,
+        )
         notify_engineers("Please check error")
 
     return

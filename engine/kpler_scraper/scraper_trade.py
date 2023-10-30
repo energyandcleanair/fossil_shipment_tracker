@@ -12,7 +12,6 @@ class KplerTradeScraper(KplerScraper):
         super().__init__()
 
     def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=False):
-
         if sts_only:
             operational_filter = "shipToShip"
         else:
@@ -78,7 +77,6 @@ class KplerTradeScraper(KplerScraper):
         product_ids=None,
         operational_filter=None,
     ):
-
         if from_zone and from_zone.get("name") == "Unknown":
             return 0, []
 
@@ -130,7 +128,11 @@ class KplerTradeScraper(KplerScraper):
         try:
             r = requests.get(url, params=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
-            logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+            logger.warning(
+                f"Kpler request failed: {params_raw}. Probably empty",
+                stack_info=True,
+                exc_info=True,
+            )
             return 0, []
 
         try:
@@ -138,11 +140,17 @@ class KplerTradeScraper(KplerScraper):
         except (json.decoder.JSONDecodeError, requests.JSONDecodeError, requests.RequestException):
             if "Result window is too large" in r.text:
                 logger.warning(
-                    f"Reached the end for Kpler trade. Probably required to split by product even further"
+                    f"Reached the end for Kpler trade. Probably required to split by product even further",
+                    stack_info=True,
+                    exc_info=True,
                 )
                 return 0, []
             else:
-                logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
+                logger.warning(
+                    f"Kpler request failed: {params_raw}. Probably empty",
+                    stack_info=True,
+                    exc_info=True,
+                )
                 return 0, []
         return len(trades_raw), trades_raw
 
@@ -181,8 +189,7 @@ class KplerTradeScraper(KplerScraper):
         sts["product_name"] = flow.get("name")
         return sts
 
-    def _parse_trade_vessels(self, vessels) -> (List[dict]):
-
+    def _parse_trade_vessels(self, vessels) -> List[dict]:
         return [
             {
                 "id": x.get("id"),
@@ -195,8 +202,7 @@ class KplerTradeScraper(KplerScraper):
             for x in vessels
         ]
 
-    def _parse_trade_trade(self, trade_raw, platform) -> (List[dict]):
-
+    def _parse_trade_trade(self, trade_raw, platform) -> List[dict]:
         trade = {}
         # General
         trade["id"] = trade_raw.get("id")
@@ -306,8 +312,7 @@ class KplerTradeScraper(KplerScraper):
 
         return result
 
-    def _parse_trade_flows(self, trade_raw) -> (List[dict]):
-
+    def _parse_trade_flows(self, trade_raw) -> List[dict]:
         trade_id = trade_raw.get("id")
         flows_raw = trade_raw.get("flowQuantities")
         if len(flows_raw) == 0:
@@ -330,7 +335,7 @@ class KplerTradeScraper(KplerScraper):
 
         return flows
 
-    def _parse_trade_zones(self, trade_raw) -> (List[dict]):
+    def _parse_trade_zones(self, trade_raw) -> List[dict]:
         """
         Extract all possible information from trade_raw about zones,
         be it berth, port, or country
@@ -395,7 +400,7 @@ class KplerTradeScraper(KplerScraper):
         result = [dict(t) for t in {tuple(d.items()) for d in result}]
         return result
 
-    def _parse_trade_installations(self, trade_raw) -> (List[dict]):
+    def _parse_trade_installations(self, trade_raw) -> List[dict]:
         """
         Extract all possible information from trade_raw about zones,
         be it berth, port, or country
@@ -428,8 +433,7 @@ class KplerTradeScraper(KplerScraper):
         result = [dict(t) for t in {tuple(d.items()) for d in result}]
         return result
 
-    def _parse_trade_products(self, flow, platform) -> (List[dict]):
-
+    def _parse_trade_products(self, flow, platform) -> List[dict]:
         if not flow:
             return []
 

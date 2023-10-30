@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import os
+import traceback
 import pandas as pd
 from tqdm import tqdm
 import sqlalchemy as sa
@@ -68,7 +69,6 @@ def update(
     add_unknown=True,
     add_unknown_only=False,
 ):
-
     try:
         update_flows(
             date_from=date_from,
@@ -94,7 +94,11 @@ def update(
         update_is_valid()
 
     except Exception as e:
-        logger_slack.error("Kpler update failed: %s" % (str(e),))
+        logger_slack.error(
+            f"Kpler update failed",
+            stack_info=True,
+            exc_info=True,
+        )
         notify_engineers("Please check error")
 
 

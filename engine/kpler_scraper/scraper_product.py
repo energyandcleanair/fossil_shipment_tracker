@@ -12,7 +12,6 @@ from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementU
 
 
 class KplerProductScraper:
-
     cache = {"liquids": {}, "lng": {}, "dry": {}}
     session = requests.Session()
     retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
@@ -33,7 +32,11 @@ class KplerProductScraper:
         try:
             infos = cls.get_infos(platform=platform, id=id)
         except Exception as e:
-            f"Failed with id={id} and platform={platform}"
+            logger.warning(
+                f"Failed with id={id} and platform={platform}",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         if infos is None:
@@ -111,13 +114,16 @@ class KplerProductScraper:
         try:
             r = KplerProductScraper.session.get(f"{url}/{id}", headers=headers)
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(f"Kpler request failed")
+            logger.warning(
+                f"Kpler request failed",
+                stack_info=True,
+                exc_info=True,
+            )
             return None
 
         return r.json()
 
     def get_products_brute(self, platforms=None):
-
         if platforms is None:
             platforms = ["liquids", "lng", "dry"]
 

@@ -24,7 +24,11 @@ def update(bucket="russia_fossil_tracker", folder="backup"):
         backup_counter(client_bucket=client_bucket, folder=folder, now=now)
         logger_slack.info("=== Creating backup done ===")
     except Exception as e:
-        logger_slack.error("=== Creating backup FAILED ===")
+        logger_slack.error(
+            "=== Creating backup FAILED ===",
+            stack_info=True,
+            exc_info=True,
+        )
 
 
 def upload(df, client_bucket, folder, filename, exts=["RDS", "csv.gz"]):
@@ -67,9 +71,7 @@ def backup_overland(client_bucket, folder, now):
     resp = PipelineFlowResource().get_from_params(params=params)
     overland_df = pd.DataFrame(resp.json)
     filename = "overland_%s" % (now.strftime("%Y%m%d_%H%M"))
-    upload(
-        df=overland_df, client_bucket=client_bucket, folder=folder, filename=filename
-    )
+    upload(df=overland_df, client_bucket=client_bucket, folder=folder, filename=filename)
 
 
 def backup_counter(client_bucket, folder, now):

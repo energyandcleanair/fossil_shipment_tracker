@@ -9,8 +9,9 @@ from base.logger import logger_slack, logger
 from base.utils import to_list
 from decouple import config
 
-ACCOUNT_START_RANGE=int(config("EQUASIS_ACCOUNT_RANGE_START", "1"))
-ACCOUNT_END_RANGE=int(config("EQUASIS_ACCOUNT_RANGE_END", "200"))
+ACCOUNT_START_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_START", "1"))
+ACCOUNT_END_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_END", "200"))
+
 
 class Equasis:
     session = None
@@ -32,7 +33,11 @@ class Equasis:
         try:
             resp = self.session.post(url, headers=headers, data=payload)
         except Exception as e:
-            self._log("Error logging in to equasis.org")
+            logger.error(
+                "Error logging in to equasis.org",
+                stack_info=True,
+                exc_info=True,
+            )
             raise e
 
     def _get_next_crendentials(self):
@@ -40,11 +45,14 @@ class Equasis:
         self.current_credentials_idx += 1
         self.current_credentials_idx %= len(credentials)
         next_credentials = credentials[self.current_credentials_idx]
-        self._log("Trying with email %s" % (next_credentials["username"]))
+        logger.info("Trying with email %s" % (next_credentials["username"]))
         return next_credentials
 
     def _get_all_credentials(self):
-        emails = ["rutankers+%d@protonmail.com" % (x) for x in range(ACCOUNT_START_RANGE, ACCOUNT_END_RANGE)]
+        emails = [
+            "rutankers+%d@protonmail.com" % (x)
+            for x in range(ACCOUNT_START_RANGE, ACCOUNT_END_RANGE)
+        ]
         password = get_env("EQUASIS_PASSWORD")
         return [{"username": x, "password": password} for x in emails]
 
@@ -56,7 +64,7 @@ class Equasis:
         pni_divs = parent.find_all("div", attrs={"class": "access-body"})
         if not len(pni_divs) > 0:
             return []
-        
+
         results = []
 
         for pni_div in pni_divs:
@@ -138,10 +146,11 @@ class Equasis:
         try:
             resp = self.session.post(url, headers=headers, data=payload)
         except Exception as e:
-            self._log("Error getting response")
-            raise e
-        except requests.exceptions.HTTPError as e:
-            self._log("HTTP error")
+            logger.info(
+                "Error getting response",
+                stack_info=True,
+                exc_info=True,
+            )
             raise e
 
         if "session has expired" in str(resp.content):
@@ -213,10 +222,11 @@ class Equasis:
         try:
             resp = self.session.post(url, headers=headers, data=payload)
         except Exception as e:
-            self._log("Error getting response")
-            raise e
-        except requests.exceptions.HTTPError as e:
-            self._log("HTTP error")
+            logger.info(
+                "Error getting response",
+                stack_info=True,
+                exc_info=True,
+            )
             raise e
 
         if "session has expired" in str(resp.content):
