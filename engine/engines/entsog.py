@@ -174,7 +174,7 @@ class EntsogApi:
             logger.info("Splitting by operator")
             splitted = EntsogApi.split(point_key, operator_key)
             result = []
-            for operator_key, point_keys in tqdm(splitted.items()):
+            for operator_key, point_keys in tqdm(splitted.items(), unit="operator-points"):
                 r = EntsogApi._get_physical_flows(
                     operator_key=operator_key,
                     point_key=point_keys,

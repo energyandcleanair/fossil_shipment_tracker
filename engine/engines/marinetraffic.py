@@ -333,7 +333,7 @@ class Marinetraffic:
         if len(response_datas) <= 500:
             response_datas
         else:
-            response_datas = tqdm(response_datas)
+            response_datas = tqdm(response_datas, "missing-ships")
 
         for r in response_datas:
             # IMO's missing
@@ -669,7 +669,7 @@ class Marinetraffic:
         ]
 
         logger.info("Querying intervals for ship imo: {}.".format(imo))
-        for interval in tqdm(intervals):
+        for interval in tqdm(intervals, unit="intervals"):
             date_from = interval[0]
             date_to = interval[1]
 

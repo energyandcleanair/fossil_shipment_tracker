@@ -110,7 +110,7 @@ def fill_missing_port_operation():
         PortCall.port_id != sa.null(),
     ).all()
 
-    for pc in tqdm(portcalls_to_update):
+    for pc in tqdm(portcalls_to_update, unit="portcall"):
         new_pc = Marinetraffic.get_portcalls_between_dates(
             marinetraffic_port_id=pc.port_id,
             arrival_or_departure="departure",
@@ -137,7 +137,7 @@ def fill_missing_port_id():
         PortCall.others == sa.null(), PortCall.port_id == sa.null()
     ).all()
 
-    for pc in tqdm(portcalls_to_update):
+    for pc in tqdm(portcalls_to_update, unit="portcall"):
         new_pc = Marinetraffic.get_portcalls_between_dates(
             imo=pc.ship_imo,
             date_from=pc.date_utc - dt.timedelta(minutes=10),
@@ -158,7 +158,7 @@ def fill_missing_port_id():
         PortCall.others != sa.null(), PortCall.port_id == sa.null()
     ).all()
 
-    for pc in tqdm(portcalls_to_update):
+    for pc in tqdm(portcalls_to_update, unit="portcall"):
         port_name = pc.others.get("marinetraffic", {}).get("PORT_NAME")
         mt_port_id = pc.others.get("marinetraffic", {}).get("PORT_ID")
 
@@ -509,7 +509,7 @@ def update_departures(
             ports = ports.filter(Port.iso2.in_(to_list(departure_port_iso2)))
 
         ports = ports.all()
-        for port in tqdm(ports):
+        for port in tqdm(ports, unit="ports"):
             # Three cases:
             # - only from last (force_rebuild=False)
             # - force rebuild between existing ones
@@ -763,7 +763,7 @@ def fill_departure_gaps(
 
     # 1/2: update port departures from Russia
     filter_impossible = lambda x: False  # To force continuing
-    for unlocode in tqdm(originally_checked_port_unlocodes):
+    for unlocode in tqdm(originally_checked_port_unlocodes, unit="ports"):
         print(unlocode)
         next_departure = get_next_portcall(
             date_from=date_from,
@@ -864,7 +864,7 @@ def fill_gaps_within_shipments(
     # For each shipment, we only fill gaps progressively,
     # until we find a matching departure portcall to save credits
     shipment_ids = gaps.id.unique()
-    for shipment_id in tqdm(shipment_ids):
+    for shipment_id in tqdm(shipment_ids, unit="shipment"):
         shipment_gaps = gaps[gaps.id == shipment_id].sort_values(["date_utc"])
         next_portcall = None
         i = 0

@@ -34,7 +34,9 @@ def update():
     all_insurance_to_update = get_all_insurance_to_update()
 
     for insurance_to_update in tqdm(
-        all_insurance_to_update.itertuples(), total=all_insurance_to_update.shape[0]
+        all_insurance_to_update.itertuples(),
+        total=all_insurance_to_update.shape[0],
+        unit="ships",
     ):
         update_insurance(insurance_to_update)
 

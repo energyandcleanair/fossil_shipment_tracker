@@ -79,7 +79,7 @@ def add_check_departure_to_anchorage():
     from related anchorages
     """
     ports_checked = Port.query.filter(Port.check_departure).all()
-    for port in tqdm(ports_checked):
+    for port in tqdm(ports_checked, unit="ports"):
         regexps = [
             port.name + " ANCH",
             port.name.split("-")[0] + " ANCH",

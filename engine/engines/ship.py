@@ -46,7 +46,7 @@ def collect_mt_for_large_oil_products():
         Ship.dwt >= 40e3,
     ).all()
 
-    for ship in tqdm(ships):
+    for ship in tqdm(ships, unit="ship"):
         if ship.type != ship.others.get("marinetraffic", {}).get("VESSEL_TYPE"):
             # If there are multiple mmsis take latest one
             ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi[-1])
@@ -94,7 +94,7 @@ def fill_missing_commodity():
     # First fill type if missing
     # Datalastic (or us) seem to have been missing a few in the past
     ships = Ship.query.filter(Ship.type == sa.null()).all()
-    for ship in tqdm(ships):
+    for ship in tqdm(ships, unit="ship"):
         new_ship = Datalastic.get_ship(imo=ship.imo, use_cache=False)
         if new_ship:
             print(new_ship.imo)
@@ -109,7 +109,7 @@ def fill_missing_commodity():
             session.commit()
 
     ships = Ship.query.filter(Ship.commodity == sa.null()).all()
-    for ship in tqdm(ships):
+    for ship in tqdm(ships, unit="ship"):
         (commodity, quantity, unit) = ship_to_commodity(ship)
         ship.commodity = commodity
         ship.quantity = quantity
@@ -452,7 +452,7 @@ def fix_duplicate_imo(imo=None, handle_versioned=True, handle_not_found=True):
 
     ships = ships.all()
 
-    for ship in tqdm(ships):
+    for ship in tqdm(ships, unit="ship"):
         logger.info("Checking vessel imo: {}, mmsi: {}.".format(ship.imo, ship.mmsi))
 
         if "NOTFOUND" in ship.old_imo and not handle_not_found:
@@ -659,7 +659,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
     wrong = []
     unknown = []
     # For each ship, ask datalastic
-    for portcall_ship in tqdm(portcall_ships):
+    for portcall_ship in tqdm(portcall_ships, unit="portcall-ship"):
         imo = portcall_ship.ship_imo
         mmsi = portcall_ship.ship_mmsi[-1]
         # others = portcall_ship.others
@@ -770,7 +770,7 @@ def fix_not_found():
 
     # portcalls = PortCall.query.filter(PortCall.ship_imo.op('~*')('NOTFOUND.*')).all()
 
-    for ship in tqdm(ships):
+    for ship in tqdm(ships, unit="ship"):
         portcall = PortCall.query.filter(PortCall.ship_imo == ship.imo).first()
         if portcall:
             ship_mt_id = portcall.others.get("marinetraffic", {}).get("SHIP_ID")
@@ -866,7 +866,7 @@ def compare_ship_sources(
 
     matching = []
 
-    for ship in tqdm(largest_transporters):
+    for ship in tqdm(largest_transporters, unit="large-ship"):
         ship_mt = ship[0]
         if reload_marinetraffic:
             ship_mt = Marinetraffic.get_ship(imo=ship_mt.imo)

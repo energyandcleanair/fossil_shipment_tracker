@@ -4,7 +4,7 @@ import geopandas as gpd
 import pandas as pd
 from tqdm import tqdm
 
-from base.db import engine, meta #KEEP meta, even though it is greyed out by IDE
+from base.db import engine, meta  # KEEP meta, even though it is greyed out by IDE
 from base.logger import logger, logger_slack
 
 
@@ -18,7 +18,7 @@ def execute_statement(stmt, print_result=False, slack_result=False):
                 if print_result:
                     print(row)
             if slack_result:
-                logger_slack.info('\n'.join(rows))
+                logger_slack.info("\n".join(rows))
         else:
             con.execute(stmt)
 
@@ -29,7 +29,7 @@ def get_upsert_method(constraint_name, show_progress=True):
         data_list = list(data_iter)
         global meta
         if show_progress:
-            data_iterator = tqdm(data_list)
+            data_iterator = tqdm(data_list, unit="rows", leave=False)
         else:
             data_iterator = data_list
 
@@ -65,16 +65,15 @@ def upsert(df, table, constraint_name, dtype={}, show_progress=True, chunksize=1
         # TODO upsert not yet supported. Not sure what's the best way to proceed
         # It will fail if constraint is violated
         # A way would be to first remove db records violating the constraint
-        df.to_postgis(table,
-                      con=engine,
-                      if_exists="append",
-                      index=False)
+        df.to_postgis(table, con=engine, if_exists="append", index=False)
 
     elif isinstance(df, pd.DataFrame):
-        df.to_sql(table,
-                  con=engine,
-                  if_exists="append",
-                  index=False,
-                  method=get_upsert_method(constraint_name, show_progress=show_progress),
-                  chunksize=chunksize,
-                  dtype=dtype)
+        df.to_sql(
+            table,
+            con=engine,
+            if_exists="append",
+            index=False,
+            method=get_upsert_method(constraint_name, show_progress=show_progress),
+            chunksize=chunksize,
+            dtype=dtype,
+        )

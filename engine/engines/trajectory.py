@@ -499,7 +499,7 @@ def reroute(
     dataset, img = get_routing_cost()
     # plt.imshow(img)
 
-    for traj in tqdm(trajs):
+    for traj in tqdm(trajs, unit="trajectory"):
         try:
             # Split segments and only deal with overlapping ones
             segments_df = get_splitted_traj(trajectory_id=traj.id)

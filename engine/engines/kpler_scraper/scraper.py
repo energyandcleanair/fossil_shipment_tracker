@@ -25,6 +25,8 @@ from unidecode import unidecode
 
 KPLER_TOTAL = "Total"
 
+CACHE_BASE_DIR = "cache/kpler/"
+
 
 ### IMPORTANT
 ### Certain country names and to_zone_name are still empty after
@@ -92,9 +94,7 @@ class KplerScraper:
         if self.installations_brute.get(platform) is not None:
             return self.installations_brute[platform]
 
-        file = f"assets/kpler/{platform}_installations.csv"
-        if os.path.exists("engine"):
-            file = f"engine/{file}"
+        file = f"{CACHE_BASE_DIR}/{platform}_installations.csv"
 
         if not os.path.exists(file):
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
@@ -117,9 +117,7 @@ class KplerScraper:
         if self.zones_brute.get(platform) is not None:
             return self.zones_brute[platform]
 
-        file = f"assets/kpler/{platform}_zones.csv"
-        if os.path.exists("engine"):
-            file = f"engine/{file}"
+        file = f"{CACHE_BASE_DIR}/{platform}_zones.csv"
 
         if not os.path.exists(file):
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
@@ -173,9 +171,7 @@ class KplerScraper:
         if self.products_brute.get(platform) is not None:
             return self.products_brute[platform]
 
-        file = f"assets/kpler/{platform}_products.csv"
-        if os.path.exists("engine"):
-            file = f"engine/{file}"
+        file = f"{CACHE_BASE_DIR}/{platform}_products.csv"
 
         if not os.path.exists(file):
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
@@ -336,11 +332,7 @@ class KplerScraper:
         try:
             r = self.session.get(url, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
-            logger.warning(
-                f"Kpler request failed: {kpler_vessel_id}.",
-                stack_info=True,
-                exc_info=True,
-            )
+            logger.warning(f"Kpler request failed: {kpler_vessel_id}.")
             return None
 
         response_data = r.json()
@@ -368,9 +360,7 @@ class KplerScraper:
         if self.vessels_brute.get(platform) is not None:
             return self.vessels_brute[platform]
 
-        file = f"assets/kpler/{platform}_vessels.csv"
-        if os.path.exists("engine"):
-            file = f"engine/{file}"
+        file = f"{CACHE_BASE_DIR}/{platform}_vessels.csv"
 
         if not os.path.exists(file):
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
@@ -468,11 +458,7 @@ class KplerProductInfo:
         try:
             r = KplerProductInfo.session.get(f"{url}/{id}", headers=headers)
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(
-                f"Kpler request failed",
-                stack_info=True,
-                exc_info=True,
-            )
+            logger.warning(f"Kpler request failed")
             return None
 
         return r.json()

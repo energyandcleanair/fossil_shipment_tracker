@@ -102,7 +102,7 @@ def update(
 
     date_to, date_from = to_datetime(date_to), to_datetime(date_from)
 
-    for ship in tqdm(ships.all()):
+    for ship in tqdm(ships.all(), unit="ships"):
         # convert SQLAlchemy.row object
         ship = ship._asdict()
 
@@ -632,7 +632,7 @@ def back_fill_ship_position(
         .filter(MarineTrafficCall.date_utc > "2022-10-05 20:50")
     )
 
-    for e in tqdm(events.all()):
+    for e in tqdm(events.all(), unit="events"):
         if not force_rebuild:
             previous_calls = mtcalls.filter(
                 MarineTrafficCall.params["imo"].astext == e.ship_imo
@@ -669,7 +669,7 @@ def back_fill_ship_imo():
     """
     events = session.query(Event).filter(Event.interacting_ship_imo == sa.null())
 
-    for e in tqdm(events.all()):
+    for e in tqdm(events.all(), unit="events"):
         # first try and find a ship has been seen in STS events and we have confirmed imo for
         interacting_ship_name = e.interacting_ship_name
 

@@ -1,12 +1,15 @@
 import datetime as dt
+import logging
 import os
+import warnings
 
 from base.utils import to_datetime
 from base import UNKNOWN_COUNTRY
 from base.db import session
-from base.logger import logger
+from base.logger import logger, logger_slack
 import pandas as pd
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from . import KplerScraper
@@ -104,97 +107,106 @@ def update_flows(
     date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
 
     _platforms = scraper.platforms if platforms is None else platforms
-    for platform in _platforms:
-        # _products = scraper.get_products(platform=platform).name if products is None else products
 
-        for origin_iso2 in tqdm(origin_iso2s):
-            print(origin_iso2)
-            for from_split in from_splits:
-                from_zones = get_from_zones(
-                    scraper=scraper,
-                    platform=platform,
-                    product=None,
-                    origin_iso2=origin_iso2,
-                    split=from_split,
-                )
+    with logging_redirect_tqdm(
+        loggers=[logging.root, logger, logger_slack]
+    ), warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for platform in tqdm(_platforms, unit="platform", leave=False):
+            # _products = scraper.get_products(platform=platform).name if products is None else products
 
-                for from_zone in from_zones:
-                    for to_split in to_splits:
-                        to_zones = get_to_zones(
-                            scraper=scraper,
-                            platform=platform,
-                            from_zone=from_zone,
-                            split=to_split,
-                            product=None,
-                        )
+            logger.info(f"Updating flows for {platform}")
 
-                        df_zones = []
-                        for to_zone in to_zones:
-                            df = scraper.get_flows(
+            for origin_iso2 in tqdm(origin_iso2s, unit="origin", leave=False):
+                logger.info(f"Updating flows for {platform}: {origin_iso2}")
+                for from_split in tqdm(from_splits, unit="from-splits", leave=False):
+                    from_zones = get_from_zones(
+                        scraper=scraper,
+                        platform=platform,
+                        product=None,
+                        origin_iso2=origin_iso2,
+                        split=from_split,
+                    )
+
+                    for from_zone in tqdm(from_zones, unit="from-zone", leave=False):
+                        for to_split in tqdm(to_splits, unit="to-splits", leave=False):
+                            to_zones = get_to_zones(
+                                scraper=scraper,
                                 platform=platform,
-                                origin_iso2=origin_iso2,
-                                date_from=date_from,
-                                date_to=date_to,
                                 from_zone=from_zone,
-                                from_split=from_split,
-                                to_zone=to_zone,
-                                to_split=to_split,
-                                split=FlowsSplit.Grades,
-                                use_brute_force=use_brute_force,
-                            )
-                            if df is not None:
-                                df_zones.append(df)
-                            if not add_unknown_only:
-                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
-
-                        if add_unknown:
-                            # Add an unknown one
-                            total = scraper.get_flows(
-                                platform=platform,
-                                origin_iso2=origin_iso2,
-                                date_from=date_from,
-                                date_to=date_to,
-                                from_zone=from_zone,
-                                from_split=from_split,
-                                to_zone=None,
-                                to_split=to_split,
-                                split=FlowsSplit.Grades,
-                                use_brute_force=use_brute_force,
+                                split=to_split,
+                                product=None,
                             )
 
-                            if len(df_zones) == 0:
-                                logger.warning("No flows found for %s", from_zone)
-                            else:
-                                known_zones = pd.concat(df_zones)
-                                known_zones_total = (
-                                    known_zones.groupby(["date", "product"])
-                                    .value.sum()
-                                    .reset_index()
+                            df_zones = []
+                            for to_zone in tqdm(to_zones, unit="to-zone", leave=False):
+                                df = scraper.get_flows(
+                                    platform=platform,
+                                    origin_iso2=origin_iso2,
+                                    date_from=date_from,
+                                    date_to=date_to,
+                                    from_zone=from_zone,
+                                    from_split=from_split,
+                                    to_zone=to_zone,
+                                    to_split=to_split,
+                                    split=FlowsSplit.Grades,
+                                    use_brute_force=use_brute_force,
                                 )
-                                if total is None:
-                                    raise ValueError(
-                                        "No total flows found for %s |%s | %s",
-                                        platform,
-                                        origin_iso2,
-                                        from_zone,
+                                if df is not None:
+                                    df_zones.append(df)
+                                if not add_unknown_only:
+                                    upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+
+                            if add_unknown:
+                                # Add an unknown one
+                                total = scraper.get_flows(
+                                    platform=platform,
+                                    origin_iso2=origin_iso2,
+                                    date_from=date_from,
+                                    date_to=date_to,
+                                    from_zone=from_zone,
+                                    from_split=from_split,
+                                    to_zone=None,
+                                    to_split=to_split,
+                                    split=FlowsSplit.Grades,
+                                    use_brute_force=use_brute_force,
+                                )
+
+                                if len(df_zones) == 0:
+                                    logger.warning("No flows found for %s", from_zone)
+                                else:
+                                    known_zones = pd.concat(df_zones)
+                                    known_zones_total = (
+                                        known_zones.groupby(["date", "product"])
+                                        .value.sum()
+                                        .reset_index()
                                     )
+                                    if total is None:
+                                        raise ValueError(
+                                            "No total flows found for %s |%s | %s",
+                                            platform,
+                                            origin_iso2,
+                                            from_zone,
+                                        )
 
-                                unknown = total.merge(
-                                    known_zones_total,
-                                    on=["product", "date"],
-                                    how="left",
-                                    suffixes=("", "_byzone"),
-                                )
-                                unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
-                                unknown["value_unknown"] = (
-                                    unknown["value"] - unknown["value_byzone"]
-                                )
-                                unknown = unknown[unknown["value_unknown"] > 0]
-                                unknown["to_zone_name"] = UNKNOWN_COUNTRY
-                                unknown["value"] = unknown["value_unknown"]
-                                unknown["updated_on"] = dt.datetime.now()
-                                unknown = unknown[known_zones.columns]
-                                upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+                                    unknown = total.merge(
+                                        known_zones_total,
+                                        on=["product", "date"],
+                                        how="left",
+                                        suffixes=("", "_byzone"),
+                                    )
+                                    unknown["value_byzone"] = unknown["value_byzone"].fillna(0)
+                                    unknown["value_unknown"] = (
+                                        unknown["value"] - unknown["value_byzone"]
+                                    )
+                                    unknown = unknown[unknown["value_unknown"] > 0]
+                                    unknown["to_zone_name"] = UNKNOWN_COUNTRY
+                                    unknown["value"] = unknown["value_unknown"]
+                                    unknown["updated_on"] = dt.datetime.now()
+                                    unknown = unknown[known_zones.columns]
+                                    upload_flows(
+                                        unknown, ignore_if_copy_failed=ignore_if_copy_failed
+                                    )
 
 
 def update_flows_reverse(
@@ -218,8 +230,8 @@ def update_flows_reverse(
     for platform in _platforms:
         # _products = scraper.get_products(platform=platform).name if products is None else products
 
-        for destination_iso2 in tqdm(destination_iso2s):
-            for to_split in to_splits:
+        for destination_iso2 in tqdm(destination_iso2s, unit="destination", leave=False):
+            for to_split in tqdm(to_splits, unit="to-splits", leave=False):
                 to_zones = get_to_zones(
                     scraper=scraper,
                     platform=platform,
@@ -229,8 +241,8 @@ def update_flows_reverse(
                     include_unknown=False,
                 )
 
-                for to_zone in tqdm(to_zones):
-                    for from_split in from_splits:
+                for to_zone in tqdm(to_zones, unit="to-zone", leave=False):
+                    for from_split in tqdm(from_splits, unit="from-splits", leave=False):
                         from_zones = get_from_zones(
                             scraper=scraper,
                             platform=platform,
@@ -241,7 +253,7 @@ def update_flows_reverse(
                         )
 
                         df_zones = []
-                        for from_zone in tqdm(from_zones):
+                        for from_zone in tqdm(from_zones, unit="from-zone", leave=False):
                             df = scraper.get_flows(
                                 platform=platform,
                                 destination_iso2=destination_iso2,

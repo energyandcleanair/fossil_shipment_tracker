@@ -1,5 +1,5 @@
 from base.db import session
-from base.logger import logger_slack, notify_engineers
+from base.logger import logger, logger_slack, notify_engineers
 
 from kpler.sdk import FlowsSplit
 
@@ -46,6 +46,7 @@ def update(
     add_unknown_only=False,
 ):
     try:
+        logger.info("Updating flows")
         update_flows(
             date_from=date_from,
             date_to=date_to,
@@ -59,6 +60,7 @@ def update(
             add_unknown_only=add_unknown_only,
         )
 
+        logger.info("Updating trades")
         update_trades(
             date_from=date_from,
             date_to=date_to,
@@ -67,6 +69,7 @@ def update(
             ignore_if_copy_failed=ignore_if_copy_failed,
         )
 
+        logger.info("Validating update")
         update_is_valid()
 
     except Exception as e:

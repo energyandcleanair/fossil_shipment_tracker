@@ -40,9 +40,9 @@ def upload_trades(trades, ignore_if_copy_failed=False):
         )
     except sa.exc.IntegrityError:
         if ignore_if_copy_failed:
-            logger.info("Some rows already exist. Skipping")
+            logger.info("Some kpler_trade rows already exist. Skipping")
         else:
-            logger.info("Some rows already exist. Upserting instead")
+            logger.info("Some kpler_trade rows already exist. Upserting instead")
             upsert(trades, DB_TABLE_KPLER_TRADE, DB_TABLE_KPLER_TRADE + "_pkey")
 
 
@@ -69,9 +69,8 @@ def upload_flows(flows, ignore_if_copy_failed=False):
             )
         except sa.exc.IntegrityError:
             if ignore_if_copy_failed:
-                logger.info("Some rows already exist. Skipping")
+                logger.info("Some kpler_flow rows already exist. Skipping")
             else:
-                logger.info("Some rows already exist. Upserting instead")
                 upsert(flows, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
 
 
@@ -97,9 +96,9 @@ def upload_products(products, ignore_if_copy_failed=False):
             )
         except sa.exc.IntegrityError:
             if ignore_if_copy_failed:
-                logger.info("Some rows already exist. Skipping")
+                logger.info("Some kpler_product rows already exist. Skipping")
             else:
-                logger.info("Some rows already exist. Upserting instead")
+                logger.info("Some kpler_product rows already exist. Upserting instead")
                 upsert(products, DB_TABLE_KPLER_PRODUCT, DB_TABLE_KPLER_PRODUCT + "_pkey")
 
 
@@ -124,9 +123,9 @@ def upload_zones(zones, ignore_if_copy_failed=False):
             )
         except sa.exc.IntegrityError:
             if ignore_if_copy_failed:
-                logger.info("Some rows already exist. Skipping")
+                logger.info("Some kpler_zone rows already exist. Skipping")
             else:
-                logger.info("Some rows already exist. Upserting instead")
+                logger.info(f"Some kpler_zone rows already exist for. Upserting instead")
                 upsert(zones, DB_TABLE_KPLER_ZONE, DB_TABLE_KPLER_ZONE + "_pkey")
 
 
@@ -151,9 +150,9 @@ def upload_installations(installations, ignore_if_copy_failed=False):
             )
         except sa.exc.IntegrityError:
             if ignore_if_copy_failed:
-                logger.info("Some rows already exist. Skipping")
+                logger.info("Some kpler_installation rows already exist. Skipping")
             else:
-                logger.info("Some rows already exist. Upserting instead")
+                logger.info("Some kpler_installation rows already exist. Upserting instead")
                 upsert(
                     installations,
                     DB_TABLE_KPLER_INSTALLATION,
@@ -184,7 +183,7 @@ def upload_vessels(vessels, ignore_if_copy_failed=False):
             )
         except sa.exc.IntegrityError:
             if ignore_if_copy_failed:
-                logger.info("Some rows already exist. Skipping")
+                logger.info("Some kpler_vessel rows already exist. Skipping")
             else:
-                logger.info("Some rows already exist. Upserting instead")
+                logger.info("Some kpler_vessel rows already exist. Upserting instead")
                 upsert(vessels, DB_TABLE_KPLER_VESSEL, DB_TABLE_KPLER_VESSEL + "_pkey")

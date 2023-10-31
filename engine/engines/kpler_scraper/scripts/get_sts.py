@@ -38,7 +38,7 @@ def main():
     )
     args = parser.parse_args()
 
-    for i in tqdm(range(args.number)):
+    for i in tqdm(range(args.number), unit="query"):
         data = get_trades(from_=i * 1000)
         write_to_csv(data, f"trades_{i}.csv")
         time.sleep(5)  # to prevent overwhelming the server

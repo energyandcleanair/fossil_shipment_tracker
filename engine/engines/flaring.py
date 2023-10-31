@@ -123,7 +123,7 @@ class FlaringComputer:
         # Get flaring amount
         dates = pd.date_range(to_datetime(date_from), to_datetime(date_to))
         res = []
-        pbar = tqdm(dates)
+        pbar = tqdm(dates, unit="dates")
 
         for date in pbar:
             pbar.set_description("Processing %s" % date)

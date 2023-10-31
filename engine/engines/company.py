@@ -200,7 +200,7 @@ def update_info_from_equasis(
 
     equasis = Equasis()
 
-    for imo in tqdm(imos):
+    for imo in tqdm(imos, unit="ships"):
         itry = 0
         equasis_infos = None
 
@@ -874,7 +874,7 @@ def fill_using_imo_website():
         .all()
     )
 
-    for company in tqdm(companies):
+    for company in tqdm(companies, unit="companies"):
         # check imo website for company imo or name
         company_info = scraper.get_information(search_text=str(company.imo))
 

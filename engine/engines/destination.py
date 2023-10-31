@@ -94,7 +94,7 @@ def update_matching():
 
     still_missings = Destination.query.filter(Destination.iso2 == sa.null()).all()
 
-    for still_missing in tqdm(still_missings):
+    for still_missing in tqdm(still_missings, unit="missing-dests"):
         looking_name = still_missing.name.replace(" OPL", "")
         found = Datalastic.search_ports(name=looking_name, fuzzy=False)
         if found:
@@ -458,7 +458,7 @@ def update_from_voyageinfo(
     if commodities is not None:
         missing_shipments = missing_shipments.filter(Ship.commodity.in_(commodities))
 
-    for missing_shipment in tqdm(missing_shipments.all()):
+    for missing_shipment in tqdm(missing_shipments.all(), units="missing-shipments"):
         Marinetraffic.get_voyage_info(
             imo=missing_shipment.ship_imo, date_from=missing_shipment.date_utc
         )

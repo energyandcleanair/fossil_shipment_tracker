@@ -249,7 +249,7 @@ def update(
 
     shipments_to_update = shipments_to_update.order_by(Departure.date_utc.desc()).all()
     # Add positions
-    for f in tqdm(shipments_to_update):
+    for f in tqdm(shipments_to_update, unit="shipment"):
         shipment_id = f[0]
         ship_imo = f[1]
         departure_date = f[2]

@@ -216,7 +216,7 @@ def update(
             .all()
         )
 
-        for d in tqdm(dangling_departures):
+        for d in tqdm(dangling_departures, unit="dangling-departures"):
             date_from = max(
                 [
                     d
@@ -246,5 +246,5 @@ def update(
             portcall.upload_portcalls(portcalls)
 
     else:
-        for d in tqdm(dangling_departures):
+        for d in tqdm(dangling_departures, unit="dangling-departures"):
             arrival_portcall = portcall.find_arrival(departure=d, cache_only=cache_only)

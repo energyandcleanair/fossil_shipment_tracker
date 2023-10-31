@@ -44,39 +44,6 @@ def update(date_from="2021-01-01", skip_chart=False):
     if not skip_chart:
         send_diagnostic_chart()
 
-    # # Create a shipment for each dangling departure
-    # # and complete it for each arrival
-    # dangling_departures = get_departures_without_shipment(date_from=date_from)
-    # dangling_arrivals = get_dangling_arrivals()
-    #
-    # arrival_departures = [x.departure_id for x in dangling_arrivals]
-    # ongoing_departures = [x for x in dangling_departures
-    #                         if x.id not in arrival_departures]
-    #
-    # for d in tqdm(dangling_arrivals):
-    #     existing_shipment = Shipment.query.filter(Shipment.departure_id == d.departure_id).first()
-    #     if existing_shipment:
-    #         existing_shipment.arrival_id = d.id
-    #         existing_shipment.status = base.COMPLETED
-    #         session.commit()
-    #     else:
-    #         new_shipment = Shipment(**{
-    #             "departure_id": d.departure_id,
-    #             "arrival_id": d.id,
-    #             "status": base.COMPLETED
-    #         })
-    #         session.add(new_shipment)
-    #         session.commit()
-    #
-    # for d in tqdm(ongoing_departures):
-    #     new_shipment = Shipment(**{
-    #         "departure_id": d.id,
-    #         "arrival_id": None,
-    #         "status": base.ONGOING
-    #     })
-    #     session.add(new_shipment)
-    # session.commit()
-
 
 def return_combined_shipments(session, columns=None):
     """

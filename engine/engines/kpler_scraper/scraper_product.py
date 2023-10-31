@@ -110,11 +110,7 @@ class KplerProductScraper:
         try:
             r = KplerProductScraper.session.get(f"{url}/{id}", headers=headers)
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(
-                f"Kpler request failed",
-                stack_info=True,
-                exc_info=True,
-            )
+            logger.warning(f"Kpler request failed")
             return None
 
         return r.json()
