@@ -2,15 +2,11 @@ import sys
 from time import sleep
 
 from selenium import webdriver
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.keys import Keys
 
 from decouple import config
 
@@ -23,7 +19,6 @@ RECAPTCHA_SELECTOR = "iframe[title=reCAPTCHA]"
 PASSWORD = config("EQUASIS_PASSWORD")
 
 if __name__ == "__main__":
-
     if len(sys.argv) != 3:
         print("Error: incorrect usage - wrong number of args.")
         print("Usage: main.py <range-start> <range-end>")
@@ -38,9 +33,9 @@ if __name__ == "__main__":
     options.add_argument("ignore-certificate-errors")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.binary_location = "/usr/bin/google-chrome"
+    options.binary_location = "/usr/bin/chromium"
 
-    browser = webdriver.Chrome(service=Service("chromedriver"), options=options)
+    browser = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
 
     for i in range(START_RANGE, END_RANGE):
         browser.switch_to.new_window("tab")
