@@ -331,6 +331,9 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.destination_country,
                 subquery.c.destination_region,
             ],
+            "destination_region": [
+                subquery.c.destination_region,
+            ],
             "commodity_destination_country": [
                 subquery.c.commodity_destination_iso2,
                 subquery.c.commodity_destination_country,
