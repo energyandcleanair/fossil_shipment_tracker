@@ -15,6 +15,10 @@ from base.logger import logger_slack
 from engines.insurance_scraper import *
 from base.models import ShipInsurer
 
+import warnings
+from tqdm.contrib.logging import logging_redirect_tqdm
+import logging
+
 known_insurers = {
     22: WestOfEnglandInsuranceScraper(),
     4: StandardClubInsuranceScraper(),
@@ -33,12 +37,15 @@ def update():
     logger_slack.info("=== Update insurance dates ===")
     all_insurance_to_update = get_all_insurance_to_update()
 
-    for insurance_to_update in tqdm(
-        all_insurance_to_update.itertuples(),
-        total=all_insurance_to_update.shape[0],
-        unit="ships",
-    ):
-        update_insurance(insurance_to_update)
+    with logging_redirect_tqdm(
+        loggers=[logging.root, logger, logger_slack]
+    ), warnings.catch_warnings():
+        for insurance_to_update in tqdm(
+            all_insurance_to_update.itertuples(),
+            total=all_insurance_to_update.shape[0],
+            unit="ships",
+        ):
+            update_insurance(insurance_to_update)
 
 
 def update_insurance(insurance):

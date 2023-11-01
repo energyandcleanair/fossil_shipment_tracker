@@ -35,6 +35,10 @@ from base.models import (
 )
 from engines.company_scraper import Equasis, CompanyImoScraper
 
+import warnings
+from tqdm.contrib.logging import logging_redirect_tqdm
+import logging
+
 
 def update(imo=None, force_unknown=False):
     logger_slack.info("=== Company update ===")
@@ -200,44 +204,47 @@ def update_info_from_equasis(
 
     equasis = Equasis()
 
-    for imo in tqdm(imos, unit="ships"):
-        itry = 0
-        equasis_infos = None
+    with logging_redirect_tqdm(
+        loggers=[logging.root, logger, logger_slack]
+    ), warnings.catch_warnings():
+        for imo in tqdm(imos, unit="ships"):
+            itry = 0
+            equasis_infos = None
 
-        while equasis_infos is None and itry <= ntries:
-            itry += 1
-            try:
-                imo_equasis = imo.replace("NOTFOUND_", "")
-                equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
-            except requests.exceptions.HTTPError as e:
-                logger.warning(
-                    "Failed to get equasis ship info, trying again.",
-                    stack_info=True,
-                    exc_info=True,
-                )
-            except requests.exceptions.ConnectionError as e:
-                logger.warning(
-                    "Connection failed, trying again.",
-                    stack_info=True,
-                    exc_info=True,
-                )
+            while equasis_infos is None and itry <= ntries:
+                itry += 1
+                try:
+                    imo_equasis = imo.replace("NOTFOUND_", "")
+                    equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
+                except requests.exceptions.HTTPError as e:
+                    logger.warning(
+                        "Failed to get equasis ship info, trying again.",
+                        stack_info=True,
+                        exc_info=True,
+                    )
+                except requests.exceptions.ConnectionError as e:
+                    logger.warning(
+                        "Connection failed, trying again.",
+                        stack_info=True,
+                        exc_info=True,
+                    )
 
-        if equasis_infos is not None:
-            # Update ship record
-            update_ship_record_with_raw_equasis(imo, equasis_infos)
+            if equasis_infos is not None:
+                # Update ship record
+                update_ship_record_with_raw_equasis(imo, equasis_infos)
 
-            equasis_insurers = equasis_infos.get("insurers")
-            update_ship_insurer(imo, equasis_insurers)
+                equasis_insurers = equasis_infos.get("insurers")
+                update_ship_insurer(imo, equasis_insurers)
 
-            # Manager
-            manager_info = equasis_infos.get("manager")
-            update_ship_manager(imo, manager_info)
+                # Manager
+                manager_info = equasis_infos.get("manager")
+                update_ship_manager(imo, manager_info)
 
-            # Owner
-            owner_info = equasis_infos.get("owner")
-            update_ship_owner(imo, owner_info)
-        else:
-            logger.info("Failed to get response from equasis")
+                # Owner
+                owner_info = equasis_infos.get("owner")
+                update_ship_owner(imo, owner_info)
+            else:
+                logger.info("Failed to get response from equasis")
 
 
 def find_ships_that_need_updating(

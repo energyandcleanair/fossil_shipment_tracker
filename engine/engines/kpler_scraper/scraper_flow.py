@@ -199,6 +199,12 @@ class KplerFlowScraper(KplerScraper):
             else:
                 raise ValueError("Wrong to_zone indication")
 
+        args_info = f"product: {product}, split: {split}, granularity: {granularity}, unit: {unit}, date_from: {date_from}, date_to: {date_to}, use_brute_force: {use_brute_force}"
+
+        logger.info(
+            f"Getting flows for {platform}: {from_zone}({from_split})->{to_zone}({to_split}) ({args_info})"
+        )
+
         params = {
             "from_zone": from_zone,
             "to_zone": to_zone,
