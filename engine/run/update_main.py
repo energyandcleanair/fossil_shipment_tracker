@@ -14,6 +14,7 @@ from engines import (
 
 import integrity
 import base
+from base.logger import logger_slack
 
 import datetime as dt
 
@@ -55,5 +56,5 @@ def update():
 
 
 if __name__ == "__main__":
-    print("=== Full update: using %s environment ===" % (base.db.environment,))
+    logger_slack.info("=== Full update: using %s environment ===" % (base.db.environment,))
     update()
