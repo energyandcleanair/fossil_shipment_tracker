@@ -55,5 +55,5 @@ def update():
 
 
 if __name__ == "__main__":
-    print("=== Using %s environment ===" % (base.db.environment,))
+    print("=== Full update: using %s environment ===" % (base.db.environment,))
     update()
