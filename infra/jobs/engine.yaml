@@ -162,7 +162,7 @@ spec:
             resources:
               limits:
                 cpu: 1000m
-                memory: 2Gi
+                memory: 4Gi
           maxRetries: 0
           timeoutSeconds: '86400'
           serviceAccountName: engine@fossil-shipment-tracker.iam.gserviceaccount.com
