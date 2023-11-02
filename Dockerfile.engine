@@ -15,8 +15,9 @@ RUN apt-get install -y \
 RUN pip install pipenv
 
 # Install dependencies
-COPY engine/Pipfile* .
-RUN PIPENV_VENV_IN_PROJECT=1 pipenv install --deploy --ignore-pipfile
+COPY engine/Pipfile* ./
+ENV PIPENV_VENV_IN_PROJECT=1
+RUN pipenv install --deploy --ignore-pipfile
 
 
 # Build the app
@@ -49,13 +50,14 @@ ENV TQDM_DISABLE=1
 COPY engine/ .
 # Assets and cache can be writen to the engine
 COPY --chown=engine engine/assets ./assets
-COPY --chown=engine engine/cache ./cache
 COPY base/ ./base
 COPY api/ ./api
 
+RUN mkdir -p cache/{kpler,datalastic,marinetraffic} && \
+  chown -R engine:engine cache
+
 # Lower the user permissions so it can't overwrite the code.
 USER engine
-RUN mkdir -p ./assets/kpler
 
 # Set the entry point to the pipenv python so we can just
 # define the run that we want to do (for example,

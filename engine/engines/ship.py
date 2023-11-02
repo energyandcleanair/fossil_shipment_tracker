@@ -919,5 +919,5 @@ def convert_mminame_cache_to_array(cache_file="cache/datalastic/ships.json"):
             # Shouldn't really need it but good practice in case json file sizes don't match
             json_file.truncate()
 
-    except json.decoder.JSONDecodeError:
+    except (json.decoder.JSONDecodeError, FileNotFoundError):
         return []

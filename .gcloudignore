@@ -25,3 +25,12 @@ __pycache__/
 # Working files
 /entsog*.csv
 /*.kml
+
+**/.venv/
+**/.vscode/
+**/__pycache__/
+**/.pytest_cache/
+dashboard/
+engine/cache
+engine/base
+engine/api

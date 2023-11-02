@@ -1,0 +1,168 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: engine
+  labels:
+    cloud.googleapis.com/location: europe-west1
+spec:
+  template:
+    spec:
+      parallelism: 1
+      taskCount: 1
+      template:
+        spec:
+          containers:
+          - image: europe-west1-docker.pkg.dev/fossil-shipment-tracker/tracker/engine
+            env:
+            - name: EQUASIS_ACCOUNT_RANGE_START
+              value: '700'
+            - name: EQUASIS_ACCOUNT_RANGE_END
+              value: '720'
+            - name: ENVIRONMENT
+              value: production
+            - name: MAIL_DEFAULT_SENDER
+              value: alert@russiafossiltracker.com
+            - name: PROJECT_ID
+              value: fossil-shipment-tracker
+            - name: SLACK_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: SLACK_API_TOKEN
+            - name: PGPASSWORD_PRODUCTION
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: PGPASSWORD_PRODUCTION
+            - name: KEY_MARINETRAFFIC_PS01
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KEY_MARINETRAFFIC_PS01
+            - name: KEY_DATALASTIC
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KEY_DATALASTIC
+            - name: DB_URL_PRODUCTION
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: DB_URL_PRODUCTION
+            - name: EQUASIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: EQUASIS_PASSWORD
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: API_KEY
+            - name: SLACK_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: SLACK_WEBHOOK
+            - name: VNF_MINES_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: VNF_MINES_SECRET
+            - name: KPLER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KPLER_TOKEN
+            - name: PGUSER_PRODUCTION
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: PGUSER_PRODUCTION
+            - name: IMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: IMO_PASSWORD
+            - name: KPLER_TOKEN_BRUTE
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KPLER_TOKEN_BRUTE
+            - name: PGHOST_PRODUCTION
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: PGHOST_PRODUCTION
+            - name: VNF_MINES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: VNF_MINES_PASSWORD
+            - name: KEY_MARINETRAFFIC_EV01_CALL_BASED
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KEY_MARINETRAFFIC_EV01_CALL_BASED
+            - name: SENDGRID_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: SENDGRID_API_KEY
+            - name: VNF_MINES_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: VNF_MINES_EMAIL
+            - name: KPLER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KPLER_PASSWORD
+            - name: KEY_MARINETRAFFIC_EV02
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KEY_MARINETRAFFIC_EV02
+            - name: KPLER_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KPLER_EMAIL
+            - name: KEY_MARINETRAFFIC_EV01
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KEY_MARINETRAFFIC_EV01
+            - name: PGPORT_PRODUCTION
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: PGPORT_PRODUCTION
+            - name: KEY_MARINETRAFFIC_VI01
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KEY_MARINETRAFFIC_VI01
+            - name: IMO_USER
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: IMO_USER
+            - name: KEY_MARINETRAFFIC_VD02
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KEY_MARINETRAFFIC_VD02
+            - name: CREA_MONGODB_URL
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: CREA_MONGODB_URL
+            resources:
+              limits:
+                cpu: 1000m
+                memory: 512Mi
+          maxRetries: 0
+          timeoutSeconds: '86400'
+          serviceAccountName: engine@fossil-shipment-tracker.iam.gserviceaccount.com

@@ -20,7 +20,7 @@ def load_cache(f):
     try:
         with open(f) as json_file:
             return json.load(json_file)
-    except json.decoder.JSONDecodeError:
+    except (json.decoder.JSONDecodeError, FileNotFoundError):
         return []
 
 
