@@ -54,6 +54,9 @@ retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504
 
 s.mount("https://", HTTPAdapter(max_retries=retries))
 
+ENTSOG_FLOW_DEFAULT_SAVE_OUTPUT = "outputs/entsog_flows.csv"
+ENTSOG_FLOW_INTERMEDIATE_DEFAULT_SAVE_OUTPUT = "outputs/entsog_flows_intermediary.csv"
+
 
 class EntsogApi:
     def split(x, f):
@@ -843,7 +846,9 @@ def process_flows_raw(
     flows_intermediary = process(flows_merged)
 
     if save_intermediary_to_file:
-        intermediary_filename = intermediary_filename or "entsog_flows_intermediary.csv"
+        intermediary_filename = (
+            intermediary_filename or ENTSOG_FLOW_INTERMEDIATE_DEFAULT_SAVE_OUTPUT
+        )
         flows_intermediary.to_csv(intermediary_filename, index=False)
 
     flows = (
@@ -874,7 +879,7 @@ def process_flows_raw(
     flows.replace({"departure_iso2": {"UK": "GB"}, "destination_iso2": {"UK": "GB"}}, inplace=True)
     flows.replace({"type": {base.ENTSOG_LNG: base.ENTSOG_CROSSBORDER}}, inplace=True)
     if save_to_file:
-        filename = filename or "entsog_flows.csv"
+        filename = filename or ENTSOG_FLOW_DEFAULT_SAVE_OUTPUT
         flows.to_csv(filename, index=False)
 
     return flows

@@ -11,6 +11,8 @@ from api.routes.overland import PipelineFlowResource
 from api.routes.voyage import VoyageResource
 from api.routes.counter import RussiaCounterResource
 
+import tempfile
+
 
 def update(bucket="russia_fossil_tracker", folder="backup"):
     logger_slack.info("=== Creating backup in %s/%s ===" % (bucket, folder))
@@ -33,16 +35,16 @@ def update(bucket="russia_fossil_tracker", folder="backup"):
 
 def upload(df, client_bucket, folder, filename, exts=["RDS", "csv.gz"]):
     for ext in exts:
-        filepath = filename + "." + ext
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            filepath = os.path.join(tmpdirname, filename + "." + ext)
 
-        if ext == "RDS":
-            pyreadr.write_rds(filepath, df, compress="gzip")
-        if ext == "csv.gz":
-            df.to_csv(filepath, compression="gzip")
+            if ext == "RDS":
+                pyreadr.write_rds(filepath, df, compress="gzip")
+            if ext == "csv.gz":
+                df.to_csv(filepath, compression="gzip")
 
-        blob = client_bucket.blob("%s/%s" % (folder, filepath))
-        blob.upload_from_filename(filepath)
-        os.remove(filepath)
+            blob = client_bucket.blob("%s/%s" % (folder, filepath))
+            blob.upload_from_filename(filepath)
 
 
 def backup_voyages(client_bucket, folder, now):
