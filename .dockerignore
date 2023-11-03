@@ -8,3 +8,5 @@ assets
 .env
 
 engine/.env
+engine/.venv
+engine/cache
