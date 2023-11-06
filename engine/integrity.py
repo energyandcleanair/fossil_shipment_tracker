@@ -10,6 +10,14 @@ from base.models import (
     Arrival,
 )
 from api.tests import test_counter
+from api.tests.test_kpler import (
+    test_kpler_gasoline_export,
+    test_kpler_trade_lng_exports_monthly,
+    test_kpler_crude_export,
+    test_kpler_diesel_exports,
+    test_kpler_crude_export_byport,
+    test_kpler_flow_lng_exports_monthly,
+)
 from api.app import app
 from base.logger import logger_slack, logger, slacker, notify_engineers
 
@@ -41,6 +49,14 @@ def check():
         test_insurer()
     except AssertionError:
         logger_slack.error("Failed integrity: insurer data")
+        notify_engineers("Please check error")
+        raise
+
+    try:
+        logger_slack.info("Checking integrity: kpler against source of truth")
+        test_kpler_against_source_of_truth()
+    except AssertionError:
+        logger_slack.error("Failed integrity: kpler against source of truth")
         notify_engineers("Please check error")
         raise
 
@@ -239,3 +255,12 @@ def test_trade_platform():
         logger_slack.error(
             "Some kpler trades have a platform field not matching the platform of their products."
         )
+
+
+def test_kpler_against_source_of_truth():
+    test_kpler_gasoline_export(app=app)
+    test_kpler_trade_lng_exports_monthly(app=app)
+    test_kpler_crude_export(app=app)
+    test_kpler_diesel_exports(app=app)
+    test_kpler_crude_export_byport(app=app)
+    test_kpler_flow_lng_exports_monthly(app=app)
