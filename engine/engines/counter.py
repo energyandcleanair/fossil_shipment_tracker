@@ -278,20 +278,12 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
 
     if not ok and not force:
         logger_slack.error(
-            "[ERROR] New global counter %s: EUR %.1fB vs EUR %.1fB. Counter not updated. Please check."
-            % (version, global_new / 1e9, global_old / 1e9)
+            f"[COUNTER NOT UPDATED] Failed for {version}: was EUR {global_old / 1e9}B -x> now EUR {global_new / 1e9}B. Please check."
         )
     else:
+        forced = " - FORCED" if force else ""
         logger_slack.info(
-            "[COUNTER UPDATE%s] New global counter %s: EUR %.1fB vs EUR %.1fB. (EU: EUR %.1fB vs EUR %.1fB)"
-            % (
-                " - FORCED" if force else "",
-                version,
-                global_new / 1e9,
-                global_old / 1e9,
-                eu_new / 1e9,
-                eu_old / 1e9,
-            )
+            f"[COUNTER UPDATE{forced}] New global counter {version}: was EUR {global_old / 1e9}B (EU: EUR {eu_old / 1e9}B) -> now EUR {global_new / 1e9}B (EU: EUR {eu_new / 1e9}B)"
         )
 
         result.drop(["commodity_destination_region", "commodity_group"], axis=1, inplace=True)
