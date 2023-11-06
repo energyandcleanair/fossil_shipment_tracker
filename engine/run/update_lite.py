@@ -54,5 +54,8 @@ def update():
 
 if __name__ == "__main__":
     logger_slack.info("=== Lite update: using %s environment ===" % (base.db.environment,))
-    update()
-    logger_slack.info("=== Lite update complete ===")
+    try:
+        update()
+        logger_slack.info("=== Lite update complete ===")
+    except BaseException:
+        logger_slack.info("=== Lite update failed", stack_info=True, exc_info=True)

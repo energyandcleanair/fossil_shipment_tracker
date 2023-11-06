@@ -57,5 +57,8 @@ def update():
 
 if __name__ == "__main__":
     logger_slack.info("=== Full update: using %s environment ===" % (base.db.environment,))
-    update()
-    logger_slack.info("=== Full update complete ===")
+    try:
+        update()
+        logger_slack.info("=== Full update complete ===")
+    except BaseException:
+        logger_slack.info("=== Full update failed", stack_info=True, exc_info=True)
