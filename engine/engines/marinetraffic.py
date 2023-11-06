@@ -723,7 +723,7 @@ class Marinetraffic:
 
             response_datas = cls.get_cached_object(cls.cache_events, event_filter)
 
-            print("Found {} cached events.".format(len(response_datas)))
+            logger.info("Found {} cached events.".format(len(response_datas)))
         else:
             response_datas = None
 

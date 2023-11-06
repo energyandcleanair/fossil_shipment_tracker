@@ -173,7 +173,7 @@ def upload_portcalls(portcalls):
 
     # Store them in db so that we won't query them again
     if portcalls:
-        print("Uploading %d portcalls" % (len(portcalls),))
+        logger.info("Uploading %d portcalls" % (len(portcalls),))
     for portcall in portcalls:
         try:
             session.add(portcall)
@@ -198,7 +198,7 @@ def upload_portcalls(portcalls):
                             [SequenceMatcher(None, x.name, name).ratio() for x in found]
                         )
                         if max(ratios) >= 0.9:
-                            print(
+                            logger.info(
                                 "Best match: %s == %s (%f)"
                                 % (name, found[ratios.argmax()].name, ratios.max())
                             )
@@ -217,7 +217,10 @@ def upload_portcalls(portcalls):
                                 )
                                 portcall.port_id = port_id
                             else:
-                                print("wasn't close enough")
+                                logger.info(
+                                    "Best match: %s == %s (%f) wasn't close enough"
+                                    % (name, found[ratios.argmax()].name, ratios.max())
+                                )
 
                 # And try again
                 try:
@@ -764,7 +767,7 @@ def fill_departure_gaps(
     # 1/2: update port departures from Russia
     filter_impossible = lambda x: False  # To force continuing
     for unlocode in tqdm(originally_checked_port_unlocodes, unit="ports"):
-        print(unlocode)
+        logger.info(f"Update port departures from {unlocode}")
         next_departure = get_next_portcall(
             date_from=date_from,
             date_to=date_to,
@@ -1001,4 +1004,4 @@ def fill_gaps_within_shipments_using_mtcall(
     )
 
     missing_parts_df = pd.read_sql(missing_parts.statement, session.bind)
-    print(missing_parts_df)
+    logger.info(missing_parts_df)

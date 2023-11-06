@@ -288,13 +288,13 @@ def get_and_process_ship_events_between_dates(
         )
 
         if not events:
-            print("No vessel events found for ship_imo: {}.".format(ship_imo))
+            logger.info("No vessel events found for ship_imo: {}.".format(ship_imo))
             continue
 
         event_process_state = [add_interacting_ship_details_to_event(e) for e in events]
 
         if event_process_state.count(False) > 0:
-            print(
+            logger.info(
                 "Failed to process {} events out of {}".format(
                     event_process_state.count(False), len(event_process_state)
                 )
@@ -387,7 +387,7 @@ def check_distance_between_ships(
         )
 
     if ship_position is None or intship_position is None:
-        print("Failed to find ship positions. try increasing time window...")
+        logger.info("Failed to find ship positions. try increasing time window...")
         return ship_position, intship_position, None, None
 
     ship_position_geom, intship_position_geom = ship_position.geometry, intship_position.geometry
@@ -396,7 +396,7 @@ def check_distance_between_ships(
     d = distance_between_points(ship_position_geom, intship_position_geom)
 
     if d:
-        print("Distance between ships was {} at {}".format(d, event_time))
+        logger.info("Distance between ships was {} at {}".format(d, event_time))
 
     # we calculate the time difference at the point the position is taken with an extra 0.5 hour buffer
     time_difference = 0.5 + abs(
@@ -457,13 +457,13 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
     intship_name = re.findall(r"\b([A-Z][A-Z\s]*[A-Z]|[A-Z])\b", event_content)
 
     if len(intship_name) != 1:
-        print("Error in parsing ship name for event: {}".format(event_content))
+        logger.info("Error in parsing ship name for event: {}".format(event_content))
         return False
 
     intship_name = intship_name[0]
     event.interacting_ship_name = intship_name
 
-    print("{} vessel interacting with {}".format(ship_name, intship_name))
+    logger.info("{} vessel interacting with {}".format(ship_name, intship_name))
 
     int_ships = find_ships_in_db(intship_name)
 
@@ -498,7 +498,7 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
 
     for intship in int_ships:
         if not intship:
-            print("Error in finding ship in Datalastic for event: {}".format(event_content))
+            logger.info("Error in finding ship in Datalastic for event: {}".format(event_content))
             continue
 
         # fill imo where necessary from MT
@@ -527,7 +527,7 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
 
                 # if we don't find any in db by mmsi we failed to upload...
                 if not mt_ship:
-                    print("Failed to find imo in MT for event: {}".format(event_content))
+                    logger.info("Failed to find imo in MT for event: {}".format(event_content))
                     continue
 
                 mt_ship = mt_ship[0]
@@ -535,14 +535,14 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
                 if intship.name[-1] in mt_ship.name:
                     intship.imo = mt_ship.imo
                 else:
-                    print(
+                    logger.info(
                         "Found match for ship with mmsi, but names do not match for event {}".format(
                             event_content
                         )
                     )
                     continue
             else:
-                print(
+                logger.info(
                     "No ship imo found and we do not have an mmsi for event: {}".format(
                         event_content
                     )
@@ -552,7 +552,7 @@ def add_interacting_ship_details_to_event(event, distance_check=30000):
         # check if interacting ship is in db
         found = fill(imos=[intship.imo])
         if not found:
-            print("Failed to upload missing ships")
+            logger.info("Failed to upload missing ships")
             continue
 
         # get closest position in time and add to event

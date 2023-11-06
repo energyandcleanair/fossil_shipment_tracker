@@ -97,7 +97,7 @@ def fill_missing_commodity():
     for ship in tqdm(ships, unit="ship"):
         new_ship = Datalastic.get_ship(imo=ship.imo, use_cache=False)
         if new_ship:
-            print(new_ship.imo)
+            logger.info("Found new ship {new_ship.imo}")
             ship.others.update({"datalastic": new_ship.others.get("datalastic")})
             new_ship.others.update(ship.others)
             # new_ship.others.update(ship.others)
@@ -759,7 +759,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
         #     others_imo = others.get("marinetraffic",{}).get("IMO")
         #     if others_imo and others_imo != found_ship.imo:
         #         print(2)
-    print(f"=== Correct: {len(correct)} | Wrong: {len(wrong)} | Unknown: {len(unknown)} ===")
+    logger.info(f"=== Correct: {len(correct)} | Wrong: {len(wrong)} | Unknown: {len(unknown)} ===")
 
 
 def fix_not_found():

@@ -23,6 +23,7 @@ from tqdm import tqdm
 from difflib import SequenceMatcher
 import numpy as np
 from base.db_utils import execute_statement
+from base.logger import logger
 from engines.shipment import return_combined_shipments
 
 
@@ -114,7 +115,7 @@ def update_matching():
             )
 
             if max(ratios) > 0.8:
-                print(
+                logger.info(
                     "Best match: %s == %s (%f)"
                     % (still_missing.name, found[ratios.argmax()].name, ratios.max())
                 )
@@ -123,7 +124,10 @@ def update_matching():
                     still_missing.iso2 = found_and_filtered.iso2
                     session.commit()
                 else:
-                    print("wasn't close enough")
+                    logger.info(
+                        "Best match: %s == %s (%f) wasn't close enough"
+                        % (still_missing.name, found[ratios.argmax()].name, ratios.max())
+                    )
 
     # Looking for country names in destination.name
     country_regexps = {
@@ -245,7 +249,7 @@ def update_matching():
             )
         )
     )
-    print(update)
+    logger.info(update)
     execute_statement(update)
 
     # "For orders" should be set as such

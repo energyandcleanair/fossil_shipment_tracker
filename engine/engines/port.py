@@ -140,7 +140,7 @@ def fill():
     )
 
     for m in missing_ports:
-        print(m)
+        logger.info(f"Searching for port {m}")
         found_ports = Datalastic.search_ports(name=m.name, fuzzy=False)
         for found_port in found_ports:
             if found_port.unlocode == m.unlocode:

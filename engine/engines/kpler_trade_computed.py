@@ -571,7 +571,7 @@ def update():
         for start, end in tqdm(periods, unit="period"):
             to_insert = pd.concat([to_insert, fetch_data(date_from=start, date_to=end)])
 
-        print(len(to_insert))
+        logger.info(f"Inserting {len(to_insert)} rows into computed table")
 
         KplerTradeComputed.query.delete()
         session.commit()

@@ -117,7 +117,7 @@ class Datalastic:
                 [SequenceMatcher(None, s["name"], name).ratio() for s in response_data]
             )
             if max(ratios) > 0.90:
-                print(
+                logger.info(
                     "Best match: %s == %s (%f)"
                     % (name, response_data[ratios.argmax()]["name"], ratios.max())
                 )
@@ -132,7 +132,7 @@ class Datalastic:
                 if sorted_response:
                     return [cls.parse_ship_data(s) for s in sorted_response[0:return_closest]]
             else:
-                print("No matches close enough")
+                logger.info("No matches close enough")
                 return None
 
     @classmethod
@@ -225,8 +225,6 @@ class Datalastic:
 
         date_from = (date - dt.timedelta(hours=window)).strftime("%Y-%m-%d")
         date_to = (date + dt.timedelta(hours=window)).strftime("%Y-%m-%d")
-
-        print(date_from, date_to)
         positions = cls.get_positions(imo, date_from=date_from, date_to=date_to)
 
         if not positions:
