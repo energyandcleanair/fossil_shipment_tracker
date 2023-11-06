@@ -557,7 +557,7 @@ def build_pagination_periods(earliest_date=None, more_data_date=None):
 
 
 def update():
-    logger_slack.info("Updating kpler computed table")
+    logger_slack.info("=== Updating kpler computed table ===")
     try:
         earliest_date = session.query(func.min(KplerTrade.departure_date_utc)).first()[0]
         more_data_date = dt.date(2016, 1, 1)

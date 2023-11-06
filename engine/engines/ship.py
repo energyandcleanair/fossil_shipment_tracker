@@ -5,7 +5,7 @@ import base
 import json
 
 from base.db import session
-from base.logger import logger
+from base.logger import logger, logger_slack
 from base.models import (
     Ship,
     PortCall,
@@ -26,6 +26,7 @@ import sqlalchemy as sa
 def update():
     # Not much really. We just confirm crude_oil vs oil_products when necessary
     # And use MT for insurance
+    logger_slack.info("=== Updating ships ===")
     collect_mt_for_large_oil_products()
     # collect_mt_for_insurers()
     return

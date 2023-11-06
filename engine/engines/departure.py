@@ -275,7 +275,10 @@ def add(
     port_id=None,
     marinetraffic_id=None,
 ):
-    logger_slack.info("=== Update departures ===")
+    unlocode_logging = "" if unlocode == None else f" unlocodes {','.join(unlocode)} and"
+    logger_slack.info(
+        f"=== Update departures for{unlocode_logging} commodities{','.join(commodities)} ==="
+    )
     # Look for relevant PortCalls without associated departure
     subquery = session.query(Departure.portcall_id).filter(Departure.portcall_id != sa.null())
 

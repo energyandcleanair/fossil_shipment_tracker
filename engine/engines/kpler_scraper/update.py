@@ -63,6 +63,7 @@ def update(
     add_unknown_only=False,
     parts=[UpdateParts.FLOWS, UpdateParts.TRADES, UpdateParts.VALIDATE],
 ):
+    logger_slack.info("=== Updating Kpler ===")
     try:
         if UpdateParts.FLOWS in parts:
             logger.info("Updating flows")
