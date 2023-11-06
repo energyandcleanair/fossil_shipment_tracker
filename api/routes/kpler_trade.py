@@ -315,12 +315,14 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.commodity_origin_country,
                 # subquery.c.commodity_origin_region,
             ],
-            # "origin": [
-            #     subquery.c.origin_name,
-            #     subquery.c.origin_iso2,
-            #     subquery.c.origin_country,
-            #     subquery.c.origin_region,
-            # ],
+            "origin": [
+                subquery.c.origin_installation_name,
+                subquery.c.origin_port_name,
+                subquery.c.origin_zone_name,
+                subquery.c.origin_iso2,
+                subquery.c.origin_country,
+                # subquery.c.origin_region,
+            ],
             "destination_country": [
                 subquery.c.destination_iso2,
                 subquery.c.destination_country,
@@ -345,6 +347,8 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.commodity_destination_region,
             ],
             "destination": [
+                subquery.c.destination_installation_name,
+                subquery.c.destination_port_name,
                 subquery.c.destination_zone_name,
                 subquery.c.destination_country,
                 subquery.c.destination_iso2,
