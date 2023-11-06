@@ -35,8 +35,8 @@ def update(bucket="russia_fossil_tracker", folder="backup"):
 
 def upload(df, client_bucket, folder, filename, exts=["RDS", "csv.gz"]):
     for ext in exts:
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            filepath = os.path.join(tmpdirname, filename + "." + ext)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            filepath = os.path.join(temp_dir, filename + "." + ext)
 
             if ext == "RDS":
                 pyreadr.write_rds(filepath, df, compress="gzip")
