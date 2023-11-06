@@ -1,10 +1,14 @@
 from typing import List
 from tqdm import tqdm
 
+import datetime as dt
+
 import base
 from .scraper import *
 from .scraper_product import KplerProductScraper
 from .misc import get_nested
+
+from base.utils import *
 
 
 class KplerTradeScraper(KplerScraper):

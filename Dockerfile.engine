@@ -50,6 +50,7 @@ ENV TQDM_DISABLE=1
 COPY engine/ .
 # Assets and cache can be writen to the engine
 COPY --chown=engine engine/assets ./assets
+COPY --chown=engine api/assets/kpler ./assets/kpler
 COPY base/ ./base
 COPY api/ ./api
 

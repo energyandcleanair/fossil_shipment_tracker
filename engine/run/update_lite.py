@@ -55,3 +55,4 @@ def update():
 if __name__ == "__main__":
     logger_slack.info("=== Lite update: using %s environment ===" % (base.db.environment,))
     update()
+    logger_slack.info("=== Lite update complete ===" % (base.db.environment,))

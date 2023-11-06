@@ -27,8 +27,8 @@ def update_trades(
         loggers=[logging.root, logger, logger_slack]
     ), warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        for platform in tqdm(_platforms, unit="platform"):
-            for from_iso2 in tqdm(origin_iso2s, position=1, unit="from-iso"):
+        for platform in tqdm(_platforms, unit="platform", leave=False):
+            for from_iso2 in tqdm(origin_iso2s, position=1, unit="from-iso", leave=False):
                 # To prevent memory issues, we do it one country at a time
                 trades, vessels, zones, products, installations = scraper.get_trades(
                     platform=platform, from_iso2=from_iso2, date_from=date_from

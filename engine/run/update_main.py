@@ -58,3 +58,4 @@ def update():
 if __name__ == "__main__":
     logger_slack.info("=== Full update: using %s environment ===" % (base.db.environment,))
     update()
+    logger_slack.info("=== Full update complete ===" % (base.db.environment,))

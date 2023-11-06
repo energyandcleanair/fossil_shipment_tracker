@@ -6,6 +6,21 @@ from kpler.sdk import FlowsSplit
 from .update_trade import update_trades
 from .update_flow import update_flows
 
+from enum import Enum
+
+import os
+
+
+class UpdateStatus(Enum):
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
+
+class UpdateParts(Enum):
+    FLOWS = "FLOWS"
+    TRADES = "TRADES"
+    VALIDATE = "VALIDATE"
+
 
 def update_full():
     return update(
@@ -22,6 +37,7 @@ def update_lite(
     from_splits=[FlowsSplit.OriginCountries],
     to_splits=[FlowsSplit.DestinationCountries],
     platforms=None,
+    parts=[UpdateParts.FLOWS, UpdateParts.TRADES, UpdateParts.VALIDATE],
 ):
     return update(
         date_from=date_from,
@@ -29,6 +45,7 @@ def update_lite(
         from_splits=from_splits,
         to_splits=to_splits,
         platforms=platforms,
+        parts=parts,
     )
 
 
@@ -44,33 +61,39 @@ def update(
     use_brute_force=True,
     add_unknown=True,
     add_unknown_only=False,
+    parts=[UpdateParts.FLOWS, UpdateParts.TRADES, UpdateParts.VALIDATE],
 ):
     try:
-        logger.info("Updating flows")
-        update_flows(
-            date_from=date_from,
-            date_to=date_to,
-            platforms=platforms,
-            origin_iso2s=origin_iso2s,
-            from_splits=from_splits,
-            to_splits=to_splits,
-            ignore_if_copy_failed=ignore_if_copy_failed,
-            use_brute_force=use_brute_force,
-            add_unknown=add_unknown,
-            add_unknown_only=add_unknown_only,
-        )
+        if UpdateParts.FLOWS in parts:
+            logger.info("Updating flows")
+            update_flows(
+                date_from=date_from,
+                date_to=date_to,
+                platforms=platforms,
+                origin_iso2s=origin_iso2s,
+                from_splits=from_splits,
+                to_splits=to_splits,
+                ignore_if_copy_failed=ignore_if_copy_failed,
+                use_brute_force=use_brute_force,
+                add_unknown=add_unknown,
+                add_unknown_only=add_unknown_only,
+            )
 
-        logger.info("Updating trades")
-        update_trades(
-            date_from=date_from,
-            date_to=date_to,
-            platforms=platforms,
-            origin_iso2s=origin_iso2s,
-            ignore_if_copy_failed=ignore_if_copy_failed,
-        )
+        if UpdateParts.TRADES in parts:
+            logger.info("Updating trades")
+            update_trades(
+                date_from=date_from,
+                date_to=date_to,
+                platforms=platforms,
+                origin_iso2s=origin_iso2s,
+                ignore_if_copy_failed=ignore_if_copy_failed,
+            )
 
-        logger.info("Validating update")
-        update_is_valid()
+        if UpdateParts.VALIDATE in parts:
+            logger.info("Validating update")
+            update_is_valid()
+
+        return UpdateStatus.SUCCESS
 
     except Exception as e:
         logger_slack.error(
@@ -79,6 +102,7 @@ def update(
             exc_info=True,
         )
         notify_engineers("Please check error")
+        return UpdateStatus.FAILED
 
 
 def update_is_valid():
