@@ -104,11 +104,11 @@ class KplerScraper:
                 "lng": "https://lng.kpler.com/api/installations",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
-            r = self.session.get(url, headers=headers)
-            data = pd.DataFrame(r.json())
-            data.to_csv(file, index=False)
-        else:
-            data = pd.read_csv(file)
+            response = self.session.get(url, headers=headers)
+            data_from_kpler = pd.DataFrame(response.json())
+            data_from_kpler.to_csv(file, index=False)
+
+        data = pd.read_csv(file)
 
         self.installations_brute[platform] = data
         return data
@@ -127,11 +127,11 @@ class KplerScraper:
                 "lng": "https://lng.kpler.com/api/zones",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
-            r = self.session.get(url, headers=headers)
-            data = pd.DataFrame(r.json())
-            data.to_csv(file, index=False)
-        else:
-            data = pd.read_csv(file)
+            response = self.session.get(url, headers=headers)
+            data_from_kpler = pd.DataFrame(response.json())
+            data_from_kpler.to_csv(file, index=False)
+
+        data = pd.read_csv(file)
 
         self.zones_brute[platform] = data
         return data
@@ -181,11 +181,11 @@ class KplerScraper:
                 "lng": "https://lng.kpler.com/api/products",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
-            r = self.session.get(url, headers=headers)
-            data = pd.DataFrame(r.json())
-            data.to_csv(file, index=False)
-        else:
-            data = pd.read_csv(file)
+            response = self.session.get(url, headers=headers)
+            data_from_kpler = pd.DataFrame(response.json())
+            data_from_kpler.to_csv(file, index=False)
+
+        data = pd.read_csv(file)
 
         self.products_brute[platform] = data
         return data
@@ -370,11 +370,11 @@ class KplerScraper:
                 "lng": "https://lng.kpler.com/api/vessels",
             }.get(platform)
             headers = {"Authorization": f"Bearer {token}"}
-            r = self.session.get(url, headers=headers)
-            data = pd.DataFrame(r.json())
-            data.to_csv(file, index=False)
-        else:
-            data = pd.read_csv(file)
+            response = self.session.get(url, headers=headers)
+            data_from_kpler = pd.DataFrame(response.json())
+            data_from_kpler.to_csv(file, index=False)
+
+        data = pd.read_csv(file)
 
         self.vessels_brute[platform] = data
         return data
