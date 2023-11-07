@@ -57,5 +57,6 @@ if __name__ == "__main__":
     try:
         update()
         logger_slack.info("=== Lite update complete ===")
-    except BaseException:
+    except BaseException as e:
         logger_slack.info("=== Lite update failed", stack_info=True, exc_info=True)
+        raise e
