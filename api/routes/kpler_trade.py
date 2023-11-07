@@ -515,6 +515,7 @@ class KplerTradeResource(TemplateResource):
                 destination_region_field,
                 destination_zone.country_name.label("commodity_destination_country"),
                 destination_zone.country_iso2.label("commodity_destination_iso2"),
+                KplerTrade.arrival_sts.label("destination_sts"),
                 CommodityDestinationCountry.region.label("commodity_destination_region"),
                 KplerProduct.grade_name.label("grade"),
                 KplerProduct.commodity_name.label("commodity"),
