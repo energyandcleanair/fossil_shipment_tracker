@@ -29,10 +29,10 @@ def rebuild(date_from="2021-01-01"):
 def update(date_from="2021-01-01", skip_chart=False):
     logger_slack.info("=== Shipment update ===")
 
-    with open("engine/shipment_refresh_sts.sql", "r") as file:
+    with open("engines/shipment_refresh_sts.sql", "r") as file:
         sql_content = file.read()
 
-    with open("engine/shipment_refresh.sql", "r") as file:
+    with open("engines/shipment_refresh.sql", "r") as file:
         sql_content += file.read()
 
     sql_content = sql_content.replace(
