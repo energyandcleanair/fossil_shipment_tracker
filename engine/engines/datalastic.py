@@ -76,7 +76,7 @@ class Datalastic:
             params["deadweight_min"] = dwt_min
 
         method = "vessel_find"
-        api_result = self.session.get(self.api_base + method, params, verify=False)
+        api_result = self.session.get(self.api_base + method, params=params, verify=False)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query vessel %s: %s" % (name, api_result))
             return None
@@ -155,7 +155,7 @@ class Datalastic:
                 params["mmsi"] = mmsi
 
             method = "vessel_info"
-            api_result = self.session.get(self.api_base + method, params)
+            api_result = self.session.get(self.api_base + method, params=params)
             if api_result.status_code != 200:
                 logger.warning("Datalastic: Failed to query vessel %s: %s" % (imo, api_result))
                 return None
@@ -261,7 +261,7 @@ class Datalastic:
             return positions
 
         method = "vessel_history"
-        api_result = self.session.get(self.api_base + method, params)
+        api_result = self.session.get(self.api_base + method, params=params)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query vessel position %s: %s" % (imo, api_result))
             return None
@@ -309,7 +309,7 @@ class Datalastic:
         params = {"api-key": self.api_key, "name": name, "fuzzy": int(fuzzy)}
 
         method = "port_find"
-        api_result = self.session.get(self.api_base + method, params)
+        api_result = self.session.get(self.api_base + method, params=params)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query port %s: %s" % (name, api_result))
             return None
