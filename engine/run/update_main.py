@@ -33,7 +33,7 @@ def update():
     shipment.update()
     position.update(date_from=dt.date.today() - dt.timedelta(days=90))
 
-    kpler_scraper.update_full()
+    # kpler_scraper.update_full()
     kpler_trade_computed.update()
     alert.update()
     counter.update()
