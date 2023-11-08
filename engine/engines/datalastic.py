@@ -1,4 +1,5 @@
-import requests
+from requests import Session
+from requests.adapters import HTTPAdapter, Retry
 import json
 import datetime as dt
 
@@ -19,22 +20,26 @@ from engines.cache.global_cache import GlobalCacher
 
 
 class Datalastic:
-    api_base = "https://api.datalastic.com/api/v0/"
-    api_key = None
-    ship_cache = GlobalCacher("datalastic_ships")
+    _instance = None
 
-    @classmethod
-    def get_ship_cached(cls, imo=None, mmsi=None):
+    def __init__(self):
+        self.api_base = "https://api.datalastic.com/api/v0/"
+        self.api_key = get_env("KEY_DATALASTIC")
+        self.ship_cache = GlobalCacher("datalastic_ships")
+        self.session = Session()
+        retries = Retry(total=None, connect=5, read=5, redirect=5, status=0, other=5)
+        self.session.mount("https://api.datalastic.com/", HTTPAdapter(max_retries=retries))
+
+    def get_ship_cached(self, imo=None, mmsi=None):
         filter = lambda x: (imo is not None and str(x["imo"]) == str(imo)) or (
             mmsi is not None and str(x["mmsi"]) == (str(mmsi))
         )
 
-        results = cls.ship_cache.get(filter)
+        results = self.ship_cache.get(filter)
 
         return None if len(results) == 0 else results[0]
 
-    @classmethod
-    def find_ship(cls, name, dwt_min=base.DWT_MIN, fuzzy=True, return_closest=1):
+    def find_ship(self, name, dwt_min=base.DWT_MIN, fuzzy=True, return_closest=1):
         """
         Find ship based on name from datalastic API
 
@@ -56,11 +61,9 @@ class Datalastic:
         Datalastic response and ship object
 
         """
-        if not cls.api_key:
-            cls.api_key = get_env("KEY_DATALASTIC")
 
         params = {
-            "api-key": cls.api_key,
+            "api-key": self.api_key,
             "name": name,
         }
 
@@ -73,7 +76,7 @@ class Datalastic:
             params["deadweight_min"] = dwt_min
 
         method = "vessel_find"
-        api_result = requests.get(Datalastic.api_base + method, params, verify=False)
+        api_result = self.session.get(self.api_base + method, params, verify=False)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query vessel %s: %s" % (name, api_result))
             return None
@@ -88,12 +91,12 @@ class Datalastic:
             logger.debug(
                 "Only 1 vessel found matching name %s (no need to compare strings)" % (name,)
             )
-            return [cls.parse_ship_data(response_data[0])]
+            return [self.parse_ship_data(response_data[0])]
 
         else:
             if not return_closest:
                 # return first match
-                return [cls.parse_ship_data(response_data[0])]
+                return [self.parse_ship_data(response_data[0])]
 
             ratios = np.array(
                 [SequenceMatcher(None, s["name"], name).ratio() for s in response_data]
@@ -112,13 +115,12 @@ class Datalastic:
                 ]
 
                 if sorted_response:
-                    return [cls.parse_ship_data(s) for s in sorted_response[0:return_closest]]
+                    return [self.parse_ship_data(s) for s in sorted_response[0:return_closest]]
             else:
                 logger.info("No matches close enough")
                 return None
 
-    @classmethod
-    def get_ship(cls, imo=None, mmsi=None, query_if_not_in_cache=True, use_cache=True):
+    def get_ship(self, imo=None, mmsi=None, query_if_not_in_cache=True, use_cache=True):
         """
 
         Parameters
@@ -133,12 +135,10 @@ class Datalastic:
         Ship object
 
         """
-        if not cls.api_key:
-            cls.api_key = get_env("KEY_DATALASTIC")
 
         # First look in cache to save query credits
         if use_cache:
-            response_data = cls.get_ship_cached(imo=imo, mmsi=mmsi)
+            response_data = self.get_ship_cached(imo=imo, mmsi=mmsi)
         else:
             response_data = None
 
@@ -147,7 +147,7 @@ class Datalastic:
             if not query_if_not_in_cache:
                 return None
 
-            params = {"api-key": cls.api_key}
+            params = {"api-key": self.api_key}
 
             if imo is not None:
                 params["imo"] = imo
@@ -155,7 +155,7 @@ class Datalastic:
                 params["mmsi"] = mmsi
 
             method = "vessel_info"
-            api_result = requests.get(Datalastic.api_base + method, params)
+            api_result = self.session.get(self.api_base + method, params)
             if api_result.status_code != 200:
                 logger.warning("Datalastic: Failed to query vessel %s: %s" % (imo, api_result))
                 return None
@@ -165,12 +165,11 @@ class Datalastic:
                 return None
 
             if use_cache:
-                cls.ship_cache.add(response_data)
+                self.ship_cache.add(response_data)
 
-        return cls.parse_ship_data(response_data)
+        return self.parse_ship_data(response_data)
 
-    @classmethod
-    def parse_ship_data(cls, response_data):
+    def parse_ship_data(self, response_data):
         data = {
             "mmsi": [response_data["mmsi"]],
             "name": [response_data["name"]],
@@ -186,8 +185,7 @@ class Datalastic:
         }
         return Ship(**data)
 
-    @classmethod
-    def get_position(cls, imo, date, upload=False, window=72):
+    def get_position(self, imo, date, upload=False, window=72):
         """
         Returns the position of the boat at the closest referenced time in datalastic
 
@@ -207,7 +205,7 @@ class Datalastic:
 
         date_from = (date - dt.timedelta(hours=window)).strftime("%Y-%m-%d")
         date_to = (date + dt.timedelta(hours=window)).strftime("%Y-%m-%d")
-        positions = cls.get_positions(imo, date_from=date_from, date_to=date_to)
+        positions = self.get_positions(imo, date_from=date_from, date_to=date_to)
 
         if not positions:
             logger.warning(
@@ -227,8 +225,7 @@ class Datalastic:
 
         return min(positions, key=lambda p: abs(p.date_utc - date))
 
-    @classmethod
-    def get_positions(cls, imo, date_from, date_to):
+    def get_positions(self, imo, date_from, date_to):
         """
         Returns positions of the vessel by imo between the two dates
 
@@ -243,13 +240,10 @@ class Datalastic:
 
         """
 
-        if not cls.api_key:
-            cls.api_key = get_env("KEY_DATALASTIC")
-
         date_from = to_datetime(date_from)
         date_to = to_datetime(date_to)
 
-        params = {"api-key": cls.api_key, "imo": imo, "from": date_from.strftime("%Y-%m-%d")}
+        params = {"api-key": self.api_key, "imo": imo, "from": date_from.strftime("%Y-%m-%d")}
         if date_to is not None:
             params["to"] = date_to.strftime("%Y-%m-%d")
 
@@ -258,7 +252,7 @@ class Datalastic:
             positions = []
             while date_from < date_to:
                 date_to_chunk = min(date_to, date_from + dt.timedelta(days=10))
-                new_positions = cls.get_positions(
+                new_positions = self.get_positions(
                     imo=imo, date_from=date_from, date_to=date_to_chunk
                 )
                 if new_positions is not None:
@@ -267,12 +261,12 @@ class Datalastic:
             return positions
 
         method = "vessel_history"
-        api_result = requests.get(Datalastic.api_base + method, params)
+        api_result = self.session.get(self.api_base + method, params)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query vessel position %s: %s" % (imo, api_result))
             return None
         response_data = api_result.json()["data"]
-        positions = Datalastic.parse_position_response_data(imo=imo, response_data=response_data)
+        positions = self.parse_position_response_data(imo=imo, response_data=response_data)
 
         # Datalastic only takes day data as from,
         # we further filter to prevent duplicates in the same day
@@ -282,8 +276,7 @@ class Datalastic:
 
         return positions
 
-    @classmethod
-    def parse_position_response_data(cls, imo, response_data):
+    def parse_position_response_data(self, imo, response_data):
         positions = [
             Position(
                 **{
@@ -303,21 +296,20 @@ class Datalastic:
 
         return positions
 
-    @classmethod
-    def search_ports(cls, name=None, marinetraffic_id=None, fuzzy=False):
+    def search_ports(self, name=None, marinetraffic_id=None, fuzzy=False):
         """
         Some ports aren't in the UNLOCODE base. MarineTraffic returns port_name however, so
         we can look them up by name here.
         :param name:
         :return:
         """
-        if not cls.api_key:
-            cls.api_key = get_env("KEY_DATALASTIC")
+        if not self.api_key:
+            self.api_key = get_env("KEY_DATALASTIC")
 
-        params = {"api-key": cls.api_key, "name": name, "fuzzy": int(fuzzy)}
+        params = {"api-key": self.api_key, "name": name, "fuzzy": int(fuzzy)}
 
         method = "port_find"
-        api_result = requests.get(Datalastic.api_base + method, params)
+        api_result = self.session.get(self.api_base + method, params)
         if api_result.status_code != 200:
             logger.warning("Datalastic: Failed to query port %s: %s" % (name, api_result))
             return None
@@ -440,3 +432,6 @@ class Datalastic:
             ports = [x for x in ports if x.name == name]
 
         return ports
+
+
+default_datalastic = Datalastic()

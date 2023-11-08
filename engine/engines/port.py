@@ -9,7 +9,7 @@ from base.db import session
 from base.db_utils import upsert
 from base.models import Port
 from base.models import DB_TABLE_PORT
-from engines.datalastic import Datalastic
+from engines.datalastic import default_datalastic
 from geoalchemy2 import Geometry
 from base.utils import update_geometry_from_wkb
 
@@ -39,7 +39,7 @@ def get_id(unlocode=None, marinetraffic_id=None, name=None, add_if_needed=True):
     found = found.all()
     if len(found) == 0:
         if add_if_needed and name:
-            ports = Datalastic.search_ports(
+            ports = default_datalastic.search_ports(
                 name=name, marinetraffic_id=marinetraffic_id, fuzzy=False
             )
             if ports is not None and len(ports) == 1:
@@ -141,7 +141,7 @@ def fill():
 
     for m in missing_ports:
         logger.info(f"Searching for port {m}")
-        found_ports = Datalastic.search_ports(name=m.name, fuzzy=False)
+        found_ports = default_datalastic.search_ports(name=m.name, fuzzy=False)
         for found_port in found_ports:
             if found_port.unlocode == m.unlocode:
                 m.geometry = found_port.geometry
@@ -152,7 +152,7 @@ def fill():
 
 def insert_new_port(iso2, unlocode, name=None, marinetraffic_id=None):
     if name is not None:
-        new_ports = Datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id)
+        new_ports = default_datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id)
     else:
         new_ports = [Port(**{"unlocode": unlocode, "iso2": iso2})]
 

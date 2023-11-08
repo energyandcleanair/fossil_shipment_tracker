@@ -15,7 +15,7 @@ from base.db_utils import upsert
 from base.db import check_if_table_exists
 from base.utils import distance_between_points, to_list, to_datetime
 
-from engines.datalastic import Datalastic
+from engines.datalastic import default_datalastic
 from engines.marinetraffic import Marinetraffic
 from engines.ship import fill
 
@@ -373,9 +373,13 @@ def check_distance_between_ships(
 
     # get closest position in time and add to event
     if ship_position is None and not cache_only:
-        ship_position = Datalastic.get_position(imo=ship_one_imo, date=event_time, window=24)
+        ship_position = default_datalastic.get_position(
+            imo=ship_one_imo, date=event_time, window=24
+        )
     if intship_position is None and not cache_only:
-        intship_position = Datalastic.get_position(imo=ship_two_imo, date=event_time, window=24)
+        intship_position = default_datalastic.get_position(
+            imo=ship_two_imo, date=event_time, window=24
+        )
 
     if ship_position is None and not cache_only:
         ship_position = Marinetraffic.get_closest_position(

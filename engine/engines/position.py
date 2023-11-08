@@ -47,14 +47,14 @@ from base.models import (
 )
 from base.db_utils import execute_statement, upsert
 from base.models import DB_TABLE_POSITION
-from engines.datalastic import Datalastic
+from engines.datalastic import default_datalastic
 from engines.shipment import return_combined_shipments
 
 ArrivalPort = aliased(Port)
 
 
 def get(imo, date_from, date_to):
-    positions = Datalastic.get_positions(imo=imo, date_from=date_from, date_to=date_to)
+    positions = default_datalastic.get_positions(imo=imo, date_from=date_from, date_to=date_to)
     return positions
 
 

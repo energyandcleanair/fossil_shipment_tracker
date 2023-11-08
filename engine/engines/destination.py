@@ -1,4 +1,4 @@
-from engines.datalastic import Datalastic
+from engines.datalastic import default_datalastic
 from engines.marinetraffic import Marinetraffic
 from base.db import session, engine
 import datetime as dt
@@ -97,7 +97,7 @@ def update_matching():
 
     for still_missing in tqdm(still_missings, unit="missing-dests"):
         looking_name = still_missing.name.replace(" OPL", "")
-        found = Datalastic.search_ports(name=looking_name, fuzzy=False)
+        found = default_datalastic.search_ports(name=looking_name, fuzzy=False)
         if found:
             potential_suffixes = ["", " PORT"]
             ratios = np.array(

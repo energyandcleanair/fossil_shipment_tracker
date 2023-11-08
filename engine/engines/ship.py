@@ -17,7 +17,7 @@ from base.models import (
     Arrival,
 )
 from base.utils import to_datetime, to_list
-from engines.datalastic import Datalastic
+from engines.datalastic import default_datalastic
 import numpy as np
 
 import sqlalchemy as sa
@@ -96,7 +96,7 @@ def fill_missing_commodity():
     # Datalastic (or us) seem to have been missing a few in the past
     ships = Ship.query.filter(Ship.type == sa.null()).all()
     for ship in tqdm(ships, unit="ship"):
-        new_ship = Datalastic.get_ship(imo=ship.imo, use_cache=False)
+        new_ship = default_datalastic.get_ship(imo=ship.imo, use_cache=False)
         if new_ship:
             logger.info("Found new ship {new_ship.imo}")
             ship.others.update({"datalastic": new_ship.others.get("datalastic")})
@@ -146,12 +146,13 @@ def fill(imos=[], mmsis=[], force=False):
     # First with Datalastic - we do check if Datalastic found the ship properly by checking dwt, and refer to
     # MT to retry if it did not
     ships = [
-        Datalastic.get_ship(imo=x, query_if_not_in_cache=True) for x in get_missing_ships_imos(imos)
+        default_datalastic.get_ship(imo=x, query_if_not_in_cache=True)
+        for x in get_missing_ships_imos(imos)
     ]
     upload_ships([s for s in ships if (s and s.dwt is not None and s.type is not None)])
 
     ships = [
-        Datalastic.get_ship(mmsi=x, query_if_not_in_cache=True)
+        default_datalastic.get_ship(mmsi=x, query_if_not_in_cache=True)
         for x in get_missing_ships_mmsis(mmsis)
     ]
     upload_ships([s for s in ships if (s and s.dwt is not None and s.type is not None)])
@@ -585,7 +586,7 @@ def fix_duplicate_imo(imo=None, handle_versioned=True, handle_not_found=True):
             else:
                 # we have conflicting information for a minotiry of cases -
                 # we fill ship using imo to get the latest data and make sure dwt is correct
-                found_ship = Datalastic.get_ship(imo=base_imo)
+                found_ship = default_datalastic.get_ship(imo=base_imo)
                 if found_ship is None or found_ship.dwt is None:
                     found_ship = Marinetraffic.get_ship(imo=base_imo)
 
@@ -664,7 +665,7 @@ def fix_mmsi_imo_discrepancy(date_from=None):
         imo = portcall_ship.ship_imo
         mmsi = portcall_ship.ship_mmsi[-1]
         # others = portcall_ship.others
-        found_ship = Datalastic.get_ship(mmsi=mmsi, use_cache=True)
+        found_ship = default_datalastic.get_ship(mmsi=mmsi, use_cache=True)
         if not found_ship or not found_ship.imo or found_ship.imo == "0":
             from engines.marinetraffic import Marinetraffic
 
@@ -767,7 +768,6 @@ def fix_not_found():
     ships = Ship.query.filter(Ship.imo.op("~*")("NOTFOUND.*|.*_v.*")).all()
 
     from engines.marinetraffic import Marinetraffic
-    from engines.datalastic import Datalastic
 
     # portcalls = PortCall.query.filter(PortCall.ship_imo.op('~*')('NOTFOUND.*')).all()
 
@@ -872,7 +872,7 @@ def compare_ship_sources(
         if reload_marinetraffic:
             ship_mt = Marinetraffic.get_ship(imo=ship_mt.imo)
 
-        ship_dt = set_commodity(Datalastic.get_ship(imo=ship_mt.imo))
+        ship_dt = set_commodity(default_datalastic.get_ship(imo=ship_mt.imo))
 
         if (ship_mt.dwt == ship_dt.dwt) & (ship_mt.commodity == ship_dt.commodity):
             if ship_mt.name != ship_dt.name:

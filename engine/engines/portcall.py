@@ -13,7 +13,7 @@ from base.utils import to_datetime, to_list, collapse_dates, remove_dates
 from engines import ship
 from engines import port
 from engines.marinetraffic import Marinetraffic
-from engines.datalastic import Datalastic
+from engines.datalastic import default_datalastic
 
 from base.models import (
     PortCall,
@@ -188,11 +188,12 @@ def upload_portcalls(portcalls):
                 marinetraffic_id = portcall.others.get("marinetraffic", {}).get("PORT_ID")
 
                 if unlocode is None:
-                    from engines.datalastic import Datalastic
                     from difflib import SequenceMatcher
                     import numpy as np
 
-                    found = Datalastic.search_ports(name=name, marinetraffic_id=marinetraffic_id)
+                    found = default_datalastic.search_ports(
+                        name=name, marinetraffic_id=marinetraffic_id
+                    )
                     if found:
                         ratios = np.array(
                             [SequenceMatcher(None, x.name, name).ratio() for x in found]
