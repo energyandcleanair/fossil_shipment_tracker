@@ -17,7 +17,7 @@ from base import PRICING_DEFAULT
 
 def rebuild(date_from="2021-01-01"):
     logger_slack.info("=== Shipment rebuild ===")
-    with open("engine/shipment_rebuild.sql", "r") as file:
+    with open("engines/shipment_rebuild.sql", "r") as file:
         sql_rebuild = file.read()
 
     execute_statement(sql_rebuild, print_result=True)
