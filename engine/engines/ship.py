@@ -894,31 +894,3 @@ def compare_ship_sources(
             )
 
     logger.info("Ships are identical for {}% of cases.".format(100 * len(matching) / float(sample)))
-
-
-def convert_mminame_cache_to_array(cache_file="cache/datalastic/ships.json"):
-    """
-    Load our previous cache and convert name/mmsi to cache
-
-    :param cache_file:
-    :return:
-    """
-
-    try:
-        with open(cache_file, "r+") as json_file:
-            cached_ships = json.load(json_file)
-
-            for cached_ship in cached_ships:
-                cached_ship["mmsi"] = [cached_ship["mmsi"]]
-                cached_ship["name"] = [cached_ship["name"]]
-
-            # Move cursor to start
-            json_file.seek(0)
-
-            json.dump(cached_ships, json_file)
-
-            # Shouldn't really need it but good practice in case json file sizes don't match
-            json_file.truncate()
-
-    except (json.decoder.JSONDecodeError, FileNotFoundError):
-        return []

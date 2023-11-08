@@ -15,6 +15,7 @@ from base.logger import logger
 from base.env import get_env
 from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall, Event, Position
 from base.utils import to_datetime, latlon_to_point
+from engines.cache.global_cache import GlobalCacher
 
 MOVETYPE_DEPARTURE = 1
 MOVETYPE_ARRIVAL = 0
@@ -33,20 +34,11 @@ s.mount("https://", HTTPAdapter(max_retries=retries))
 from engines import ship, port
 
 
-def load_cache(f):
-    try:
-        with open(f) as json_file:
-            return json.load(json_file)
-    except (json.decoder.JSONDecodeError, FileNotFoundError):
-        return []
-
-
 class Marinetraffic:
     api_base = "https://services.marinetraffic.com/api/"
-    cache_file_ship = "cache/marinetraffic/ships.json"
-    cache_file_events = "cache/marinetraffic/events.json"
-    cache_ship = load_cache(cache_file_ship)
-    cache_events = load_cache(cache_file_events)
+
+    ship_cache = GlobalCacher("mt_ship")
+    event_cache = GlobalCacher("mt_event")
     last_call_dt = None
 
     @classmethod
@@ -115,10 +107,6 @@ class Marinetraffic:
         return result
 
     @classmethod
-    def get_cached_object(cls, object_cache, filter):
-        return [x for x in object_cache if filter(x)]
-
-    @classmethod
     def do_cache_object(cls, response_data, object_cache, object_cache_file):
         """
         Add response data to cache
@@ -146,7 +134,7 @@ class Marinetraffic:
                 or (mt_id is not None and str(x.get("SHIPID", "---")) == str(mt_id))
             )
 
-            response_data = cls.get_cached_object(cls.cache_ship, ship_filter)
+            response_data = cls.ship_cache.get(ship_filter)
 
             if len(response_data) == 1:
                 response_data = response_data[0]
@@ -208,7 +196,7 @@ class Marinetraffic:
                 response_data["SHIPID"] = mt_id
 
             if use_cache:
-                cls.do_cache_object(response_data, cls.cache_ship, cls.cache_file_ship)
+                cls.ship_cache.add(response_data)
 
         data = {
             "mmsi": [response_data["MMSI"]],
@@ -721,7 +709,7 @@ class Marinetraffic:
                 and x["EVENT_ID"] in event_type.split(",")
             )
 
-            response_datas = cls.get_cached_object(cls.cache_events, event_filter)
+            response_datas = cls.event_cache.get(event_filter)
 
             logger.info("Found {} cached events.".format(len(response_datas)))
         else:
@@ -757,7 +745,7 @@ class Marinetraffic:
                 # if we are not using cache and queried MT, let's add ship imo to response and then cache object
                 r["IMO"] = imo
                 if cache_objects:
-                    cls.do_cache_object(r, cls.cache_events, cls.cache_file_events)
+                    cls.event_cache.add(r)
 
         events = []
         for r in response_datas:

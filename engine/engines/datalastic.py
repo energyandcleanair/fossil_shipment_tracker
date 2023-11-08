@@ -15,41 +15,23 @@ from sqlalchemy.exc import IntegrityError
 from difflib import SequenceMatcher
 import numpy as np
 
-
-def load_cache(f):
-    try:
-        with open(f) as json_file:
-            return json.load(json_file)
-    except (json.decoder.JSONDecodeError, FileNotFoundError):
-        return []
+from engines.cache.global_cache import GlobalCacher
 
 
 class Datalastic:
     api_base = "https://api.datalastic.com/api/v0/"
     api_key = None
-    cache_ships_file = "cache/datalastic/ships.json"
-    cache_ships = load_cache(cache_ships_file)
+    ship_cache = GlobalCacher("datalastic_ships")
 
     @classmethod
     def get_ship_cached(cls, imo=None, mmsi=None):
-        try:
-            filter = lambda x: (imo is not None and str(x["imo"]) == str(imo)) or (
-                mmsi is not None and str(x["mmsi"]) == (str(mmsi))
-            )
-            return next(x for x in cls.cache_ships if filter(x))
-        except StopIteration:
-            return None
+        filter = lambda x: (imo is not None and str(x["imo"]) == str(imo)) or (
+            mmsi is not None and str(x["mmsi"]) == (str(mmsi))
+        )
 
-    @classmethod
-    def cache_ship(cls, response_data):
-        """
-        Add response data to cache
-        :param response_data:
-        :return:
-        """
-        cls.cache_ships.append(response_data)
-        with open(cls.cache_ships_file, "w") as outfile:
-            json.dump(cls.cache_ships, outfile)
+        results = cls.ship_cache.get(filter)
+
+        return None if len(results) == 0 else results[0]
 
     @classmethod
     def find_ship(cls, name, dwt_min=base.DWT_MIN, fuzzy=True, return_closest=1):
@@ -183,7 +165,7 @@ class Datalastic:
                 return None
 
             if use_cache:
-                cls.cache_ship(response_data)
+                cls.ship_cache.add(response_data)
 
         return cls.parse_ship_data(response_data)
 
