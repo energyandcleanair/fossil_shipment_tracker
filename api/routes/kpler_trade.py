@@ -295,25 +295,45 @@ class KplerTradeResource(TemplateResource):
 
     def get_aggregate_cols_dict(self, subquery):
         return {
+            "flow_origin_port": [
+                subquery.c.origin_port_name.label("origin_name"),
+                subquery.c.origin_port_name,
+                subquery.c.origin_zone_name,
+                subquery.c.origin_iso2,
+                subquery.c.origin_country,
+                subquery.c.origin_region,
+                subquery.c.commodity_origin_iso2,
+                subquery.c.commodity_origin_country,
+                subquery.c.commodity_origin_region,
+            ],
+            "flow_origin_country": [
+                subquery.c.origin_country.label("origin_name"),
+                subquery.c.origin_iso2,
+                subquery.c.origin_country,
+                subquery.c.origin_region,
+                subquery.c.commodity_origin_iso2,
+                subquery.c.commodity_origin_country,
+                subquery.c.commodity_origin_region,
+            ],
             "origin_country": [
                 subquery.c.origin_iso2,
                 subquery.c.origin_country,
-                # subquery.c.origin_region,
+                subquery.c.origin_region,
             ],
             "origin_iso2": [
                 subquery.c.origin_iso2,
                 subquery.c.origin_country,
-                # subquery.c.origin_region,
+                subquery.c.origin_region,
             ],
             "commodity_origin_country": [
                 subquery.c.commodity_origin_iso2,
                 subquery.c.commodity_origin_country,
-                # subquery.c.commodity_origin_region,
+                subquery.c.commodity_origin_region,
             ],
             "commodity_origin_iso2": [
                 subquery.c.commodity_origin_iso2,
                 subquery.c.commodity_origin_country,
-                # subquery.c.commodity_origin_region,
+                subquery.c.commodity_origin_region,
             ],
             "origin": [
                 subquery.c.origin_installation_name,
@@ -321,7 +341,34 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.origin_zone_name,
                 subquery.c.origin_iso2,
                 subquery.c.origin_country,
-                # subquery.c.origin_region,
+                subquery.c.origin_region,
+            ],
+            "flow_destination_port": [
+                subquery.c.destination_port_name.label("destination_name"),
+                subquery.c.destination_port_name,
+                subquery.c.destination_zone_name,
+                subquery.c.destination_iso2,
+                subquery.c.destination_country,
+                subquery.c.destination_region,
+                subquery.c.commodity_destination_iso2,
+                subquery.c.commodity_destination_country,
+                subquery.c.commodity_destination_region,
+            ],
+            "flow_destination_country": [
+                subquery.c.destination_country.label("destination_name"),
+                subquery.c.destination_iso2,
+                subquery.c.destination_country,
+                subquery.c.destination_region,
+                subquery.c.commodity_destination_iso2,
+                subquery.c.commodity_destination_country,
+                subquery.c.commodity_destination_region,
+            ],
+            "destination_port": [
+                subquery.c.destination_port_name,
+                subquery.c.destination_zone_name,
+                subquery.c.destination_iso2,
+                subquery.c.destination_country,
+                subquery.c.destination_region,
             ],
             "destination_country": [
                 subquery.c.destination_iso2,
@@ -399,6 +446,7 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.commodity_equivalent_group_name,
             ],
             "currency": [subquery.c.currency],
+            "date": [func.date_trunc("day", subquery.c.origin_date_utc).label("date")],
             "origin_date": [
                 func.date_trunc("day", subquery.c.origin_date_utc).label("origin_date")
             ],
@@ -447,6 +495,8 @@ class KplerTradeResource(TemplateResource):
         origin_zone = aliased(KplerZone)
         destination_zone = aliased(KplerZone)
         CommodityEquivalent = aliased(Commodity)
+        OriginCountry = aliased(Country)
+        DestinationCountry = aliased(Country)
         CommodityOriginCountry = aliased(Country)
         CommodityDestinationCountry = aliased(Country)
 
@@ -465,23 +515,31 @@ class KplerTradeResource(TemplateResource):
             "value_eur"
         )
 
-        destination_region_field = CommodityDestinationCountry.region.label("destination_region")
+        destination_region_field = DestinationCountry.region.label("destination_region")
+        commodity_destination_region_field = CommodityDestinationCountry.region.label(
+            "commodity_destination_region"
+        )
         if map_unconfirmed_region_eu_to_unknown:
-            destination_region_field = case(
-                (
-                    sa.and_(
-                        sa.or_(
-                            KplerTrade.status == "ongoing",
-                            KplerTrade.departure_date_utc > "2022-12-05",
+
+            def map_destination_field(cls):
+                return case(
+                    (
+                        sa.and_(
+                            sa.or_(
+                                KplerTrade.status == "ongoing",
+                                KplerTrade.departure_date_utc > "2022-12-05",
+                            ),
+                            CommodityEquivalent.name == "Crude oil",
+                            cls.region == "EU",
+                            cls.iso2 != "BG",
                         ),
-                        CommodityEquivalent.name == "Crude oil",
-                        CommodityDestinationCountry.region == "EU",
-                        destination_zone.country_iso2 != "BG",
+                        "Unknown",
                     ),
-                    "Unknown",
-                ),
-                else_=CommodityDestinationCountry.region,
-            ).label("destination_region")
+                    else_=cls.region,
+                ).label("destination_region")
+
+            destination_region_field = map_destination_field(DestinationCountry)
+            commodity_destination_region_field = map_destination_field(CommodityDestinationCountry)
 
         query = (
             session.query(
@@ -499,6 +557,7 @@ class KplerTradeResource(TemplateResource):
                 origin_zone.port_name.label("origin_port_name"),
                 origin_zone.country_name.label("origin_country"),
                 origin_zone.country_iso2.label("origin_iso2"),
+                OriginCountry.region.label("origin_region"),
                 commodity_origin_iso2_field,
                 CommodityOriginCountry.name.label("commodity_origin_country"),
                 CommodityOriginCountry.region.label("commodity_origin_region"),
@@ -515,8 +574,8 @@ class KplerTradeResource(TemplateResource):
                 destination_region_field,
                 destination_zone.country_name.label("commodity_destination_country"),
                 destination_zone.country_iso2.label("commodity_destination_iso2"),
+                commodity_destination_region_field,
                 KplerTrade.arrival_sts.label("destination_sts"),
-                CommodityDestinationCountry.region.label("commodity_destination_region"),
                 KplerProduct.grade_name.label("grade"),
                 KplerProduct.commodity_name.label("commodity"),
                 KplerProduct.group_name.label("group"),
@@ -551,6 +610,14 @@ class KplerTradeResource(TemplateResource):
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
             .outerjoin(destination_zone, KplerTrade.arrival_zone_id == destination_zone.id)
+            .outerjoin(
+                OriginCountry,
+                OriginCountry.iso2 == origin_zone.country_iso2,
+            )
+            .outerjoin(
+                DestinationCountry,
+                DestinationCountry.iso2 == destination_zone.country_iso2,
+            )
             .outerjoin(
                 CommodityOriginCountry,
                 CommodityOriginCountry.iso2 == commodity_origin_iso2_field,
