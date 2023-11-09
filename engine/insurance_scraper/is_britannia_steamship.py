@@ -1,12 +1,9 @@
 from datetime import datetime
-from engine.insurance_scraper.insurance_scraper import InsuranceScraper
-
 from requests import Session
 from bs4 import BeautifulSoup
 
 from base.logger import logger
-
-import re
+from engine.insurance_scraper.insurance_scraper import InsuranceScraper
 
 
 class BritanniaSteamshipInsuranceScraper(InsuranceScraper):
