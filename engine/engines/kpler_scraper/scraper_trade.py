@@ -60,7 +60,7 @@ class KplerTradeScraper(KplerScraper):
                     ):
                         break
 
-            for x in tqdm(trades_raw, unit="raw trade"):
+            for x in tqdm(trades_raw, unit="raw-trade", leave=False):
                 trades_, vessels_, zones_, products_, installations_ = self._parse_trade(
                     x, platform=platform
                 )
