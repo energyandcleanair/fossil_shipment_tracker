@@ -15,7 +15,7 @@ from base.logger import logger
 from base.env import get_env
 from base.models import Ship, PortCall, MTVoyageInfo, MarineTrafficCall, Event, Position
 from base.utils import to_datetime, latlon_to_point
-from engines.cache.global_cache import GlobalCacher
+from engines.global_cache import GlobalCacher
 
 MOVETYPE_DEPARTURE = 1
 MOVETYPE_ARRIVAL = 0

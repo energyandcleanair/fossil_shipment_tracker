@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from difflib import SequenceMatcher
 import numpy as np
 
-from engines.cache.global_cache import GlobalCacher
+from engines.global_cache import GlobalCacher
 
 
 class Datalastic:
