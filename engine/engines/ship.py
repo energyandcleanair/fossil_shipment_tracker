@@ -160,11 +160,26 @@ def fill(imos=[], mmsis=[], force=False):
     # Then with Marinetraffic for those still missing
     from engines.marinetraffic import Marinetraffic
 
-    ships = [Marinetraffic.get_ship(imo=x) for x in get_missing_ships_imos(imos)]
-    upload_ships(ships)
+    def get_missing_ship(imo=None, mmsi=None):
+        try:
+            if imo:
+                return Marinetraffic.get_ship(imo=imo)
+            else:
+                return Marinetraffic.get_ship(mmsi=mmsi)
+        except ValueError:
+            return None
 
-    ships = [Marinetraffic.get_ship(mmsi=x) for x in get_missing_ships_mmsis(mmsis)]
-    upload_ships(ships)
+    def get_missing_ships(imos=None, mmsis=None):
+        not_none = lambda s: s is not None
+        if imos:
+            ships = [get_missing_ship(imo=x) for x in get_missing_ships_imos(imos)]
+        else:
+            ships = [get_missing_ship(mmsi=x) for x in get_missing_ships_mmsis(mmsis)]
+
+        return list(filter(not_none, ships))
+
+    upload_ships(get_missing_ships(imos=imos))
+    upload_ships(get_missing_ships(mmsis=mmsis))
 
     missing = get_missing_ships_imos(imos)
     missing.extend(get_missing_ships_mmsis(mmsis))
