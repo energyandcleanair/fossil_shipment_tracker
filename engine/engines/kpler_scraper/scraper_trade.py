@@ -15,7 +15,7 @@ class KplerTradeScraper(KplerScraper):
     def __init__(self):
         super().__init__()
 
-    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=False):
+    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=False, month=None):
         if sts_only:
             operational_filter = "shipToShip"
         else:
@@ -50,6 +50,7 @@ class KplerTradeScraper(KplerScraper):
                         query_from=query_from,
                         operational_filter=operational_filter,
                         product_ids=[product_id],
+                        month=month,
                     )
                     trades_raw.extend(query_trades_raw)
                     query_from += size
@@ -80,6 +81,7 @@ class KplerTradeScraper(KplerScraper):
         query_from=0,
         product_ids=None,
         operational_filter=None,
+        month=None,
     ):
         if from_zone and from_zone.get("name") == "Unknown":
             return 0, []
@@ -113,6 +115,10 @@ class KplerTradeScraper(KplerScraper):
             "locations": from_locations,
             "operationalFilter": operational_filter,
         }
+
+        if month:
+            params_raw["granuality"] = "months"
+            params_raw["period"] = month
 
         if product_ids is not None:
             params_raw["products"] = to_list(product_ids)

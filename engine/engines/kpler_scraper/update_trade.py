@@ -20,6 +20,7 @@ def update_trades(
     scraper = KplerTradeScraper()
     date_from = to_datetime(date_from) if date_from is not None else dt.date(2020, 1, 1)
     date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
+    periods = pd.period_range(start=date_from, end=date_to, freq="M").astype(str)
 
     _platforms = scraper.platforms if platforms is None else platforms
 
@@ -28,15 +29,16 @@ def update_trades(
     ), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for platform in tqdm(_platforms, unit="platform", leave=False):
-            for from_iso2 in tqdm(origin_iso2s, position=1, unit="from-iso", leave=False):
-                logger.info(f"Updating trades for {platform}, {from_iso2}")
-                # To prevent memory issues, we do it one country at a time
-                trades, vessels, zones, products, installations = scraper.get_trades(
-                    platform=platform, from_iso2=from_iso2, date_from=date_from
-                )
+            for from_iso2 in tqdm(origin_iso2s, unit="from-iso", leave=False):
+                for period in tqdm(periods, unit="month", leave=False):
+                    logger.info(f"Updating trades for {platform}, {from_iso2}")
+                    # To prevent memory issues, we do it one country at a time
+                    trades, vessels, zones, products, installations = scraper.get_trades(
+                        platform=platform, from_iso2=from_iso2, month=period
+                    )
 
-                # upload_products(products, ignore_if_copy_failed=ignore_if_copy_failed)
-                upload_zones(zones, ignore_if_copy_failed=ignore_if_copy_failed)
-                upload_vessels(vessels, ignore_if_copy_failed=ignore_if_copy_failed)
-                upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
-                upload_installations(installations, ignore_if_copy_failed=ignore_if_copy_failed)
+                    # upload_products(products, ignore_if_copy_failed=ignore_if_copy_failed)
+                    upload_zones(zones, ignore_if_copy_failed=ignore_if_copy_failed)
+                    upload_vessels(vessels, ignore_if_copy_failed=ignore_if_copy_failed)
+                    upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
+                    upload_installations(installations, ignore_if_copy_failed=ignore_if_copy_failed)
