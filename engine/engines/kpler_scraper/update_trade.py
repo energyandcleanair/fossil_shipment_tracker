@@ -31,7 +31,9 @@ def update_trades(
         for platform in tqdm(_platforms, unit="platform", leave=False):
             for from_iso2 in tqdm(origin_iso2s, unit="from-iso", leave=False):
                 for period in tqdm(periods, unit="month", leave=False):
-                    logger.info(f"Updating trades for {platform}, {from_iso2}")
+                    logger.info(
+                        f"Updating trades for {platform} for country {from_iso2} in {period}"
+                    )
                     # To prevent memory issues, we do it one country at a time
                     trades, vessels, zones, products, installations = scraper.get_trades(
                         platform=platform, from_iso2=from_iso2, month=period
