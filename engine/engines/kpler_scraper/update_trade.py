@@ -45,4 +45,4 @@ def update_trades(
                     upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
                     upload_installations(installations, ignore_if_copy_failed=ignore_if_copy_failed)
 
-            logger.info(f"Finished updating trades for {platform} for country {from_iso2}")
+                logger.info(f"Finished updating trades for {platform} for country {from_iso2}")
