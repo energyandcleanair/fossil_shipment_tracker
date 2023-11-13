@@ -18,7 +18,7 @@ from base.db import engine
 from base.logger import logger
 
 
-def upload_trades(trades):
+def upload_trades(trades, update_time=dt.datetime.utcnow()):
     # Ensure this is a pandas dataframe
     if not isinstance(trades, pd.DataFrame):
         trades = pd.DataFrame(trades)
@@ -27,7 +27,7 @@ def upload_trades(trades):
         return None
 
     if not "updated_on" in trades.columns:
-        trades["updated_on"] = dt.datetime.utcnow()
+        trades["updated_on"] = update_time
 
     trades = trades[~pd.isnull(trades.product_id)]
     upsert(trades, DB_TABLE_KPLER_TRADE, DB_TABLE_KPLER_TRADE + "_pkey")

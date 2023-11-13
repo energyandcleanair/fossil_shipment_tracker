@@ -23,6 +23,8 @@ def update_trades(
 
     _platforms = scraper.platforms if platforms is None else platforms
 
+    update_time = dt.datetime.now()
+
     with logging_redirect_tqdm(
         loggers=[logging.root, logger, logger_slack]
     ), warnings.catch_warnings():
@@ -40,7 +42,7 @@ def update_trades(
 
                     upload_zones(zones)
                     upload_vessels(vessels)
-                    upload_trades(trades)
+                    upload_trades(trades, update_time=update_time)
                     upload_installations(installations)
 
                     del trades, vessels, zones, products, installations
