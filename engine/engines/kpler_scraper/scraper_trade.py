@@ -305,6 +305,8 @@ class KplerTradeScraper(KplerScraper):
         trade["seller_ids"] = [x.get("id") for x in sellers]
         trade["seller_names"] = [x.get("name") for x in sellers]
 
+        trade["is_valid"] = True
+
         # Do a cross product of all flows with trade
         result = []
         for flow in flows:
