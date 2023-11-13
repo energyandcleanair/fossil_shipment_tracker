@@ -117,7 +117,7 @@ class KplerTradeScraper(KplerScraper):
         }
 
         if month:
-            params_raw["granuality"] = "months"
+            params_raw["granularity"] = "months"
             params_raw["period"] = month
 
         if product_ids is not None:
