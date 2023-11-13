@@ -15,7 +15,6 @@ def update_trades(
     date_to=None,
     platforms=None,
     origin_iso2s=["RU"],
-    ignore_if_copy_failed=False,
 ):
     scraper = KplerTradeScraper()
     date_from = to_datetime(date_from) if date_from is not None else dt.date(2020, 1, 1)
@@ -39,11 +38,10 @@ def update_trades(
                         platform=platform, from_iso2=from_iso2, month=period
                     )
 
-                    # upload_products(products, ignore_if_copy_failed=ignore_if_copy_failed)
-                    upload_zones(zones, ignore_if_copy_failed=ignore_if_copy_failed)
-                    upload_vessels(vessels, ignore_if_copy_failed=ignore_if_copy_failed)
-                    upload_trades(trades, ignore_if_copy_failed=ignore_if_copy_failed)
-                    upload_installations(installations, ignore_if_copy_failed=ignore_if_copy_failed)
+                    upload_zones(zones)
+                    upload_vessels(vessels)
+                    upload_trades(trades)
+                    upload_installations(installations)
 
                     del trades, vessels, zones, products, installations
 

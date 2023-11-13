@@ -97,7 +97,6 @@ def update_flows(
     from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     # add_total_installation=True,
-    ignore_if_copy_failed=False,
     use_brute_force=True,
     add_unknown=True,
     add_unknown_only=False,
@@ -155,7 +154,7 @@ def update_flows(
                                 if df is not None:
                                     df_zones.append(df)
                                 if not add_unknown_only:
-                                    upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                                    upload_flows(df)
 
                             if add_unknown:
                                 # Add an unknown one
@@ -204,9 +203,7 @@ def update_flows(
                                     unknown["value"] = unknown["value_unknown"]
                                     unknown["updated_on"] = dt.datetime.now()
                                     unknown = unknown[known_zones.columns]
-                                    upload_flows(
-                                        unknown, ignore_if_copy_failed=ignore_if_copy_failed
-                                    )
+                                    upload_flows(unknown)
 
 
 def update_flows_reverse(
@@ -217,7 +214,6 @@ def update_flows_reverse(
     from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     # add_total_installation=True,
-    ignore_if_copy_failed=False,
     use_brute_force=True,
     add_unknown=True,
     add_unknown_only=False,
@@ -270,7 +266,7 @@ def update_flows_reverse(
                                 df_zones.append(df)
 
                             if not add_unknown_only:
-                                upload_flows(df, ignore_if_copy_failed=ignore_if_copy_failed)
+                                upload_flows(df)
 
                         if add_unknown and len(df_zones) > 0:
                             # Add an unknown one
@@ -307,7 +303,7 @@ def update_flows_reverse(
                                 unknown["value"] = unknown["value_unknown"]
                                 unknown["updated_on"] = dt.datetime.now()
                                 unknown = unknown[known_zones.columns]
-                                upload_flows(unknown, ignore_if_copy_failed=ignore_if_copy_failed)
+                                upload_flows(unknown)
                             else:
                                 raise ValueError("Total should not be None if we have data by zone")
 

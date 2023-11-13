@@ -18,7 +18,7 @@ from base.db import engine
 from base.logger import logger
 
 
-def upload_trades(trades, ignore_if_copy_failed=False):
+def upload_trades(trades):
     # Ensure this is a pandas dataframe
     if not isinstance(trades, pd.DataFrame):
         trades = pd.DataFrame(trades)
@@ -29,24 +29,11 @@ def upload_trades(trades, ignore_if_copy_failed=False):
     if not "updated_on" in trades.columns:
         trades["updated_on"] = dt.datetime.utcnow()
 
-    try:
-        # trades["others"] = trades.others.apply(json.dumps)
-        trades = trades[~pd.isnull(trades.product_id)]
-        trades.to_sql(
-            DB_TABLE_KPLER_TRADE,
-            con=engine,
-            if_exists="append",
-            index=False,
-        )
-    except sa.exc.IntegrityError:
-        if ignore_if_copy_failed:
-            logger.info("Some kpler_trade rows already exist. Skipping")
-        else:
-            logger.info("Some kpler_trade rows already exist. Upserting instead")
-            upsert(trades, DB_TABLE_KPLER_TRADE, DB_TABLE_KPLER_TRADE + "_pkey")
+    trades = trades[~pd.isnull(trades.product_id)]
+    upsert(trades, DB_TABLE_KPLER_TRADE, DB_TABLE_KPLER_TRADE + "_pkey")
 
 
-def upload_flows(flows, ignore_if_copy_failed=False):
+def upload_flows(flows):
     # Ensure this is a pandas dataframe
     if not isinstance(flows, pd.DataFrame):
         flows = pd.DataFrame(flows)
@@ -60,21 +47,10 @@ def upload_flows(flows, ignore_if_copy_failed=False):
         flows.drop(columns=["destination_country"], inplace=True)
 
     if len(flows) > 0:
-        try:
-            flows.to_sql(
-                DB_TABLE_KPLER_FLOW,
-                con=engine,
-                if_exists="append",
-                index=False,
-            )
-        except sa.exc.IntegrityError:
-            if ignore_if_copy_failed:
-                logger.info("Some kpler_flow rows already exist. Skipping")
-            else:
-                upsert(flows, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
+        upsert(flows, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
 
 
-def upload_products(products, ignore_if_copy_failed=False):
+def upload_products(products):
     # Ensure this is a pandas dataframe
     if not isinstance(products, pd.DataFrame):
         products = pd.DataFrame(products)
@@ -87,22 +63,10 @@ def upload_products(products, ignore_if_copy_failed=False):
         return None
 
     if len(products) > 0:
-        try:
-            products.to_sql(
-                DB_TABLE_KPLER_PRODUCT,
-                con=engine,
-                if_exists="append",
-                index=False,
-            )
-        except sa.exc.IntegrityError:
-            if ignore_if_copy_failed:
-                logger.info("Some kpler_product rows already exist. Skipping")
-            else:
-                logger.info("Some kpler_product rows already exist. Upserting instead")
-                upsert(products, DB_TABLE_KPLER_PRODUCT, DB_TABLE_KPLER_PRODUCT + "_pkey")
+        upsert(products, DB_TABLE_KPLER_PRODUCT, DB_TABLE_KPLER_PRODUCT + "_pkey")
 
 
-def upload_zones(zones, ignore_if_copy_failed=False):
+def upload_zones(zones):
     # Ensure this is a pandas dataframe
     if not isinstance(zones, pd.DataFrame):
         zones = pd.DataFrame(zones)
@@ -114,22 +78,10 @@ def upload_zones(zones, ignore_if_copy_failed=False):
     # Drop zones with id = None
     zones = zones[~pd.isnull(zones.id)]
     if len(zones) > 0:
-        try:
-            zones.to_sql(
-                DB_TABLE_KPLER_ZONE,
-                con=engine,
-                if_exists="append",
-                index=False,
-            )
-        except sa.exc.IntegrityError:
-            if ignore_if_copy_failed:
-                logger.info("Some kpler_zone rows already exist. Skipping")
-            else:
-                logger.info(f"Some kpler_zone rows already exist for. Upserting instead")
-                upsert(zones, DB_TABLE_KPLER_ZONE, DB_TABLE_KPLER_ZONE + "_pkey")
+        upsert(zones, DB_TABLE_KPLER_ZONE, DB_TABLE_KPLER_ZONE + "_pkey")
 
 
-def upload_installations(installations, ignore_if_copy_failed=False):
+def upload_installations(installations):
     # Ensure this is a pandas dataframe
     if not isinstance(installations, pd.DataFrame):
         installations = pd.DataFrame(installations)
@@ -141,26 +93,14 @@ def upload_installations(installations, ignore_if_copy_failed=False):
     # Drop installations with id = None
     installations = installations[~pd.isnull(installations.id)]
     if len(installations) > 0:
-        try:
-            installations.to_sql(
-                DB_TABLE_KPLER_INSTALLATION,
-                con=engine,
-                if_exists="append",
-                index=False,
-            )
-        except sa.exc.IntegrityError:
-            if ignore_if_copy_failed:
-                logger.info("Some kpler_installation rows already exist. Skipping")
-            else:
-                logger.info("Some kpler_installation rows already exist. Upserting instead")
-                upsert(
-                    installations,
-                    DB_TABLE_KPLER_INSTALLATION,
-                    DB_TABLE_KPLER_INSTALLATION + "_pkey",
-                )
+        upsert(
+            installations,
+            DB_TABLE_KPLER_INSTALLATION,
+            DB_TABLE_KPLER_INSTALLATION + "_pkey",
+        )
 
 
-def upload_vessels(vessels, ignore_if_copy_failed=False):
+def upload_vessels(vessels):
     # Ensure this is a pandas dataframe
     if not isinstance(vessels, pd.DataFrame):
         vessels = pd.DataFrame(vessels)
@@ -173,17 +113,4 @@ def upload_vessels(vessels, ignore_if_copy_failed=False):
     fill(vessels.imo.unique())
 
     if len(vessels) > 0:
-        try:
-            vessels.to_sql(
-                DB_TABLE_KPLER_VESSEL,
-                con=engine,
-                if_exists="append",
-                index=False,
-                dtype={"others": JSONB},
-            )
-        except sa.exc.IntegrityError:
-            if ignore_if_copy_failed:
-                logger.info("Some kpler_vessel rows already exist. Skipping")
-            else:
-                logger.info("Some kpler_vessel rows already exist. Upserting instead")
-                upsert(vessels, DB_TABLE_KPLER_VESSEL, DB_TABLE_KPLER_VESSEL + "_pkey")
+        upsert(vessels, DB_TABLE_KPLER_VESSEL, DB_TABLE_KPLER_VESSEL + "_pkey")
