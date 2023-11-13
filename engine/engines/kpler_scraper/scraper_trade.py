@@ -139,7 +139,10 @@ class KplerTradeScraper(KplerScraper):
             r = requests.get(url, params=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
             logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
-            return 0, []
+            raise
+
+        if r.status_code not in [200, 204]:
+            raise RuntimeError(f"Kpler request failed: {params_raw}. Status code: {r.status_code}")
 
         try:
             trades_raw = r.json()
@@ -148,10 +151,10 @@ class KplerTradeScraper(KplerScraper):
                 logger.warning(
                     f"Reached the end for Kpler trade. Probably required to split by product even further"
                 )
-                return 0, []
+                raise
             else:
                 logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
-                return 0, []
+                raise
         return len(trades_raw), trades_raw
 
     def _parse_trade_sts(self, x, origin_or_destination):
