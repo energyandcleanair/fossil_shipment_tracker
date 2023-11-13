@@ -230,20 +230,20 @@ WITH last_update AS (
     FROM
         (
             SELECT
-                DATE(kt.departure_date_utc) AS origin_date,
-                kz.country_iso2 AS country_iso2_departure,
-                kt.product_id,
-                MAX(kt.updated_on) OVER (
-                    PARTITION BY kz.country_iso2,
-                    kt.product_id
+                DATE(trade.departure_date_utc) AS origin_date,
+                zone.country_iso2 AS country_iso2_departure,
+                trade.product_id,
+                MAX(trade.updated_on) OVER (
+                    PARTITION BY zone.country_iso2,
+                    trade.product_id
                     ORDER BY
-                        DATE(kt.departure_date_utc),
-                        kt.updated_on ROWS BETWEEN UNBOUNDED PRECEDING
+                        DATE(trade.departure_date_utc),
+                        trade.updated_on ROWS BETWEEN UNBOUNDED PRECEDING
                         AND CURRENT ROW
                 ) AS updated_on_max
             FROM
-                kpler_trade AS kt
-                JOIN kpler_zone AS kz ON kt.departure_zone_id = kz.id
+                kpler_trade AS trade
+                JOIN kpler_zone AS zone ON trade.departure_zone_id = zone.id
         ) AS sub
     GROUP BY
         sub.origin_date,
