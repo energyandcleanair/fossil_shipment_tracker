@@ -40,7 +40,7 @@ with last_update as (
     from
         kpler_trade
     group by
-        1
+        id
 )
 update
     kpler_trade
@@ -71,11 +71,11 @@ with last_update as (
     from
         kpler_trade
     group by
-        1,
-        2,
-        3,
-        4,
-        5
+        flow_id,
+        departure_date_utc,
+        departure_zone_id,
+        arrival_zone_id,
+        value_tonne
 )
 update
     kpler_trade
@@ -105,11 +105,11 @@ with last_update as (
     where
         arrival_zone_id is NULL
     group by
-        1,
-        2,
-        3,
-        4,
-        5
+        flow_id,
+        departure_date_utc,
+        departure_zone_id,
+        vessel_imos,
+        value_tonne
 )
 update
     kpler_trade
@@ -137,11 +137,11 @@ with last_update as (
     from
         kpler_trade
     group by
-        1,
-        2,
-        3,
-        4,
-        5
+        flow_id,
+        departure_date_utc,
+        departure_zone_id,
+        vessel_imos,
+        value_tonne
 )
 update
     kpler_trade
@@ -171,12 +171,12 @@ with last_update as (
     from
         kpler_trade
     group by
-        1,
-        2,
-        3,
-        4,
-        5,
-        6
+        flow_id,
+        departure_date_utc,
+        departure_zone_id,
+        vessel_imos,
+        arrival_date_utc,
+        arrival_zone_id
 )
 update
     kpler_trade
@@ -203,9 +203,9 @@ with last_update as (
     from
         kpler_trade
     group by
-        1,
-        2,
-        3
+        flow_id,
+        departure_date_utc,
+        departure_zone_id
 )
 update
     kpler_trade
