@@ -77,7 +77,6 @@ class KplerTradeScraper(KplerScraper):
         self,
         platform,
         from_zone=None,
-        to_zone=None,
         query_from=0,
         product_ids=None,
         operational_filter=None,
@@ -96,24 +95,35 @@ class KplerTradeScraper(KplerScraper):
             else []
         )
 
-        from_locations = [x["resourceType"][0].lower() + str(x["id"]) for x in from_locations]
-        to_locations = (
-            [self.get_zone_dict(id=to_zone.get("id"), name=to_zone.get("name"), platform=platform)]
-            if to_zone
-            else []
-        )
-        to_locations = [x["resourceType"][0].lower() + str(x["id"]) for x in to_locations]
+        filters = {}
+
+        if product_ids is not None:
+            filters["product"] = product_ids
 
         # Get zone dict
         params_raw = {
+            "exchangeType": "export",
+            "filters": filters,
+            "flowDirection": "export",
             "from": query_from,
+            "fromLocations": from_locations,
+            "interIntra": "interintra",
+            "locations": [],
+            "onlyRealized": False,
+            "players": [],
             "size": 1000,
+            "splitValues": [],
+            "splitValuesToExclude": [],
+            "toLocations": [],
+            "vesselClassifications": [],
+            "vessels": [],
             "view": "kpler",
-            "withForecasted": "false",
-            "withFreightView": "false",
-            "withProductEstimation": "false",
-            "locations": from_locations,
-            "operationalFilter": operational_filter,
+            "withBetaVessels": False,
+            "withForecasted": True,
+            "withFreightView": False,
+            "withIncompleteTrades": True,
+            "withIntraCountry": True,
+            "withProductEstimation": False,
         }
 
         if month:
@@ -125,9 +135,9 @@ class KplerTradeScraper(KplerScraper):
 
         token = self.token  # get_env("KPLER_TOKEN_BRUTE")
         url = {
-            "dry": "https://dry.kpler.com/api/trades",
-            "liquids": "https://terminal.kpler.com/api/trades",
-            "lng": "https://lng.kpler.com/api/trades",
+            "dry": "https://dry.kpler.com/api/flows/trades",
+            "liquids": "https://terminal.kpler.com/api/flows/trades",
+            "lng": "https://lng.kpler.com/api/flows/trades",
         }.get(platform)
 
         headers = {
@@ -136,13 +146,15 @@ class KplerTradeScraper(KplerScraper):
             "content-type": "application/json",
         }
         try:
-            r = requests.get(url, params=params_raw, headers=headers)
+            r = requests.post(url, json=params_raw, headers=headers)
         except requests.exceptions.ChunkedEncodingError:
             logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
             raise
 
         if r.status_code not in [200, 204]:
-            raise RuntimeError(f"Kpler request failed: {params_raw}. Status code: {r.status_code}")
+            raise RuntimeError(
+                f"Kpler request failed: {params_raw}. Status code: {r.status_code}, {r.content}"
+            )
 
         try:
             trades_raw = r.json()
