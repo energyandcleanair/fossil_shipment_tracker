@@ -1,5 +1,5 @@
 # Deploy production
-name: russia-api-deploy-production
+name: russia-engine-deploy-production
 
 on: workflow_dispatch
 
