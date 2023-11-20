@@ -240,9 +240,8 @@ class UKPiClubInsuranceScraper(InsuranceScraper):
             "inputParameters": {},
         }
 
-        headers = {"X-Csrftoken": "T6C+9iB49TLra4jEsMeSckDMNhQ="}
         url = f"{self.base_path}/screenservices/UKPI_ShipFinder_R/Public/PublicShipFinderEntry/ServiceAPICacheCreate"
-        request = self.session.post(url, json=data, headers=headers, verify=False)
+        request = self.session.post(url, json=data, verify=False)
 
         res = request.json()
 
