@@ -37,7 +37,7 @@ def update_lite(
     from_splits=[FlowsSplit.OriginCountries],
     to_splits=[FlowsSplit.DestinationCountries],
     platforms=None,
-    parts=[UpdateParts.FLOWS, UpdateParts.TRADES, UpdateParts.VALIDATE],
+    parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
 ):
     return update(
         date_from=date_from,
