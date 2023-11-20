@@ -33,12 +33,14 @@ def update():
     entsog.update(date_from=-21, nodata_error_date_from=-4)
     rscript.update()
     trajectory.update()
-    flaring.update()
 
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)
     counter.update(version=base.COUNTER_VERSION2)
     integrity.check()
+
+    flaring.update()
+
     return
 
 
