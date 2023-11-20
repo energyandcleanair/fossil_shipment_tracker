@@ -256,20 +256,25 @@ select * from matching__flow$dep
 select * from matching__dep_country$product;
 
 
-BEGIN
-
-update
-    kpler_trade
-set is_valid = true;
+with trade_valid as (
+    SELECT
+        kpler_trade.id,
+        kpler_trade.flow_id,
+        kpler_trade.product_id,
+        invalid_trade.trade_id is null as is_valid
+    FROM
+        kpler_trade join invalid_trade
+            on kpler_trade.id = invalid_trade.trade_id
+            and kpler_trade.flow_id = invalid_trade.flow_id
+            and kpler_trade.product_id = invalid_trade.product_id
+)
 
 update
     kpler_trade
 set
-    is_valid = false
+    is_valid = trade_valid.is_valid
 from
-    invalid_trade
-where kpler_trade.id in invalid_trade.trade_id
-        and kpler_trade.flow_id in invalid_trade.flow_id
-        and kpler_trade.product_id in invalid_trade.product_id;
-
-COMMIT;
+    trade_valid
+where kpler_trade.id = trade_valid.id
+        and kpler_trade.flow_id = trade_valid.flow_id
+        and kpler_trade.product_id = trade_valid.product_id;
