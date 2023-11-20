@@ -23,7 +23,7 @@ import set_rlimit as _
 
 def update():
     currency.update()
-    # kpler_scraper.update_lite()
+    kpler_scraper.update_lite()
     kpler_trade_computed.update()
 
     position.update(date_from=dt.date.today() - dt.timedelta(days=90))

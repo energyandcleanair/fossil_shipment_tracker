@@ -22,21 +22,14 @@ import set_rlimit as _
 
 
 def update():
-    portcall.update_departures(
-        departure_port_iso2=["RU"],
-        date_from=-14,
-        force_rebuild=True,
-        use_call_based=True,
-    )
-    ship.update()
-    departure.update()
-    arrival.update(date_from=dt.date.today() - dt.timedelta(days=90), departure_port_iso2=["RU"])
 
-    shipment.update()
+    ship.update()
+
     position.update(date_from=dt.date.today() - dt.timedelta(days=90))
 
-    # kpler_scraper.update_full()
+    kpler_scraper.update_full()
     kpler_trade_computed.update()
+
     alert.update()
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)
