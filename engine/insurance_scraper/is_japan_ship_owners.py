@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from base.logger import logger
 from engine.insurance_scraper.insurance_scraper import InsuranceScraper
 
-class SkuldInsuranceScraper(InsuranceScraper):
+class JapanShipOwnersScraper(InsuranceScraper):
     def __init__(self) -> None:
         self.session = Session()
         self.session.headers.update(
