@@ -48,18 +48,22 @@ if slack_webhook_ok(get_env("SLACK_WEBHOOK")):
     sh2.setLevel(level=logging.INFO)
     logger_slack.addHandler(sh2)
 
-slacker = WebClient(token=get_env("SLACK_API_TOKEN"))
+slack_token = get_env("SLACK_API_TOKEN", None)
+slack_enabled = slack_token != None and slack_token != ""
 
-USERS = [
-    "<@U012ZQ5NU4U>", # Hubert
-    "<@U05LD5C42G6>"  # Panda
-]
+slacker = WebClient(token=slack_token)
+
+USERS = ["<@U012ZQ5NU4U>", "<@U05LD5C42G6>"]  # Hubert  # Panda
 NOTIFICATION_STRING = " ".join(USERS)
 CHANNEL = "#log-russia-counter"
+
+
 def notify_engineers(msg):
-    response = slacker.chat_postMessage(
-        channel = CHANNEL, text=f"{msg} {NOTIFICATION_STRING}"
-    )
+    if slack_enabled:
+        slacker.chat_postMessage(channel=CHANNEL, text=f"{msg} {NOTIFICATION_STRING}")
+    else:
+        logger.warning("Slack logging disabled. Did not notify engineers.")
+
 
 # Adding an error logging in file
 # logger_fh = logging.FileHandler('error.log')

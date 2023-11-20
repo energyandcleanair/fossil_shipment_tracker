@@ -20,60 +20,7 @@ import base
 from base.db import Base
 from base.logger import logger
 
-from . import DB_TABLE_PORTCALL
-from . import DB_TABLE_DEPARTURE
-from . import DB_TABLE_ARRIVAL
-from . import DB_TABLE_SHIP
-from . import DB_TABLE_SHIP_INSURER
-from . import DB_TABLE_SHIP_OWNER
-from . import DB_TABLE_SHIP_MANAGER
-from . import DB_TABLE_COMPANY
-from . import DB_TABLE_PORT
-from . import DB_TABLE_TERMINAL
-from . import DB_TABLE_BERTH
-from . import DB_TABLE_COUNTRY
-from . import DB_TABLE_POSITION
-from . import DB_TABLE_DESTINATION
-from . import DB_TABLE_TRAJECTORY
-from . import DB_TABLE_SHIPMENT
-from . import DB_TABLE_SHIPMENTARRIVALBERTH
-from . import DB_TABLE_SHIPMENTDEPARTUREBERTH
-from . import DB_TABLE_MTVOYAGEINFO
-from . import DB_TABLE_PRICE
-from . import DB_TABLE_PRICE_SCENARIO
-from . import DB_TABLE_PIPELINEFLOW
-from . import DB_TABLE_COUNTER
-from . import DB_TABLE_ENDPOINTCACHE
-from . import DB_TABLE_COMMODITY
-from . import DB_TABLE_ENTSOGFLOW
-from . import DB_TABLE_ENTSOGFLOW_RAW
-from . import DB_TABLE_MARINETRAFFICCALL
-from . import DB_TABLE_CURRENCY
-from . import DB_TABLE_MTEVENT_TYPE
-from . import DB_TABLE_EVENT
-from . import DB_TABLE_SHIPMENT_WITH_STS
-from . import DB_TABLE_STS_LOCATIONS
-from . import DB_TABLE_STSARRIVALLOCATION
-from . import DB_TABLE_STSDEPARTURELOCATION
-
-from . import DB_TABLE_ALERT_INSTANCE
-from . import DB_TABLE_ALERT_CONFIG
-from . import DB_TABLE_ALERT_RECIPIENT
-from . import DB_TABLE_ALERT_RECIPIENT_ASSOC
-from . import DB_TABLE_ALERT_CRITERIA
-from . import DB_TABLE_ALERT_CRITERIA_ASSOC
-
-from . import DB_TABLE_FLARING
-from . import DB_TABLE_FLARING_FACILITY
-
-from . import DB_TABLE_KPLER_PRODUCT
-from . import DB_TABLE_KPLER_FLOW
-from . import DB_TABLE_KPLER_VESSEL
-from . import DB_TABLE_KPLER_TRADE
-from . import DB_TABLE_KPLER_INSTALLATION
-from . import DB_TABLE_KPLER_ZONE
-
-from . import DB_TABLE_API_KEY
+from .table_names import *
 
 
 class Ship(Base):
@@ -998,3 +945,11 @@ class ApiKey(Base):
     endpoints = Column(ARRAY(String))
 
     __tablename__ = DB_TABLE_API_KEY
+
+
+class GlobalCache(Base):
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    value = Column(JSONB)
+
+    __tablename__ = DB_TABLE_GLOBAL_CACHE

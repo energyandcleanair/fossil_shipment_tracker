@@ -1,6 +1,6 @@
 import base
-from engine.company import *
-from engine.equasis import equasis
+from engines.company import *
+from engines.equasis import equasis
 from base.env import get_env
 
 

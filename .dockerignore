@@ -1,0 +1,12 @@
+.venv
+__pycache__
+.pytest_cache
+
+assets
+
+.vscode
+.env
+
+engine/.env
+engine/.venv
+engine/cache

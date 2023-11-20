@@ -5,7 +5,7 @@ from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementU
 
 from base.db import session, engine
 
-from engine.kpler_scraper import KplerScraper, KplerFlowScraper, KplerTradeScraper
+from engines.kpler_scraper import KplerScraper, KplerFlowScraper, KplerTradeScraper
 
 
 def test_get_flow():
@@ -116,7 +116,7 @@ def test_update_trades():
     from base.db import init_db
 
     init_db()
-    from engine.kpler_scraper import update_trades
+    from engines.kpler_scraper import update_trades
 
     update_trades(date_from=-5)
 
