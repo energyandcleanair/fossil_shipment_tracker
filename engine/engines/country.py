@@ -29,6 +29,7 @@ def fill():
         },
         inplace=True,
     )
+    countries.loc[countries.iso3 == "GBR", "iso2"] = "GB"
 
     def to_region(row):
         if row.iso2 in ["US", "TR", "KR", "CN", "IN", "GB"]:
@@ -39,15 +40,17 @@ def fill():
 
     def to_regions(row):
         regions = []
-        if row.iso2 in ["US", "TR", "KR", "CN", "IN", "GB"]:
-            regions.append(row["name"])
-        if row.EU28 == "EU28":
-            regions.append("EU28")
         if row.EU == "EU":
             regions.append("EU")
+        if row.G7 == "G7":
+            regions.append("G7")
+        # Price Cap Coalition
+        if row.iso2 in ["AU", "CA", "JP", "UK", "GB", "US"] or row.EU == "EU":
+            regions.append("PCC")
+
         if not regions:
             regions.append("Others")
-        regions.append("Global")
+
         return regions
 
     countries["region"] = countries.apply(to_region, axis=1)
@@ -62,11 +65,11 @@ def fill():
         "For orders",
         "For orders",
         "For orders",
-        "For orders",
+        ["For orders"],
     ]
 
     # Adding LNG
-    countries.loc[len(countries)] = [base.LNG, base.LNG, "LNG", "LNG", "LNG", "LNG"]
+    countries.loc[len(countries)] = [base.LNG, base.LNG, "LNG", "LNG", "LNG", ["LNG"]]
 
     upsert(countries, DB_TABLE_COUNTRY, "unique_country")
     session.commit()

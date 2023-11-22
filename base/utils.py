@@ -7,6 +7,7 @@ from geoalchemy2 import WKTElement, WKBElement
 from base.encoder import JsonEncoder
 import json
 import numpy as np
+from collections.abc import Iterable
 
 
 def daterange_intersection(daterange1, daterange2):
@@ -294,3 +295,42 @@ def to_bool(v):
 def read_json(path):
     with open(path) as f:
         return json.load(f)
+
+
+def hash_df(df):
+    # Create a hashable version
+    # find columns that are list and convert them to tuple
+    list_columns = [
+        col
+        for col in df.columns
+        if any(df[col].notna()) and any(df[col].apply(lambda x: type(x) == list))
+    ]
+
+    def to_tuple_if_iterable(x):
+        if x is None:
+            return None
+        if np.isscalar(x):
+            if pd.isna(x):
+                return None
+            return x
+        if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+            return tuple(x)
+        return x
+
+    for col in list_columns:
+        df[col] = df[col].apply(to_tuple_if_iterable)
+    return df, list_columns
+
+
+def unhash_df(df, list_columns):
+    # Unhash the dataframe
+    def to_list_if_iterable(x):
+        if x is None or (np.isscalar(x) and pd.isna(x)):
+            return None
+        if isinstance(x, Iterable) and not isinstance(x, (str, bytes)):
+            return list(x)
+        return x
+
+    for col in list_columns:
+        df[col] = df[col].apply(to_list_if_iterable)
+    return df

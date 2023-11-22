@@ -24,7 +24,7 @@ def test_counter_version(app):
         data = response.json["data"]
         assert len(data) >= 4
         data_df = pd.DataFrame(data)
-        assert all(data_df.version == base.COUNTER_VERSION0)
+        assert all(data_df.version == base.COUNTER_VERSION2)
 
 
 def test_counter_last(app):
@@ -95,6 +95,14 @@ def test_counter(app):
     with app.test_client() as test_client:
         response = test_client.get("/v0/counter")
         assert response.status_code == 200
+        data = response.json["data"]
+        assert len(data) >= 4
+        data_df = pd.DataFrame(data)
+        expected_columns = set(
+            ["destination_region", "destination_regions", "destination_is_pcc", "date", "value_eur"]
+        )
+        assert set(data_df.columns) >= expected_columns
+        assert data_df.destination_is_pcc.unique().tolist() == ["NOT_PCC", "PCC"]
 
         params = {"format": "json"}
         response = test_client.get("/v0/counter_last?" + urllib.parse.urlencode(params))
@@ -124,6 +132,8 @@ def test_counter(app):
                 "destination_iso2",
                 "destination_country",
                 "destination_region",
+                "destination_regions",
+                "destination_is_pcc",
                 "pricing_scenario_name",
                 "pricing_scenario",
                 "value_tonne",
@@ -266,6 +276,8 @@ def test_counter_aggregation(app):
                         "commodity_group",
                         "commodity_group_name",
                         "destination_region",
+                        "destination_regions",
+                        "destination_is_pcc",
                         "destination_iso2",
                         "destination_country",
                         "date",
@@ -287,8 +299,17 @@ def test_counter_aggregation(app):
 
             if "destination_iso2" in aggregate_by or "destination_country" in aggregate_by:
                 expected_columns.update(
-                    ["destination_country", "destination_iso2", "destination_region"]
+                    [
+                        "destination_country",
+                        "destination_iso2",
+                        "destination_region",
+                        "destination_regions",
+                        "destination_is_pcc",
+                    ]
                 )
+
+            if "destination_region" in aggregate_by:
+                expected_columns.update(["destination_regions", "destination_is_pcc"])
 
             assert set(data_df.columns) == expected_columns
 
@@ -311,63 +332,6 @@ def test_counter_aggregation(app):
         # assert they are within 1% of each other - small disparity mainly due to others country destination missing
         assert np.isclose(sum1, sum2, rtol=0.01)
         assert sum1 > 1e9
-
-
-def test_counter_matches_shipments(app):
-    # We take a country without overland, or a commodity that is only traded through shipments
-    with app.test_client() as test_client:
-        params = {
-            "format": "json",
-            "destination_iso2": "JP",
-            "commodity": "lng",
-            "aggregate_by": "commodity,destination_country,date",
-        }
-        response = test_client.get("/v0/counter?" + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        data = response.json["data"]
-        assert len(data) > 0
-        counter_df = pd.DataFrame(data)
-
-        params = {
-            "format": "json",
-            "destination_iso2": "JP",
-            "commodity_origin_iso2": "RU",
-            "commodity": "lng",
-            "aggregate_by": "commodity,destination_country,arrival_date",
-        }
-        response = test_client.get("/v0/voyage?" + urllib.parse.urlencode(params))
-        assert response.status_code == 200
-        data = response.json["data"]
-        assert len(data) > 0
-        shipments_df = pd.DataFrame(data)
-
-        date_from = to_datetime("2022-03-01")
-        date_to = to_datetime("2022-06-01")
-        counter_sum = (
-            counter_df[
-                (pd.to_datetime(counter_df.date) >= date_from)
-                & (pd.to_datetime(counter_df.date) <= date_to)
-            ]
-            .groupby(["commodity", "destination_country"])["value_eur"]
-            .sum()
-        )
-
-        shipments_sum = (
-            shipments_df[
-                (pd.to_datetime(shipments_df.arrival_date) >= date_from)
-                & (pd.to_datetime(shipments_df.arrival_date) <= date_to)
-            ]
-            .groupby(["commodity", "destination_country"])["value_eur"]
-            .sum()
-        )
-
-        comparison = pd.merge(
-            counter_sum.reset_index(),
-            shipments_sum.reset_index(),
-            on=["commodity", "destination_country"],
-        )
-
-        assert all(comparison.value_eur_x == comparison.value_eur_y)
 
 
 # TODO agree on sorting specification

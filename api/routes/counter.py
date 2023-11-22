@@ -16,7 +16,7 @@ from base import PRICING_DEFAULT, COUNTER_VERSION_DEFAULT
 from base.logger import logger
 from base.db import session
 from base.models import Counter, Country, Currency, PriceScenario
-from base.utils import to_datetime, to_list, intersect, df_to_json
+from base.utils import to_datetime, to_list, intersect, df_to_json, hash_df, unhash_df
 from .commodity import get_subquery as get_commodity_subquery
 
 
@@ -46,11 +46,13 @@ class RussiaCounterResource(Resource):
                 "destination_iso2",
                 "destination_country",
                 "destination_region",
+                "destination_regions",
             ],
             "destination_country": [
                 "destination_iso2",
                 "destination_country",
                 "destination_region",
+                "destination_regions",
             ],
             "destination_region": ["destination_region"],
             "version": ["version"],
@@ -323,6 +325,20 @@ class RussiaCounterResource(Resource):
             else_=Country.region,
         ).label("destination_region")
 
+        destination_regions_field = Country.regions.label("destination_regions")
+        destination_is_pcc_field = sa.case(
+            [
+                (
+                    sa.and_(
+                        destination_regions_field != sa.null(),
+                        sa.func.array_to_string(destination_regions_field, ",").like("%PCC%"),
+                    ),
+                    "PCC",
+                ),
+            ],
+            else_="NOT_PCC",
+        ).label("destination_is_pcc")
+
         value_currency_field = (Counter.value_eur * Currency.per_eur).label("value_currency")
 
         commodity_subquery = get_commodity_subquery(
@@ -337,6 +353,9 @@ class RussiaCounterResource(Resource):
                 Counter.destination_iso2,
                 Country.name.label("destination_country"),
                 destination_region_field,
+                destination_regions_field,
+                destination_is_pcc_field,
+                Country.regions,
                 Counter.date,
                 Counter.value_tonne,
                 Counter.value_eur,
@@ -385,6 +404,9 @@ class RussiaCounterResource(Resource):
             counter.drop(["id"], axis=1, inplace=True)
 
         # Resample
+        # Need to hash list columns before resampling
+        counter, list_columns = hash_df(counter)
+
         if "date" in counter:
             daterange = pd.date_range(min(counter.date), max(counter.date)).rename("date")
             counter["date"] = pd.to_datetime(counter["date"]).dt.floor(
@@ -398,6 +420,8 @@ class RussiaCounterResource(Resource):
                     "destination_iso2",
                     "destination_country",
                     "destination_region",
+                    "destination_regions",
+                    "destination_is_pcc",
                     "currency",
                     "pricing_scenario",
                     "pricing_scenario_name",
@@ -431,6 +455,8 @@ class RussiaCounterResource(Resource):
                     "destination_iso2",
                     "destination_country",
                     "destination_region",
+                    "destination_regions",
+                    "destination_is_pcc",
                     "currency",
                     "pricing_scenario",
                     "pricing_scenario_name",
@@ -460,6 +486,8 @@ class RussiaCounterResource(Resource):
                             "destination_iso2",
                             "destination_country",
                             "destination_region",
+                            "destination_regions",
+                            "destination_is_pcc",
                             "currency",
                             "pricing_scenario",
                             "pricing_scenario_name",
@@ -541,6 +569,9 @@ class RussiaCounterResource(Resource):
 
         # Translate
         counter = self.translate(data=counter, language=language)
+
+        # Unhash finally
+        counter = unhash_df(counter, intersect(list_columns, counter.columns))
 
         if format == "csv":
             return Response(
