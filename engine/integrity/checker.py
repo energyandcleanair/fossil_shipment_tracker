@@ -42,6 +42,9 @@ class IntegrityCheckDefinition:
             return IntegrityCheckResult(self, error=e, tb=tb)
 
 
+KPLER_CHECKER_DATE_FROM = "2021-01-01"
+
+
 class IntegrityStep(Enum):
     SHIPMENTS = IntegrityCheckDefinition("shipments", test_shipment_table)
     SHIPMENT_PORTCALL = IntegrityCheckDefinition(
@@ -60,15 +63,51 @@ class IntegrityStep(Enum):
     INSURER = IntegrityCheckDefinition("pricing positive", test_insurer)
     KPLER_TRADE_CRUDE = IntegrityCheckDefinition(
         "Kpler trade crude",
-        lambda: test_kpler_trades(date_from="2022-01-01", product="Crude/Co", origin_iso2="RU"),
+        lambda: test_kpler_trades(
+            date_from=KPLER_CHECKER_DATE_FROM,
+            product=KplerCheckerProducts.CRUDE,
+            origin_iso2="RU",
+        ),
+    )
+    KPLER_TRADE_LNG = IntegrityCheckDefinition(
+        "Kpler trade LNG",
+        lambda: test_kpler_trades(
+            date_from=KPLER_CHECKER_DATE_FROM,
+            product=KplerCheckerProducts.LNG,
+            origin_iso2="RU",
+        ),
+    )
+    KPLER_TRADE_GASOIL_DIESEL = IntegrityCheckDefinition(
+        "Kpler trade Gasoil/Diesel",
+        lambda: test_kpler_trades(
+            date_from=KPLER_CHECKER_DATE_FROM,
+            product=KplerCheckerProducts.GASOIL_DIESEL,
+            origin_iso2="RU",
+        ),
+    )
+    KPLER_TRADE_METALLURGICAL_COAL = IntegrityCheckDefinition(
+        "Kpler trade Coal",
+        lambda: test_kpler_trades(
+            date_from=KPLER_CHECKER_DATE_FROM,
+            product=KplerCheckerProducts.METALLURGICAL_COAL,
+            origin_iso2="RU",
+        ),
+    )
+    KPLER_TRADE_THERMAL_COAL = IntegrityCheckDefinition(
+        "Kpler trade Coal",
+        lambda: test_kpler_trades(
+            date_from=KPLER_CHECKER_DATE_FROM,
+            product=KplerCheckerProducts.THERMAL_COAL,
+            origin_iso2="RU",
+        ),
     )
 
     def run_test(self):
         return self.value.run_test()
 
-    @property
-    def name(self):
-        return self.name
+    @classmethod
+    def get_kpler_checks(cls):
+        return [step for step in IntegrityStep if step.name.startswith("KPLER_TRADE_")]
 
 
 def check(steps=[step for step in IntegrityStep]):
@@ -81,5 +120,5 @@ def check(steps=[step for step in IntegrityStep]):
         failures = "\n------------\n".join([result.format_error() for result in failed_results])
         logger_slack.error(f"Integrity checks failed: {failures}")
         notify_engineers("Please check error")
-
-    logger_slack.info(f"All integrity checks passed")
+    else:
+        logger_slack.info(f"All integrity checks passed")

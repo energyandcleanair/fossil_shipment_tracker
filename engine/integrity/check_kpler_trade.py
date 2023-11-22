@@ -1,3 +1,4 @@
+from enum import Enum
 import requests
 from engines.kpler_scraper.scraper_flow import KplerFlowScraper
 from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
@@ -12,17 +13,57 @@ FST_API_KEY = config("API_KEY")
 
 scraper = KplerFlowScraper()
 
-product_info = {
-    "Crude/Co": {
+
+class KplerCheckerProducts(Enum):
+    CRUDE = {
         "platform": "liquids",
-        "type": "group",
-    },
-    "LNG": {"platform": "lng", "type": "group"},
-}
+        "kpler_product": "Crude/Co",
+        "our_type": "group",
+        "our_product": "Crude/Co",
+    }
+    LNG = {
+        "platform": "lng",
+        "kpler_product": None,
+        "our_type": "commodity",
+        "our_product": "lng",
+    }
+    GASOIL_DIESEL = {
+        "platform": "liquids",
+        "kpler_product": "Gasoil/Diesel",
+        "our_type": "group",
+        "our_product": "Gasoil/Diesel",
+    }
+    METALLURGICAL_COAL = {
+        "platform": "dry",
+        "kpler_product": "Metallurgical",
+        "our_type": "commodity",
+        "our_product": "Metallurgical",
+    }
+    THERMAL_COAL = {
+        "platform": "dry",
+        "kpler_product": "Thermal",
+        "our_type": "commodity",
+        "our_product": "Thermal",
+    }
+
+    @property
+    def platform(self):
+        return self.value["platform"]
+
+    @property
+    def kpler_product(self):
+        return self.value["kpler_product"]
+
+    @property
+    def our_type(self):
+        return self.value["our_type"]
+
+    @property
+    def our_product(self):
+        return self.value["our_product"]
 
 
 def test_kpler_trades(date_from=None, product=None, origin_iso2=None):
-
     start_date = to_datetime(date_from).date()
     end_date = (dt.datetime.now().replace(day=1) - dt.timedelta(days=1)).date()
 
@@ -48,7 +89,7 @@ def compare_flows_to_trades(flows, aggregated_trades):
         flows,
         aggregated_trades,
         how="outer",
-        on=["month", "group", "to_iso2"],
+        on=["month", "to_iso2"],
         suffixes=(".expected", ".actual"),
     )
 
@@ -64,9 +105,9 @@ def compare_flows_to_trades(flows, aggregated_trades):
 
 def get_flows_from_kpler(product, origin_iso2, date_from, date_to):
     df = scraper.get_flows(
-        product_info[product]["platform"],
+        product.platform,
         origin_iso2=origin_iso2,
-        product=product,
+        product=product.kpler_product,
         granularity=FlowsPeriod.Monthly,
         unit=FlowsMeasurementUnit.T,
         date_from=date_from,
@@ -76,9 +117,8 @@ def get_flows_from_kpler(product, origin_iso2, date_from, date_to):
 
     column_selector = {
         "date": "month",
-        "value": "value_tonne",
-        "product": "group",
         "to_iso2": "to_iso2",
+        "value": "value_tonne",
     }
 
     renamed_df = df.rename(columns=column_selector)[[*column_selector.values()]]
@@ -88,14 +128,13 @@ def get_flows_from_kpler(product, origin_iso2, date_from, date_to):
 
 
 def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
-
-    product_type = product_info[product]["type"]
+    product_type = product.our_type
 
     params = {
         "api_key": FST_API_KEY,
-        product_type: product,
+        product_type: product.our_product,
         "origin_iso2": origin_iso2,
-        "aggregate_by": f"origin_month,group,destination_iso2",
+        "aggregate_by": f"origin_month,destination_iso2",
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
         "format": "json",
@@ -105,9 +144,8 @@ def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
 
     column_selector = {
         "month": "month",
-        "value_tonne": "value_tonne",
-        "group": "group",
         "destination_iso2": "to_iso2",
+        "value_tonne": "value_tonne",
     }
 
     df = pd.DataFrame(response.json()["data"]).rename(columns=column_selector)[
@@ -122,7 +160,7 @@ def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
 def format_failed(failed):
     format_number = lambda n: f"{round(n / 1e3, 3)}kt"
     row_to_reason = lambda row: (
-        f" - For {row['month']}, "
+        f" - For {row['month']} {row['to_iso2']}, "
         + f"expected {format_number(row['value_tonne.expected'])} "
         + f"but got {format_number(row['value_tonne.actual'])}."
     )

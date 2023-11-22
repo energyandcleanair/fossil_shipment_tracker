@@ -12,7 +12,10 @@ from base.models import (
 )
 from base.logger import logger_slack
 
-from .check_kpler_trade import test_kpler_trades
+from .check_kpler_trade import (
+    test_kpler_trades,
+    KplerCheckerProducts,
+)  # pylint: disable=unused-import
 
 
 def test_shipment_portcall_integrity():
