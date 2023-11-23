@@ -10,6 +10,13 @@ from engines import (
     backuper,
     kpler_scraper,
     kpler_trade_computed,
+    currency,
+    destination,
+    berth,
+    entsog,
+    rscript,
+    trajectory,
+    flaring,
 )
 
 import integrity
@@ -22,20 +29,32 @@ import set_rlimit as _
 
 
 def update():
-
-    ship.update()
-
-    position.update(date_from=dt.date.today() - dt.timedelta(days=90))
+    currency.update()
 
     kpler_scraper.update_full()
     kpler_trade_computed.update()
 
+    ship.update()
+
+    position.update(date_from=dt.date.today() - dt.timedelta(days=90))
+    destination.update()
+    berth.update()
+
+    entsog.update(date_from=-21, nodata_error_date_from=-4)
+    rscript.update()
+    trajectory.update()
+
     alert.update()
+
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)
     counter.update(version=base.COUNTER_VERSION2)
+
     backuper.update()
     integrity.check()
+
+    flaring.update()
+
     return
 
 
