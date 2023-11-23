@@ -29,7 +29,10 @@ def fill():
         },
         inplace=True,
     )
+
+    # Manual edits
     countries.loc[countries.iso3 == "GBR", "iso2"] = "GB"
+    countries.loc[countries.iso2 == "TR", "name"] = "Turkey"
 
     def to_region(row):
         if row.iso2 in ["US", "TR", "KR", "CN", "IN", "GB"]:
