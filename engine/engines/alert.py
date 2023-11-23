@@ -386,12 +386,6 @@ def build_email_content(mail_alerts_df):
         .replace("{shipment_plural}", "s" if shipment_count > 1 else "")
     )
 
-    with open("email_%s_%s.html" % (recipient_email, config_name), "w") as f:
-        f.write(content_html)
-
-    with open("email_%s_%s.txt" % (recipient_email, config_name), "w") as f:
-        f.write(content_txt)
-
     result = pd.DataFrame(
         {
             "content_html": [content_html],
