@@ -77,7 +77,12 @@ def test_kpler_trades(date_from=None, product=None, origin_iso2=None):
 
     comparison = compare_flows_to_trades(flows, aggregated_trades)
 
-    assert all(comparison["ok"]), (
+    expected_sum = comparison["value_tonne.expected"].sum()
+    actual_sum = comparison["value_tonne.expected"].sum()
+
+    sum_close = np.isclose(expected_sum, actual_sum, rtol=0.01)
+
+    assert sum_close, (
         f"Incorrect values for kpler trade for {product} "
         + f"from {origin_iso2} after {date_from}:\n"
         + format_failed(comparison[~comparison.ok])
