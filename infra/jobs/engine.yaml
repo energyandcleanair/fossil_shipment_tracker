@@ -24,6 +24,8 @@ spec:
               value: alert@russiafossiltracker.com
             - name: PROJECT_ID
               value: fossil-shipment-tracker
+            - name: FOSSIL_SHIPMENT_TRACKER_API_URL
+              value: https://api.russiafossiltracker.com/
             - name: SLACK_API_TOKEN
               valueFrom:
                 secretKeyRef:
