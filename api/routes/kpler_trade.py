@@ -268,6 +268,14 @@ class KplerTradeResource(TemplateResource):
         default=False,
     )
 
+    parser.add_argument(
+        "only_sts",
+        type=bool,
+        help="Filters where trade involves STS at origin, during transit, or at destination",
+        required=False,
+        default=False,
+    )
+
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date", "origin_date", "destination_date"]
     value_cols = ["value_tonne", "value_m3", "value_gas_m3", "value_eur", "value_currency"]
@@ -472,6 +480,7 @@ class KplerTradeResource(TemplateResource):
             ],
             "ownership_sanction_coverage": [subquery.c.ownership_sanction_coverage],
             "status": [subquery.c.status],
+            "is_sts": [subquery.c.is_sts],
         }
 
     def get_agg_value_cols(self, subquery):
@@ -541,6 +550,12 @@ class KplerTradeResource(TemplateResource):
             destination_region_field = map_destination_field(DestinationCountry)
             commodity_destination_region_field = map_destination_field(CommodityDestinationCountry)
 
+        is_sts_field = sa.or_(
+            sa.and_(KplerTrade.arrival_sts != None, KplerTrade.arrival_sts == True),
+            sa.and_(KplerTrade.departure_sts != None, KplerTrade.departure_sts == True),
+            KplerTrade.step_zone_ids != None,
+        ).label("is_sts")
+
         query = (
             session.query(
                 # Renaming everything in terms of "origin" and "destination"
@@ -575,6 +590,7 @@ class KplerTradeResource(TemplateResource):
                 destination_zone.country_name.label("commodity_destination_country"),
                 destination_zone.country_iso2.label("commodity_destination_iso2"),
                 commodity_destination_region_field,
+                KplerTrade.departure_sts.label("origin_sts"),
                 KplerTrade.arrival_sts.label("destination_sts"),
                 KplerProduct.grade_name.label("grade"),
                 KplerProduct.commodity_name.label("commodity"),
@@ -606,6 +622,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTradeComputed.step_zone_iso2s,
                 KplerTradeComputed.step_zone_regions,
                 KplerTradeComputed.step_zone_ids,
+                is_sts_field,
             )
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
@@ -661,6 +678,7 @@ class KplerTradeResource(TemplateResource):
         destination_port_name = params.get("destination_port_name")
         destination_region = params.get("destination_region")
         exclude_within_country = params.get("exclude_within_country")
+        only_sts = params.get("only_sts")
 
         trade_ids = params.get("trade_ids")
 
@@ -797,5 +815,8 @@ class KplerTradeResource(TemplateResource):
                     subquery.c.destination_iso2 == None,
                 )
             )
+
+        if only_sts:
+            query = query.filter(subquery.c.is_sts == True)
 
         return query
