@@ -116,25 +116,23 @@ class KplerFlowScraper(KplerScraper):
         }
         try:
             r = self.session.post(url, json=params_raw, headers=headers)
-        except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(f"Kpler request failed. Probably empty")
-            return None
-
-        # read content to dataframe
-        try:
             data = r.json()["series"]
-        except requests.exceptions.JSONDecodeError:
-            logger.warning(f"Kpler request failed. Probably empty")
+        except (
+            requests.exceptions.ChunkedEncodingError,
+            urllib3.exceptions.ReadTimeoutError,
+            requests.exceptions.JSONDecodeError,
+        ) as e:
+            logger.warning(f"Kpler request failed. Probably empty: {e}")
             return None
 
         dfs = []
-        for x in data:
+        for row in data:
             df = pd.concat(
-                [pd.DataFrame(y["splitValues"]) for y in x["datasets"]], ignore_index=True
+                [pd.DataFrame(y["splitValues"]) for y in row["datasets"]], ignore_index=True
             )
             if len(df) > 0:
                 df = pd.concat([df.drop(["values"], axis=1), df["values"].apply(pd.Series)], axis=1)
-                df["date"] = x["date"]
+                df["date"] = row["date"]
                 dfs += [df]
 
             # Add total
