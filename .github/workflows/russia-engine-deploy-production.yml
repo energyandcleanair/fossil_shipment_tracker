@@ -22,8 +22,8 @@ jobs:
     - name: Set up Cloud SDK
       uses: 'google-github-actions/setup-gcloud@v1'
     - name: Build and deploy latest docker image
-      id: build
+      id: build-and-deploy-image
       run: 'gcloud builds submit --region=europe-west1 --config cloudbuild-engine.yaml'
     - name: Deploy latest job spec
-      id: build
+      id: deploy-job-spec
       run: 'gcloud run jobs replace infra/jobs/engine.yaml'
