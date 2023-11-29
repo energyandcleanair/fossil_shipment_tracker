@@ -1,6 +1,8 @@
-import base
+import numpy as np
+from tqdm import tqdm
+import pandas as pd
+import datetime as dt
 
-from functools import reduce
 from sqlalchemy import (
     func,
     case,
@@ -13,27 +15,19 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import aggregate_order_by, array, ARRAY, array_agg
-
-from tqdm import tqdm
-
 import sqlalchemy as sa
 from sqlalchemy import func
 from sqlalchemy import nullslast
 
-import pandas as pd
 
-import datetime as dt
-
+import base
 from base.db import session, engine
-from base.logger import logger_slack
+from base.logger import logger_slack, logger
 from engines.insurance_scraper import *
-
 from base.models import (
-    KplerFlow,
     KplerProduct,
     Country,
     Price,
-    Currency,
     Commodity,
     KplerTrade,
     KplerTradeComputed,
@@ -573,6 +567,8 @@ def update():
 
         logger.info(f"Inserting {len(to_insert)} rows into computed table")
 
+        to_insert = get_valid_trade_computed(to_insert, throw_error_if_not_valid=True)
+
         KplerTradeComputed.query.delete()
         session.commit()
         to_insert.to_sql(DB_TABLE_KPLER_TRADE_COMPUTED, con=engine, if_exists="append", index=False)
@@ -584,3 +580,50 @@ def update():
             exc_info=True,
         )
         raise e
+
+
+def get_valid_trade_computed(to_insert, throw_error_if_not_valid=True):
+    """
+    Inspect the computed trades that have no associated pricing
+    and confirm that this is expected. Throw an error if not
+    :param to_insert:
+    :return:
+    """
+    ignorable_commodities = [
+        "kpler_clean_condensate",
+        "kpler_bitumen_asphalt",
+        "kpler_cbfs",
+        "kpler_coal_tar",
+        "kpler_pitch",
+        "kpler_specialities",
+        "kpler_cutter_stock",
+    ]
+    # Not all commodities have old pricing
+    date_from = dt.datetime(2015, 1, 1)
+
+    missing = to_insert[to_insert.pricing_scenario.isnull()]
+    missing_trades = pd.DataFrame(
+        session.query(
+            KplerTrade.departure_date_utc,
+            KplerTrade.id.label("trade_id"),
+            KplerTrade.product_id,
+            KplerProduct.commodity_name,
+        )
+        .join(KplerProduct, KplerTrade.product_id == KplerProduct.id)
+        .filter(KplerTrade.id.in_(missing.trade_id.unique()))
+        .all()
+    )
+    missing_detailed = missing.merge(missing_trades, on=["trade_id", "product_id"])
+
+    ok = (
+        missing_detailed.kpler_product_commodity_id.isnull()
+        | missing_detailed.kpler_product_commodity_id.isin(ignorable_commodities)
+        | (pd.to_datetime(missing_detailed.departure_date_utc) < date_from)
+    )
+
+    if any(~ok) and throw_error_if_not_valid:
+        logger_slack.error(f"Computed trades without pricing found")
+        raise Exception(f"Computed trades without pricing found: {missing_detailed[~ok]}")
+
+    valid = to_insert[to_insert.pricing_scenario.notnull()]
+    return valid

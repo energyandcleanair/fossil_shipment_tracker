@@ -1,15 +1,12 @@
-import requests
 import urllib
-import geopandas as gpd
-import io
 import numpy as np
 import pandas as pd
+
 import base
-import json
-import sqlalchemy as sa
+from base.env import get_env
 from base.models import Position, ShipmentArrivalBerth, Price
 from base.db import session
-from base import PRICING_DEFAULT
+from base import PRICING_DEFAULT, PRICING_ENHANCED
 
 
 PRICING_PRICECAP = "usd40"
@@ -171,21 +168,32 @@ def test_price_cap(app):
         data = data[data.departure_date_utc >= "2022-12-01"]
         data = data[data.departure_date_utc <= "2022-12-31"]
         # There is some discrepancy in exchange rate, hence the 1.1
-        assert data[data.ship_owner_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < price_per_barrel * 1.1
-        assert data[data.ship_manager_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < price_per_barrel * 1.1
-        assert data[data.ship_insurer_region == "EU"].usd_per_tonne.max() / bbl_per_tonne < price_per_barrel * 1.1
+        assert (
+            data[data.ship_owner_region == "EU"].usd_per_tonne.max() / bbl_per_tonne
+            < price_per_barrel * 1.1
+        )
+        assert (
+            data[data.ship_manager_region == "EU"].usd_per_tonne.max() / bbl_per_tonne
+            < price_per_barrel * 1.1
+        )
+        assert (
+            data[data.ship_insurer_region == "EU"].usd_per_tonne.max() / bbl_per_tonne
+            < price_per_barrel * 1.1
+        )
 
         data = data[data.arrival_date_utc >= "2022-12-01"]
         # Check that those not covered aren't affected
         data["covered"] = (
-                (data.ship_owner_region == "EU")
-                | (data.ship_manager_region == "EU")
-                | (data.ship_manager_region == "EU")
-                | (data.commodity_destination_region == "EU")
+            (data.ship_owner_region == "EU")
+            | (data.ship_manager_region == "EU")
+            | (data.ship_manager_region == "EU")
+            | (data.commodity_destination_region == "EU")
         )
 
         assert data.groupby(data.covered)["value_tonne"].sum().all() > 0
-        assert np.isclose(data[~data.covered].usd_per_tonne.max() / bbl_per_tonne, price_per_barrel * 1.1, 0.05)
+        assert np.isclose(
+            data[~data.covered].usd_per_tonne.max() / bbl_per_tonne, price_per_barrel * 1.1, 0.05
+        )
 
         # Default and cap pricing should be similar before put in place
         params = {
@@ -259,8 +267,10 @@ def test_price_cap(app):
         data = response.json["data"]
         assert len(data) > 0
         both_df = pd.DataFrame(data)
-        assert both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum() \
-               > both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
+        assert (
+            both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum()
+            > both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
+        )
 
 
 def test_coal_pricing(app):
@@ -287,3 +297,52 @@ def test_coal_pricing(app):
         default_sum = both_df[both_df.pricing_scenario == PRICING_DEFAULT].value_eur.sum()
         capped_sum = both_df[both_df.pricing_scenario == PRICING_PRICECAP].value_eur.sum()
         assert default_sum == capped_sum
+
+
+def test_pricing_scenario(app):
+
+    with app.test_client() as test_client:
+        params = {
+            "date_from": -30,
+            "commodity_origin_iso2": "RU",
+            "aggregate_by": ",".join(
+                [
+                    "commodity_origin_iso2",
+                    "commodity_destination_iso2",
+                    "commodity",
+                    "date",
+                ]
+            ),
+            "pricing_scenario": ",".join([PRICING_DEFAULT, PRICING_ENHANCED]),
+        }
+        response = test_client.get("/v0/overland?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        pipeline_df = pd.DataFrame(response.json["data"])
+        assert set(pipeline_df.pricing_scenario.unique()) == set(
+            [PRICING_DEFAULT, PRICING_ENHANCED]
+        )
+
+        # No price cap on pipelines, so pricing should be equal
+        pipeline_df = pipeline_df.groupby(["pricing_scenario"]).sum()
+        assert all(pipeline_df.loc[PRICING_ENHANCED] == pipeline_df.loc[PRICING_DEFAULT])
+        assert all(pipeline_df > 0)
+
+        # On kpler trade
+        params["api_key"] = get_env("API_KEY")
+        response = test_client.get("/v1/kpler_trade?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        trade_df = pd.DataFrame(response.json["data"])
+        assert set(trade_df.pricing_scenario.unique()) == set([PRICING_DEFAULT, PRICING_ENHANCED])
+
+        # No price cap on pipelines, so pricing should be equal
+        scenario_values = trade_df.groupby(["pricing_scenario"]).sum()
+        identical_values = ["value_tonne", "value_m3"]
+        different_values = ["value_eur"]
+        assert all(
+            scenario_values.loc[PRICING_ENHANCED][identical_values]
+            == scenario_values.loc[PRICING_DEFAULT][identical_values]
+        )
+        assert all(
+            scenario_values.loc[PRICING_ENHANCED][different_values]
+            != scenario_values.loc[PRICING_DEFAULT][different_values]
+        )

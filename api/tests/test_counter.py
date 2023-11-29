@@ -11,10 +11,7 @@ import datetime as dt
 from base.models import Position, ShipmentArrivalBerth
 from base.db import session
 from base.utils import to_datetime
-from base import PRICING_DEFAULT
-
-
-PRICING_PRICECAP = "usd40"
+from base import PRICING_DEFAULT, PRICING_ENHANCED
 
 
 def test_counter_version(app):
@@ -437,10 +434,21 @@ def test_pricing_scenario(app):
         assert list(counter_df.pricing_scenario.unique()) == [PRICING_DEFAULT]
         default_sum = counter_df.value_eur.sum()
 
-        # params = {"pricing_scenario": PRICING_PRICECAP}
-        # response = test_client.get("/v0/counter?" + urllib.parse.urlencode(params))
-        # assert response.status_code == 200
-        # data = response.json["data"]
-        # counter_df = pd.DataFrame(data)
-        # assert list(counter_df.pricing_scenario.unique()) == [PRICING_PRICECAP]
-        # default_sum = counter_df.value_eur.sum()
+        params = {"pricing_scenario": ",".join([PRICING_DEFAULT, PRICING_ENHANCED])}
+        response = test_client.get("/v0/counter?" + urllib.parse.urlencode(params))
+        assert response.status_code == 200
+        data = response.json["data"]
+        counter_df = pd.DataFrame(data)
+        assert set(counter_df.pricing_scenario.unique()) == set([PRICING_DEFAULT, PRICING_ENHANCED])
+
+        scenario_values = counter_df.groupby(["pricing_scenario"]).sum()
+        identical_values = ["value_tonne", "value_m3"]
+        different_values = ["value_eur"]
+        assert all(
+            scenario_values.loc[PRICING_ENHANCED][identical_values]
+            == scenario_values.loc[PRICING_DEFAULT][identical_values]
+        )
+        assert all(
+            scenario_values.loc[PRICING_ENHANCED][different_values]
+            != scenario_values.loc[PRICING_DEFAULT][different_values]
+        )
