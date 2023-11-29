@@ -97,6 +97,7 @@ IMO_BASE_URL = "https://gisis.imo.org/public/ships/default.aspx"
 
 # PRICING SCENARIO
 PRICING_DEFAULT = "default"
+PRICING_ENHANCED = "enhanced"  # Enhanced price cap
 
 # INSURER
 UNKNOWN_INSURER = "unknown"

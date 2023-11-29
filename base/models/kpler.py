@@ -162,9 +162,9 @@ class KplerTradeComputed(Base):
     )
     flow_id = Column(ForeignKey(DB_TABLE_KPLER_TRADE + ".flow_id"), primary_key=True)
     product_id = Column(ForeignKey(DB_TABLE_KPLER_TRADE + ".product_id"), primary_key=True)
+    pricing_scenario = Column(String, primary_key=True)
 
     eur_per_tonne = Column(Numeric)
-    pricing_scenario = Column(String)
     pricing_commodity = Column(ForeignKey(DB_TABLE_COMMODITY + ".id"))
     kpler_product_commodity_id = Column(ForeignKey(DB_TABLE_COMMODITY + ".id"))
     ship_insurer_names = Column(ARRAY(String))

@@ -8,7 +8,7 @@ from base.models import Counter, Port, Country, Berth, Commodity
 from base.models import DB_TABLE_COUNTER
 from base.utils import to_datetime
 from base.logger import logger_slack
-from base import PRICING_DEFAULT
+from base import PRICING_DEFAULT, PRICING_ENHANCED
 from base.db_utils import upsert
 
 try:
@@ -46,7 +46,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
         ],
         "nest_in_data": False,
         "currency": "EUR",
-        "pricing_scenario": None,
+        "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
         "bypass_maintenance": True,
     }
     pipelineflows_resp = PipelineFlowResource().get_from_params(params=params_pipelineflows)
@@ -73,7 +73,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
             "nest_in_data": False,
             "currency": "EUR",
             "status": "completed",
-            "pricing_scenario": None,
+            "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
             "bypass_maintenance": True,
         }
         voyages_resp = VoyageResource().get_from_params(params=params_voyage)
@@ -102,7 +102,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
             "nest_in_data": False,
             "currency": "EUR",
             "status": "completed",
-            "pricing_scenario": None,
+            "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
             "bypass_maintenance": True,
             "commodity": [base.LPG],
         }
@@ -131,7 +131,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
             ],
             "nest_in_data": False,
             "currency": "EUR",
-            "pricing_scenario": None,
+            "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
             "bypass_maintenance": True,
         }
         kpler_flows_resp = KplerFlowResource().get_from_params(params=params_kpler_flows)
@@ -168,7 +168,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
             "nest_in_data": False,
             "currency": "EUR",
             "status": "completed",
-            "pricing_scenario": None,
+            "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
             "bypass_maintenance": True,
             "commodity": [base.LPG],
         }
@@ -195,7 +195,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
             ],
             "nest_in_data": False,
             "currency": "EUR",
-            "pricing_scenario": None,
+            "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
             "bypass_maintenance": True,
         }
         kpler_trades_resp = KplerTradeResource().get_from_params(params=params_kpler_trades)
