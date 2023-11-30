@@ -29,16 +29,14 @@ def update():
     counter.update(version=base.COUNTER_VERSION2)
     integrity.check()
 
-    flaring.update()
-
     return
 
 
 if __name__ == "__main__":
-    logger_slack.info("=== Lite update: using %s environment ===" % (base.db.environment,))
+    logger_slack.info("=== Kpler computed only: using %s environment ===" % (base.db.environment,))
     try:
         update()
-        logger_slack.info("=== Lite update complete ===")
+        logger_slack.info("=== Kpler computed only update complete ===")
     except BaseException as e:
-        logger_slack.error("=== Lite update failed", stack_info=True, exc_info=True)
+        logger_slack.error("=== Kpler computed only update failed", stack_info=True, exc_info=True)
         raise e

@@ -19,6 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy import func
 from sqlalchemy import nullslast
 
+from sqlalchemy.sql.expression import delete, insert
 
 import base
 from base.db import session, engine
@@ -50,7 +51,7 @@ def integer_array(values):
     return cast(array(values), ARRAY(Integer))
 
 
-def fetch_data(date_from: None, date_to: None):
+def build_select(date_from: None, date_to: None):
     origin_zone = aliased(KplerZone)
     destination_zone = aliased(KplerZone)
     CommodityEquivalent = aliased(Commodity)
@@ -90,15 +91,7 @@ def fetch_data(date_from: None, date_to: None):
     )
 
     # Commodity used for pricing
-    commodity_id_field = "kpler_" + sa.func.replace(
-        sa.func.replace(
-            sa.func.lower(func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)),
-            " ",
-            "_",
-        ),
-        "/",
-        "_",
-    )
+    commodity_id_field = build_commodity_id_field()
 
     pricing_commodity_id_field = case(
         [
@@ -514,14 +507,13 @@ def fetch_data(date_from: None, date_to: None):
                 func.date_trunc("day", KplerTrade.departure_date_utc) >= date_from,
                 func.date_trunc("day", KplerTrade.departure_date_utc) <= date_to,
                 KplerTrade.is_valid == True,
+                Price.scenario != None,
             )
         )
         .order_by(KplerTrade.id, KplerTrade.flow_id, KplerTrade.product_id, Price.scenario)
     )
 
-    results = query.all()
-
-    return pd.DataFrame(results)
+    return query.selectable
 
 
 def build_pagination_periods(earliest_date=None, more_data_date=None):
@@ -560,19 +552,39 @@ def update():
             earliest_date=earliest_date, more_data_date=more_data_date
         )
 
-        to_insert = pd.DataFrame()
+        with session.begin_nested():
+            session.execute(delete(KplerTradeComputed))
+            for start, end in tqdm(periods, unit="period"):
+                session.execute(
+                    insert(KplerTradeComputed).from_select(
+                        [
+                            "trade_id",
+                            "flow_id",
+                            "product_id",
+                            "kpler_product_commodity_id",
+                            "pricing_scenario",
+                            "pricing_commodity",
+                            "eur_per_tonne",
+                            "ship_insurer_names",
+                            "ship_insurer_iso2s",
+                            "ship_insurer_regions",
+                            "ship_owner_names",
+                            "ship_owner_iso2s",
+                            "ship_owner_regions",
+                            "ownership_sanction_coverage",
+                            "step_zone_names",
+                            "step_zone_iso2s",
+                            "step_zone_regions",
+                            "step_zone_ids",
+                        ],
+                        build_select(date_from=start, date_to=end),
+                    )
+                )
 
-        for start, end in tqdm(periods, unit="period"):
-            to_insert = pd.concat([to_insert, fetch_data(date_from=start, date_to=end)])
+            check_invalid_trade_computed()
 
-        logger.info(f"Inserting {len(to_insert)} rows into computed table")
-
-        to_insert = get_valid_trade_computed(to_insert, throw_error_if_not_valid=True)
-
-        KplerTradeComputed.query.delete()
         session.commit()
-        to_insert.to_sql(DB_TABLE_KPLER_TRADE_COMPUTED, con=engine, if_exists="append", index=False)
-        session.commit()
+
     except Exception as e:
         logger_slack.error(
             f"Updating kpler computed table failed",
@@ -582,12 +594,10 @@ def update():
         raise e
 
 
-def get_valid_trade_computed(to_insert, throw_error_if_not_valid=True):
+def check_invalid_trade_computed():
     """
     Inspect the computed trades that have no associated pricing
     and confirm that this is expected. Throw an error if not
-    :param to_insert:
-    :return:
     """
     ignorable_commodities = [
         "kpler_clean_condensate",
@@ -597,33 +607,54 @@ def get_valid_trade_computed(to_insert, throw_error_if_not_valid=True):
         "kpler_pitch",
         "kpler_specialities",
         "kpler_cutter_stock",
+        "kpler_resids",
+        "kpler_blendings",
     ]
     # Not all commodities have old pricing
     date_from = dt.datetime(2015, 1, 1)
 
-    missing = to_insert[to_insert.pricing_scenario.isnull()]
+    # Commodity used for pricing
+    commodity_id_field = build_commodity_id_field()
+
     missing_trades = pd.DataFrame(
         session.query(
             KplerTrade.departure_date_utc,
             KplerTrade.id.label("trade_id"),
             KplerTrade.product_id,
-            KplerProduct.commodity_name,
+            commodity_id_field.label("kpler_product_commodity_id"),
         )
         .join(KplerProduct, KplerTrade.product_id == KplerProduct.id)
-        .filter(KplerTrade.id.in_(missing.trade_id.unique()))
+        .outerjoin(
+            KplerTradeComputed,
+            (KplerTrade.id == KplerTradeComputed.trade_id)
+            & (KplerTrade.product_id == KplerTradeComputed.product_id)
+            & (KplerTrade.flow_id == KplerTradeComputed.flow_id),
+        )
+        .filter(
+            sa.and_(
+                KplerTradeComputed.trade_id == None,
+                KplerTrade.is_valid == True,
+                KplerTrade.product_id != None,
+                commodity_id_field != None,
+                commodity_id_field.notin_(ignorable_commodities),
+                KplerTrade.departure_date_utc >= date_from,
+            )
+        )
         .all()
     )
-    missing_detailed = missing.merge(missing_trades, on=["trade_id", "product_id"])
 
-    ok = (
-        missing_detailed.kpler_product_commodity_id.isnull()
-        | missing_detailed.kpler_product_commodity_id.isin(ignorable_commodities)
-        | (pd.to_datetime(missing_detailed.departure_date_utc) < date_from)
-    )
-
-    if any(~ok) and throw_error_if_not_valid:
+    if any(missing_trades):
         logger_slack.error(f"Computed trades without pricing found")
-        raise Exception(f"Computed trades without pricing found: {missing_detailed[~ok]}")
+        raise Exception(f"Computed trades without pricing found:\n{missing_trades}")
 
-    valid = to_insert[to_insert.pricing_scenario.notnull()]
-    return valid
+
+def build_commodity_id_field():
+    return "kpler_" + sa.func.replace(
+        sa.func.replace(
+            sa.func.lower(func.coalesce(KplerProduct.commodity_name, KplerProduct.group_name)),
+            " ",
+            "_",
+        ),
+        "/",
+        "_",
+    )
