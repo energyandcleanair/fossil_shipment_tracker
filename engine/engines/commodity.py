@@ -68,6 +68,7 @@ def fill_kpler_commodities(commodities_df):
             "Gasoline/Naphtha",
             "Fuel Oils",
             "Coal",
+            "Blendings",
         ]
         for group in groups_to_add:
             new = kpler_products[kpler_products.group == group].head(1).copy()
