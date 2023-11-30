@@ -120,6 +120,8 @@ class KplerScraper:
         file = f"{CACHE_BASE_DIR}/{platform}_zones.csv"
 
         if not os.path.exists(file):
+            if not os.path.exists(CACHE_BASE_DIR):
+                os.makedirs(CACHE_BASE_DIR)
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
             url = {
                 "dry": "https://dry.kpler.com/api/zones",
