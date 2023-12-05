@@ -4,7 +4,7 @@ from engines import (
     destination,
     berth,
     currency,
-    rscript,
+    rscript as pricing,
     counter,
     entsog,
     flaring,
@@ -23,6 +23,9 @@ import set_rlimit as _
 
 def update():
     currency.update()
+
+    pricing.update()
+
     kpler_scraper.update_lite()
     kpler_trade_computed.update()
 
@@ -31,7 +34,7 @@ def update():
     berth.update()
 
     entsog.update(date_from=-21, nodata_error_date_from=-4)
-    rscript.update()
+
     trajectory.update()
 
     counter.update()
