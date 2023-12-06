@@ -60,7 +60,13 @@ class IntegrityStep(Enum):
     PRICING = IntegrityCheckDefinition(
         "pricing positive", lambda: test_counter.test_pricing_gt0(app)
     )
-    INSURER = IntegrityCheckDefinition("pricing positive", test_insurer)
+    INSURER_UNKNOWNS = IntegrityCheckDefinition(
+        "insurer no unexpected unknowns", test_insurers_no_unexpected_unknown
+    )
+    INSURER_FIRST_DATE_NOT_NULL = IntegrityCheckDefinition(
+        "insurer first date not null", test_insurers_no_null_date_from
+    )
+
     KPLER_TRADE_CRUDE = IntegrityCheckDefinition(
         "Kpler trade crude",
         lambda: test_kpler_trades(

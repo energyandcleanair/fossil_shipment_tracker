@@ -133,7 +133,7 @@ def test_portcall_relationship():
     )
 
 
-def test_insurer():
+def test_insurers_no_unexpected_unknown():
     """ " If scraping fails and our code doesn't detect it, it adds a false 'unknown'.
     We try to detect these by detecting patterns where an insurer was known, then unknown,
     and at a later date, then found again.
@@ -171,15 +171,20 @@ def test_insurer():
     """
 
     result = session.execute(raw_sql)
-    if result.rowcount > 0:
-        missing_types = [row[0] for row in result]
-        count = pd.Series(missing_types).value_counts()
-        logger_slack.error(
-            "There are ships marked with Unknown insurers that most likely shouldn't be:\n%s."
-            % count.to_string()
-        )
-        logger_slack.info(f"Unknown insurers query:\n {raw_sql}")
 
+    unexpected_unknown = result.rowcount > 0
+
+    assert not unexpected_unknown, build_insurers_unknown_error_info(result, raw_sql)
+
+
+def build_insurers_unknown_error_info(result, query):
+    missing_types = [row[0] for row in result]
+    count = pd.Series(missing_types).value_counts()
+    count_table = count.to_string()
+    return f"There are ships marked with Unknown insurers that shouldn't be:\n{count_table}\n\nUsing query:\n{query}"
+
+
+def test_insurers_no_null_date_from():
     # Test that those will only one insurer have a null date_from
     raw_sql = """
         WITH count as (select ship_imo, min(date_from_equasis), count(*) from ship_insurer group by 1)
@@ -187,13 +192,10 @@ def test_insurer():
         """
 
     wrong_date_from = session.execute(raw_sql)
-    # Count how many rows there are
-    if wrong_date_from.rowcount > 0:
-        logger_slack.error(
-            "There are insurers with date_from_equasis = NULL even though these are the only ones identified: %s"
-            % ", ".join([row[0] for row in wrong_date_from])
-        )
-    assert wrong_date_from.rowcount == 0
+
+    assert (
+        wrong_date_from.rowcount == 0
+    ), f"There are insurers with date_from_equasis = NULL even though these are the only ones identified: {', '.join([row[0] for row in wrong_date_from])}"
 
 
 def test_trade_platform():
