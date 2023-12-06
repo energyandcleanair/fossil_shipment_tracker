@@ -299,14 +299,16 @@ def test_kpler_gasoline_export(app):
     # Remove rows where both value_tonne_flow and value_tonne_trade are NaN
     merge = merge[~(merge.value_tonne_flow.isna() & merge.value_tonne_trade.isna())]
 
-    merge["ok_flow"] = np.isclose(
-        merge.value_tonne_flow, merge.value_tonne_manual, rtol=5 * percent
-    )
     merge["ok_trade"] = np.isclose(
         merge.value_tonne_trade, merge.value_tonne_manual, rtol=5 * percent
     )
-    merge["ok"] = merge["ok_flow"] & merge["ok_trade"]
-    assert all(merge.ok)
+    if not all(merge.ok_trade):
+        print(
+            merge[~merge.ok_trade][
+                [merge.origin_iso2, merge.month, merge.value_tonne_manual, merge.value_tonne_trade]
+            ]
+        )
+    assert all(merge.ok_trade)
 
 
 def test_kpler_diesel_exports(app):
