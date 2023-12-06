@@ -359,17 +359,23 @@ def test_counter_sorting(app):
 def test_counter_against_voyage(app):
     with app.test_client() as test_client:
         response = test_client.get("/v0/counter?version=v0")
-        assert response.status_code == 200
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 response from counter v0 but got {response.status_code}"
         data = response.json["data"]
         counter_df = pd.DataFrame(data).sort_values(["date"], ascending=False)
 
         response = test_client.get("/v0/overland")
-        assert response.status_code == 200
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 response from overland but got {response.status_code}"
         data = response.json["data"]
         pipeline_df = pd.DataFrame(data).sort_values(["date"], ascending=False)
 
         response = test_client.get("/v0/voyage")
-        assert response.status_code == 200
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 response from voyage but got {response.status_code}"
         data = response.json["data"]
         voyage_df = pd.DataFrame(data)
 
