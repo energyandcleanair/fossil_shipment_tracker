@@ -97,7 +97,6 @@ def update_flows(
     from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     # add_total_installation=True,
-    use_brute_force=True,
     add_unknown=True,
     add_unknown_only=False,
 ):
@@ -149,7 +148,6 @@ def update_flows(
                                     to_zone=to_zone,
                                     to_split=to_split,
                                     split=FlowsSplit.Grades,
-                                    use_brute_force=use_brute_force,
                                 )
                                 if df is not None:
                                     df_zones.append(df)
@@ -168,7 +166,6 @@ def update_flows(
                                     to_zone=None,
                                     to_split=to_split,
                                     split=FlowsSplit.Grades,
-                                    use_brute_force=use_brute_force,
                                 )
 
                                 if len(df_zones) == 0:
@@ -214,7 +211,6 @@ def update_flows_reverse(
     from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     # add_total_installation=True,
-    use_brute_force=True,
     add_unknown=True,
     add_unknown_only=False,
 ):
@@ -260,7 +256,6 @@ def update_flows_reverse(
                                 to_zone=to_zone,
                                 to_split=to_split,
                                 split=FlowsSplit.Products,
-                                use_brute_force=use_brute_force,
                             )
                             if df is not None:
                                 df_zones.append(df)
@@ -280,7 +275,6 @@ def update_flows_reverse(
                                 to_zone=to_zone,
                                 to_split=to_split,
                                 split=FlowsSplit.Products,
-                                use_brute_force=use_brute_force,
                             )
 
                             known_zones = pd.concat(df_zones)

@@ -133,7 +133,6 @@ def test_get_flow_cn():
         "date_to": to_datetime("2022-03-24"),
         "split": FlowsSplit.DestinationCountries,
         "unit": FlowsMeasurementUnit.T,
-        "use_brute_force": True,
     }
 
     scraper = KplerFlowScraper()
@@ -166,7 +165,6 @@ def test_get_flow_sg_cn():
         "date_to": to_datetime("2019-08-31"),
         "split": FlowsSplit.Products,
         "unit": FlowsMeasurementUnit.T,
-        "use_brute_force": True,
     }
 
     scraper = KplerScraper()
@@ -198,7 +196,6 @@ def test_get_flow_sg_cn():
         "date_to": to_datetime("2016-06-10"),
         "split": FlowsSplit.Products,
         "unit": FlowsMeasurementUnit.T,
-        "use_brute_force": True,
     }
 
     scraper = KplerScraper()

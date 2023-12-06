@@ -57,7 +57,6 @@ def update(
     origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG"],
     from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
-    use_brute_force=True,
     add_unknown=True,
     add_unknown_only=False,
     parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
@@ -73,7 +72,6 @@ def update(
                 origin_iso2s=origin_iso2s,
                 from_splits=from_splits,
                 to_splits=to_splits,
-                use_brute_force=use_brute_force,
                 add_unknown=add_unknown,
                 add_unknown_only=add_unknown_only,
             )

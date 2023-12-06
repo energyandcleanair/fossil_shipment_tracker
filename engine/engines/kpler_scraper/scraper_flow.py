@@ -183,7 +183,6 @@ class KplerFlowScraper(KplerScraper):
         unit=FlowsMeasurementUnit.T,
         date_from=dt.datetime.now() - dt.timedelta(days=365),
         date_to=dt.datetime.now(),
-        use_brute_force=True,
     ):
         if from_zone is None and origin_iso2 is not None:
             if from_split == FlowsSplit.OriginCountries:
@@ -197,7 +196,7 @@ class KplerFlowScraper(KplerScraper):
             else:
                 raise ValueError("Wrong to_zone indication")
 
-        args_info = f"product: {product}, split: {split}, granularity: {granularity}, unit: {unit}, date_from: {date_from}, date_to: {date_to}, use_brute_force: {use_brute_force}"
+        args_info = f"product: {product}, split: {split}, granularity: {granularity}, unit: {unit}, date_from: {date_from}, date_to: {date_to}"
 
         logger.info(
             f"Getting flows for {platform}: {from_zone}({from_split})->{to_zone}({to_split}) ({args_info})"
@@ -214,10 +213,7 @@ class KplerFlowScraper(KplerScraper):
             "date_to": date_to or dt.datetime.now(),
         }
 
-        if use_brute_force:
-            df = self.get_flows_raw_brute(platform=platform, **params, include_total=False)
-        else:
-            df = self.get_flows_raw(platform=platform, **params)
+        df = self.get_flows_raw_brute(platform=platform, **params, include_total=False)
         if df is None:
             return None
 
