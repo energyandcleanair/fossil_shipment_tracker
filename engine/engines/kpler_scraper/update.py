@@ -60,7 +60,7 @@ def update(
     use_brute_force=True,
     add_unknown=True,
     add_unknown_only=False,
-    parts=[UpdateParts.FLOWS, UpdateParts.TRADES, UpdateParts.VALIDATE],
+    parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
 ):
     logger_slack.info("=== Updating Kpler ===")
     try:
