@@ -6,7 +6,7 @@ import requests
 from base.logger import logger_slack, slacker, notify_engineers
 
 
-def update():
+def update(rebuild_prices=False):
     logger_slack.info("=== RScript update ===")
     payload = {
         "command": "run_script",
@@ -18,7 +18,7 @@ def update():
                 # To ensure latest version is being used
                 "if('russiacounter' %in% (.packages())){detach('package:russiacounter', unload=T)}",
                 "library(russiacounter)",
-                "russiacounter::update_counter()",
+                f"russiacounter::update_counter(rebuild_prices={'T' if rebuild_prices else 'F'})",
             ]
         },
         "environment_variables": [
