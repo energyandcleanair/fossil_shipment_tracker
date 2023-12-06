@@ -34,6 +34,7 @@ from base.models import (
     Commodity,
     KplerTrade,
     KplerTradeComputed,
+    KplerInstallation,
     KplerZone,
     Company,
     ShipInsurer,
@@ -258,6 +259,22 @@ class KplerTradeResource(TemplateResource):
         action="split",
         default=None,
         help="filters where destination_installation_id is any of the provided",
+    )
+
+    parser.add_argument(
+        "origin_zone_ids",
+        type=int,
+        action="split",
+        default=None,
+        help="filters where origin_zone_id is any of the provided",
+    )
+
+    parser.add_argument(
+        "destination_zone_ids",
+        type=int,
+        action="split",
+        default=None,
+        help="filters where destination_zone_id is any of the provided",
     )
 
     parser.add_argument(
@@ -508,6 +525,8 @@ class KplerTradeResource(TemplateResource):
         DestinationCountry = aliased(Country)
         CommodityOriginCountry = aliased(Country)
         CommodityDestinationCountry = aliased(Country)
+        OriginInstallation = aliased(KplerInstallation)
+        DestinationInstallation = aliased(KplerInstallation)
 
         price_date = func.date_trunc("day", KplerTrade.departure_date_utc)
 
@@ -565,6 +584,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.departure_date_utc.label("origin_date_utc"),
                 KplerTrade.departure_installation_id.label("origin_installation_id"),
                 KplerTrade.departure_installation_name.label("origin_installation_name"),
+                OriginInstallation.type.label("origin_installation_type"),
                 KplerTrade.departure_zone_id.label("origin_zone_id"),
                 origin_zone.name.label("origin_zone_name"),
                 origin_zone.name.label("origin_zone_type"),
@@ -579,6 +599,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.arrival_date_utc.label("destination_date_utc"),
                 KplerTrade.arrival_installation_id.label("destination_installation_id"),
                 KplerTrade.arrival_installation_name.label("destination_installation_name"),
+                DestinationInstallation.type.label("destination_installation_type"),
                 destination_zone.id.label("destination_zone_id"),
                 destination_zone.name.label("destination_zone_name"),
                 destination_zone.name.label("destination_zone_type"),
@@ -655,6 +676,13 @@ class KplerTradeResource(TemplateResource):
             .join(Commodity, KplerTradeComputed.kpler_product_commodity_id == Commodity.id)
             .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
             .outerjoin(Currency, Currency.date == price_date)
+            .outerjoin(
+                OriginInstallation, OriginInstallation.id == KplerTrade.departure_installation_id
+            )
+            .outerjoin(
+                DestinationInstallation,
+                DestinationInstallation.id == KplerTrade.arrival_installation_id,
+            )
             .order_by(
                 KplerTrade.id,
                 KplerTrade.flow_id,
@@ -703,6 +731,9 @@ class KplerTradeResource(TemplateResource):
 
         origin_installation_ids = params.get("origin_installation_ids")
         destination_installation_ids = params.get("destination_installation_ids")
+
+        origin_zone_ids = params.get("origin_zone_ids")
+        destination_zone_ids = params.get("destination_zone_ids")
 
         if trade_ids:
             query = query.filter(KplerTrade.id.in_(to_list(trade_ids)))
@@ -763,6 +794,12 @@ class KplerTradeResource(TemplateResource):
             query = query.filter(
                 KplerTrade.arrival_installation_id.in_(to_list(destination_installation_ids))
             )
+
+        if origin_zone_ids:
+            query = query.filter(KplerTrade.departure_zone_id.in_(to_list(origin_zone_ids)))
+
+        if destination_zone_ids:
+            query = query.filter(KplerTrade.arrival_zone_id.in_(to_list(destination_zone_ids)))
 
         subquery = query.subquery()
         query = session.query(subquery)
