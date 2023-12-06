@@ -29,7 +29,7 @@ def get_upsert_method(constraint_name, show_progress=True):
         data_list = list(data_iter)
         global meta
         if show_progress:
-            data_iterator = tqdm(data_list, unit="rows", leave=False)
+            data_iterator = tqdm(data_list, unit=f"rows({table})", leave=False)
         else:
             data_iterator = data_list
 
