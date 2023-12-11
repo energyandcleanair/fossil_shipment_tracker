@@ -293,6 +293,20 @@ class KplerTradeResource(TemplateResource):
         default=False,
     )
 
+    parser.add_argument(
+        "sts_region",
+        type=str,
+        help="Filters where trade involves STS in region at origin, during transit, or at destination",
+        required=False,
+    )
+
+    parser.add_argument(
+        "sts_iso2",
+        type=str,
+        help="Filters where trade involves STS in country at origin, during transit, or at destination",
+        required=False,
+    )
+
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date", "origin_date", "destination_date"]
     value_cols = ["value_tonne", "value_m3", "value_gas_m3", "value_eur", "value_currency"]
@@ -735,6 +749,9 @@ class KplerTradeResource(TemplateResource):
         origin_zone_ids = params.get("origin_zone_ids")
         destination_zone_ids = params.get("destination_zone_ids")
 
+        sts_region = params.get("sts_region")
+        sts_iso2 = params.get("sts_iso2")
+
         if trade_ids:
             query = query.filter(KplerTrade.id.in_(to_list(trade_ids)))
 
@@ -855,5 +872,21 @@ class KplerTradeResource(TemplateResource):
 
         if only_sts:
             query = query.filter(subquery.c.is_sts == True)
+
+        if sts_region:
+            query = query.filter(
+                (
+                    (subquery.c.destination_region == sts_region)
+                    & (subquery.c.destination_sts == True)
+                )
+                | ((subquery.c.origin_region == sts_region) & (subquery.c.origin_sts == True))
+                | subquery.c.step_zone_regions.any(sts_region)
+            )
+        if sts_iso2:
+            query = query.filter(
+                ((subquery.c.destination_iso2 == sts_iso2) & (subquery.c.destination_sts == True))
+                | ((subquery.c.origin_iso2 == sts_iso2) & (subquery.c.origin_sts == True))
+                | subquery.c.step_zone_iso2s.any(sts_iso2)
+            )
 
         return query
