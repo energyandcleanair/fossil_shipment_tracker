@@ -20,7 +20,12 @@ from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, to_datetime
 from base.logger import logger
-from base import PRICING_DEFAULT
+from base import (
+    PRICING_DEFAULT,
+    COMMODITY_GROUPING_DEFAULT,
+    COMMODITY_GROUPING_CHOICES,
+    COMMODITY_GROUPING_HELP,
+)
 from .commodity import get_subquery as get_commodity_subquery
 
 
@@ -102,8 +107,9 @@ class EntsogFlowResource(Resource):
     parser.add_argument(
         "commodity_grouping",
         type=str,
-        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
-        default="default",
+        help=COMMODITY_GROUPING_HELP,
+        default=COMMODITY_GROUPING_DEFAULT,
+        choices=COMMODITY_GROUPING_CHOICES,
     )
     parser.add_argument(
         "pricing_scenario",

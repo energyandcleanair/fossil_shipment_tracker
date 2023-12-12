@@ -13,7 +13,12 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import case
 
 import base
-from base import PRICING_DEFAULT
+from base import (
+    PRICING_DEFAULT,
+    COMMODITY_GROUPING_HELP,
+    COMMODITY_GROUPING_DEFAULT,
+    COMMODITY_GROUPING_CHOICES,
+)
 from . import routes_api
 from .endpoint_cache import EndpointCacher
 from base.encoder import JsonEncoder
@@ -75,8 +80,9 @@ class RussiaCounterLastResource(Resource):
     parser.add_argument(
         "commodity_grouping",
         type=str,
-        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
-        default="default",
+        help=COMMODITY_GROUPING_HELP,
+        default=COMMODITY_GROUPING_DEFAULT,
+        choices=COMMODITY_GROUPING_CHOICES,
     )
     parser.add_argument(
         "pricing_scenario",

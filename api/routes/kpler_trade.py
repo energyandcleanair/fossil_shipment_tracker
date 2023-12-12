@@ -279,7 +279,7 @@ class KplerTradeResource(TemplateResource):
 
     parser.add_argument(
         "map_unconfirmed_region_eu_to_unknown",
-        type=bool,
+        type=inputs.boolean,
         help="Maps destination region to unknown if the destination of the EU is not likely.",
         required=False,
         default=False,
@@ -287,7 +287,7 @@ class KplerTradeResource(TemplateResource):
 
     parser.add_argument(
         "only_sts",
-        type=bool,
+        type=inputs.boolean,
         help="Filters where trade involves STS at origin, during transit, or at destination",
         required=False,
         default=False,

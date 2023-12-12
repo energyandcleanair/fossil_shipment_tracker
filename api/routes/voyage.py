@@ -49,7 +49,12 @@ from base.db import session
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime, to_bool
 from base.logger import logger
-from base import PRICING_DEFAULT
+from base import (
+    PRICING_DEFAULT,
+    COMMODITY_GROUPING_DEFAULT,
+    COMMODITY_GROUPING_CHOICES,
+    COMMODITY_GROUPING_HELP,
+)
 from base.utils import update_geometry_from_wkb, read_json
 from base.env import get_env
 import base
@@ -278,8 +283,9 @@ class VoyageResource(Resource):
     parser.add_argument(
         "commodity_grouping",
         type=str,
-        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
-        default="default",
+        help=COMMODITY_GROUPING_HELP,
+        default=COMMODITY_GROUPING_DEFAULT,
+        choices=COMMODITY_GROUPING_CHOICES,
     )
     parser.add_argument(
         "currency",
@@ -435,7 +441,7 @@ class VoyageResource(Resource):
 
     parser.add_argument(
         "map_unconfirmed_region_eu_to_unknown",
-        type=bool,
+        type=inputs.boolean,
         help="Maps destination region to unknown if the destination of the EU is not likely.",
         required=False,
         default=False,

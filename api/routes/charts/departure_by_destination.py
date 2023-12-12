@@ -10,7 +10,12 @@ from flask_restx import Resource, reqparse
 
 
 import base
-from base import CHARTS_USE_KPLER_DEFAULT
+from base import (
+    CHARTS_USE_KPLER_DEFAULT,
+    COMMODITY_GROUPING_DEFAULT,
+    COMMODITY_GROUPING_CHOICES,
+    COMMODITY_GROUPING_HELP,
+)
 from base.encoder import JsonEncoder
 from base.utils import to_list
 from .. import postcompute
@@ -58,8 +63,9 @@ class ChartDepartureDestination(Resource):
     parser.add_argument(
         "commodity_grouping",
         type=str,
-        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
-        default="split_gas_oil",
+        help=COMMODITY_GROUPING_HELP,
+        default=COMMODITY_GROUPING_DEFAULT,
+        choices=COMMODITY_GROUPING_CHOICES,
     )
 
     parser.add_argument(
@@ -128,7 +134,10 @@ class ChartDepartureDestination(Resource):
     )
 
     parser.add_argument(
-        "use_kpler", help="Whether to use Kpler or MT", type=bool, default=CHARTS_USE_KPLER_DEFAULT
+        "use_kpler",
+        help="Whether to use Kpler or MT",
+        type=inputs.boolean,
+        default=CHARTS_USE_KPLER_DEFAULT,
     )
 
     @routes_api.expect(parser)

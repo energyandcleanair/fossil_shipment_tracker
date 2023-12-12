@@ -12,7 +12,13 @@ from sqlalchemy import case
 from operator import attrgetter
 
 from . import routes_api, postcompute
-from base import PRICING_DEFAULT, COUNTER_VERSION_DEFAULT
+from base import (
+    PRICING_DEFAULT,
+    COUNTER_VERSION_DEFAULT,
+    COMMODITY_GROUPING_DEFAULT,
+    COMMODITY_GROUPING_CHOICES,
+    COMMODITY_GROUPING_HELP,
+)
 from base.logger import logger
 from base.db import session
 from base.models import Counter, Country, Currency, PriceScenario
@@ -156,8 +162,9 @@ class RussiaCounterResource(Resource):
     parser.add_argument(
         "commodity_grouping",
         type=str,
-        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
-        default="default",
+        help=COMMODITY_GROUPING_HELP,
+        default=COMMODITY_GROUPING_DEFAULT,
+        choices=COMMODITY_GROUPING_CHOICES,
     )
     parser.add_argument(
         "currency",

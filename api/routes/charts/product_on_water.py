@@ -9,6 +9,9 @@ from flask_restx import Resource, reqparse
 import base
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
+
+from base import COMMODITY_GROUPING_DEFAULT, COMMODITY_GROUPING_CHOICES, COMMODITY_GROUPING_HELP
+
 from .voyage_data_proxy import get_voyages
 from .. import routes_api, ns_charts
 from ..voyage import VoyageResource
@@ -37,8 +40,9 @@ class ChartProductOnWater(Resource):
     parser.add_argument(
         "commodity_grouping",
         type=str,
-        help="Grouping used (e.g. coal,oil,gas ('default') vs coal,oil,lng,pipeline_gas ('split_gas')",
-        default=None,
+        help=COMMODITY_GROUPING_HELP,
+        default=COMMODITY_GROUPING_DEFAULT,
+        choices=COMMODITY_GROUPING_CHOICES,
     )
 
     parser.add_argument(
@@ -107,7 +111,7 @@ class ChartProductOnWater(Resource):
     parser.add_argument(
         "use_kpler",
         help="Whether to use Kpler or MT",
-        type=bool,
+        type=inputs.boolean,
         default=base.CHARTS_USE_KPLER_DEFAULT,
     )
 

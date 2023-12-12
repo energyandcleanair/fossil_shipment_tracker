@@ -89,7 +89,9 @@ ENTSOG_TRANSMISSION_EXIT = "transmission_exit"
 ENTSOG_TRADING = "trading"
 
 # COMMODITY GROUPING
+COMMODITY_GROUPING_HELP = "Grouping to use (default=coal,oil,gas; split_gas=coal,oil,lng,pipeline_gas; split_gas_oil=coal,crude_oil,oil_products,lng,pipeline_gas)"
 COMMODITY_GROUPING_DEFAULT = "default"
+COMMODITY_GROUPING_CHOICES = ["default", "split_gas", "split_gas_oil"]
 
 # IMO WEBSITE SCRAPING
 IMO_BASE_URL = "https://gisis.imo.org/public/ships/default.aspx"
@@ -141,5 +143,6 @@ EU27_ISO2S = [
     "SI",
     "SK",
 ]
+
 
 CHARTS_USE_KPLER_DEFAULT = True
