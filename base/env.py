@@ -2,17 +2,17 @@
 # depending on the infrastructure (e.g. GCE, GAE, local etc.)
 import os
 from decouple import config
-from google.cloud import secretmanager
+from google.cloud.secretmanager_v1 import SecretManagerServiceClient
 
 
-project_id = config('PROJECT_ID')
+project_id = config("PROJECT_ID")
 
 cred = config("GOOGLE_APPLICATION_CREDENTIALS", None)
 if cred is not None:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cred
 
 try:
-    client = secretmanager.SecretManagerServiceClient()
+    client = SecretManagerServiceClient()
 except Exception:
     client = None
 
@@ -32,15 +32,16 @@ def get_env(key, default=None):
     if client and c is None:
         try:
             from base.logger import logger
+
             logger.info("...Looking for %s in Google Secret" % (key,))
             # Build the resource name of the parent secret.
             parent = client.secret_path(project_id, key)
             versions = client.list_secret_versions(parent)
-            names = [x.name for x in versions if (x.State.Name(x.state) == 'ENABLED')]
+            names = [x.name for x in versions if (x.State.Name(x.state) == "ENABLED")]
 
             if len(names) == 1:
                 response = client.access_secret_version(names[0])
-                g = response.payload.data.decode('UTF-8')
+                g = response.payload.data.decode("UTF-8")
                 logger.info("Found key: %s" % (key,))
 
         except Exception as e:
