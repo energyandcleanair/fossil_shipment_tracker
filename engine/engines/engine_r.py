@@ -3,7 +3,7 @@
 # We use our Python/R capacity in the air pollution containers. Not ideal...
 
 import requests
-from base.logger import logger_slack, slacker, notify_engineers
+from base.logger import logger_slack, logger, slacker, notify_engineers
 
 from google.cloud.run_v2 import JobsClient, RunJobRequest
 
@@ -23,6 +23,7 @@ def update(rebuild_prices=False):
             operation = client.run_job(request=request)
             # Wait for the operation to complete
             result = operation.result()
+            logger.info("Job result: ", result)
             return result.succeeded_count > 0
 
         itry = 0
