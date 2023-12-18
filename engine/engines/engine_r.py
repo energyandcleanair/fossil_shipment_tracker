@@ -31,13 +31,13 @@ def update(rebuild_prices=False):
         success = False
 
         while not success and itry < maxtries:
-            success = run_job(rebuild_prices=rebuild_prices)
+            success = run_job()
 
         if not success:
             logger_slack.error("R script failed")
             notify_engineers("Please check error")
         else:
             logger_slack.info("R script succeeded")
-    except Exception as e:
+    except Exception:
         logger_slack.error("R script failed", stack_info=True, exc_info=True)
         notify_engineers("Please check error")
