@@ -1,4 +1,5 @@
 from engines import (
+    engine_r,
     portcall,
     departure,
     arrival,
@@ -14,7 +15,6 @@ from engines import (
     destination,
     berth,
     entsog,
-    rscript as pricing,
     trajectory,
     flaring,
 )
@@ -30,7 +30,7 @@ import set_rlimit as _
 
 def update():
     currency.update()
-    pricing.update()
+    engine_r.update()
 
     kpler_scraper.update_full()
     kpler_trade_computed.update()

@@ -1,4 +1,5 @@
 from engines import (
+    engine_r,
     portcall,
     departure,
     arrival,
@@ -14,7 +15,6 @@ from engines import (
     destination,
     berth,
     entsog,
-    rscript as pricing,
     trajectory,
     flaring,
 )
@@ -29,7 +29,7 @@ import set_rlimit as _
 
 
 def update():
-    pricing.update(rebuild_prices=True)
+    engine_r.update(rebuild_prices=True)
     return
 
 
