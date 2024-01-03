@@ -172,7 +172,9 @@ class CompanyImoScraper:
                 else:
                     self.service = Service(path)
 
-            self.browser = webdriver.Chrome(service=self.service, options=options)
+            self.browser = webdriver.Chrome(
+                service=self.service, options=options, service_args=["--verbose"]
+            )
         else:
             self.browser = browser
 

@@ -18,6 +18,7 @@ logging.getLogger("google.auth").setLevel(level=logging.WARNING)
 logging.getLogger("urllib3").setLevel(level=logging.WARNING)
 logging.getLogger("botocore").setLevel(level=logging.WARNING)
 logging.getLogger("shapely").setLevel(level=logging.WARNING)
+logging.getLogger("selenium").setLevel(level=logging.DEBUG)
 
 logger = logging.getLogger("FOSSIL_SHIPMENT_TRACKER")
 logger.setLevel(logging.INFO)
