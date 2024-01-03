@@ -1,5 +1,5 @@
 import base
-from base.logger import logger_slack, post_to_data_channel
+from base.logger import logger_slack, post_to_token_channel
 
 from requests import post
 
@@ -13,7 +13,7 @@ from google.cloud.secretmanager_v1.types import AddSecretVersionRequest, SecretP
 
 def update():
     token = get_token()
-    post_to_data_channel(f"New kpler token: \n```\n{token}\n```")
+    post_to_token_channel(f"New kpler token: \n```\n{token}\n```")
     update_token(token)
 
 

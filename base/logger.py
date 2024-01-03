@@ -56,7 +56,7 @@ slacker = WebClient(token=slack_token)
 USERS = ["<@U012ZQ5NU4U>", "<@U05LD5C42G6>"]  # Hubert  # Panda
 NOTIFICATION_STRING = " ".join(USERS)
 CHANNEL = "#log-russia-counter"
-DATA_CHANNEL = "#project-russia-data"
+TOKEN_CHANNEL = "#project-russia-kpler-token"
 
 
 def notify_engineers(msg):
@@ -66,9 +66,9 @@ def notify_engineers(msg):
         logger.warning("Slack logging disabled. Did not notify engineers.")
 
 
-def post_to_data_channel(msg):
+def post_to_token_channel(msg):
     if slack_enabled:
-        slacker.chat_postMessage(channel=DATA_CHANNEL, text=msg)
+        slacker.chat_postMessage(channel=TOKEN_CHANNEL, text=msg)
 
 
 # Adding an error logging in file
