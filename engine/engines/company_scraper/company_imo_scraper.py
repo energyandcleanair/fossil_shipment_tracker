@@ -158,6 +158,8 @@ class CompanyImoScraper:
             options = webdriver.ChromeOptions()
             options.add_argument("ignore-certificate-errors")
             options.add_argument("--no-sandbox")
+            options.add_argument("--disable-gpu")
+            options.add_argument("window-size=1024,768")
             options.add_argument("--disable-dev-shm-usage")
             if headless:
                 options.add_argument("--headless")
