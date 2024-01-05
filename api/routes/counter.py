@@ -427,7 +427,6 @@ class RussiaCounterResource(Resource):
                     "destination_iso2",
                     "destination_country",
                     "destination_region",
-                    "destination_regions",
                     "destination_is_pcc",
                     "currency",
                     "pricing_scenario",
