@@ -15,9 +15,9 @@ spec:
           - image: europe-west1-docker.pkg.dev/fossil-shipment-tracker/tracker/engine
             env:
             - name: EQUASIS_ACCOUNT_RANGE_START
-              value: '720'
-            - name: EQUASIS_ACCOUNT_RANGE_END
               value: '740'
+            - name: EQUASIS_ACCOUNT_RANGE_END
+              value: '780'
             - name: ENVIRONMENT
               value: production
             - name: MAIL_DEFAULT_SENDER
