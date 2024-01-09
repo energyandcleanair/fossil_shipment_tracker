@@ -25,8 +25,6 @@ from base.logger import logger_slack
 
 import datetime as dt
 
-import set_rlimit as _
-
 
 def update():
     currency.update()

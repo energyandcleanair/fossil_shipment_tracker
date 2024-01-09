@@ -18,11 +18,8 @@ from base.logger import logger_slack
 
 import datetime as dt
 
-import set_rlimit as _
-
 
 def update():
-
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)
     counter.update(version=base.COUNTER_VERSION2)

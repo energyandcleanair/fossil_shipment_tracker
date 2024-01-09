@@ -2,8 +2,6 @@ from engines import company, insurance, kpler_trade_computed, counter
 import integrity
 import base
 
-import set_rlimit as _
-
 
 def update():
     company.update()

@@ -3,8 +3,6 @@ from base.logger import logger_slack, post_to_token_channel
 
 from requests import post
 
-import set_rlimit as _
-
 from decouple import config
 
 from google.cloud.secretmanager_v1 import SecretManagerServiceClient
