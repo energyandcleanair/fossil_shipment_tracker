@@ -126,6 +126,9 @@ class Marinetraffic:
     def get_ship(cls, imo=None, mmsi=None, mt_id=None, use_cache=True):
         api_key = get_env("KEY_MARINETRAFFIC_VD02")
 
+        if (imo is None) and (mmsi is None) and (mt_id is None):
+            raise ValueError("Need to specify either imo, mmsi or mt_id")
+
         # First look in cache to save query credits
         if use_cache:
             ship_filter = (
