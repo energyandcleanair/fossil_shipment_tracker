@@ -24,6 +24,8 @@ jobs:
     - name: Build and deploy latest docker image
       id: build-and-deploy-image
       run: 'gcloud builds submit --region=europe-west1 --config cloudbuild-engine.yaml'
-    - name: Deploy latest job spec
+    - name: Deploy latest job specs
       id: deploy-job-spec
-      run: 'gcloud run jobs replace infra/jobs/engine.yaml'
+      run: |
+        gcloud run jobs replace infra/jobs/engine.yaml
+        gcloud run jobs replace infra/jobs/engine-big.yaml

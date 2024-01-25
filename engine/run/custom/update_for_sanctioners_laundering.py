@@ -61,12 +61,15 @@ G7_ISO2S = ["CA", "FR", "DE", "IT", "JP", "GB", "US"]
 
 OTHER_PRICE_CAP_MEMBERS = ["AU"]
 
-ALL_PC_MEMBERS = sorted(
+NON_PCC_APPLYING_SANCTIONS = ["NO", "CH"]
+
+ALL_SANCTIONING_COUNTRIES = sorted(
     list(
         set.union(
             set(EU_ISO2S),
             set(G7_ISO2S),
             set(OTHER_PRICE_CAP_MEMBERS),
+            set(NON_PCC_APPLYING_SANCTIONS),
         )
     )
 )
@@ -117,11 +120,11 @@ def get_crude_oil_exporters(to_importers=None, date_from=None):
     return sorted(list(without_broken_values))
 
 
-def update():
+def update(continue_from=None):
     date_from = to_datetime("2022-12-01")
 
     exporters_of_oil_products = get_oil_products_exporters(
-        to_importers=ALL_PC_MEMBERS, date_from=date_from
+        to_importers=ALL_SANCTIONING_COUNTRIES, date_from=date_from
     )
     crude_exporters_to_oil_products = get_crude_oil_exporters(
         to_importers=exporters_of_oil_products, date_from=date_from
@@ -135,6 +138,9 @@ def update():
             )
         )
     )
+
+    if continue_from is not None:
+        countries_to_update = countries_to_update[countries_to_update.index(continue_from) :]
 
     kpler_scraper.update(
         date_from=date_from,
@@ -151,9 +157,14 @@ def update():
 
 
 if __name__ == "__main__":
+    parser = ArgumentParser()
+    parser.add_argument("--continue-from", type=str, default=None)
+
+    args = parser.parse_args()
+
     logger_slack.info("=== Update for report: using %s environment ===" % (base.db.environment,))
     try:
-        update()
+        update(continue_from=args.continue_from)
         logger_slack.info("=== Update for report complete ===")
     except BaseException as e:
         logger_slack.error("=== Update for report failed", stack_info=True, exc_info=True)
