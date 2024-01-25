@@ -110,7 +110,11 @@ def upload_vessels(vessels):
 
     vessels = vessels.drop_duplicates(subset=["id"])
 
-    fill(vessels.imo.unique())
+    unique_vessels = vessels.imo.unique()
+
+    not_none_unique_vessels = filter(lambda x: x != None, unique_vessels)
+
+    fill(not_none_unique_vessels)
 
     if len(vessels) > 0:
         upsert(vessels, DB_TABLE_KPLER_VESSEL, DB_TABLE_KPLER_VESSEL + "_pkey")
