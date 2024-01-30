@@ -65,7 +65,7 @@ class KplerCheckerProducts(Enum):
 
 def test_kpler_trades(date_from=None, product=None, origin_iso2=None):
     start_date = to_datetime(date_from).date()
-    end_date = (dt.datetime.now().replace(day=1) - dt.timedelta(days=1)).date()
+    end_date = dt.datetime.now().date()
 
     flows = get_flows_from_kpler(
         product=product, origin_iso2=origin_iso2, date_from=start_date, date_to=end_date
@@ -77,35 +77,83 @@ def test_kpler_trades(date_from=None, product=None, origin_iso2=None):
 
     comparison = compare_flows_to_trades(flows, aggregated_trades)
 
-    expected_sum = comparison["value_tonne.expected"].sum()
-    actual_sum = comparison["value_tonne.expected"].sum()
+    expected = comparison["value_tonne.expected"].sum()
+    actual = comparison["value_tonne.expected"].sum()
 
-    sum_close = np.isclose(expected_sum, actual_sum, rtol=0.01)
+    sum_close = np.isclose(expected, actual, rtol=0.01)
 
     assert sum_close, (
-        f"Incorrect values for kpler trade for {product} "
-        + f"from {origin_iso2} after {date_from}:\n"
+        f"Expected totals similar for {product} from {origin_iso2} after {date_from}:"
+        + f"{expected} != {actual}. Details:\n"
         + format_failed(comparison[~comparison.ok])
     )
 
+    assert comparison["ok"].all(), (
+        f"Expected monthly values similar for {product} from {origin_iso2} after {date_from}:\n"
+        + format_failed(comparison[~comparison.ok])
+    )
+    assert len(comparison[comparison.ok_strict == False]) < 10, (
+        f"More than 10 monthly values too different for {product} from {origin_iso2} after {date_from}:\n"
+        + format_failed(comparison[~comparison.ok_strict])
+    )
+
+    missing_months = check_for_missing_months(aggregated_trades, date_from, end_date)
+
+    assert len(missing_months) == 0, (
+        f"Expected monthly values for {product} from {origin_iso2} after {date_from}:\n"
+        + f"Missing months: {missing_months}"
+    )
+
+
+def check_for_missing_months(aggregated_trades, date_from, date_to):
+    by_month = aggregated_trades.groupby("month").aggregate({"value_tonne": "sum"}).reset_index()
+
+    months = pd.date_range(date_from, date_to, freq="MS").strftime("%Y-%m-%d").tolist()
+
+    missing_months = [month for month in months if month not in by_month["month"].tolist()]
+
+    return missing_months
+
 
 def compare_flows_to_trades(flows, aggregated_trades):
-    comparison = pd.merge(
+    flows_and_aggregated_trades = pd.merge(
         flows,
         aggregated_trades,
         how="outer",
         on=["month", "to_iso2"],
         suffixes=(".expected", ".actual"),
     )
-
-    # We don't keep track of trades with unknown destinations.
-    comparison = comparison[pd.notnull(comparison.to_iso2)]
-
-    comparison["ok"] = np.isclose(
-        comparison["value_tonne.expected"], comparison["value_tonne.actual"], rtol=0.01
+    comparison_per_month = (
+        flows_and_aggregated_trades[pd.notnull(flows_and_aggregated_trades.to_iso2)]
+        .fillna({"value_tonne.expected": 0, "value_tonne.actual": 0})
+        .groupby("month")
+        .aggregate({"value_tonne.expected": "sum", "value_tonne.actual": "sum"})
+        .reset_index()
+        .sort_values("month")
     )
 
-    return comparison
+    average_total = (
+        comparison_per_month["value_tonne.expected"].mean()
+        + comparison_per_month["value_tonne.actual"].mean()
+    ) / 2
+
+    comparison_per_month["ok"] = np.isclose(
+        comparison_per_month["value_tonne.expected"],
+        comparison_per_month["value_tonne.actual"],
+        rtol=0.5,
+        # This gives a bit of flexibility for the first few days of the month.
+        atol=average_total * 0.5,
+    )
+
+    comparison_per_month["ok_strict"] = np.isclose(
+        comparison_per_month["value_tonne.expected"],
+        comparison_per_month["value_tonne.actual"],
+        rtol=0.025,
+        # This gives a bit of flexibility for the first few days of the month.
+        atol=average_total * 0.025,
+    )
+
+    return comparison_per_month
 
 
 def get_flows_from_kpler(product, origin_iso2, date_from, date_to):
@@ -165,7 +213,7 @@ def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
 def format_failed(failed):
     format_number = lambda n: f"{round(n / 1e3, 3)}kt"
     row_to_reason = lambda row: (
-        f" - For {row['month']} {row['to_iso2']}, "
+        f" - For {row['month']} "
         + f"expected {format_number(row['value_tonne.expected'])} "
         + f"but got {format_number(row['value_tonne.actual'])}."
     )
