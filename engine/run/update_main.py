@@ -51,8 +51,6 @@ def update():
     backuper.update()
     integrity.check()
 
-    flaring.update()
-
     return
 
 
