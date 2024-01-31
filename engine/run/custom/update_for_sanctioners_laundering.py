@@ -75,7 +75,7 @@ ALL_SANCTIONING_COUNTRIES = sorted(
 )
 
 
-def get_oil_products_exporters(to_importers=None, date_from=None):
+def get_oil_products_exporters(to_importers=None, date_from=None, date_to=None):
     scraper = KplerFlowScraper()
 
     all_flows = pd.DataFrame()
@@ -83,6 +83,7 @@ def get_oil_products_exporters(to_importers=None, date_from=None):
     for importer in to_importers:
         importer_flows = scraper.get_flows(
             date_from=date_from,
+            date_to=date_to,
             platform="liquids",
             destination_iso2=importer,
             granularity=FlowsPeriod.Annually,
@@ -97,7 +98,7 @@ def get_oil_products_exporters(to_importers=None, date_from=None):
     return sorted(list(without_broken_values))
 
 
-def get_crude_oil_exporters(to_importers=None, date_from=None):
+def get_crude_oil_exporters(to_importers=None, date_from=None, date_to=None):
     scraper = KplerFlowScraper()
 
     all_flows = pd.DataFrame()
@@ -121,13 +122,14 @@ def get_crude_oil_exporters(to_importers=None, date_from=None):
 
 
 def update(continue_from=None):
-    date_from = to_datetime("2022-12-01")
+    date_from = to_datetime("2022-01-01")
+    date_to = to_datetime("2022-11-30")
 
     exporters_of_oil_products = get_oil_products_exporters(
-        to_importers=ALL_SANCTIONING_COUNTRIES, date_from=date_from
+        to_importers=ALL_SANCTIONING_COUNTRIES, date_from=date_from, date_to=date_to
     )
     crude_exporters_to_oil_products = get_crude_oil_exporters(
-        to_importers=exporters_of_oil_products, date_from=date_from
+        to_importers=exporters_of_oil_products, date_from=date_from, date_to=date_to
     )
 
     countries_to_update = sorted(
@@ -144,7 +146,7 @@ def update(continue_from=None):
 
     kpler_scraper.update(
         date_from=date_from,
-        date_to=-1,
+        date_to=date_to,
         origin_iso2s=countries_to_update,
         parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
         platforms=["liquids"],
