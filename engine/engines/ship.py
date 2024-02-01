@@ -49,19 +49,23 @@ def collect_mt_for_large_oil_products():
 
     for ship in tqdm(ships, unit="ship"):
         if ship.type != ship.others.get("marinetraffic", {}).get("VESSEL_TYPE"):
-            # If there are multiple mmsis take latest one
-            ship_mt = Marinetraffic.get_ship(mmsi=ship.mmsi[-1])
-            if ship_mt is not None and ship.imo == ship_mt.imo:
-                ship_mt.others.update(ship.others)
-                (commodity, quantity, unit) = ship_to_commodity(ship_mt)
-                ship_mt.commodity = commodity
-                ship_mt.quantity = quantity
-                ship_mt.unit = unit
-                ship_mt.subtype = None
-                session.merge(ship_mt)
-                session.commit()
+            if len(ship.mmsi[-1]) == 0:
+                logger.info(f"Ship {ship.imo} has no mmsi, not collecting")
             else:
-                logger.info("IMOs don't match or ship not found")
+                # If there are multiple mmsis take latest one
+                mmsi = ship.mmsi[-1]
+                ship_mt = Marinetraffic.get_ship(mmsi=mmsi)
+                if ship_mt is not None and ship.imo == ship_mt.imo:
+                    ship_mt.others.update(ship.others)
+                    (commodity, quantity, unit) = ship_to_commodity(ship_mt)
+                    ship_mt.commodity = commodity
+                    ship_mt.quantity = quantity
+                    ship_mt.unit = unit
+                    ship_mt.subtype = None
+                    session.merge(ship_mt)
+                    session.commit()
+                else:
+                    logger.info("IMOs don't match or ship not found")
         else:
             logger.info("Was already using MT")
 
