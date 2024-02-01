@@ -14,7 +14,7 @@ from engines import (
     kpler_trade_computed,
 )
 from engines.kpler_scraper.scraper_flow import KplerFlowScraper
-from engines.kpler_scraper.update import UpdateParts
+from engines.kpler_scraper.update import UpdateParts, UpdateStatus
 from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 import integrity
@@ -144,13 +144,17 @@ def update(continue_from=None, date_from=None, date_to=None):
     if continue_from is not None:
         countries_to_update = countries_to_update[countries_to_update.index(continue_from) :]
 
-    kpler_scraper.update(
+    result = kpler_scraper.update(
         date_from=date_from,
         date_to=date_to,
         origin_iso2s=countries_to_update,
         parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
         platforms=["liquids"],
     )
+
+    if result == UpdateStatus.FAILED:
+        raise RuntimeError("Unable to update Kpler trades, can't continue")
+
     kpler_trade_computed.update()
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)
