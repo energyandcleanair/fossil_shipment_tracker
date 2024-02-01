@@ -65,7 +65,7 @@ class KplerCheckerProducts(Enum):
 
 def test_kpler_trades(date_from=None, product=None, origin_iso2=None):
     start_date = to_datetime(date_from).date()
-    end_date = dt.datetime.now().date()
+    end_date = dt.datetime.now().date() - dt.timedelta(days=1)
 
     flows = get_flows_from_kpler(
         product=product, origin_iso2=origin_iso2, date_from=start_date, date_to=end_date
