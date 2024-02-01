@@ -121,9 +121,9 @@ def get_crude_oil_exporters(to_importers=None, date_from=None, date_to=None):
     return sorted(list(without_broken_values))
 
 
-def update(continue_from=None):
-    date_from = to_datetime("2022-01-01")
-    date_to = to_datetime("2022-11-30")
+def update(continue_from=None, date_from=None, date_to=None):
+    date_from = to_datetime(date_from)
+    date_to = to_datetime(date_to)
 
     exporters_of_oil_products = get_oil_products_exporters(
         to_importers=ALL_SANCTIONING_COUNTRIES, date_from=date_from, date_to=date_to
@@ -160,13 +160,23 @@ def update(continue_from=None):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
+    parser.add_argument("--date-from", type=str, default=None)
+    parser.add_argument("--date-to", type=str, default=None)
     parser.add_argument("--continue-from", type=str, default=None)
 
     args = parser.parse_args()
 
+    if args.date_from is None:
+        print("Please specify --date-from")
+        exit(1)
+
+    if args.date_to is None:
+        print("Please specify --date-to")
+        exit(1)
+
     logger_slack.info("=== Update for report: using %s environment ===" % (base.db.environment,))
     try:
-        update(continue_from=args.continue_from)
+        update(continue_from=args.continue_from, date_from=args.date_from, date_to=args.date_to)
         logger_slack.info("=== Update for report complete ===")
     except BaseException as e:
         logger_slack.error("=== Update for report failed", stack_info=True, exc_info=True)
