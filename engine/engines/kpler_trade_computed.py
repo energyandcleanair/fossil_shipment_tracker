@@ -555,6 +555,7 @@ def update():
         with session.begin_nested():
             session.execute(delete(KplerTradeComputed))
             for start, end in tqdm(periods, unit="period"):
+                logger.info(f"Updating kpler computed table for {start} to {end}")
                 session.execute(
                     insert(KplerTradeComputed).from_select(
                         [
