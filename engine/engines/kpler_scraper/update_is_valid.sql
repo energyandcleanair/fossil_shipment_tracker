@@ -203,24 +203,18 @@ matching__dep_country$product as (
             DATE(trade.departure_date_utc) as origin_date,
             zone.country_iso2 as country_iso2_departure,
             trade.product_id,
-            MAX(trade.updated_on) OVER (
-                PARTITION BY zone.country_iso2,
-                trade.product_id
-                ORDER BY
-                    DATE(trade.departure_date_utc),
-                    trade.updated_on ROWS BETWEEN UNBOUNDED PRECEDING
-                    and CURRENT ROW
-            ) as updated_on_max
+            trade.updated_on
         from
             kpler_trade as trade
             join kpler_zone as zone on trade.departure_zone_id = zone.id
+
     ),
     last_update as (
         select
             sub.origin_date,
             sub.country_iso2_departure,
             sub.product_id,
-            MAX(sub.updated_on_max) as updated_on_max
+            MAX(sub.updated_on) as updated_on_max
         from
             sub
         group by
