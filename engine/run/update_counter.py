@@ -28,12 +28,10 @@ def update():
 
 
 if __name__ == "__main__":
-    logger_slack.info(
-        "=== Update historic Russia: using %s environment ===" % (base.db.environment,)
-    )
+    logger_slack.info("=== Update counter only: using %s environment ===" % (base.db.environment,))
     try:
         update()
-        logger_slack.info("=== Update historic Russia complete ===")
+        logger_slack.info("=== Update counter only complete ===")
     except BaseException as e:
-        logger_slack.error("=== Update historic Russia failed", stack_info=True, exc_info=True)
+        logger_slack.error("=== Update counter only failed", stack_info=True, exc_info=True)
         raise e
