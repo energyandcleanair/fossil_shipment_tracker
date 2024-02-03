@@ -7,12 +7,13 @@ from api.tests import test_counter
 
 from .checks import *
 
+from .check_kpler_trade import test_kpler_trades, KplerCheckerProducts
+
 
 class IntegrityCheckResult:
-    def __init__(self, step, error=None, tb=None):
+    def __init__(self, step, error=None):
         self.step = step
         self.error = error
-        self.tb = tb
 
     @property
     def success(self):
@@ -23,7 +24,7 @@ class IntegrityCheckResult:
         return self.step.name
 
     def format_error(self):
-        return f"Integrity check {self.name} failed with error: {self.tb}"
+        return f"Integrity check {self.name} failed with error: {self.error}"
 
 
 class IntegrityCheckDefinition:
@@ -37,9 +38,9 @@ class IntegrityCheckDefinition:
             self.test()
             return IntegrityCheckResult(self)
         except AssertionError as e:
-            logger.info(f"Checking integrity {self.name} - failure")
-            tb = traceback.format_exc()
-            return IntegrityCheckResult(self, error=e, tb=tb)
+            logger.info(f"Checking integrity {self.name} - failure: {e}")
+            message = str(e)
+            return IntegrityCheckResult(self, error=message)
 
 
 KPLER_CHECKER_DATE_FROM = "2021-01-01"
@@ -65,6 +66,10 @@ class IntegrityStep(Enum):
     )
     INSURER_FIRST_DATE_NOT_NULL = IntegrityCheckDefinition(
         "insurer first date not null", test_insurers_no_null_date_from
+    )
+
+    OVERLAND_TRADE_HAS_VALUES = IntegrityCheckDefinition(
+        "overland trade has values for each month", test_overland_trade_has_values
     )
 
     KPLER_TRADE_CRUDE = IntegrityCheckDefinition(

@@ -1,3 +1,4 @@
+import requests
 import sqlalchemy as sa
 import pandas as pd
 
@@ -10,12 +11,13 @@ from base.models import (
     Departure,
     Arrival,
 )
-from base.logger import logger_slack
+from base.logger import logger_slack, logger
+from decouple import config
 
-from .check_kpler_trade import (
-    test_kpler_trades,
-    KplerCheckerProducts,
-)  # pylint: disable=unused-import
+import datetime as dt
+
+FST_API_URL = config("FOSSIL_SHIPMENT_TRACKER_API_URL")
+FST_API_KEY = config("API_KEY")
 
 
 def test_shipment_portcall_integrity():
@@ -214,3 +216,76 @@ def test_trade_platform():
         logger_slack.error(
             "Some kpler trades have a platform field not matching the platform of their products."
         )
+
+
+def test_overland_trade_has_values():
+    # create a date range for each year from the start of 2020 to today
+    start_date = dt.date(2020, 1, 1)
+    end_date = dt.date.today()
+    date_ranges = pd.date_range(start=start_date, end=end_date, freq="YS")
+
+    dfs = []
+
+    # for each year, check that we have overland trade values for each commodity and month
+    for date in date_ranges:
+        year_start = date.date()
+        year_end = (date + pd.DateOffset(years=1)).date()
+
+        params = {
+            "date_from": year_start.isoformat(),
+            "date_to": year_end.isoformat(),
+            "format": "json",
+        }
+
+        response = requests.get(
+            f"{FST_API_URL}/v0/overland/",
+            params=params,
+        )
+
+        if response.status_code == 204:
+            logger.warn(f"No overland trade data for the year {year_start.year} to {year_end.year}")
+            continue
+
+        if response.status_code != 200:
+            raise Exception(
+                f"Failed to get overland trade data for the year {year_start.year} to {year_end.year}: {response.status_code}"
+            )
+
+        dfs = dfs + [pd.DataFrame(response.json()["data"])]
+
+    df = pd.concat(dfs)
+
+    df["month"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m")
+
+    assert not df.empty, "No overland trade data found"
+
+    expected_commodities = [
+        "coal_rail_road",
+        "coke_rail_road",
+        "crude_oil_rail_road",
+        "natural_gas",
+        "oil_products_pipeline",
+        "oil_products_rail_road",
+        "pipeline_oil",
+    ]
+
+    assert set(df["commodity"]) == set(expected_commodities), "Commodities sets do not match"
+
+    verify_months_for_commodities(
+        df,
+        start_date=start_date,
+        end_date=end_date,
+        commodities=["natural_gas", "pipeline_oil"],
+    )
+    verify_months_for_commodities(
+        df, start_date=start_date, end_date="2022-08-01", commodities=["coal_rail_road"]
+    )
+
+
+def verify_months_for_commodities(df, start_date, end_date, commodities):
+    months = set(pd.date_range(start=start_date, end=end_date, freq="M").strftime("%Y-%m"))
+
+    # Do the above loop but in a single assert statement
+    assert all(
+        [not (months - set(df[df["commodity"] == commodity]["month"])) for commodity in commodities]
+    ), "Missing months for some commodities"
