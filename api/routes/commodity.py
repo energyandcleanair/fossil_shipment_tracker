@@ -90,3 +90,11 @@ def get_ids(transport=None):
         query = query.filter(Commodity.transport.in_(to_list(transport)))
 
     return [x[0] for x in query.all()]
+
+
+def get_groups(transport=None):
+    query = session.query(Commodity.group).distinct()
+    if transport:
+        query = query.filter(Commodity.transport.in_(to_list(transport)))
+
+    return [x[0] for x in query.all()]
