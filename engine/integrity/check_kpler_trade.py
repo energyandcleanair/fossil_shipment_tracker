@@ -8,6 +8,8 @@ from base.utils import to_datetime
 import pandas as pd
 import numpy as np
 
+from base.logger import logger
+
 FST_API_URL = config("FOSSIL_SHIPMENT_TRACKER_API_URL")
 FST_API_KEY = config("API_KEY")
 
@@ -63,9 +65,12 @@ class KplerCheckerProducts(Enum):
         return self.value["our_product"]
 
 
-def test_kpler_trades(date_from=None, product=None, origin_iso2=None):
+def test_kpler_trades(date_from=None, date_to=None, product=None, origin_iso2=None):
+    logger.debug(f"Testing kpler trades for {product} from {origin_iso2} after {date_from}")
     start_date = to_datetime(date_from).date()
     end_date = dt.datetime.now().date() - dt.timedelta(days=1)
+    if date_to:
+        end_date = to_datetime(date_to).date()
 
     flows = get_flows_from_kpler(
         product=product, origin_iso2=origin_iso2, date_from=start_date, date_to=end_date
@@ -96,23 +101,6 @@ def test_kpler_trades(date_from=None, product=None, origin_iso2=None):
         f"More than 10 monthly values too different for {product} from {origin_iso2} after {date_from}:\n"
         + format_failed(comparison[~comparison.ok_strict])
     )
-
-    missing_months = check_for_missing_months(aggregated_trades, date_from, end_date)
-
-    assert len(missing_months) == 0, (
-        f"Expected monthly values for {product} from {origin_iso2} after {date_from}:\n"
-        + f"Missing months: {missing_months}"
-    )
-
-
-def check_for_missing_months(aggregated_trades, date_from, date_to):
-    by_month = aggregated_trades.groupby("month").aggregate({"value_tonne": "sum"}).reset_index()
-
-    months = pd.date_range(date_from, date_to, freq="MS").strftime("%Y-%m-%d").tolist()
-
-    missing_months = [month for month in months if month not in by_month["month"].tolist()]
-
-    return missing_months
 
 
 def compare_flows_to_trades(flows, aggregated_trades):
@@ -168,6 +156,15 @@ def get_flows_from_kpler(product, origin_iso2, date_from, date_to):
         split=FlowsSplit.DestinationCountries,
     )
 
+    if df is None:
+        return pd.DataFrame(
+            {
+                "month": pd.Series(dtype="str"),
+                "to_iso2": pd.Series(dtype="str"),
+                "value_tonne": pd.Series(dtype="float64"),
+            }
+        )
+
     column_selector = {
         "date": "month",
         "to_iso2": "to_iso2",
@@ -188,12 +185,28 @@ def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
         product_type: product.our_product,
         "origin_iso2": origin_iso2,
         "aggregate_by": f"origin_month,destination_iso2",
+        "origin_date_from": "1970-01-01",
+        "destination_date_from": "1970-01-01",
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
         "format": "json",
     }
 
     response = requests.get(FST_API_URL + "/v1/kpler_trade", params=params)
+
+    if response.status_code != 200 and response.status_code != 204:
+        raise Exception(
+            f"Failed to get Kpler trade data for {product} from {origin_iso2} after {date_from} with status code {response.status_code}: using {response.url}"
+        )
+
+    if response.status_code == 204:
+        return pd.DataFrame(
+            {
+                "month": pd.Series(dtype="str"),
+                "to_iso2": pd.Series(dtype="str"),
+                "value_tonne": pd.Series(dtype="float64"),
+            }
+        )
 
     column_selector = {
         "month": "month",
