@@ -27,7 +27,11 @@ from base import (
     COMMODITY_GROUPING_HELP,
 )
 
-from .commodity import get_subquery as get_commodity_subquery, get_ids as get_commodity_ids
+from .commodity import (
+    get_subquery as get_commodity_subquery,
+    get_ids as get_commodity_ids,
+    get_groups as get_commodity_groups,
+)
 
 
 @routes_api.route(
@@ -63,6 +67,14 @@ class PipelineFlowResource(Resource):
         required=False,
     )
     parser.add_argument(
+        "commodity_group",
+        help="commodity group(s) of interest. Default: returns all of them. Options: %s"
+        % (",".join(get_commodity_groups(transport=[base.PIPELINE, base.RAIL_ROAD]))),
+        default=None,
+        action="split",
+        required=False,
+    )
+    parser.add_argument(
         "date_from",
         help="start date (format 2020-01-15)",
         default="2022-01-01",
@@ -79,6 +91,13 @@ class PipelineFlowResource(Resource):
         "commodity_origin_iso2",
         action="split",
         help="iso2(s) of commodity origin",
+        required=False,
+        default=None,
+    )
+    parser.add_argument(
+        "commodity_destination_iso2",
+        action="split",
+        help="iso2(s) of commodity destination",
         required=False,
         default=None,
     )
@@ -206,9 +225,11 @@ class PipelineFlowResource(Resource):
 
         id = params.get("id")
         commodity = params.get("commodity")
+        commodity_group = params.get("commodity_group")
         commodity_grouping = params.get("commodity_grouping")
         date_from = params.get("date_from")
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
+        commodity_destination_iso2 = params.get("commodity_destination_iso2")
         departure_iso2 = params.get("departure_iso2")
         destination_iso2 = params.get("destination_iso2")
         destination_region = params.get("destination_region")
@@ -337,6 +358,9 @@ class PipelineFlowResource(Resource):
         if commodity is not None:
             flows_rich = flows_rich.filter(PipelineFlow.commodity.in_(to_list(commodity)))
 
+        if commodity_group is not None:
+            flows_rich = flows_rich.filter(commodity_subquery.c.group.in_(to_list(commodity_group)))
+
         if date_from is not None:
             flows_rich = flows_rich.filter(PipelineFlow.date >= to_datetime(date_from))
 
@@ -346,6 +370,11 @@ class PipelineFlowResource(Resource):
         if commodity_origin_iso2 is not None:
             flows_rich = flows_rich.filter(
                 commodity_origin_iso2_field.in_(to_list(commodity_origin_iso2))
+            )
+
+        if commodity_destination_iso2 is not None:
+            flows_rich = flows_rich.filter(
+                commodity_destination_iso2_field.in_(to_list(commodity_destination_iso2))
             )
 
         if departure_iso2 is not None:
