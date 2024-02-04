@@ -23,7 +23,6 @@ class KplerTradeScraper(KplerScraper):
 
         trades = []
         vessels = []
-        zones = []
         products = []
         installations = []
 
@@ -67,11 +66,10 @@ class KplerTradeScraper(KplerScraper):
                 )
                 trades.extend(trades_)
                 vessels.extend(vessels_)
-                zones.extend(zones_)
                 products.extend(products_)
                 installations.extend(installations_)
 
-        return trades, vessels, zones, products, installations
+        return trades, vessels, products, installations
 
     def get_trades_raw(
         self,

@@ -36,11 +36,10 @@ def update_trades(
                         f"Updating trades for {platform} for country {from_iso2} in {period}"
                     )
                     # To prevent memory issues, we do it one country at a time
-                    trades, vessels, zones, products, installations = scraper.get_trades(
+                    trades, vessels, products, installations = scraper.get_trades(
                         platform=platform, from_iso2=from_iso2, month=period
                     )
 
-                    upload_zones(zones)
                     upload_vessels(vessels)
                     upload_trades(trades, update_time=update_time)
                     upload_installations(installations)

@@ -3,6 +3,7 @@ from base.logger import logger, logger_slack, notify_engineers
 
 from kpler.sdk import FlowsSplit
 
+from .update_zones import update_zones
 from .update_trade import update_trades
 from .update_flow import update_flows
 
@@ -17,6 +18,7 @@ class UpdateStatus(Enum):
 
 
 class UpdateParts(Enum):
+    ZONES = "ZONES"
     FLOWS = "FLOWS"
     TRADES = "TRADES"
     VALIDATE = "VALIDATE"
@@ -37,7 +39,6 @@ def update_lite(
     from_splits=[FlowsSplit.OriginCountries],
     to_splits=[FlowsSplit.DestinationCountries],
     platforms=None,
-    parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
 ):
     return update(
         date_from=date_from,
@@ -45,7 +46,6 @@ def update_lite(
         from_splits=from_splits,
         to_splits=to_splits,
         platforms=platforms,
-        parts=parts,
     )
 
 
@@ -59,10 +59,13 @@ def update(
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     add_unknown=True,
     add_unknown_only=False,
-    parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
+    parts=[UpdateParts.ZONES, UpdateParts.TRADES, UpdateParts.VALIDATE],
 ):
     logger_slack.info("=== Updating Kpler ===")
     try:
+        if UpdateParts.ZONES in parts:
+            update_zones()
+
         if UpdateParts.FLOWS in parts:
             logger.info("Updating flows")
             update_flows(

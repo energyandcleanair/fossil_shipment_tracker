@@ -213,6 +213,20 @@ class KplerScraper:
                 name = "Turkey"
             elif iso2 == "SG":
                 name = "Singapore Republic"
+            elif iso2 == "CG":
+                name = "Republic of the Congo"
+            elif iso2 == "CD":
+                name = "Democratic Republic of the Congo"
+            elif iso2 == "LC":
+                name = "Saint Lucia"
+            elif iso2 == "CI":
+                name = "Ivory Coast"
+            elif iso2 == "FO":
+                name = "Faroe Islands"
+            elif iso2 == "BN":
+                name = "Brunei"
+            elif iso2 == "CV":
+                name = "Cape Verde"
 
         found = False
         types = {
@@ -230,7 +244,9 @@ class KplerScraper:
                 break
 
         if not found:
-            logger.warning(f"Zone not found: {platform} {iso2} {id} {name}")
+            logger.warning(
+                f"Zone not found: (platform: {platform}, country: {iso2}, id: {id}, name: {name})"
+            )
             return None
 
         return {"id": int(matching["id"].values[0]), "resourceType": type}

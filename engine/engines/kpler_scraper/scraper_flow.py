@@ -198,7 +198,7 @@ class KplerFlowScraper(KplerScraper):
 
         args_info = f"product: {product}, split: {split}, granularity: {granularity}, unit: {unit}, date_from: {date_from}, date_to: {date_to}"
 
-        logger.info(
+        logger.debug(
             f"Getting flows for {platform}: {from_zone}({from_split})->{to_zone}({to_split}) ({args_info})"
         )
 
