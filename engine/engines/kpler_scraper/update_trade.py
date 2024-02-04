@@ -44,6 +44,6 @@ def update_trades(
                     upload_trades(trades, update_time=update_time)
                     upload_installations(installations)
 
-                    del trades, vessels, zones, products, installations
+                    del trades, vessels, products, installations
 
                 logger.info(f"Finished updating trades for {platform} for country {from_iso2}")
