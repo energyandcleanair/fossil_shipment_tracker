@@ -19,7 +19,7 @@ from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 import integrity
 import base
-from base.logger import logger_slack
+from base.logger import logger_slack, logger
 
 import datetime as dt
 
@@ -76,6 +76,7 @@ ALL_SANCTIONING_COUNTRIES = sorted(
 
 
 def get_oil_products_exporters(to_importers=None, date_from=None, date_to=None):
+    logger.info("Getting oil products exporters")
     scraper = KplerFlowScraper()
 
     all_flows = pd.DataFrame()
@@ -91,14 +92,15 @@ def get_oil_products_exporters(to_importers=None, date_from=None, date_to=None):
         )
         all_flows = pd.concat([all_flows, importer_flows])
 
-    unqique_countries = all_flows["from_iso2"].unique()
+    unique_countries = all_flows["from_iso2"].unique()
 
-    without_broken_values = filter(lambda x: x != None and x != "not found", unqique_countries)
+    without_broken_values = filter(lambda x: x != None and x != "not found", unique_countries)
 
     return sorted(list(without_broken_values))
 
 
 def get_crude_oil_exporters(to_importers=None, date_from=None, date_to=None):
+    logger.info("Getting crude oil exporters")
     scraper = KplerFlowScraper()
 
     all_flows = pd.DataFrame()
@@ -106,6 +108,7 @@ def get_crude_oil_exporters(to_importers=None, date_from=None, date_to=None):
     for importer in to_importers:
         importer_flows = scraper.get_flows(
             date_from=date_from,
+            date_to=date_to,
             platform="liquids",
             destination_iso2=importer,
             product="Crude/Co",
@@ -114,17 +117,15 @@ def get_crude_oil_exporters(to_importers=None, date_from=None, date_to=None):
         )
         all_flows = pd.concat([all_flows, importer_flows])
 
-    unqique_countries = all_flows["from_iso2"].unique()
+    unique_countries = all_flows["from_iso2"].unique()
 
-    without_broken_values = filter(lambda x: x != None and x != "not found", unqique_countries)
+    without_broken_values = filter(lambda x: x != None and x != "not found", unique_countries)
 
     return sorted(list(without_broken_values))
 
 
-def update(continue_from=None, date_from=None, date_to=None):
-    date_from = to_datetime(date_from)
-    date_to = to_datetime(date_to)
-
+def get_countries_to_update(date_from=None, date_to=None):
+    logger.info("Getting countries to update")
     exporters_of_oil_products = get_oil_products_exporters(
         to_importers=ALL_SANCTIONING_COUNTRIES, date_from=date_from, date_to=date_to
     )
@@ -132,7 +133,7 @@ def update(continue_from=None, date_from=None, date_to=None):
         to_importers=exporters_of_oil_products, date_from=date_from, date_to=date_to
     )
 
-    countries_to_update = sorted(
+    return sorted(
         list(
             set.union(
                 set(exporters_of_oil_products),
@@ -140,6 +141,15 @@ def update(continue_from=None, date_from=None, date_to=None):
             )
         )
     )
+
+
+def update(continue_from=None, date_from=None, date_to=None):
+    date_from = to_datetime(date_from)
+    date_to = to_datetime(date_to)
+
+    countries_to_update = get_countries_to_update(date_from=date_from, date_to=date_to)
+
+    logger.info(f"Updating countries: {countries_to_update}")
 
     if continue_from is not None:
         countries_to_update = countries_to_update[countries_to_update.index(continue_from) :]
@@ -159,6 +169,7 @@ def update(continue_from=None, date_from=None, date_to=None):
     counter.update()
     counter.update(version=base.COUNTER_VERSION1)
     counter.update(version=base.COUNTER_VERSION2)
+
     return
 
 
