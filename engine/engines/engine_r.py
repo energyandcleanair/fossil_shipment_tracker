@@ -21,8 +21,8 @@ def update(rebuild_prices=False):
         def run_job():
             request = RunJobRequest(name=f"projects/{project}/locations/{location}/jobs/{job}")
             operation = client.run_job(request=request)
-            # Wait for the operation to complete
-            result = operation.result()
+            # Wait for the operation to complete - explicitly set the timeout to wait for 3 hours
+            result = operation.result(timeout=60 * 60 * 3)
             logger.info("Job result: ", result)
             return result.succeeded_count > 0
 
