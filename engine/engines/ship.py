@@ -49,7 +49,7 @@ def collect_mt_for_large_oil_products():
 
     for ship in tqdm(ships, unit="ship"):
         if ship.type != ship.others.get("marinetraffic", {}).get("VESSEL_TYPE"):
-            if len(ship.mmsi[-1]) == 0:
+            if ship.mmsi == None or len(ship.mmsi[-1]) == 0:
                 logger.info(f"Ship {ship.imo} has no mmsi, not collecting")
             else:
                 # If there are multiple mmsis take latest one
