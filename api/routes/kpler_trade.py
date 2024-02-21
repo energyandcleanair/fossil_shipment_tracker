@@ -1,3 +1,5 @@
+from http import HTTPStatus
+from flask import Response
 import sqlalchemy as sa
 from sqlalchemy import (
     func,
@@ -12,7 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import aggregate_order_by, array, ARRAY, array_agg
 
-from flask_restx import inputs
+from flask_restx import inputs, reqparse
 
 import datetime as dt
 
@@ -53,7 +55,7 @@ def integer_array(values):
 
 @routes_api.route("/v1/kpler_trade", strict_slashes=False)
 class KplerTradeResource(TemplateResource):
-    parser = TemplateResource.parser.copy()
+    parser: reqparse.RequestParser = TemplateResource.parser.copy()
 
     parser.replace_argument(
         "aggregate_by",
@@ -121,7 +123,7 @@ class KplerTradeResource(TemplateResource):
     parser.add_argument(
         "date_from",
         type=str,
-        help="Filters where ships left origin on or after date (format 2020-01-01)",
+        help="Filters where ships left origin on or after date (format 2020-01-01). Overwritten if destination_date_from or origin_date_from is provided.",
         default="2020-01-01",
         required=False,
     )
@@ -129,7 +131,7 @@ class KplerTradeResource(TemplateResource):
     parser.add_argument(
         "date_to",
         type=str,
-        help="Filters where ships left origin on or before date (format 2020-01-01)",
+        help="Filters where ships left origin on or before date (format 2020-01-01). Overwritten if destination_date_to or origin_date_to is provided.",
         default=None,
         required=False,
     )
@@ -138,7 +140,7 @@ class KplerTradeResource(TemplateResource):
         "destination_date_from",
         type=str,
         help="Filters where ships arrived at destination on or after date (format 2020-01-01)",
-        default="2020-01-01",
+        default=None,
         required=False,
     )
 
@@ -154,7 +156,7 @@ class KplerTradeResource(TemplateResource):
         "origin_date_from",
         type=str,
         help="Filters where ships left origin on or after date (format 2020-01-01)",
-        default="2020-01-01",
+        default=None,
         required=False,
     )
 
@@ -528,7 +530,33 @@ class KplerTradeResource(TemplateResource):
     @routes_api.expect(parser)
     @key_required
     def get(self):
-        params = KplerTradeResource.parser.parse_args(strict=True)
+        params = self.parser.parse_args(strict=True)
+
+        if params.get("origin_date_from") or params.get("destination_date_from"):
+            params["date_from"] = None
+        if params.get("origin_date_to") or params.get("destination_date_to"):
+            params["date_to"] = None
+
+        if params.get("date_from") is not None and params.get("date_from") == params.get("date_to"):
+            return Response(
+                status=HTTPStatus.BAD_REQUEST,
+                response="date_from and date_to cannot be the same date",
+            )
+        if params.get("origin_date_from") is not None and params.get(
+            "origin_date_from"
+        ) == params.get("origin_date_to"):
+            return Response(
+                status=HTTPStatus.BAD_REQUEST,
+                response="origin_date_from and origin_date_to cannot be the same date",
+            )
+        if params.get("destination_date_from") is not None and params.get(
+            "destination_date_from"
+        ) == params.get("destination_date_to"):
+            return Response(
+                status=HTTPStatus.BAD_REQUEST,
+                response="destination_date_from and destination_date_to cannot be the same date",
+            )
+
         return self.get_from_params(params)
 
     def initial_query(self, params=None):
