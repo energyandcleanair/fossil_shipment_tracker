@@ -28,6 +28,7 @@ from . import DB_TABLE_KPLER_TRADE_FLOW
 from . import DB_TABLE_KPLER_ZONE
 from . import DB_TABLE_KPLER_INSTALLATION
 from . import DB_TABLE_KPLER_TRADE_COMPUTED
+from . import DB_TABLE_KPLER_SYNC_HISTORY
 
 
 class KplerFlow(Base):
@@ -241,3 +242,14 @@ class KplerInstallation(Base):
     port_id = Column(BigInteger)
 
     __tablename__ = DB_TABLE_KPLER_INSTALLATION
+
+
+class KplerSyncHistory(Base):
+    id = Column(BigInteger, primary_key=True)
+    date = Column(DateTime, nullable=False)
+    platform = Column(String, nullable=False)
+    country_iso2 = Column(String, nullable=False)
+    is_valid = Column(Boolean)
+    last_checked = Column(DateTime)
+
+    __tablename__ = DB_TABLE_KPLER_SYNC_HISTORY

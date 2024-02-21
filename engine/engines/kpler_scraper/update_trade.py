@@ -3,11 +3,14 @@ import logging
 import warnings
 from base.utils import to_datetime
 from base.logger import logger, logger_slack
+from base.models.kpler import KplerSyncHistory
 from .scraper_trade import KplerTradeScraper
 from .upload import *
 
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+
+from base.db import session
 
 
 def update_trades(
@@ -44,6 +47,32 @@ def update_trades(
                     upload_trades(trades, update_time=update_time)
                     upload_installations(installations)
 
+                    mark_scraper_history(platform, from_iso2, period)
+
                     del trades, vessels, products, installations
 
                 logger.info(f"Finished updating trades for {platform} for country {from_iso2}")
+
+
+def mark_scraper_history(platform, from_iso2, period):
+    days = [day for day in get_days_in_month(period) if day <= dt.date.today()]
+
+    session.add_all(
+        [
+            KplerSyncHistory(
+                date=day,
+                platform=platform,
+                country_iso2=from_iso2,
+                is_valid=False,
+                last_checked=None,
+            )
+            for day in days
+        ]
+    )
+    session.commit()
+
+
+def get_days_in_month(period_as_str):
+    period = pd.Period(period_as_str, freq="M")
+    days = pd.date_range(start=period.start_time.date(), end=period.end_time.date()).to_list()
+    return days

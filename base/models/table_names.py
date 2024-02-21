@@ -60,6 +60,7 @@ DB_TABLE_KPLER_TRADE_FLOW = "kpler_trade_flow"
 DB_TABLE_KPLER_INSTALLATION = "kpler_installation"
 DB_TABLE_KPLER_ZONE = "kpler_zone"
 DB_TABLE_KPLER_TRADE_COMPUTED = "kpler_trade_computed"
+DB_TABLE_KPLER_SYNC_HISTORY = "kpler_sync_history"
 
 DB_TABLE_API_KEY = "api_key"
 DB_TABLE_GLOBAL_CACHE = "global_cache"
