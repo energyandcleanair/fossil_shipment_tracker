@@ -19,7 +19,6 @@ class UpdateStatus(Enum):
 
 class UpdateParts(Enum):
     ZONES = "ZONES"
-    FLOWS = "FLOWS"
     TRADES = "TRADES"
     CLEAN_OUTDATED_ENTRIES = "CLEAN_OUTDATED_ENTRIES"
 
@@ -53,31 +52,13 @@ def update(
     date_from=-30,
     date_to=None,
     platforms=None,
-    products=None,
     origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG"],
-    from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
-    to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
-    add_unknown=True,
-    add_unknown_only=False,
     parts=[UpdateParts.ZONES, UpdateParts.TRADES, UpdateParts.CLEAN_OUTDATED_ENTRIES],
 ):
     logger_slack.info("=== Updating Kpler ===")
     try:
         if UpdateParts.ZONES in parts:
             update_zones()
-
-        if UpdateParts.FLOWS in parts:
-            logger.info("Updating flows")
-            update_flows(
-                date_from=date_from,
-                date_to=date_to,
-                platforms=platforms,
-                origin_iso2s=origin_iso2s,
-                from_splits=from_splits,
-                to_splits=to_splits,
-                add_unknown=add_unknown,
-                add_unknown_only=add_unknown_only,
-            )
 
         if UpdateParts.TRADES in parts:
             logger.info("Updating trades")
