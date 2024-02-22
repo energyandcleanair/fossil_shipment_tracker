@@ -43,7 +43,7 @@ def update(countries=None, continue_from=None, date_from=None, date_to=None):
         date_from=date_from,
         date_to=date_to,
         origin_iso2s=countries_to_update,
-        parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
+        parts=[UpdateParts.TRADES, UpdateParts.CLEAN_OUTDATED_ENTRIES],
         platforms=["liquids"],
     )
 

@@ -98,7 +98,7 @@ def update():
         date_from=date_from,
         date_to=-1,
         origin_iso2s=countries_to_update,
-        parts=[UpdateParts.TRADES, UpdateParts.VALIDATE],
+        parts=[UpdateParts.TRADES, UpdateParts.CLEAN_OUTDATED_ENTRIES],
         platforms=["liquids"],
     )
     kpler_trade_computed.update()

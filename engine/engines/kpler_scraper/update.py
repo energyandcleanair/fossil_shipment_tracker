@@ -21,7 +21,7 @@ class UpdateParts(Enum):
     ZONES = "ZONES"
     FLOWS = "FLOWS"
     TRADES = "TRADES"
-    VALIDATE = "VALIDATE"
+    CLEAN_OUTDATED_ENTRIES = "CLEAN_OUTDATED_ENTRIES"
 
 
 def update_full():
@@ -59,7 +59,7 @@ def update(
     to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     add_unknown=True,
     add_unknown_only=False,
-    parts=[UpdateParts.ZONES, UpdateParts.TRADES, UpdateParts.VALIDATE],
+    parts=[UpdateParts.ZONES, UpdateParts.TRADES, UpdateParts.CLEAN_OUTDATED_ENTRIES],
 ):
     logger_slack.info("=== Updating Kpler ===")
     try:
@@ -88,9 +88,9 @@ def update(
                 origin_iso2s=origin_iso2s,
             )
 
-        if UpdateParts.VALIDATE in parts:
-            logger.info("Validating update")
-            update_is_valid()
+        if UpdateParts.CLEAN_OUTDATED_ENTRIES in parts:
+            logger.info("Cleaning outdated entries")
+            clean_outdated_entries()
 
         return UpdateStatus.SUCCESS
 
@@ -104,9 +104,9 @@ def update(
         return UpdateStatus.FAILED
 
 
-def update_is_valid():
+def clean_outdated_entries():
     # Read sql from 'update_is_valid.sql'
-    with open(os.path.join(os.path.dirname(__file__), "update_is_valid.sql")) as f:
+    with open(os.path.join(os.path.dirname(__file__), "clean_outdated_entries.sql")) as f:
         sql = f.read()
     session.execute(sql)
     session.commit()
