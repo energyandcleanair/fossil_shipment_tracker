@@ -276,6 +276,13 @@ class RussiaCounterResource(Resource):
         default=COUNTER_VERSION_DEFAULT,
     )
 
+    parser.add_argument(
+        "include_legacy_data",
+        type=inputs.boolean,
+        help="Whether to include legacy data which may not be up to date.",
+        default=False,
+    )
+
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterResource.parser.parse_args()
@@ -310,6 +317,7 @@ class RussiaCounterResource(Resource):
         select = params.get("select")
         language = params.get("language")
         version = params.get("version")
+        include_legacy_data = params.get("include_legacy_data")
 
         if aggregate_by and "" in aggregate_by:
             aggregate_by.remove("")
@@ -404,6 +412,10 @@ class RussiaCounterResource(Resource):
         if date_to is not None:
             query = query.filter(Counter.date <= to_datetime(date_to))
 
+        if not include_legacy_data:
+            legacy_filter = Counter.commodity != "lpg"
+            query = query.filter(legacy_filter)
+
         query = self.aggregate(query, aggregate_by)
         counter = pd.read_sql(query.statement, session.bind)
 
@@ -413,6 +425,13 @@ class RussiaCounterResource(Resource):
         # Resample
         # Need to hash list columns before resampling
         counter, list_columns = hash_df(counter)
+
+        if len(counter) == 0:
+            return Response(
+                response="No data available with given arguments.",
+                status=204,
+                mimetype="application/json",
+            )
 
         if "date" in counter:
             daterange = pd.date_range(min(counter.date), max(counter.date)).rename("date")
