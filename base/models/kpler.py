@@ -249,6 +249,7 @@ class KplerSyncHistory(Base):
     date = Column(DateTime, nullable=False)
     platform = Column(String, nullable=False)
     country_iso2 = Column(String, nullable=False)
+    last_updated = Column(String, nullable=False)
     is_valid = Column(Boolean)
     last_checked = Column(DateTime)
 

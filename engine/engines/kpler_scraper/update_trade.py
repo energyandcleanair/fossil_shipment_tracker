@@ -47,29 +47,36 @@ def update_trades(
                     upload_trades(trades, update_time=update_time)
                     upload_installations(installations)
 
-                    mark_scraper_history(platform, from_iso2, period)
+                    mark_scraper_history(platform, from_iso2, period, update_time)
 
                     del trades, vessels, products, installations
 
                 logger.info(f"Finished updating trades for {platform} for country {from_iso2}")
 
 
-def mark_scraper_history(platform, from_iso2, period):
+def mark_scraper_history(platform, from_iso2, period, update_time):
     days = [day for day in get_days_in_month(period) if day <= dt.date.today()]
 
-    session.add_all(
-        [
-            KplerSyncHistory(
-                date=day,
-                platform=platform,
-                country_iso2=from_iso2,
-                is_valid=False,
-                last_checked=None,
-            )
-            for day in days
-        ]
+    records = [
+        {
+            "date": day,
+            "platform": platform,
+            "country_iso2": from_iso2,
+            "last_updated": update_time,
+            "is_valid": False,
+            "last_checked": None,
+        }
+        for day in days
+    ]
+
+    df = pd.DataFrame.from_records(records)
+
+    upsert(
+        df,
+        table=KplerSyncHistory.__tablename__,
+        constraint_name="kpler_sync_history_unique",
+        show_progress=False,
     )
-    session.commit()
 
 
 def get_days_in_month(period_as_str):
