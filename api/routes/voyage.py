@@ -65,7 +65,10 @@ from sqlalchemy.sql import extract
 @routes_api.route(
     "/v0/voyage",
     strict_slashes=False,
-    doc={"description": "Retrieve shipments of fossil fuels."},
+    doc={
+        "description": "Deprecated, use /v0/kpler_trade. Retrieve shipments of fossil fuels.",
+        "deprecated": True,
+    },
 )
 class VoyageResource(Resource):
     parser = reqparse.RequestParser()

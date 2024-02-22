@@ -17,7 +17,14 @@ from base.utils import to_datetime, to_list, intersect, df_to_json
 KPLER_TOTAL = "Total"
 
 
-@routes_api.route("/v1/kpler_flow", strict_slashes=False)
+@routes_api.route(
+    "/v1/kpler_flow",
+    strict_slashes=False,
+    doc={
+        "deprecated": True,
+        "description": "This route is deprecated, use /v1/kpler_trade with aggregate_by=origin_date,flow_origin_country,flow_destination_country,grade,pricing_scenario instead.",
+    },
+)
 class KplerFlowResource(TemplateResource):
     parser = TemplateResource.parser.copy()
 
