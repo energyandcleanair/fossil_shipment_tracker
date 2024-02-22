@@ -20,7 +20,7 @@ from . import routes_api
     "/v0/departure",
     strict_slashes=False,
     doc={
-        "description": "Deprecated, use /v0/kpler_trade.",
+        "description": "Deprecated, use /v1/kpler_trade.",
         "deprecated": True,
     },
 )

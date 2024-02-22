@@ -15,7 +15,7 @@ import pandas as pd
     methods=["GET"],
     strict_slashes=False,
     doc={
-        "description": "Deprecated, use /v0/kpler_trade. Retrieve shipments of fossil fuels.",
+        "description": "Deprecated, use /v1/kpler_trade. Retrieve shipments of fossil fuels.",
         "deprecated": True,
     },
 )
