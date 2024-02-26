@@ -83,7 +83,7 @@ def test_kpler_trades(date_from=None, date_to=None, product=None, origin_iso2=No
     comparison = compare_flows_to_trades(flows, aggregated_trades)
 
     expected = comparison["value_tonne.expected"].sum()
-    actual = comparison["value_tonne.expected"].sum()
+    actual = comparison["value_tonne.actual"].sum()
 
     sum_close = np.isclose(expected, actual, rtol=0.01)
 
@@ -185,8 +185,6 @@ def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
         product_type: product.our_product,
         "origin_iso2": origin_iso2,
         "aggregate_by": f"origin_month,destination_iso2",
-        "origin_date_from": "1970-01-01",
-        "destination_date_from": "1970-01-01",
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
         "format": "json",
