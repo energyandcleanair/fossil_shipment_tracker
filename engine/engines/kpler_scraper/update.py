@@ -27,23 +27,17 @@ def update_full():
     return update(
         date_from=-30,
         origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG", "QA", "US", "DZ", "NO"],
-        from_splits=[FlowsSplit.OriginCountries, FlowsSplit.OriginPorts],
-        to_splits=[FlowsSplit.DestinationCountries, FlowsSplit.DestinationPorts],
     )
 
 
 def update_lite(
     date_from=-30,
     origin_iso2s=["RU"],
-    from_splits=[FlowsSplit.OriginCountries],
-    to_splits=[FlowsSplit.DestinationCountries],
     platforms=None,
 ):
     return update(
         date_from=date_from,
         origin_iso2s=origin_iso2s,
-        from_splits=from_splits,
-        to_splits=to_splits,
         platforms=platforms,
     )
 
