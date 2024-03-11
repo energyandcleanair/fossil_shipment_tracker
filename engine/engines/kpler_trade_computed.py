@@ -249,22 +249,36 @@ def build_select(date_from: None, date_to: None):
         )
         .join(
             Price,
-            sa.and_(
-                pricing_commodity_id_field == Price.commodity,
-                Price.date == price_date,
-                sa.or_(
-                    voyage_insurer.c.iso2 == any_(Price.ship_insurer_iso2s),
+            sa.or_(
+                # If it's from Russia, match it based on destination, insurer, or owener.
+                sa.and_(
+                    origin_zone.country_iso2 == "RU",
+                    pricing_commodity_id_field == Price.commodity,
+                    Price.date == price_date,
+                    sa.or_(
+                        voyage_insurer.c.iso2 == any_(Price.ship_insurer_iso2s),
+                        Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    ),
+                    sa.or_(
+                        voyage_owner.c.iso2 == any_(Price.ship_owner_iso2s),
+                        Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    ),
+                    sa.or_(
+                        destination_zone.country_iso2 == any_(Price.destination_iso2s),
+                        Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    ),
+                    Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
+                ),
+                # If it's not from Russia, we use the default pricing.
+                sa.and_(
+                    origin_zone.country_iso2 != "RU",
+                    pricing_commodity_id_field == Price.commodity,
+                    Price.date == price_date,
                     Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
-                ),
-                sa.or_(
-                    voyage_owner.c.iso2 == any_(Price.ship_owner_iso2s),
                     Price.ship_owner_iso2s == base.PRICE_NULLARRAY_CHAR,
-                ),
-                sa.or_(
-                    destination_zone.country_iso2 == any_(Price.destination_iso2s),
                     Price.destination_iso2s == base.PRICE_NULLARRAY_CHAR,
+                    Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
                 ),
-                Price.departure_port_ids == base.PRICE_NULLARRAY_INT,
             ),
         )
         .distinct(
