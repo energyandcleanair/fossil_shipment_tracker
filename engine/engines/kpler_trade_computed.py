@@ -271,7 +271,7 @@ def build_select(date_from: None, date_to: None):
                 ),
                 # If it's not from Russia, we use the default pricing.
                 sa.and_(
-                    origin_zone.country_iso2 != "RU",
+                    sa.or_(origin_zone.country_iso2 == None, origin_zone.country_iso2 != "RU"),
                     pricing_commodity_id_field == Price.commodity,
                     Price.date == price_date,
                     Price.ship_insurer_iso2s == base.PRICE_NULLARRAY_CHAR,
