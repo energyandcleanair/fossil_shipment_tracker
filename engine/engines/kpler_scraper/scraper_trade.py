@@ -31,34 +31,22 @@ class KplerTradeScraper(KplerScraper):
             from_zone = self.get_zone_dict(iso2=current_iso2, platform=platform)
             trades_raw = []
 
-            # We split by group to be able to go further back in time (otherwise hitting 10000 window)
-            products_ = pd.DataFrame(self.get_products())
-            if platform == "liquids":
-                products_ = products_[products_["type"] == "group"]
-            else:
-                products_ = products_[products_["type"] == "commodity"]
-            products_ = products_[products_["platform"] == platform]
-            product_ids = products_["id"].tolist()
-
-            for product_id in product_ids:
-                query_from = 0
-                while True:
-                    size, query_trades_raw = self.get_trades_raw(
-                        from_zone=from_zone,
-                        platform=platform,
-                        query_from=query_from,
-                        operational_filter=operational_filter,
-                        product_ids=[product_id],
-                        month=month,
-                    )
-                    trades_raw.extend(query_trades_raw)
-                    query_from += size
-                    if (
-                        size == 0
-                        or min([pd.to_datetime(x.get("start")) for x in query_trades_raw])
-                        < date_from
-                    ):
-                        break
+            query_from = 0
+            while True:
+                size, query_trades_raw = self.get_trades_raw(
+                    from_zone=from_zone,
+                    platform=platform,
+                    query_from=query_from,
+                    operational_filter=operational_filter,
+                    month=month,
+                )
+                trades_raw.extend(query_trades_raw)
+                query_from += size
+                if (
+                    size == 0
+                    or min([pd.to_datetime(x.get("start")) for x in query_trades_raw]) < date_from
+                ):
+                    break
 
             for x in tqdm(trades_raw, unit="raw-trade", leave=False):
                 trades_, vessels_, zones_, products_, installations_ = self._parse_trade(
@@ -76,10 +64,12 @@ class KplerTradeScraper(KplerScraper):
         platform,
         from_zone=None,
         query_from=0,
-        product_ids=None,
         operational_filter=None,
         month=None,
     ):
+        if month is None:
+            raise ValueError("Month must be specified")
+
         if from_zone and from_zone.get("name") == "Unknown":
             return 0, []
 
@@ -93,21 +83,15 @@ class KplerTradeScraper(KplerScraper):
             else []
         )
 
-        filters = {}
-
-        if product_ids is not None:
-            filters["product"] = product_ids
-
         # Get zone dict
         params_raw = {
             "exchangeType": "export",
-            "filters": filters,
+            "filters": {},
             "flowDirection": "export",
             "from": query_from,
             "fromLocations": from_locations,
             "interIntra": "interintra",
             "locations": [],
-            "onlyRealized": False,
             "players": [],
             "size": 1000,
             "splitValues": [],
@@ -115,21 +99,18 @@ class KplerTradeScraper(KplerScraper):
             "toLocations": [],
             "vesselClassifications": [],
             "vessels": [],
-            "view": "kpler",
+            "onlyRealized": False,
             "withBetaVessels": False,
             "withForecasted": True,
             "withFreightView": False,
             "withIncompleteTrades": True,
             "withIntraCountry": True,
             "withProductEstimation": False,
+            "granularity": "months",
+            "period": month,
         }
-
-        if month:
-            params_raw["granularity"] = "months"
-            params_raw["period"] = month
-
-        if product_ids is not None:
-            params_raw["products"] = to_list(product_ids)
+        default_products = {"liquids": [1400, 1328, 1370], "lng": [1750], "dry": [1334]}
+        params_raw["filters"] = {"product": default_products[platform]}
 
         token = self.token  # get_env("KPLER_TOKEN_BRUTE")
         url = {
@@ -138,6 +119,7 @@ class KplerTradeScraper(KplerScraper):
             "lng": "https://lng.kpler.com/api/flows/trades",
         }.get(platform)
 
+        logger.info(f"Making Kpler request with URL {url} and params {params_raw}")
         headers = {
             "Authorization": f"Bearer {token}",
             "x-web-application-version": "v21.316.0",
@@ -246,18 +228,11 @@ class KplerTradeScraper(KplerScraper):
         #     get_nested(trade_raw, "portCallOrigin", "zone", "country", "name")
         # )
 
-        trade["arrival_zone_id"] = get_nested(
-            trade_raw, "portCallDestination", "zone", "id", warn=False
+        destination = get_nested(trade_raw, "portCallDestination", warn=False) or get_nested(
+            trade_raw, "forecastPortCallDestination", warn=False
         )
-        # trade["arrival_zone_name"] = get_nested(
-        #     trade_raw, "portCallDestination", "zone", "name", warn=False
-        # )
-        # trade["arrival_zone_type"] = get_nested(
-        #     trade_raw, "portCallDestination", "zone", "type", warn=False
-        # )
-        # trade["arrival_iso2"] = self._country_name_to_iso2(
-        #     get_nested(trade_raw, "portCallDestination", "zone", "country", "name", warn=False)
-        # )
+
+        trade["arrival_zone_id"] = get_nested(destination, "zone", "id", warn=False)
 
         # Berth
         trade["departure_berth_id"] = get_nested(
@@ -266,12 +241,8 @@ class KplerTradeScraper(KplerScraper):
         trade["departure_berth_name"] = get_nested(
             trade_raw, "portCallOrigin", "berth", "name", warn=False
         )
-        trade["arrival_berth_id"] = get_nested(
-            trade_raw, "portCallDestination", "berth", "id", warn=False
-        )
-        trade["arrival_berth_name"] = get_nested(
-            trade_raw, "portCallDestination", "berth", "name", warn=False
-        )
+        trade["arrival_berth_id"] = get_nested(destination, "berth", "id", warn=False)
+        trade["arrival_berth_name"] = get_nested(destination, "berth", "name", warn=False)
 
         # Installation
         trade["departure_installation_id"] = get_nested(
@@ -280,17 +251,13 @@ class KplerTradeScraper(KplerScraper):
         trade["departure_installation_name"] = get_nested(
             trade_raw, "portCallOrigin", "installation", "name", warn=False
         )
-        trade["arrival_installation_id"] = get_nested(
-            trade_raw, "portCallDestination", "installation", "id", warn=False
-        )
+        trade["arrival_installation_id"] = get_nested(destination, "installation", "id", warn=False)
         trade["arrival_installation_name"] = get_nested(
-            trade_raw, "portCallDestination", "installation", "name", warn=False
+            destination, "installation", "name", warn=False
         )
 
         trade["departure_sts"] = get_nested(trade_raw, "portCallOrigin", "shipToShip")
-        trade["arrival_sts"] = get_nested(
-            trade_raw, "portCallDestination", "shipToShip", warn=False
-        )
+        trade["arrival_sts"] = get_nested(destination, "shipToShip", warn=False)
 
         # Vessels
         trade["vessel_ids"] = [y.get("id") for y in trade_raw.get("vessels")]

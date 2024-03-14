@@ -1,3 +1,4 @@
+import sys
 from base.db_utils import upsert
 from engines import (
     kpler_scraper,
@@ -12,7 +13,7 @@ from sqlalchemy import text
 import pandas as pd
 
 
-def update():
+def update(continue_from_country=None):
 
     statement = """
       select origin_zone.country_iso2,
@@ -35,6 +36,12 @@ def update():
         .agg(min_date_utc=("min_date_utc", "min"), max_date_utc=("max_date_utc", "max"))
         .reset_index()
     )
+
+    # If continue_from_country is not None, filter the date_range_per_country_platform to start from that country
+    if continue_from_country:
+        date_range_per_country_platform = date_range_per_country_platform[
+            date_range_per_country_platform["country_iso2"] >= continue_from_country
+        ]
 
     for index, row in date_range_per_country_platform.iterrows():
         country = row["country_iso2"]
@@ -91,5 +98,10 @@ def update():
 
 
 if __name__ == "__main__":
+
+    continue_from_country = None
+    if len(sys.argv) > 1:
+        continue_from_country = sys.argv[1]
+
     print("=== Using %s environment ===" % (base.db.environment,))
-    update()
+    update(continue_from_country=continue_from_country)

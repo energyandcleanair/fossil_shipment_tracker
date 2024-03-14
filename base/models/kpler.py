@@ -246,7 +246,7 @@ class KplerInstallation(Base):
 
 class KplerSyncHistory(Base):
     id = Column(BigInteger, primary_key=True)
-    date = Column(DateTime, nullable=False)
+    date = Column(Date, nullable=False)
     platform = Column(String, nullable=False)
     country_iso2 = Column(String, nullable=False)
     last_updated = Column(String, nullable=False)

@@ -1,15 +1,13 @@
-from base.db import session
 from base.logger import logger, logger_slack, notify_engineers
 
-from kpler.sdk import FlowsSplit
+from engines import kpler_scraper
 
 from .update_zones import update_zones
 from .update_trade import update_trades
-from .update_flow import update_flows
+from .verify import verify_sync_against_flows
+from .clean_outdated_entries import clean_outdated_entries
 
 from enum import Enum
-
-import os
 
 
 class UpdateStatus(Enum):
@@ -21,6 +19,7 @@ class UpdateParts(Enum):
     ZONES = "ZONES"
     TRADES = "TRADES"
     CLEAN_OUTDATED_ENTRIES = "CLEAN_OUTDATED_ENTRIES"
+    VERIFY_AGAINST_LIVE_FLOWS = "VERIFY_AGAINST_LIVE_FLOWS"
 
 
 def update_full():
@@ -33,7 +32,7 @@ def update_full():
 def update_lite(
     date_from=-30,
     origin_iso2s=["RU"],
-    platforms=None,
+    platforms=kpler_scraper.PLATFORMS,
 ):
     return update(
         date_from=date_from,
@@ -45,9 +44,14 @@ def update_lite(
 def update(
     date_from=-30,
     date_to=None,
-    platforms=None,
+    platforms=kpler_scraper.PLATFORMS,
     origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG"],
-    parts=[UpdateParts.ZONES, UpdateParts.TRADES, UpdateParts.CLEAN_OUTDATED_ENTRIES],
+    parts=[
+        UpdateParts.ZONES,
+        UpdateParts.TRADES,
+        UpdateParts.CLEAN_OUTDATED_ENTRIES,
+        UpdateParts.VERIFY_AGAINST_LIVE_FLOWS,
+    ],
 ):
     logger_slack.info("=== Updating Kpler ===")
     try:
@@ -67,6 +71,12 @@ def update(
             logger.info("Cleaning outdated entries")
             clean_outdated_entries()
 
+        if UpdateParts.VERIFY_AGAINST_LIVE_FLOWS in parts:
+            logger.info("Verifying against live flows")
+            verify_sync_against_flows(
+                origin_iso2s=origin_iso2s, platforms=platforms, date_from=date_from, date_to=date_to
+            )
+
         return UpdateStatus.SUCCESS
 
     except Exception as e:
@@ -77,12 +87,3 @@ def update(
         )
         notify_engineers("Please check error")
         return UpdateStatus.FAILED
-
-
-def clean_outdated_entries():
-    # Read sql from 'update_is_valid.sql'
-    with open(os.path.join(os.path.dirname(__file__), "clean_outdated_entries.sql")) as f:
-        sql = f.read()
-    session.execute(sql)
-    session.commit()
-    return

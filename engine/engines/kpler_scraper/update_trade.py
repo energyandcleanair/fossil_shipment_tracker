@@ -20,8 +20,8 @@ def update_trades(
     origin_iso2s=["RU"],
 ):
     scraper = KplerTradeScraper()
-    date_from = to_datetime(date_from) if date_from is not None else dt.date(2020, 1, 1)
-    date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
+    date_from = to_datetime(date_from).date() if date_from is not None else dt.date(2020, 1, 1)
+    date_to = to_datetime(date_to).date() if date_to is not None else dt.date.today()
     periods = pd.period_range(start=date_from, end=date_to, freq="M").astype(str)
 
     _platforms = scraper.platforms if platforms is None else platforms
@@ -43,19 +43,39 @@ def update_trades(
                         platform=platform, from_iso2=from_iso2, month=period
                     )
 
+                    if not isinstance(trades, pd.DataFrame):
+                        trades = pd.DataFrame(trades)
+
+                    departure_date = pd.to_datetime(trades.departure_date_utc).dt.date
+
+                    trades = trades[(departure_date >= date_from) & (departure_date <= date_to)]
+                    logger.info(
+                        f"Uploading {len(vessels)} vessels for {platform}, {from_iso2}, {period}"
+                    )
                     upload_vessels(vessels)
+                    logger.info(
+                        f"Uploading {len(trades)} trades for {platform}, {from_iso2}, {period}"
+                    )
                     upload_trades(trades, update_time=update_time)
+                    logger.info(
+                        f"Uploading {len(installations)} installations for {platform}, {from_iso2}, {period}"
+                    )
                     upload_installations(installations)
 
-                    mark_scraper_history(platform, from_iso2, period, update_time)
+                    logger.info(
+                        f"Marking scraper history complete for {platform}, {from_iso2}, {period}"
+                    )
+                    mark_scraper_history(
+                        platform, from_iso2, period, update_time, date_from, date_to
+                    )
 
                     del trades, vessels, products, installations
 
                 logger.info(f"Finished updating trades for {platform} for country {from_iso2}")
 
 
-def mark_scraper_history(platform, from_iso2, period, update_time):
-    days = [day for day in get_days_in_month(period) if day <= dt.date.today()]
+def mark_scraper_history(platform, from_iso2, period, update_time, date_from, date_to):
+    days = [day for day in get_days_in_month(period) if day >= date_from and day <= date_to]
 
     records = [
         {

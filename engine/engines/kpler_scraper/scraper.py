@@ -24,8 +24,8 @@ from unidecode import unidecode
 
 
 KPLER_TOTAL = "Total"
-
 CACHE_BASE_DIR = "cache/kpler/"
+PLATFORMS = ["liquids", "lng", "dry"]
 
 
 ### IMPORTANT
@@ -39,7 +39,7 @@ CACHE_BASE_DIR = "cache/kpler/"
 ### Ended up removing 833 and 110755 as having the lowest values
 class KplerScraper:
     def __init__(self):
-        self.platforms = ["liquids", "lng", "dry"]
+        self.platforms = PLATFORMS
         self.cc = coco.CountryConverter()
 
         # To cache products
