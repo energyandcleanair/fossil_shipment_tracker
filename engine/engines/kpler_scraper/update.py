@@ -4,7 +4,7 @@ from engines import kpler_scraper
 
 from .update_zones import update_zones
 from .update_trade import update_trades
-from .verify import verify_sync_against_flows
+from .verify import KplerTradeVerifier
 from .clean_outdated_entries import clean_outdated_entries
 
 from enum import Enum
@@ -73,7 +73,10 @@ def update(
 
         if UpdateParts.VERIFY_AGAINST_LIVE_FLOWS in parts:
             logger.info("Verifying against live flows")
-            verify_sync_against_flows(
+
+            verifier = KplerTradeVerifier()
+
+            verifier.verify_sync_against_flows(
                 origin_iso2s=origin_iso2s, platforms=platforms, date_from=date_from, date_to=date_to
             )
 
