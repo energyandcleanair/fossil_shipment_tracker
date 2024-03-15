@@ -50,9 +50,6 @@ class KplerTradeVerifier:
                 comparison["country"] = country
                 comparison["platform"] = platform
 
-                logger.info(
-                    f"Comparison for {country} {platform} from {date_from} to {date_to}:\n{comparison}"
-                )
                 self.update_sync_history_with_status(
                     origin_iso2=country,
                     platform=platform,
@@ -66,7 +63,7 @@ class KplerTradeVerifier:
 
         failed_comparisons = comparisons[~comparisons["ok"]]
         if (comparisons["ok"] == False).any():
-            logger.warn(f"Some comparisons failed:\n{failed_comparisons}")
+            logger.warn(f"Some comparisons failed:\n{failed_comparisons.to_string()}")
 
         return
 
