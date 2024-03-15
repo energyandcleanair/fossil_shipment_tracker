@@ -137,8 +137,8 @@ class KplerTradeResource(TemplateResource):
     parser.add_argument(
         "date_to",
         type=str,
-        help="Filters where ships left origin on or before date (format 2020-01-01). Overwritten if destination_date_to or origin_date_to is provided.",
-        default=None,
+        help="Filters where ships left origin on or before date (format 2020-01-01). Overwritten if destination_date_to or origin_date_to is provided. Defaults to yesterday.",
+        default="-1",
         required=False,
     )
 
