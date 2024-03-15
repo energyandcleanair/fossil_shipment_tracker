@@ -107,6 +107,14 @@ class TemplateResource(Resource):
         default=None,
     )
 
+    parser.add_argument(
+        "check_complete",
+        type=inputs.boolean,
+        help="whether to check if the dataset is complete",
+        required=False,
+        default=True,
+    )
+
     # MUST BE FILLED
     must_group_by = []
     date_cols = []
@@ -118,6 +126,10 @@ class TemplateResource(Resource):
     def get(self):
         params = TemplateResource.parser.parse_args()
         return self.get_from_params(params)
+
+    def check_complete(self, query, params):
+
+        return True, None
 
     def get_aggregate_cols_dict(self, subquery):
         return {}
@@ -171,6 +183,8 @@ class TemplateResource(Resource):
         return result
 
     def get_from_params(self, params):
+
+        check_complete = params.get("check_complete")
         aggregate_by = params.get("aggregate_by")
         format = params.get("format", "json")
         nest_in_data = params.get("nest_in_data")
@@ -188,6 +202,18 @@ class TemplateResource(Resource):
         query = self.initial_query(params=params)
 
         query = self.filter(query=query, params=params)
+
+        if check_complete:
+            check_status, incomplete_reason = self.check_complete(query=query, params=params)
+            if not check_status:
+                return Response(
+                    status=HTTPStatus.NOT_FOUND,
+                    response=f"The dataset requested is not complete. "
+                    + f"Check the data and decide whether it needs updating or if you can continue "
+                    + f"with incomplete data. You can continue with incomplete data by specifying check_complete=False.\n"
+                    + f"The following data is incomplete:\n{incomplete_reason}",
+                    mimetype="text/plain",
+                )
 
         query = self.aggregate(query=query, params=params)
 
