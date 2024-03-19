@@ -1,0 +1,1295 @@
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="description" content="">
+		<meta name="author" content="Equasis">
+
+
+		<title>Equasis - HomePage
+		</title>
+		<meta http-equiv="content-type" content="text/html;charset=UTF-8">
+		<meta http-equiv="pragma" content="no-cache">
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+		<meta http-equiv="Expires" content="0">
+
+		<link href="../Static/css/input.css" rel="stylesheet">
+		<link href="../Static/css/bootstrap.min.css" rel="stylesheet">
+		<link href="../Static/css/font-awesome.min.css" rel="stylesheet">
+		<link href="../Static/css/main.css" rel="stylesheet">
+		<link href="../Static/css/dropdown.css" rel="stylesheet">
+		<link href="../Static/css/table.css" rel="stylesheet">
+		<link href="../Static/css/radios.css" rel="stylesheet">
+
+		<link rel="icon" type="image/x-icon" href="../Static/favicon.ico">
+		<link rel="shortcut icon" type="image/x-icon" href="../Static/favicon.ico">
+		<link rel="apple-touch-icon-precomposed" sizes="144x144"
+			href="../Static/images/ico/apple-touch-icon-144-precomposed.png">
+		<link rel="apple-touch-icon-precomposed" sizes="114x114"
+			href="../Static/images/ico/apple-touch-icon-114-precomposed.png">
+		<link rel="apple-touch-icon-precomposed" sizes="72x72"
+			href="../Static/images/ico/apple-touch-icon-72-precomposed.png">
+		<link rel="apple-touch-icon-precomposed"
+			href="../Static/images/ico/apple-touch-icon-57-precomposed.png">
+
+
+		<script src="../Static/jslib/equasis.js" ></script>
+
+		<script type="text/javascript" src="../Static/jslib/memberaccess.js" ></script>
+
+
+
+
+		  <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="../Static/js/html5shiv.min.js"></script>
+      <script src="../Static/js/respond.min.js"></script>
+    <![endif]-->
+	</head>
+	<body onload="initOnglet()">
+	<a style="display:none" data-toggle="collapse" href="#collapse1" aria-expanded="false" id="boutonInitOnglet">
+	</a>
+	<div id="body">
+	<header class="banner">
+		<nav class="navbar navbar-default navbar-fixed-top navbar-inverse white" role="navigation">
+			<div class="separator bleu-equasis"></div>
+			<div class="container-fluid">
+				<div class="row">
+					<div class="col-sm-2 no-padding">
+
+						<!-- LOGO -->
+						<div class="navbar-header full-width">
+							<button type="button" class="navbar-toggle"
+								data-toggle="collapse" data-target="#equasis-menu-collapse" id= menu onClick="toggleMenu();" >
+								<span class="sr-only">Toggle navigation</span> <span
+									class="icon-bar"></span> <span class="icon-bar"></span> <span
+									class="icon-bar"></span>
+							</button>
+
+							<button type="button" class="navbar-toggle user"
+								data-toggle="collapse" data-target="#equasis-user-collapse" id=user onClick="toggleUser();">
+								<span class="sr-only">Toggle navigation</span> <span
+									class="icon-user"></span></button>
+
+
+
+						<a class="navbar-brand" href="HomePage?fs=HomePage"><img
+							class="img-responsive" src="../Static/img/logo_equasis_prod.gif"
+							alt="logo"></a>
+					</div>
+					<!-- /LOGO -->
+
+				</div>
+				<div class="hidden-lg hidden-md hidden-sm">
+					<div class="collapse navbar-collapse hidden-lg hidden-md hidden-sm"
+						id="equasis-user-collapse">
+
+
+							<div class="navbar-right hidden-lg hidden-md hidden-sm">
+								<!-- USER INFO XS -->
+								<div class="access-body">
+									<h3>
+										Welcome
+									</h3>
+									<div class="clearfix"></div>
+									<form name="formInfoUser" method="post"
+										action="HomePage?fs=HomePage"
+										onSubmit="window.location.reload()">
+										<div class="row">
+											<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+												<h3 class="bleu-equasis">Mr
+													Panda Panda Rushwood</h3>
+											</div>
+										</div>
+										<div class="row">
+											<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+											<div class="clearfix h15"></div>
+												<h3 class="bleu-equasis">
+													You can :
+												</h3>
+											</div>
+										</div>
+										<div class="row">
+											<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+												<ul class="no-margin">
+													<li><a
+														href="../public/HomePage?fs=HomePage&P_ACTION=NEW_CONNECTION">
+															Logout <i
+															class="icon-arrow-right icon-sm"></i>
+													</a></li>
+												</ul>
+											</div>
+										</div>
+
+											<div class="row">
+												<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+
+													<a href="Registration?fs=HomePage"> My profile <i
+														class="icon-arrow-right icon-sm"></i></a>
+												</div>
+											</div>
+
+										<div class="row">
+											<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+												<ul>
+													<li><a
+														href="ReportAnError?fs=HomePage&amp;P_ACTION=NEW_QUERY">
+															Report an Issue
+															<i class="icon-arrow-right icon-sm"></i>
+													</a></li>
+													<li><a href="Feedback?fs=HomePage"> Give your opinion <i
+															class="icon-arrow-right icon-sm"></i></a></li>
+												</ul>
+											</div>
+										</div>
+
+									</form>
+									<div class="clearfix h15 hidden-lg hidden-md"></div>
+								</div>
+								<!-- /USER INFO XS -->
+							</div>
+
+					</div>
+				</div>
+				<div class="collapse navbar-collapse" id="equasis-menu-collapse">
+
+
+
+
+						<div class="col-sm-4 col-lg-3 navbar-right hidden-xs">
+
+							<div class="table-cell cell-full text-right" >
+
+							</div>
+
+
+							<div class="table-cell">
+								<ul class="nav" style="margin-top: -10px;">
+
+									<li class="dropdown dropdown-arrow" id="user_menu_container">
+										<a href="#" class="dropdown-toggle text-overflow text-left"
+										data-toggle="dropdown"> <span><i
+												class="icon-user icon-md"></i></span>
+									</a>
+										<ul
+											class="dropdown-menu user-menu panel panel-success no-border no-padding no-radius noclose">
+											<li class="panel-body" id="guest-register">
+												<!-- USER INFO -->
+												<form class="text-left" role="form">
+													<div class="pull-left">
+														<i class="icon-unlock icon-md"></i>
+													</div>
+													<div class="access-body">
+														<h3>
+															Welcome
+														</h3>
+														<div class="row">
+															<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+																<h3 class="bleu-equasis">Mr
+																	Panda
+																	Panda Rushwood</h3>
+															</div>
+														</div>
+														<div class="row">
+															<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+																<div class="clearfix h20"></div>
+																<h3 class="bleu-equasis">
+																	You can :
+																</h3>
+															</div>
+														</div>
+														<div class="row">
+															<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+																<ul class="no-margin">
+																	<li><a
+																		href="../public/HomePage?fs=HomePage&P_ACTION=NEW_CONNECTION">
+																			Logout <i
+																			class="icon-arrow-right icon-sm"></i>
+																	</a></li>
+																</ul>
+															</div>
+														</div>
+
+															<div class="row">
+																<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+
+																	<a href="Registration?fs=HomePage"> My profile <i
+																		class="icon-arrow-right icon-sm"></i></a>
+																</div>
+															</div>
+
+														<div class="row">
+															<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+																<ul>
+																	<li><a
+																		href="ReportAnError?fs=HomePage&amp;P_ACTION=NEW_QUERY">
+																			Report an Issue <i
+																			class="icon-arrow-right icon-sm"></i>
+																	</a></li>
+
+																	<li><a href="Feedback?fs=HomePage"> Give your opinion <i
+																			class="icon-arrow-right icon-sm"></i></a></li>
+																</ul>
+															</div>
+														</div>
+													</div>
+												</form> <!-- USER INFO -->
+											</li>
+
+										</ul>
+									</li>
+								</ul>
+							</div>
+						</div>
+
+
+					<div class="col-sm-6 col-lg-7 navbar-center">
+						<ul class="nav navbar-nav text-left" style="visibility: visible;">
+							<!-- Home -->
+
+
+								<li class="active">
+
+
+							<a href="../public/HomePage?fs=HomePage"> Home <i
+								class="icon-arrow-right icon-sm pull-right hidden-lg hidden-md hidden-sm">
+							</i>
+							</a>
+
+							</li>
+							<!-- /Home -->
+
+							<!-- ADMINISTRATION -->
+
+							<!-- /ADMINISTRATION -->
+
+							<!-- MY EQUASIS -->
+
+
+
+									<li>
+
+														 		<a href="../restricted/ShipSubcription?fs=HomePage" id="dropdownMenuMyEquasis" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"  >
+										My Equasis&nbsp;<i class="icon-chevron-down icon-sm hidden-xs"></i>
+									 <i class="icon-arrow-right icon-sm pull-right hidden-lg hidden-md hidden-sm"></i>
+								</a>
+								<ul class="dropdown-menu"
+									aria-labelledby="dropdownMenuMyEquasis">
+									<li><A
+										href="../restricted/ShipSubcription?fs=HomePage"><i class="icon-caret-right"></i>&nbsp;Ship sign up
+									</A></li>
+
+
+									<li><A
+										href="../restricted/CompanySubcription?fs=HomePage"><i class="icon-caret-right"></i>&nbsp;Company sign up
+									</A></li>
+
+
+									<li><A href="../restricted/SurveyList?fs=HomePage"><i class="icon-caret-right"></i>&nbsp;Survey
+									</A></li>
+
+								</ul>
+
+							<!-- /MY EQUASIS -->
+
+
+							<!-- ABOUT -->
+
+
+								<li>
+
+							<a href="../restricted/About?fs=HomePage" id="dropdownMenu1"
+								data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+								About Equasis &nbsp;<i class="icon-chevron-down icon-sm hidden-xs"></i><i
+								class="icon-arrow-right icon-sm pull-right hidden-lg hidden-md hidden-sm"></i>
+							</a>
+							<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+								<li><A
+									href="../public/About?fs=HomePage&amp;P_ABOUT=MainConcern.html">
+										<i class="icon-caret-right"></i>&nbsp;Overview
+								</A></li>
+								<li><A
+									href="../public/About?fs=HomePage&amp;P_ABOUT=MoUText.html">
+										<i class="icon-caret-right"></i>&nbsp;MOU text
+								</A></li>
+								<li><A
+									href="../public/About?fs=HomePage&amp;P_ABOUT=Org.html">
+										<i class="icon-caret-right"></i>&nbsp;Organisation
+								</A></li>
+
+								<li><A
+									href="../public/DataUpdatePublic?fs=HomePage&amp;P_PAGE=1">
+										<i class="icon-caret-right"></i>&nbsp;Data update
+								</A></li>
+								<li><A
+									href="../public/About?fs=HomePage&amp;P_ABOUT=Providers.html">
+										<i class="icon-caret-right"></i>&nbsp;Data-Providers
+								</A></li>
+								<li><A
+									href="../public/About?fs=HomePage&amp;P_ABOUT=Events.html">
+										<i class="icon-caret-right"></i>&nbsp;Events
+								</A></li>
+
+									<li><A href="../restricted/FlagPerf?fs=HomePage">
+										<i class="icon-caret-right"></i>&nbsp;Flag Perf.
+									</A></li>
+
+
+									<li><A href="../restricted/ROPerf?fs=HomePage">
+										<i class="icon-caret-right"></i>&nbsp;RO Perf.
+									</A></li>
+
+
+
+								<li><A href="../restricted/RatConv?fs=HomePage"> <i class="icon-caret-right"></i>&nbsp;IMO conventions
+								</A></li>
+
+							</ul>
+							<!-- /ABOUT -->
+
+							<!-- STATISTICS -->
+
+
+								<li>
+
+
+
+								<a href="../restricted/PublicStatistic?fs=HomePage">Statistics <i
+									class="icon-arrow-right icon-sm pull-right hidden-lg hidden-md hidden-sm"></i></a>
+
+								</li>
+							<!-- /STATISTICS -->
+						</ul>
+					</div>
+				</div>
+			</div>
+		</div>
+	</nav>
+</header>
+<noscript>
+	<div class="remove-spaces-alert">
+		<div class="alert alert-warning text-left browser-outdated" style="margin: 0px auto;">
+			<div class="table-cell align-top">
+				<span class="fa-stack font-200" style="margin-right: 10px">
+					<i class="fa fa-square fa-stack-2x"></i>
+					<i style="color: #CDE7F4" class="fa fa-exclamation-triangle fa-stack-1x"></i>
+				</span>
+			</div>
+			<div class="table-cell align-top full-width center-block">
+				<p style="text-align:justify;" class="no-margin"><strong class="font-120 center-block">You don't have javascript enabled in your browser.<br />The Equasis Website use Javascript as a part of its core functionality, and if you browse this website without JavaScript enabled then you won't have the full experience that you normally would.<br />This website may not work properly.</strong></p>
+			</div>
+		</div>
+	</div>
+</noscript>
+<div id="cookiesDisabled" class="remove-spaces-alert" style="display:none;">
+	<div class="alert alert-danger text-left browser-outdated" style="margin: 0px auto;">
+		<div class="table-cell align-top">
+			<span class="fa-stack font-200" style="margin-right: 10px">
+				<i class="fa fa-square fa-stack-2x"></i>
+				<i style="color: #CDE7F4" class="fa fa-exclamation-triangle fa-stack-1x"></i>
+			</span>
+		</div>
+		<div class="table-cell align-top full-width center-block">
+			<p style="text-align:justify;" class="no-margin"><strong class="font-120 center-block">You don't have Cookies enabled in your browser.<br />Cookies help us deliver our services. By using our services, you agree to our use of Cookies.
+			<br />The Equasis Website use Cookies as a part of its core functionality, and if you browse this website without Cookies enabled then you won't have the full experience that you normally would.<br />This website may not work properly.</strong></p>
+		</div>
+	</div>
+</div>
+<div id="browser" class="remove-spaces-alert" style="display:none;">
+	<div class="alert alert-danger text-left browser-outdated" style="margin: 0px auto;">
+		<div class="table-cell align-top">
+			<span class="fa-stack font-200" style="margin-right: 10px">
+				<i class="fa fa-square fa-stack-2x"></i>
+				<i style="color: #CDE7F4" class="fa fa-exclamation-triangle fa-stack-1x"></i>
+			</span>
+		</div>
+		<div class="table-cell align-top full-width center-block">
+			<p style="text-align:justify;" class="no-margin"><strong class="font-120 center-block">Your browser is not supported by Equasis Website.
+		</strong></p>
+		</div>
+	</div>
+</div>
+
+
+
+
+
+<!-- Breadcrumb -->
+
+
+
+
+
+<script src="../Static/js/enteteMenuUser.js"></script>
+
+
+
+
+
+<!-- Message error -->
+
+
+
+
+
+
+<!-- HomePage -->
+
+<section class="remove-spaces hidden-sm hidden-md hidden-lg"></section>
+
+	<section id="news" class="equasis_blue_boxes bleu-equasis"
+		style="height: 100%;">
+		<div class="container-fluid" style="height: 100%;">
+			<div class="row-fluid" style="height: 100%;">
+				<!-- Public web-site -->
+				<div class="col-lg-4 col-md-4 col-sm-12 col-xs-12 about-box no-padding">
+					<div class="news-item">
+						<div class="news-body">
+
+							<h3 class="orange-equasis">
+								Welcome to Equasis, a public site promoting maritime safety and quality</h3>
+							<div class="hidden-sm hidden-xs">
+								 Equasis is a tool aimed at reducing substandard shipping  <BR>- Equasis provides safety related information on ships and companies <BR>- Its services are free of any charge <BR>- You only need to register as a user <BR>&nbsp;
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- photos -->
+				<div class="col-lg-4 col-md-4 hidden-sm hidden-xs" style="height: 100%;">
+
+					<section id="main-slider" class="no-margin">
+						<div class="carousel slide wet-asphalt">
+
+
+								<ol class="carousel-indicators">
+
+
+
+									<li data-target="#main-slider" data-slide-to="0" class="active"></li>
+
+
+
+
+
+									<li data-target="#main-slider" data-slide-to="1"></li>
+
+
+
+
+									<li data-target="#main-slider" data-slide-to="2"></li>
+
+
+
+
+									<li data-target="#main-slider" data-slide-to="3"></li>
+
+
+								</ol>
+								<div class="carousel-inner">
+
+
+									<div class="item active full-height full-width item-slider"
+										style="background-image: url(/EquasisWeb/Static/images/slider/bg3.jpg)"></div>
+
+
+
+
+
+										<div class="item  full-height full-width item-slider"
+										style="background-image: url(/EquasisWeb/Static/images/slider/bg4.jpg)"></div>
+
+
+
+
+										<div class="item  full-height full-width item-slider"
+										style="background-image: url(/EquasisWeb/Static/images/slider/bg1.jpg)"></div>
+
+
+
+
+										<div class="item  full-height full-width item-slider"
+										style="background-image: url(/EquasisWeb/Static/images/slider/bg2.jpg)"></div>
+
+
+									<!-- <div class="item full-height full-width item-slider"
+										style="background-image: url(../Static/images/slider/bg2.jpg)"></div>
+
+									<div class="item full-height full-width item-slider"
+										style="background-image: url(../Static/images/slider/bg3.jpg)"></div>
+
+									<div class="item full-height full-width item-slider"
+										style="background-image: url(../Static/images/slider/bg4.jpg)"></div> -->
+								</div>
+
+
+
+						</div>
+
+						<a class="prev hidden-xs" href="#main-slider" data-slide="prev">
+							<i class="icon-angle-left"></i>
+						</a> <a class="next hidden-xs" href="#main-slider" data-slide="next">
+							<i class="icon-angle-right"></i>
+						</a>
+					</section>
+
+				</div>
+
+				<!-- news -->
+				<div class="col-lg-4 col-md-4 col-sm-12 col-xs-12 news-box no-padding item-slider-max">
+
+					<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+						<div class="news-body">
+							<div class="row">
+
+
+								<section id="news-slider" class="no-margin">
+
+
+										 <div class="carousel slide wet-asphalt carousel-news">
+
+											<ol class="carousel-indicators">
+
+
+
+
+														<li data-target="#news-slider" data-slide-to="0"
+														class="active">1</li>
+
+
+
+
+
+
+
+
+
+														<li data-target="#news-slider" data-slide-to= "1">2</li>
+
+
+
+
+
+												</ol>
+
+											<div class="carousel-inner ">
+												<div class="item active ">
+													<div class="col-lg-6 col-md-6 col-sm-6 col-xs-6 no-padding">
+
+														<h3 class="orange-equasis">News</h3>
+													</div>
+													<div class="col-lg-6 col-md-6 col-sm-6 col-xs-6 no-padding">
+														<h3 class="pull-right orange-equasis">2023-12-20</h3>
+													</div>
+													<div
+														class="col-lg-12 col-md-12 col-sm-12 col-xs-12 no-padding">
+
+														<p><p>The Equasis Quality Shipping Information System, a worldwide information system, free of charge, and unique in the maritime world announces that the <br><u><b><A href=https://www.equasis.org/Fichiers/Statistique/MOA/Documents%20availables%20on%20statistics%20of%20Equasis/Equasis%20Statistics%20-%20The%20world%20fleet%202022.pdf  target=blank class=bleu-equasis>2022 World Fleet Report</A></b></u>  has just been published.</p></p>
+													</div>
+												</div>
+
+
+
+
+
+														<div class="item ">
+
+															<div class="col-lg-6 col-md-6 col-sm-6 col-xs-6 no-padding">
+
+																<h3 class="orange-equasis">News</h3>
+															</div>
+															<div class="col-lg-6 col-md-6 col-sm-6 col-xs-6 no-padding">
+																<h3 class="pull-right orange-equasis">2023-06-30</h3>
+															</div>
+															<div
+																class="col-lg-12 col-md-12 col-sm-12 col-xs-12 no-padding">
+
+																<p><p>Some issues to change your password?
+This document has been realised to help you:</p>
+<p><b><A href=../Static/MOA/About/infos_accounts_management.pdf target=blank  class=bleu-equasis>About account management</A></b></p></p>
+															</div>
+														</div>
+
+
+
+
+											</div>
+										</div>
+
+								</section>
+							</div>
+							<div class="row socials">
+								<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12 no-padding">
+									<p class="pull-right">
+										<b>More news</b>&nbsp;
+										<a href="//www.facebook.com/equasis.news" target="_blank"
+											class="social"><i class="icon-facebook icon-md"></i></a>&nbsp;<a
+											href="//twitter.com/equasis_news" target="_blank" class="social"><i
+											class="icon-twitter icon-md"></i></a>
+									</p>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+	<!--/#news-->
+	<section id="news-separator" class="separator orange-equasis"></section>
+
+		<!-- l'utilisateur est connecte -->
+			<form id="form" method="post" action="../public/HomePage?fs=HomePage" >
+				<input type="hidden" name="P_ACTION" value="NEW_CONNECTION">
+				<input type="hidden" id="P_ID_USER" value="653591">
+			</form>
+
+
+
+			<section id="access"
+				class="grey_white_boxes gris-clair-login connected">
+					<div class="container-fluid no-padding">
+						<div class="row-fluid">
+							<div class="col-md-offset-2">
+								<form role="form" id="searchForm" action="../restricted/Search?fs=HomePage" method="post" name="searchFormHome" onsubmit="document.searchFormHome.P_ENTREE_HOME_HIDDEN.value=document.searchFormHome.P_ENTREE_HOME.value;">
+									<input type="hidden" id="P_PAGE" value='1' name="P_PAGE">
+									<input type="hidden" name="P_PAGE_COMP" value="1">
+									<input type="hidden" name="P_PAGE_SHIP" value="1">
+									<div
+										class="col-lg-4 col-md-4 col-sm-12 col-xs-12 search-box white">
+
+										<div class="access-item access-box">
+											<div class="pull-left">
+												<i class="icon-unlock icon-md"></i>
+											</div>
+
+
+
+											<div class="access-body">
+												<h3>
+													Search
+												</h3>
+												<div class="clearfix"></div>
+
+												<div class="input-group">
+													<input type="text" class="form-control" autocomplete="off"
+														placeholder="IMO, Name, Company"
+														name="P_ENTREE_HOME" id="P_ENTREE_HOME" required="required">
+													<span class="input-group-btn"> <input type="hidden"
+														id="P_ENTREE_HOME_HIDDEN" value=''
+														name="P_ENTREE_HOME_HIDDEN">
+
+														<button class="btn btn-default" type="submit">
+															<i class="icon-search icon-sm"></i>
+														</button>
+													</span>
+												</div>
+
+											</div>
+										</div>
+
+										<div class="clearfix"></div>
+									</div>
+
+
+									<div class="col-lg-2 col-md-2 col-sm-12 col-xs-12 ship-box white">
+
+										<div class="access-item access-box">
+
+											<div class="access-body">
+												<div class="container-fluid">
+													<div class="row pull-bottom">
+														<div class="col-lg-12 col-md-12 col-sm-4 col-xs-4">
+															<div class="checkbox">
+																<input type="checkbox" value="Ship" id="checkbox-ship"
+																	name="checkbox-ship" checked /> <label
+																	for="checkbox-ship"></label>
+																<p>
+																	Ship
+																</p>
+															</div>
+														</div>
+														<div class="col-sm-4 col-xs-4"></div>
+														<div class="col-lg-12 col-md-12 col-sm-4 col-xs-4">
+															<div class="checkbox">
+																<input type="checkbox" value="Company"
+																	id="checkbox-company" name="checkbox-company" /> <label
+																	for="checkbox-company"></label>
+																<p>
+																	Company
+																</p>
+															</div>
+														</div>
+													</div>
+												</div>
+
+												<div class="clearfix h25 hidden-lg hidden-md"></div>
+
+
+											</div>
+										</div>
+									</div>
+
+
+									<div
+										class="col-lg-2 col-md-2 col-sm-12 col-xs-12 advanced-box white">
+										<div class="access-item access-box">
+											<div class="access-body pull-bottom">
+
+
+												<input type="hidden" name="advancedSearch" id="advancedSearch"
+													value="">
+												<div>
+													<a href="#" id=advancedLink>Advanced Search <i
+														class="icon-arrow-right icon-sm"></i></a>
+												</div>
+
+												<div>
+													<a href="../restricted/ShipSubcription?fs=HomePage">Go to My Equasis <i
+														class="icon-arrow-right icon-sm"></i></a>
+												</div>
+											</div>
+										</div>
+									</div>
+								</form>
+							</div>
+
+
+						</div>
+
+
+					</div>
+				</section>
+
+
+
+
+
+	<!--/#access-->
+	<section class="grey_blue_boxes gris-bleu-traffic">
+		<div class="container-fluid no-padding">
+			<div class="row-fluid">
+				<div
+					class="col-lg-8 col-lg-push-4 col-md-8 col-md-push-4 col-sm-12 col-xs-12 padding-15">
+					<div class="row">
+						<div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
+							<div class="access-item">
+								<div class="access-body">
+									<h3>LAST DATA UPDATE :</h3>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="row">
+						<div class="access-item">
+							<div class="access-body">
+								<div class="list-group">
+									<div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
+
+
+
+
+												<div class="list-group-item">
+													<span class="badge">3 hour(s) ago  </span>
+													<p>IHS Maritime</p>
+												</div>
+
+
+
+
+
+
+												<div class="list-group-item">
+													<span class="badge">3 hour(s) ago  </span>
+													<p>MarineTraffic</p>
+												</div>
+
+
+
+
+
+
+												<div class="list-group-item">
+													<span class="badge">4 hour(s) ago  </span>
+													<p>Türk Loydu</p>
+												</div>
+
+
+
+
+
+
+
+									</div>
+									<div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
+
+
+												<div class="list-group-item">
+													<span class="badge">4 hour(s) ago  </span>
+													<p>Mediterranean MoU</p>
+												</div>
+
+
+
+
+
+
+												<div class="list-group-item">
+													<span class="badge">4 hour(s) ago  </span>
+													<p>Paris MoU</p>
+												</div>
+
+
+
+
+
+
+
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div
+					class="col-sm-12 col-xs-12 white h2 hidden-lg hidden-md no-padding">
+				</div>
+
+				<div
+					class="col-lg-4 col-lg-pull-8 col-md-4 col-md-pull-8  col-sm-12 col-xs-12 padding-15">
+					<div class="row">
+						<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+							<div class="access-item">
+								<div class="access-body">
+									<h3>USER ACTIVITY :</h3>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+							<div class="access-item">
+								<div class="access-body">
+
+										<p>Connections : 77,333,797 since 2007 </p>
+
+									<p>Users connected : 5596</p>
+									<a target="_blank" href="https://www.clustrmaps.com/map/equasis.org">
+									<img class="img-responsive col-centered hidden-sm hidden-xs"
+										align="middle" src="https://www2.clustrmaps.com/stats/maps-no_clusters/equasis.org-thumb.jpg" alt="Locations of visitors to this page">
+									</a>
+									<button
+										class="center-block btn btn-sm gris-bleu-copyright col-centered hidden-lg hidden-md"
+										type="button" onclick="window.open('https://www.clustrmaps.com/map/equasis.org');">
+											Cluster Maps
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+			</div>
+
+		</div>
+		<div class="clearfix h25"></div>
+	</section>
+
+
+
+<script type="text/javascript">
+
+	// lien recherche avancee
+	 var form = document.getElementById("searchForm");
+	document.getElementById("advancedLink").addEventListener("click", function () {
+		var element =document.getElementById("advancedSearch");
+		element.value='advancedOk';
+	  form.submit();
+	});
+
+
+</script>
+
+
+
+
+
+
+
+	<!--#page-wrap -->
+	<div class="footer">
+	<section id="news-separator" class="separator orange-equasis"></section>
+	<section id="contributors" class="white">
+		<div class="container-fluid col-centered">
+			<div class="row-fluid">
+				<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+					<div class="access-item">
+						<div class="access-body">
+							<h3>Equasis's contributors</h3>
+							<div class="col-md-offset-1">
+								<div class="row">
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="http://www.mar.mil.br/" target="_blank" class="social"><img class="img-responsive" title="Brasil" alt="Brasil" src="../Static/img/logo_members/brasil_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="http://www.tc.gc.ca/eng/marinesafety/oep-inspection-menu-770.htm" target="_blank" class="social"><img class="img-responsive" title="Canada" alt="Canada" src="../Static/img/logo_members/Canada_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="http://www.emsa.europa.eu/" target="_blank" class="social"><img class="img-responsive" title="EMSA" alt="EMSA" src="../Static/img/logo_members/EMSA_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="https://www.mer.gouv.fr/" target="_blank" class="social"><img class="img-responsive" title="France" alt="France" src="../Static/img/logo_members/France_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="http://www.mofa.go.jp/" target="_blank" class="social"><img class="img-responsive" title="Japan" alt="Japan" src="../Static/img/logo_members/Japan_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="http://www.korea.net/" target="_blank" class="social"><img class="img-responsive" title="Korea (Republic of )" alt="Korea (Republic of )" src="../Static/img/logo_members/South_Korea_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="http://www.norway.no/" target="_blank" class="social"><img class="img-responsive" title="Norway" alt="Norway" src="../Static/img/logo_members/Norway_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="https://www.fomento.gob.es/MFOM/LANG_CASTELLANO/DIRECCIONES_GENERALES/MARINA_MERCANTE/" target="_blank" class="social"><img class="img-responsive" title="Spain" alt="Spain" src="../Static/img/logo_members/Spain_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="http://www.mcga.gov.uk/c4mca/mcga07-home" target="_blank" class="social"><img class="img-responsive" title="United Kingdom" alt="United Kingdom" src="../Static/img/logo_members/UK_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+									<div class="col-lg-1 col-md-1 col-sm-3 col-xs-3">
+
+
+
+											<a href="https://www.dco.uscg.mil/Our-Organization/Assistant-Commandant-for-Prevention-Policy-CG-5P/" target="_blank" class="social"><img class="img-responsive" title="United States of America" alt="United States of America" src="../Static/img/logo_members/USA_flag.jpg"></a>&nbsp;
+
+
+
+									</div>
+
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!--/.col-md-12-->
+			</div>
+		</div>
+	</section>
+	<!--/#contributors-->
+
+	<!--  -->
+	<section id="sitemap" class="gris-bleu-traffic">
+		<div class="container-fluid no-padding">
+			<div class="row-fluid">
+			<!-- join us xs-->
+				<div class="hidden-lg hidden-md  col-sm-12 col-xs-12 social-group ">
+					<div class="sitemap-item">
+						<div class="sitemap-body">
+							<div class="col-sm-6 col-xs-6 hidden-lg hidden-md">
+								<div class="row">
+									<p>
+										<a href="Moa?fs=HomePage&amp;P_MOA=contact" class="social">
+											<i class="icon-envelope icon-md"></i>
+											&nbsp;Contact us
+										</a>
+									</p>
+								</div>
+								<div class="row">
+									<p>
+										<a href="Moa?fs=HomePage&amp;P_MOA=help" class="social">
+											<i class="icon-info icon-md"></i>
+											&nbsp;Help
+										</a>
+									</p>
+								</div>
+							</div>
+							<div class="col-sm-6 col-xs-6">
+								<div class="row">
+									<p class="pull-right">
+										Join us on&nbsp;
+										<a href="//www.facebook.com/equasis.news" target="_blank" class="social">
+											<i class="icon-facebook icon-md"></i>
+										</a>&nbsp;
+										<a href="//twitter.com/equasis_news" target="_blank" class="social">
+											<i class="icon-twitter icon-md"></i>
+										</a>
+									</p>
+								</div>
+								<div class="row hidden-lg hidden-md">
+									<p class="pull-right">
+										<a href="Moa?fs=HomePage&amp;P_MOA=faq" class="social">
+											<i class="icon-question icon-md"></i>
+											&nbsp;FAQ
+										</a>
+									</p>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- /join us -->
+			<!-- site map -->
+			<div class="col-lg-6  col-md-6  col-sm-12 col-xs-12">
+					<div class="sitemap-item">
+						<div class="sitemap-body">
+							<h3>Site map</h3>
+							<div class="col-lg-6 col-md-6 col-sm-6 col-xs-6">
+								<ul>
+									<li>
+										<a href="../public/HomePage?fs=HomePage">
+											Home
+										</a>
+									</li>
+									<li>
+										<a href="../public/About?fs=HomePage">
+											About Equasis
+										</a>
+									</li>
+									<li>
+											<form name="lienSearchFooter" method="post" action ="../restricted/Search?fs=HomePage">
+												<input type="hidden" name="lienFooter" value =true>
+											</form>
+										<a href ="#" onClick="document.lienSearchFooter.submit();">
+											Search
+										</a>
+									</li>
+									<li>
+										<a href="../public/About?fs=HomePage&amp;P_ABOUT=Providers.html">
+											Data providers
+										</a>
+									</li>
+								</ul>
+							</div>
+							<div class="col-lg-6 col-md-6 col-sm-6 col-xs-6">
+								<ul>
+
+									<li>
+
+
+											<a href="../restricted/PublicStatistic?fs=HomePage">
+												Statistics
+											</a>
+
+									</li>
+									<li>
+										<a href="../public/HomePage?fs=HomePage">
+											News
+										</a>
+									</li>
+									<li>
+										<a href="../restricted/ShipSubcription?fs=HomePage">
+											My Equasis
+										</a>
+									</li>
+									<li>
+										<a href="../public/About?fs=HomePage&amp;P_ABOUT=EquasisPolicy.html">
+											Equasis policy
+										</a>
+									</li>
+
+								</ul>
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- /site map -->
+				<!-- join us lg-->
+				<div class="col-lg-6 col-md-6 hidden-sm hidden-xs social-group ">
+					<div class="sitemap-item">
+						<div class="sitemap-body">
+							<div class="clearfix h30 hidden-sm hidden-xs"></div>
+
+							<div class="col-lg-12 col-md-12 col-sm-6 col-xs-6">
+								<div class="row">
+									<p class="pull-right">
+										Join us on&nbsp;
+										<a href="//www.facebook.com/equasis.news" target="_blank" class="social">
+											<i class="icon-facebook icon-md"></i>
+										</a>&nbsp;
+										<a href="//twitter.com/equasis_news" target="_blank" class="social">
+											<i class="icon-twitter icon-md"></i>
+										</a>
+										<span class="no-style hidden-sm hidden-xs">
+											&nbsp;or contact us&nbsp;
+											<a href="Moa?fs=HomePage&amp;P_MOA=contact" class="social">
+												<i class="icon-envelope icon-md"></i>
+											</a>
+										</span>
+									</p>
+								</div>
+
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- /join us -->
+			</div>
+		</div>
+	</section>
+	<!--/#sitemap-->
+	<footer id="footer" class="gris-bleu-copyright">
+		<div class="container-fluid">
+			<div class="row-fluid">
+				<div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
+					<p>© Copyright 2000-2021; Version : Prod v3.4.0; Developed and hosted by French Ministry in charge of Transport -DAM/MAN-Saint-Malo</p>
+				</div>
+				<div
+					class="col-lg-6 col-md-6 col-sm-12 col-xs-12 hidden-sm hidden-xs">
+					<ul class="pull-right">
+						<li>
+							<a href="Moa?fs=HomePage&amp;P_MOA=help">
+								Help
+							</a>
+						</li>
+
+
+						<li>
+							<a href="Moa?fs=HomePage&amp;P_MOA=faq">
+								FAQ
+							</a>
+						</li>
+
+
+							<li>
+								<a href="ReportAnError?fs=HomePage&amp;P_ACTION=NEW_QUERY">
+									Report an Issue
+								</a>
+							</li>
+							<li>
+								<a href="Feedback?fs=HomePage">
+									Give your opinion
+								</a>
+							</li>
+
+						<li><a id="gototop" class="gototop" href="#"><i
+								class="icon-chevron-up"></i></a></li>
+						<!--#gototop-->
+					</ul>
+				</div>
+			</div>
+		</div>
+	</footer>
+	<!--/#footer-->
+</div>
+
+
+	<!-- Help Modal -->
+<div class="modal fade" id="modal-help" tabindex="-1" role="dialog"
+	aria-labelledby="mymodallabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header bleu-equasis">
+				<button type="button" class="close" data-dismiss="modal"
+					aria-hidden="true">
+					<i class="icon-remove-sign"></i>
+				</button>
+				<h1>
+					<i class="icon-info-sign"></i> <span id="modal-title-help">&nbsp;</span>
+				</h1>
+			</div>
+			<div class="modal-body" id="modal-body-help"></div>
+			<div class="modal-footer">
+				<button style="padding-right: 11px;" type="button"
+					class="btn btn-md gris-bleu-copyright pull-left"
+					data-dismiss="modal">Close</button>
+			</div>
+		</div>
+		<!-- /.modal-content -->
+	</div>
+	<!-- /.modal-dialog -->
+</div>
+<!-- /.modal -->
+
+		<script src="../Static/js/jquery.js"></script>
+		<script src="../Static/js/AdvancedSearch.js"></script>
+		<script src="../Static/js/bootstrap.min.js"></script>
+		<script src="../Static/js/modernizr-2.0.6-min.js"></script>
+		<script src="../Static/js/dropdown.js"></script>
+		<script  src="../Static/js/modal.js"> </script>
+		<script src="../Static/js/SearchHandler.js"></script>
+		<script src="../Static/js/jquery.placeholder.js"></script>
+		<script src="../Static/js/footer.js"></script>
+		<script src="../Static/js/home.js"></script>
+
+		<!-- #body -->
+	</div>
+	</body>
+</html>

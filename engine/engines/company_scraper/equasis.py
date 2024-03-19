@@ -1,4 +1,6 @@
+from contextlib import contextmanager
 import requests
+from requests import RequestException
 from bs4 import BeautifulSoup
 import datetime as dt
 import pandas as pd
@@ -13,48 +15,173 @@ ACCOUNT_START_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_START", "1"))
 ACCOUNT_END_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_END", "200"))
 
 
-class Equasis:
-    session = None
-    current_credentials_idx = -1
+class EquasisSessionUnavailable(Exception):
+    pass
 
-    def __init__(self):
+
+class EquasisSessionLocked(EquasisSessionUnavailable):
+    pass
+
+
+class EquasisSessionTemporarilyUnavailable(Exception):
+    pass
+
+
+class EquasisSessionStatus:
+    UNUSED = "UNUSED"
+    AVAILABLE = "AVAILABLE"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class EquasisSession:
+
+    max_retries = 3
+    standard_headers = {"User-Agent": "Mozilla/5.0"}
+
+    @staticmethod
+    def check_connection():
+        errors = []
+        for _ in range(EquasisSession.max_retries):
+            try:
+                resp = requests.get(
+                    "https://www.equasis.org/", headers=EquasisSession.standard_headers
+                )
+                if resp.status_code == 200:
+                    return
+            except RequestException as e:
+                errors.append(e)
+
+        raise Exception(f"Could not connect to Equasis:\n{errors}")
+
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
         self.session = requests.Session()
-        self._login()
+        self.status = EquasisSessionStatus.UNUSED
+
+    def make_request(self, url, data={}):
+
+        if self.status == EquasisSessionStatus.UNAVAILABLE:
+            raise EquasisSessionUnavailable(
+                f"The session for {self.username} is unavailable and can no longer be used."
+            )
+
+        if self.status == EquasisSessionStatus.UNUSED:
+            self._login()
+
+        try:
+            response_body = self._handle_request(url, data)
+            self.status = EquasisSessionStatus.AVAILABLE
+            return response_body
+        except EquasisSessionUnavailable as e:
+            self.status = EquasisSessionStatus.UNAVAILABLE
+            raise e
 
     def _login(self):
         url = "https://www.equasis.org/EquasisWeb/authen/HomePage?fs=HomePage"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        credentials = self._get_next_crendentials()
         payload = {
-            "j_email": credentials["username"],
-            "j_password": credentials["password"],
+            "j_email": self.username,
+            "j_password": self.password,
             "submit": "Login",
         }
-        try:
-            resp = self.session.post(url, headers=headers, data=payload)
-        except Exception as e:
-            logger.error(
-                "Error logging in to equasis.org",
-                stack_info=True,
-                exc_info=True,
-            )
-            raise e
 
-    def _get_next_crendentials(self):
-        credentials = self._get_all_credentials()
-        self.current_credentials_idx += 1
-        self.current_credentials_idx %= len(credentials)
-        next_credentials = credentials[self.current_credentials_idx]
-        logger.info("Trying with email %s" % (next_credentials["username"]))
-        return next_credentials
+        errors = []
+        for _ in range(EquasisSession.max_retries):
+            try:
+                resp = self.session.post(url, headers=EquasisSession.standard_headers, data=payload)
+                body_text = resp.text
+                if "Protected area, your access is denied" in body_text:
+                    raise EquasisSessionLocked(f"The account {self.username} is locked.")
+                elif resp.status_code == 200:
+                    return
+                else:
+                    errors.append(
+                        {
+                            "status_code": resp.status_code,
+                            "content": body_text,
+                        }
+                    )
+            except RequestException as e:
+                errors.append(e)
+                continue
 
-    def _get_all_credentials(self):
+        raise EquasisSessionUnavailable(f"Could get a login session for {self.username}:\n{errors}")
+
+    def _handle_request(self, url, data):
+
+        errors = []
+        for _ in range(EquasisSession.max_retries):
+            try:
+                resp = self.session.post(url, headers=EquasisSession.standard_headers, data=data)
+                body_text = resp.text
+                if "session has expired" in body_text or "session has been cancelled" in body_text:
+                    self._login()
+                elif resp.status_code == 200:
+                    return body_text
+                else:
+                    errors.append(
+                        {
+                            "status_code": resp.status_code,
+                            "content": resp.text,
+                        }
+                    )
+            except RequestException as e:
+                errors.append(e)
+                continue
+
+        raise EquasisSessionUnavailable(
+            f"The account {self.username} is unavailable and can no longer be used:\n{errors}"
+        )
+
+
+class EquasisSessionPool:
+    @staticmethod
+    def using_environment_range():
         emails = [
             "rutankers+%d@protonmail.com" % (x)
             for x in range(ACCOUNT_START_RANGE, ACCOUNT_END_RANGE)
         ]
         password = get_env("EQUASIS_PASSWORD")
-        return [{"username": x, "password": password} for x in emails]
+
+        sessions = [EquasisSession(x, password) for x in emails]
+
+        return EquasisSessionPool(sessions)
+
+    def __init__(self, sessions):
+        self.sessions = sessions
+        self.current_session_idx = -1
+
+    def make_request(self, url, data):
+
+        while len(self.sessions) > 0:
+            if self.current_session_idx == 0:
+                EquasisSession.check_connection()
+
+            session = self._get_next_session()
+            try:
+                return session.make_request(url, data)
+            except EquasisSessionUnavailable as e:
+                logger.info(
+                    f"Equasis session {session.username} unavailable, removing from pool.",
+                    exc_info=True,
+                    stack_info=True,
+                )
+                self.sessions.remove(session)
+            except e:
+                logger.info("Equasis session had an error.", exc_info=True, stack_info=True)
+
+        raise Exception("No more sessions available.")
+
+    def _get_next_session(self):
+        self.current_session_idx += 1
+        if self.current_session_idx >= len(self.sessions):
+            self.current_session_idx = 0
+        return self.sessions[self.current_session_idx]
+
+
+class Equasis:
+    def __init__(self):
+        self.sessions = EquasisSessionPool.using_environment_range()
 
     def _clean_text(self, text):
         text = text.replace("\t", "").replace("\r", "").replace("\n", "")
@@ -137,26 +264,14 @@ class Equasis:
             return None
 
         url = "https://www.equasis.org/EquasisWeb/restricted/ShipInfo?fs=Search"
-        headers = {"User-Agent": "Mozilla/5.0"}
         ship_data = {}
         ship_data["imo"] = imo
         ship_data["updated_on"] = dt.datetime.now()
         payload = {"P_IMO": imo}
 
-        try:
-            resp = self.session.post(url, headers=headers, data=payload)
-        except Exception as e:
-            logger.info(
-                "Error getting response",
-                stack_info=True,
-                exc_info=True,
-            )
-            raise e
+        resp = self.sessions.make_request(url, payload)
 
-        if "session has expired" in str(resp.content):
-            self._login()
-            return self.get_ship_infos(imo=imo, itry=itry + 1)
-        html_obj = BeautifulSoup(resp.content, "html.parser")
+        html_obj = BeautifulSoup(resp, "html.parser")
 
         # In case ship info is required
         # info_box = html_obj.body.find('div', attrs={'class':'info-details'})
@@ -214,25 +329,13 @@ class Equasis:
             return None
 
         url = "https://www.equasis.org/EquasisWeb/restricted/ShipHistory?fs=Search"
-        headers = {"User-Agent": "Mozilla/5.0"}
         ship_data = {}
         ship_data["imo"] = imo
         payload = {"P_IMO": imo}
 
-        try:
-            resp = self.session.post(url, headers=headers, data=payload)
-        except Exception as e:
-            logger.info(
-                "Error getting response",
-                stack_info=True,
-                exc_info=True,
-            )
-            raise e
+        resp = self.sessions.make_request(url, payload)
 
-        if "session has expired" in str(resp.content):
-            self._login()
-            return self.get_ship_infos(imo=imo, itry=itry + 1)
-        html_obj = BeautifulSoup(resp.content, "html.parser")
+        html_obj = BeautifulSoup(resp, "html.parser")
 
         # In case ship info is required
         # info_box = html_obj.body.find('div', attrs={'class':'info-details'})

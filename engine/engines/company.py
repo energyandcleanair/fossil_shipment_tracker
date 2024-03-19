@@ -196,8 +196,6 @@ def update_info_from_equasis(
         force_unknown=force_unknown,
     )
 
-    ntries = 3
-
     if len(imos) == 0:
         logger.info("No ships to update for %s" % (",".join(commodities)))
         return
@@ -208,26 +206,8 @@ def update_info_from_equasis(
         loggers=[logging.root, logger, logger_slack]
     ), warnings.catch_warnings():
         for imo in tqdm(imos, unit="ships"):
-            itry = 0
-            equasis_infos = None
-
-            while equasis_infos is None and itry <= ntries:
-                itry += 1
-                try:
-                    imo_equasis = imo.replace("NOTFOUND_", "")
-                    equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
-                except requests.exceptions.HTTPError as e:
-                    logger.warning(
-                        "Failed to get equasis ship info, trying again.",
-                        stack_info=True,
-                        exc_info=True,
-                    )
-                except requests.exceptions.ConnectionError as e:
-                    logger.warning(
-                        "Connection failed, trying again.",
-                        stack_info=True,
-                        exc_info=True,
-                    )
+            imo_equasis = imo.replace("NOTFOUND_", "")
+            equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
 
             if equasis_infos is not None:
                 # Update ship record

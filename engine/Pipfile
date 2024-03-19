@@ -46,6 +46,7 @@ pymongo = {version = "~=4.0.2", extras = ["srv"]}
 pygeos = "~=0.14"
 "kpler.sdk" = "~=1.0.39"
 google-cloud-run = "*"
+responses = "*"
 
 [dev-packages]
 pre-commit = "*"
