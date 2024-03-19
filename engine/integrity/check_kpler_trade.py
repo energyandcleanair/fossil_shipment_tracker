@@ -89,8 +89,7 @@ def test_kpler_trades(date_from=None, date_to=None, product=None, origin_iso2=No
 
     assert sum_close, (
         f"Expected totals similar for {product} from {origin_iso2} after {date_from}:"
-        + f"{expected} != {actual}. Details:\n"
-        + format_failed(comparison[~comparison.ok])
+        + f"{expected} != {actual}."
     )
 
     assert comparison["ok"].all(), (
@@ -105,8 +104,8 @@ def test_kpler_trades(date_from=None, date_to=None, product=None, origin_iso2=No
 
 def compare_flows_to_trades(flows, aggregated_trades):
     flows_and_aggregated_trades = pd.merge(
-        flows,
-        aggregated_trades,
+        left=flows,
+        right=aggregated_trades,
         how="outer",
         on=["month", "to_iso2"],
         suffixes=(".expected", ".actual"),
@@ -187,6 +186,7 @@ def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
         "aggregate_by": f"origin_month,destination_iso2",
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
+        "check_complete": "false",
         "format": "json",
     }
 
