@@ -45,28 +45,33 @@ def update(imo=None, force_unknown=False):
     # For crude oil and oil products, force a daily refresh
     # given the importance for price caps and bans
 
-    max_age = {
-        base.CRUDE_OIL: {"known": 30, "unknown": 3},
-        base.OIL_PRODUCTS: {"known": 30, "unknown": 3},
-        base.OIL_OR_CHEMICAL: {"known": 30, "unknown": 3},
-        base.LNG: {"known": 30, "unknown": 3},
-        base.LPG: {"known": 30, "unknown": 3},
-        base.COAL: {"known": 30, "unknown": 15},
-        base.BULK: {"known": 30, "unknown": 15},
-    }
+    try:
 
-    for commodity, max_age in max_age.items():
-        logger.info("Updating %s" % commodity)
-        update_info_from_equasis(
-            imo=imo,
-            commodities=to_list(commodity),
-            known_update_period=max_age["known"],
-            unknown_update_period=max_age["unknown"],
-            force_unknown=force_unknown,
-        )
+        max_age = {
+            base.CRUDE_OIL: {"known": 30, "unknown": 3},
+            base.OIL_PRODUCTS: {"known": 30, "unknown": 3},
+            base.OIL_OR_CHEMICAL: {"known": 30, "unknown": 3},
+            base.LNG: {"known": 30, "unknown": 3},
+            base.LPG: {"known": 30, "unknown": 3},
+            base.COAL: {"known": 30, "unknown": 15},
+            base.BULK: {"known": 30, "unknown": 15},
+        }
 
-    fill_country()
-    logger_slack.info("=== Company update done ===")
+        for commodity, max_age in max_age.items():
+            logger.info("Updating %s" % commodity)
+            update_info_from_equasis(
+                imo=imo,
+                commodities=to_list(commodity),
+                known_update_period=max_age["known"],
+                unknown_update_period=max_age["unknown"],
+                force_unknown=force_unknown,
+            )
+
+        fill_country()
+        logger_slack.info("=== Company update done ===")
+    except Exception as e:
+        logger_slack.error("=== Company update failed ===", stack_info=True, exc_info=True)
+        raise e
     return
 
 

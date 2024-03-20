@@ -134,6 +134,10 @@ class EquasisSession:
         )
 
 
+class EquasisSessionPoolExhausted(Exception):
+    pass
+
+
 class EquasisSessionPool:
     @staticmethod
     def using_environment_range():
@@ -170,7 +174,7 @@ class EquasisSessionPool:
             except e:
                 logger.info("Equasis session had an error.", exc_info=True, stack_info=True)
 
-        raise Exception("No more sessions available.")
+        raise EquasisSessionPoolExhausted("No more sessions available.")
 
     def _get_next_session(self):
         self.current_session_idx += 1
@@ -273,12 +277,6 @@ class Equasis:
 
         html_obj = BeautifulSoup(resp, "html.parser")
 
-        # In case ship info is required
-        # info_box = html_obj.body.find('div', attrs={'class':'info-details'})
-        if (not html_obj or not html_obj.body) and itry == 1:
-            self._login()
-            return self.get_ship_infos(imo=imo, itry=itry + 1)
-
         if not html_obj or not html_obj.body:
             return None
 
@@ -336,12 +334,6 @@ class Equasis:
         resp = self.sessions.make_request(url, payload)
 
         html_obj = BeautifulSoup(resp, "html.parser")
-
-        # In case ship info is required
-        # info_box = html_obj.body.find('div', attrs={'class':'info-details'})
-        if (not html_obj or not html_obj.body) and itry == 1:
-            self._login()
-            return self.get_ship_infos(imo=imo, itry=itry + 1)
 
         if not html_obj or not html_obj.body:
             return None
