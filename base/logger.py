@@ -42,7 +42,7 @@ if slack_webhook_ok(get_env("SLACK_WEBHOOK")):
     slack_error_handler.setFormatter(SlackFormatter())
     slack_error_handler.setLevel(level=logging.ERROR)
 
-    # logger.addHandler(slack_error_handler)
+    logger.addHandler(slack_error_handler)
 
     direct_slack_handler = SlackHandler(get_env("SLACK_WEBHOOK"))
     direct_slack_handler.setFormatter(SlackFormatter())
