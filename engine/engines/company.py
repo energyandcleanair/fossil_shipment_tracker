@@ -66,9 +66,6 @@ def update(force_unknown=False):
             force_unknown=force_unknown,
         )
 
-        for commodity, commodity_settings in commodity_settings.items():
-            logger.info("Updating %s" % commodity)
-
         fill_country()
         logger_slack.info("=== Company update done ===")
     except Exception as e:
