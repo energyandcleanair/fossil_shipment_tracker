@@ -1,3 +1,4 @@
+from typing import TypedDict
 import requests.exceptions
 from tqdm import tqdm
 import pandas as pd
@@ -40,32 +41,33 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 import logging
 
 
-def update(imo=None, force_unknown=False):
+UPDATE_LIMIT: int = 500
+
+
+def update(force_unknown=False):
     logger_slack.info("=== Company update ===")
     # For crude oil and oil products, force a daily refresh
     # given the importance for price caps and bans
 
     try:
 
-        max_age = {
-            base.CRUDE_OIL: {"known": 30, "unknown": 3},
-            base.OIL_PRODUCTS: {"known": 30, "unknown": 3},
-            base.OIL_OR_CHEMICAL: {"known": 30, "unknown": 3},
-            base.LNG: {"known": 30, "unknown": 3},
-            base.LPG: {"known": 30, "unknown": 3},
-            base.COAL: {"known": 30, "unknown": 15},
-            base.BULK: {"known": 30, "unknown": 15},
+        commodity_settings = {
+            base.CRUDE_OIL: {"known": 30, "unknown": 3, "update_priority": 0},
+            base.OIL_PRODUCTS: {"known": 30, "unknown": 3, "update_priority": 0},
+            base.OIL_OR_CHEMICAL: {"known": 30, "unknown": 3, "update_priority": 0},
+            base.LNG: {"known": 30, "unknown": 3, "update_priority": 1},
+            base.COAL: {"known": 30, "unknown": 15, "update_priority": 2},
+            base.BULK: {"known": 30, "unknown": 15, "update_priority": 2},
+            base.LPG: {"known": 30, "unknown": 3, "update_priority": 3},
         }
 
-        for commodity, max_age in max_age.items():
+        update_info_from_equasis(
+            commodity_settings=commodity_settings,
+            force_unknown=force_unknown,
+        )
+
+        for commodity, commodity_settings in commodity_settings.items():
             logger.info("Updating %s" % commodity)
-            update_info_from_equasis(
-                imo=imo,
-                commodities=to_list(commodity),
-                known_update_period=max_age["known"],
-                unknown_update_period=max_age["unknown"],
-                force_unknown=force_unknown,
-            )
 
         fill_country()
         logger_slack.info("=== Company update done ===")
@@ -129,18 +131,6 @@ def find_or_create_company_id(raw_name, imo=None, address=None):
 
 
 def build_filter_query():
-    departure_ships = (
-        session.query(
-            Departure.ship_imo.label("ship_imo"),
-            Departure.date_utc.label("date_utc"),
-            Departure.port_id.label("port_id"),
-            Port.iso2.label("port_iso2"),
-            Ship.commodity.label("commodity"),
-            sa.sql.expression.literal("departure").label("source"),
-        )
-        .outerjoin(Port, Departure.port_id == Port.id)
-        .outerjoin(Ship, Ship.imo == Departure.ship_imo)
-    )
 
     commodity_id_field = (
         "kpler_"
@@ -159,30 +149,24 @@ def build_filter_query():
         session.query(
             func.unnest(KplerTrade.vessel_imos).label("ship_imo"),
             KplerTrade.departure_date_utc.label("date_utc"),
-            KplerZone.port_id.label("port_id"),
-            KplerZone.country_iso2.label("port_iso2"),
             Commodity.equivalent_id.label("commodity"),
             sa.sql.expression.literal("kpler").label("source"),
         )
-        .outerjoin(KplerZone, KplerTrade.departure_zone_id == KplerZone.id)
         .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
         .outerjoin(Commodity, commodity_id_field == Commodity.id)
     )
 
-    filter_query = kpler_ships.union(departure_ships).subquery()
+    return kpler_ships.subquery()
 
-    return filter_query
+
+class CommoditySettings(TypedDict):
+    known: int
+    unknown: int
 
 
 def update_info_from_equasis(
-    commodities=None,
-    known_update_period=30,
-    unknown_update_period=3,
-    departure_date_from=None,
-    imo=None,
-    departure_port_id=None,
-    departure_port_iso2=None,
-    force_unknown=False,
+    commodity_settings: "dict[str, CommoditySettings]" = None,
+    force_unknown: "bool" = False,
 ):
     """
     Collect infos from equasis about shipments that either don't have infos,
@@ -190,29 +174,27 @@ def update_info_from_equasis(
     :return:
     """
 
-    imos = find_ships_that_need_updating(
-        commodities=commodities,
-        known_update_period=known_update_period,
-        unknown_update_period=unknown_update_period,
-        departure_date_from=departure_date_from,
-        imo=imo,
-        departure_port_id=departure_port_id,
-        departure_port_iso2=departure_port_iso2,
-        force_unknown=force_unknown,
-    )
+    top_ships = get_ships_to_update(commodity_settings, force_unknown)
 
-    if len(imos) == 0:
-        logger.info("No ships to update for %s" % (",".join(commodities)))
+    if len(top_ships) == 0:
+        commodities = ",".join(commodity_settings.keys())
+        logger.info(f"No ships to update for {commodities}")
         return
+
+    imos_to_update = top_ships.imo.unique().tolist()
 
     equasis = Equasis()
 
     with logging_redirect_tqdm(
         loggers=[logging.root, logger, logger_slack]
     ), warnings.catch_warnings():
-        for imo in tqdm(imos, unit="ships"):
+        for imo in tqdm(imos_to_update, unit="ships"):
             imo_equasis = imo.replace("NOTFOUND_", "")
             equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
+
+            logger.info(
+                f"Details from equasis to update in database for {imo_equasis}: {equasis_infos}"
+            )
 
             if equasis_infos is not None:
                 # Update ship record
@@ -232,15 +214,57 @@ def update_info_from_equasis(
                 logger.info("Failed to get response from equasis")
 
 
+def get_ships_to_update(commodity_settings: "dict[str, CommoditySettings]", force_unknown: "bool"):
+
+    logger.info("Finding the ships to update")
+    ships_to_update = pd.DataFrame()
+
+    for commodity, settings in commodity_settings.items():
+
+        logger.info(f"Finding ships to update for {commodity}")
+        known_update_period = settings["known"]
+        unknown_update_period = settings["unknown"]
+
+        ships_for_commodity = find_ships_that_need_updating(
+            commodities=[commodity],
+            known_update_period=known_update_period,
+            unknown_update_period=unknown_update_period,
+            force_unknown=force_unknown,
+        )
+
+        ships_to_update = pd.concat([ships_to_update, ships_for_commodity])
+
+    if len(ships_to_update) > UPDATE_LIMIT:
+        logger_slack.warn(
+            f"Too many ships to update, limiting to {UPDATE_LIMIT} ships. "
+            + f"It will take {len(ships_to_update) / UPDATE_LIMIT} iterations to update all ships. "
+            + f"Prioritising by commodity type's priority, fewest consecutive failures, then oldest checked."
+        )
+
+    commodity_settings_df = pd.DataFrame.from_dict(commodity_settings, orient="index").reset_index(
+        names=["commodity"]
+    )
+
+    top_ships = (
+        ships_to_update.merge(commodity_settings_df, left_on="commodity", right_on="commodity")
+        .sort_values(
+            by=["update_priority", "consecutive_failures", "checked_on"],
+            na_position="first",
+            ascending=[True, True, True],
+        )
+        .drop_duplicates(subset="imo", keep="first")
+        .head(UPDATE_LIMIT)
+        .reset_index(drop=True)
+    )
+
+    return top_ships
+
+
 def find_ships_that_need_updating(
-    commodities=None,
-    known_update_period=30,
-    unknown_update_period=3,
-    departure_date_from=None,
-    imo=None,
-    departure_port_id=None,
-    departure_port_iso2=None,
-    force_unknown=False,
+    commodities: "list[str]" = None,
+    known_update_period: int = 30,
+    unknown_update_period: int = 3,
+    force_unknown: bool = False,
 ):
     filter_query = build_filter_query()
 
@@ -254,6 +278,7 @@ def find_ships_that_need_updating(
             ShipInsurer.checked_on,
             ShipInsurer.updated_on.label("last_updated"),
             ShipInsurer.consecutive_failures,
+            filter_query.c.commodity,
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
         .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
@@ -263,18 +288,6 @@ def find_ships_that_need_updating(
 
     if commodities:
         imo_query = imo_query.filter(filter_query.c.commodity.in_(to_list(commodities)))
-
-    if departure_date_from:
-        imo_query = imo_query.filter(filter_query.c.date_utc >= departure_date_from)
-
-    if imo:
-        imo_query = imo_query.filter(filter_query.c.ship_imo.in_(to_list(imo)))
-
-    if departure_port_id:
-        imo_query = imo_query.filter(filter_query.c.port_id.in_(to_list(departure_port_id)))
-
-    if departure_port_iso2:
-        imo_query = imo_query.filter(filter_query.c.port_iso2.in_(to_list(departure_port_iso2)))
 
     imo_query = imo_query.subquery()
 
@@ -328,8 +341,6 @@ def find_ships_that_need_updating(
         force_unknown, imo_query.c.company_raw_name == base.UNKNOWN_INSURER
     )
 
-    in_selected_imos_to_update = False if not imo else imo_query.c.imo.in_(to_list(imo))
-
     needs_update = sa.and_(
         not_in_backoff_period,
         sa.or_(
@@ -341,7 +352,7 @@ def find_ships_that_need_updating(
         ),
     )
 
-    imo_query = session.query(imo_query).filter(sa.or_(needs_update, in_selected_imos_to_update))
+    imo_query = session.query(imo_query).filter(needs_update)
 
     imos_results = imo_query.all()
 
@@ -352,12 +363,7 @@ def find_ships_that_need_updating(
 
     results = results[~results.imo.str.match("_v", case=False)]
 
-    unique_imos = results.imo.unique()
-    unique_imos_count = len(unique_imos)
-
-    logger.info(f"{unique_imos_count} ship IMOs to update")
-
-    return unique_imos
+    return results
 
 
 def update_ship_owner(imo, owner_info):
