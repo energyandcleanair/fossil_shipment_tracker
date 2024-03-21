@@ -28,9 +28,7 @@ def update_trades(
 
     update_time = dt.datetime.now()
 
-    with logging_redirect_tqdm(
-        loggers=[logging.root, logger, logger_slack]
-    ), warnings.catch_warnings():
+    with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for platform in tqdm(_platforms, unit="platform", leave=False):
             for from_iso2 in tqdm(origin_iso2s, unit="from-iso", leave=False):

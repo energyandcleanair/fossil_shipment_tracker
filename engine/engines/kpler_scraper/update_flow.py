@@ -49,9 +49,9 @@ def get_from_zones(scraper, platform, product, origin_iso2, split, to_zone=None)
         product=product,
         date_from="2010-01-01",
         date_to=dt.date.today(),
-        from_zone=scraper.get_zone_dict(platform=platform, iso2=origin_iso2)
-        if origin_iso2
-        else None,
+        from_zone=(
+            scraper.get_zone_dict(platform=platform, iso2=origin_iso2) if origin_iso2 else None
+        ),
         to_zone=to_zone,
         split=split,
         granularity=FlowsPeriod.Annually,
@@ -106,9 +106,7 @@ def update_flows(
 
     _platforms = scraper.platforms if platforms is None else platforms
 
-    with logging_redirect_tqdm(
-        loggers=[logging.root, logger, logger_slack]
-    ), warnings.catch_warnings():
+    with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for platform in tqdm(_platforms, unit="platform", leave=False):
             # _products = scraper.get_products(platform=platform).name if products is None else products

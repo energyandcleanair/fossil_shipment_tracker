@@ -36,17 +36,18 @@ def slack_webhook_ok(url):
 logger_slack = logging.getLogger("FOSSIL_SHIPMENT_TRACKER_SLACK")
 logger_slack.setLevel(logging.INFO)
 
-sh = None
+slack_error_handler = None
 if slack_webhook_ok(get_env("SLACK_WEBHOOK")):
-    sh = SlackHandler(get_env("SLACK_WEBHOOK"))
-    sh.setFormatter(SlackFormatter())
-    sh.setLevel(level=logging.ERROR)
-    logger.addHandler(sh)
+    slack_error_handler = SlackHandler(get_env("SLACK_WEBHOOK"))
+    slack_error_handler.setFormatter(SlackFormatter())
+    slack_error_handler.setLevel(level=logging.ERROR)
 
-    sh2 = SlackHandler(get_env("SLACK_WEBHOOK"))
-    sh2.setFormatter(SlackFormatter())
-    sh2.setLevel(level=logging.INFO)
-    logger_slack.addHandler(sh2)
+    # logger.addHandler(slack_error_handler)
+
+    direct_slack_handler = SlackHandler(get_env("SLACK_WEBHOOK"))
+    direct_slack_handler.setFormatter(SlackFormatter())
+    direct_slack_handler.setLevel(level=logging.INFO)
+    logger_slack.addHandler(direct_slack_handler)
 
 slack_token = get_env("SLACK_API_TOKEN", None)
 slack_enabled = slack_token != None and slack_token != ""
@@ -69,9 +70,3 @@ def notify_engineers(msg):
 def post_to_token_channel(msg):
     if slack_enabled:
         slacker.chat_postMessage(channel=TOKEN_CHANNEL, text=msg)
-
-
-# Adding an error logging in file
-# logger_fh = logging.FileHandler('error.log')
-# logger_fh.setLevel(logging.ERROR)
-# logger.addHandler(logger_fh)

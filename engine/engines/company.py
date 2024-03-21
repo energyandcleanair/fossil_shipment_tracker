@@ -182,9 +182,7 @@ def update_info_from_equasis(
 
     equasis = Equasis()
 
-    with logging_redirect_tqdm(
-        loggers=[logging.root, logger, logger_slack]
-    ), warnings.catch_warnings():
+    with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
         for imo in tqdm(imos_to_update, unit="ships"):
             imo_equasis = imo.replace("NOTFOUND_", "")
             equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
