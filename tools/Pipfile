@@ -4,6 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+responses = "*"
+pandas = "~=1.5.3"
 
 [dev-packages]
 selenium = "*"
