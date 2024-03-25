@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "fossil-shipment-tracker-api"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.9"
+flask = "^2.0.3"
+flask-restx = "^0.5.1"
+pandas = "^1.4.2"
+sqlalchemy = "^1.4.34"
+shapely = "^2.0.1"
+pymongo = "^4.0.2"
+geopandas = "^0.12.2"
+tqdm = "^4.65.0"
+psycopg2 = "^2.9.3"
+slack-logger = "^0.3.1"
+slack-sdk = "^3.20.2"
+geoalchemy2 = "^0.13.1"
+flask-cors = "^3.0.10"
+flask-mail = "^0.9.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.1"
+requests = "^2.28.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -10,13 +10,7 @@ from flask_mail import Mail, Message
 from base.db import session
 from base.logger import logger
 from base.db import engine
-
-
-try:
-    from .routes import routes
-except ImportError:
-    from routes import routes
-
+from .routes import routes
 from base.env import get_env
 
 app = Flask(__name__)
