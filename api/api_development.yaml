@@ -1,5 +1,5 @@
 service: development
-runtime: python38
+runtime: python39
 instance_class: F4_1G
 env_variables:
   PROJECT_ID: 'fossil-shipment-tracker'
