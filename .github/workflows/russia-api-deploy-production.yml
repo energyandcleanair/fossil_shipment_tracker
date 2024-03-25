@@ -23,10 +23,11 @@ jobs:
       with:
         poetry-version: ${{ env.POETRY_VERSION }}
     - name: Install dependencies
+      working-directory: api
       run: |
-        poetry export -f requirements.txt --output api/requirements.txt
         python -m pip install --upgrade pip
-        pip install -r api/requirements.txt
+        poetry export -f requirements.txt --output requirements.txt
+        pip install -r requirements.txt
     - name: Authenticate
       id: 'auth'
       uses: 'google-github-actions/auth@v1'
