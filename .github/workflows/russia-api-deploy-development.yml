@@ -19,7 +19,7 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     - name: Setup Poetry ${{ env.POETRY_VERSION }}
-      uses: actions/setup-poetry@v9
+      uses: Gr1N/setup-poetry@v9
       with:
         poetry-version: ${{ env.POETRY_VERSION }}
     - name: Install dependencies
