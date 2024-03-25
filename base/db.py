@@ -7,10 +7,9 @@ from base.logger import logger
 from base.env import get_env
 
 import numpy as np
-import psycopg2
 from psycopg2.extensions import register_adapter, AsIs
 
-psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
+register_adapter(np.int64, AsIs)
 
 
 environment = get_env("ENVIRONMENT", "test").lower()  # development, production, test
