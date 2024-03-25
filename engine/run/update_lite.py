@@ -1,4 +1,5 @@
 from engines import (
+    company,
     engine_r,
     trajectory,
     position,
@@ -25,6 +26,7 @@ def update():
     engine_r.update()
 
     kpler_scraper.update_lite()
+    company.update()
     kpler_trade_computed.update()
 
     position.update(date_from=dt.date.today() - dt.timedelta(days=90))

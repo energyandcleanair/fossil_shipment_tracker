@@ -1,3 +1,5 @@
+import random
+import time
 from typing import TypedDict
 import requests.exceptions
 from tqdm import tqdm
@@ -182,10 +184,15 @@ def update_info_from_equasis(
 
     equasis = Equasis()
 
+    def random_wait():
+        time.sleep(random.uniform(0.25, 0.5))
+
     with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
         for imo in tqdm(imos_to_update, unit="ships"):
             imo_equasis = imo.replace("NOTFOUND_", "")
             equasis_infos = equasis.get_ship_infos(imo=imo_equasis)
+
+            random_wait()
 
             logger.info(
                 f"Details from equasis to update in database for {imo_equasis}: {equasis_infos}"

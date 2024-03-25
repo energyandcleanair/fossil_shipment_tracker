@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import time
 import requests
 from requests import RequestException
 from bs4 import BeautifulSoup
@@ -15,6 +16,8 @@ ACCOUNT_PASSWORD = config("EQUASIS_PASSWORD")
 ACCOUNT_USERNAME_PATTERN = config("EQUASIS_USERNAME_PATTERN")
 ACCOUNT_START_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_START", "1"))
 ACCOUNT_END_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_END", "200"))
+
+SLEEP_PERIOD_AFTER_FAILURE = 5
 
 
 class EquasisSessionUnavailable(Exception):
@@ -103,8 +106,9 @@ class EquasisSession:
                             "content": body_text,
                         }
                     )
-            except RequestException as e:
+            except (RequestException, ConnectionError) as e:
                 errors.append(e)
+                time.sleep(SLEEP_PERIOD_AFTER_FAILURE)
                 continue
 
         raise EquasisSessionUnavailable(f"Could get a login session for {self.username}:\n{errors}")
@@ -128,8 +132,9 @@ class EquasisSession:
                             "content": resp.text,
                         }
                     )
-            except RequestException as e:
+            except (RequestException, ConnectionError) as e:
                 errors.append(e)
+                time.sleep(SLEEP_PERIOD_AFTER_FAILURE)
                 continue
 
         raise EquasisSessionUnavailable(
