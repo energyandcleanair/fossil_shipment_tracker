@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHON_VERSION: 3.9
-      POETRY_VERSION: 1.8
+      POETRY_VERSION: 1.8.2
 
 
     steps:
