@@ -24,6 +24,11 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: EQUASIS_ACCOUNT_RANGE_END
+            - name: EQUASIS_USERNAME_PATTERN
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: EQUASIS_USERNAME_PATTERN
             - name: ENVIRONMENT
               value: production
             - name: MAIL_DEFAULT_SENDER
