@@ -117,6 +117,7 @@ class EquasisSession:
                 resp = self.session.post(url, headers=EquasisSession.standard_headers, data=data)
                 body_text = resp.text
                 if "session has expired" in body_text or "session has been cancelled" in body_text:
+                    logger.info(f"Session for {self.username} has expired, re-logging in.")
                     self._login()
                 elif resp.status_code == 200:
                     return body_text
