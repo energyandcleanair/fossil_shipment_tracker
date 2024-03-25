@@ -11,6 +11,8 @@ from base.logger import logger_slack, logger
 from base.utils import to_list
 from decouple import config
 
+ACCOUNT_PASSWORD = config("EQUASIS_PASSWORD")
+ACCOUNT_USERNAME_PATTERN = config("EQUASIS_USERNAME_PATTERN")
 ACCOUNT_START_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_START", "1"))
 ACCOUNT_END_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_END", "200"))
 
@@ -140,12 +142,11 @@ class EquasisSessionPoolExhausted(Exception):
 
 class EquasisSessionPool:
     @staticmethod
-    def using_environment_range():
+    def from_env():
         emails = [
-            "rutankers+%d@protonmail.com" % (x)
-            for x in range(ACCOUNT_START_RANGE, ACCOUNT_END_RANGE)
+            ACCOUNT_USERNAME_PATTERN % (x) for x in range(ACCOUNT_START_RANGE, ACCOUNT_END_RANGE)
         ]
-        password = get_env("EQUASIS_PASSWORD")
+        password = ACCOUNT_PASSWORD
 
         sessions = [EquasisSession(x, password) for x in emails]
 
@@ -185,7 +186,7 @@ class EquasisSessionPool:
 
 class Equasis:
     def __init__(self):
-        self.sessions = EquasisSessionPool.using_environment_range()
+        self.sessions = EquasisSessionPool.from_env()
 
     def _clean_text(self, text):
         text = text.replace("\t", "").replace("\r", "").replace("\n", "")

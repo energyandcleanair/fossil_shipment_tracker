@@ -17,6 +17,7 @@ RECAPTCHA_SELECTOR = "iframe[title=reCAPTCHA]"
 
 
 PASSWORD = config("EQUASIS_PASSWORD")
+USERNAME = config("EQUASIS_USERNAME_PATTERN")
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
@@ -44,9 +45,7 @@ if __name__ == "__main__":
             EC.visibility_of_element_located((By.CSS_SELECTOR, RECAPTCHA_SELECTOR))
         )
 
-        browser.find_element(By.CSS_SELECTOR, "#field-mail").send_keys(
-            f"rutankers+{i}@protonmail.com"
-        )
+        browser.find_element(By.CSS_SELECTOR, "#field-mail").send_keys(USERNAME % i)
         browser.find_element(By.CSS_SELECTOR, "#field-pwd").send_keys(PASSWORD)
         browser.find_element(By.CSS_SELECTOR, "#field-confirm-pwd").send_keys(PASSWORD)
         browser.find_element(By.CSS_SELECTOR, "#field-firstname").send_keys("A")
