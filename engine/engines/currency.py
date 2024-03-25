@@ -15,6 +15,10 @@ from base.models import DB_TABLE_CURRENCY
 import base
 
 
+from forex_python.converter import CurrencyRates
+from forex_python.converter import RatesNotAvailableError
+
+
 def update(date_from=dt.date(2022, 1, 1), date_to=None, force=False):
     """
     Fill from countryconvert data
@@ -22,9 +26,6 @@ def update(date_from=dt.date(2022, 1, 1), date_to=None, force=False):
     """
 
     logger_slack.info("=== Currency update ===")
-
-    from forex_python.converter import CurrencyRates
-    from forex_python.converter import RatesNotAvailableError
 
     c = CurrencyRates()
 

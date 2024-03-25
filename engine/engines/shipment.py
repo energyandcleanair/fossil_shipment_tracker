@@ -6,7 +6,7 @@ import seaborn as sns
 import tempfile
 import os
 
-from engines import departure
+from engines import api_client, departure
 from base.db_utils import execute_statement
 from base.utils import to_list, to_datetime
 from base.logger import logger_slack, slacker
@@ -64,7 +64,6 @@ def return_combined_shipments(session, columns=None):
 
 
 def send_diagnostic_chart():
-    from api.routes.voyage import VoyageResource
 
     params = {
         "aggregate_by": ["departure_date", "status", "commodity"],
@@ -77,8 +76,7 @@ def send_diagnostic_chart():
         "commodity_grouping": "default",
     }
 
-    v = VoyageResource().get_from_params(params=params)
-    v = pd.DataFrame(json.loads(v.response[0]))
+    v = api_client.get_voyages(**params)
 
     v["value_tonne"] = pd.to_numeric(v.value_tonne)
     v["departure_date"] = pd.to_datetime(v.departure_date)

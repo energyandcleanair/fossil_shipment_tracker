@@ -52,7 +52,6 @@ COPY engine/ .
 COPY --chown=engine engine/assets ./assets
 COPY --chown=engine api/assets/kpler ./assets/kpler
 COPY base/ ./base
-COPY api/ ./api
 
 RUN mkdir -p cache/kpler cache/datalastic cache/marinetraffic && \
   chown -R engine:engine cache

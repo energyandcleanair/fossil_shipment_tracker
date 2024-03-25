@@ -7,13 +7,6 @@ from base.db import init_db
 
 
 @pytest.fixture
-def app():
-    from api.app import app
-
-    return app
-
-
-@pytest.fixture
 def test_db_empty():
     assert os.environ.get("ENVIRONMENT") == "test"
 

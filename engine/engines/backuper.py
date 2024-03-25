@@ -7,11 +7,10 @@ import pyreadr
 import base
 from base.logger import logger_slack
 from base.env import get_env
-from api.routes.overland import PipelineFlowResource
-from api.routes.voyage import VoyageResource
-from api.routes.counter import RussiaCounterResource
 
 import tempfile
+
+from engines import api_client
 
 
 def update(bucket="russia_fossil_tracker", folder="backup"):
@@ -48,44 +47,39 @@ def upload(df, client_bucket, folder, filename, exts=["RDS", "csv.gz"]):
 
 
 def backup_voyages(client_bucket, folder, now):
-    params = {
-        "date_from": "2021-01-01",
-        "commodity_grouping": "default",
-        "currency": ["USD", "EUR"],
-        "pricing_scenario": base.PRICING_DEFAULT,
-        "format": "json",
-    }
-    resp = VoyageResource().get_from_params(params=params)
-    voyages_df = pd.DataFrame(resp.json)
+
+    voyages_df = api_client.get_voyages(
+        date_from="2021-01-01",
+        commodity_grouping="default",
+        currency=["USD", "EUR"],
+        pricing_scenario=base.PRICING_DEFAULT,
+    )
     filename = "voyages_%s" % (now.strftime("%Y%m%d_%H%M"))
     upload(df=voyages_df, client_bucket=client_bucket, folder=folder, filename=filename)
 
 
 def backup_overland(client_bucket, folder, now):
-    params = {
-        "date_from": "2021-01-01",
-        "commodity_grouping": "default",
-        "currency": ["USD", "EUR"],
-        "keep_zeros": False,
-        "pricing_scenario": base.PRICING_DEFAULT,
-        "format": "json",
-    }
-    resp = PipelineFlowResource().get_from_params(params=params)
-    overland_df = pd.DataFrame(resp.json)
+
+    overland_df = api_client.get_overland(
+        date_from="2021-01-01",
+        commodity_grouping="default",
+        currency=["USD", "EUR"],
+        keep_zeros=False,
+        pricing_scenario=base.PRICING_DEFAULT,
+    )
     filename = "overland_%s" % (now.strftime("%Y%m%d_%H%M"))
     upload(df=overland_df, client_bucket=client_bucket, folder=folder, filename=filename)
 
 
 def backup_counter(client_bucket, folder, now):
-    params = {
-        "date_from": "2021-01-01",
-        "commodity_grouping": "default",
-        "currency": ["USD", "EUR"],
-        "keep_zeros": False,
-        "format": "json",
-        "pricing_scenario": base.PRICING_DEFAULT,
-    }
-    resp = RussiaCounterResource().get_from_params(params=params)
-    counter_df = pd.DataFrame(resp.json)
+
+    counter_df = api_client.get_counter(
+        date_from="2021-01-01",
+        commodity_grouping="default",
+        currency=["USD", "EUR"],
+        keep_zeros=False,
+        pricing_scenario=base.PRICING_DEFAULT,
+    )
+
     filename = "counter_%s" % (now.strftime("%Y%m%d_%H%M"))
     upload(df=counter_df, client_bucket=client_bucket, folder=folder, filename=filename)

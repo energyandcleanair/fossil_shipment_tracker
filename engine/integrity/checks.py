@@ -1,6 +1,7 @@
 import requests
 import sqlalchemy as sa
 import pandas as pd
+import numpy as np
 
 from base.db import session
 from base.models import (
@@ -16,8 +17,7 @@ from decouple import config
 
 import datetime as dt
 
-FST_API_URL = config("FOSSIL_SHIPMENT_TRACKER_API_URL")
-FST_API_KEY = config("API_KEY")
+from engines import api_client
 
 
 def test_shipment_portcall_integrity():
@@ -231,27 +231,11 @@ def test_overland_trade_has_values():
         year_start = date.date()
         year_end = (date + pd.DateOffset(years=1)).date()
 
-        params = {
-            "date_from": year_start.isoformat(),
-            "date_to": year_end.isoformat(),
-            "format": "json",
-        }
+        params = {"date_from": year_start.isoformat(), "date_to": year_end.isoformat()}
 
-        response = requests.get(
-            f"{FST_API_URL}/v0/overland/",
-            params=params,
-        )
+        response = api_client.get_overland(**params)
 
-        if response.status_code == 204:
-            logger.warn(f"No overland trade data for the year {year_start.year} to {year_end.year}")
-            continue
-
-        if response.status_code != 200:
-            raise Exception(
-                f"Failed to get overland trade data for the year {year_start.year} to {year_end.year}: {response.status_code}"
-            )
-
-        dfs = dfs + [pd.DataFrame(response.json()["data"])]
+        dfs = dfs + [response]
 
     df = pd.concat(dfs)
 
@@ -289,3 +273,18 @@ def verify_months_for_commodities(df, start_date, end_date, commodities):
     assert all(
         [not (months - set(df[df["commodity"] == commodity]["month"])) for commodity in commodities]
     ), "Missing months for some commodities"
+
+
+def test_counter_pricing_positive():
+
+    data = pd.DataFrame()
+    for year in range(2022, dt.date.today().year + 1):
+        response = api_client.get_counter(
+            date_from=f"{year}-01-01", date_to=f"{year}-12-31"
+        ).sort_values(["date"], ascending=False)
+        data = pd.concat([data, response])
+
+    max_date = pd.to_datetime(data.date).max().date()
+    all_positive = all(data.value_eur > 0)
+    assert max_date.year == dt.date.today().year, f"Counter is incomplete, max date was: {max_date}"
+    assert all_positive, "Counter pricing is not all positive"

@@ -28,7 +28,7 @@ from base.models import (
 from base.utils import to_list, to_datetime
 from base.logger import logger_slack
 
-from api.app import mail
+from .emails import app, mail
 from flask_mail import Message
 
 
@@ -481,7 +481,6 @@ def send_emails(emails_df):
 
 
 def send_email(recipient_email, shipment_count, content_txt, config_name, content_html, **kwargs):
-    from api.app import app
 
     with app.app_context():
         msg = Message(

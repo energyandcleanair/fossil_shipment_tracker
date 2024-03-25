@@ -87,19 +87,29 @@ def test_kpler_trades(date_from=None, date_to=None, product=None, origin_iso2=No
 
     sum_close = np.isclose(expected, actual, rtol=0.01)
 
-    assert sum_close, (
-        f"Expected totals similar for {product} from {origin_iso2} after {date_from}:"
-        + f"{expected} != {actual}."
-    )
+    asserts = [
+        (
+            sum_close,
+            f"Expected totals similar for {product} from {origin_iso2} after {date_from}:"
+            + f"expected {expected} ~= actual {actual}.",
+        ),
+        (
+            comparison["ok"].all(),
+            f"Expected monthly values similar for {product} from {origin_iso2} after {date_from}:\n"
+            + format_failed(comparison[~comparison.ok]),
+        ),
+        (
+            len(comparison[comparison.ok_strict == False]) < 10,
+            f"More than 10 monthly values too different for {product} from {origin_iso2} after {date_from}:\n"
+            + format_failed(comparison[~comparison.ok_strict]),
+        ),
+    ]
 
-    assert comparison["ok"].all(), (
-        f"Expected monthly values similar for {product} from {origin_iso2} after {date_from}:\n"
-        + format_failed(comparison[~comparison.ok])
-    )
-    assert len(comparison[comparison.ok_strict == False]) < 10, (
-        f"More than 10 monthly values too different for {product} from {origin_iso2} after {date_from}:\n"
-        + format_failed(comparison[~comparison.ok_strict])
-    )
+    failure_reasons = [message for assert_condition, message in asserts if not assert_condition]
+
+    if failure_reasons:
+        combined_reasons = "\n".join([f" - {failure}" for failure in failure_reasons])
+        raise AssertionError(f"One ore mor failure conditions occurred:\n{combined_reasons}")
 
 
 def compare_flows_to_trades(flows, aggregated_trades):
@@ -224,8 +234,8 @@ def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
 def format_failed(failed):
     format_number = lambda n: f"{round(n / 1e3, 3)}kt"
     row_to_reason = lambda row: (
-        f" - For {row['month']} "
-        + f"expected {format_number(row['value_tonne.expected'])} "
-        + f"but got {format_number(row['value_tonne.actual'])}."
+        f"{row['month']}: "
+        + f"expected {format_number(row['value_tonne.expected'])}"
+        + f" ~= actual {format_number(row['value_tonne.actual'])}"
     )
-    return "\n".join(failed.apply(row_to_reason, axis=1))
+    return " | ".join(failed.apply(row_to_reason, axis=1))
