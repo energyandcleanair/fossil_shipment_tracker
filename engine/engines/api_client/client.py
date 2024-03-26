@@ -15,65 +15,50 @@ DEFAULT_ARGS = {
 }
 
 
-def build_exception(response):
-    url_without_key = response.url.replace(API_KEY, "***API_KEY***")
+def _build_log_url(url):
+    return url.replace(API_KEY, "***API_KEY***")
+
+
+def _build_exception(response):
+    url_without_key = _build_log_url(response.url)
     return Exception(
         f"Error fetching {url_without_key}: {response.status_code} - {response.reason}"
     )
 
 
+def _make_request_with_retries(url, params):
+    params_for_logs = {k: (v if k != "api_key" else "***API_KEY***") for k, v in params.items()}
+    logger.info(f"Fetching {url} with params: {params_for_logs}")
+    for i in range(3):
+        try:
+            resp = requests.get(url, params=params)
+            if resp.status_code not in [200, 204]:
+                raise _build_exception(resp)
+            return pd.DataFrame(resp.json())
+        except Exception as e:
+            logger.error(f"Error fetching {_build_log_url(resp.url)}: {e}")
+    raise Exception(f"Failed to fetch {url} after 3 retries")
+
+
 def get_voyages(**kwargs):
-    url = f"{API_BASE}/v0/voyage"
-
-    args = {**kwargs, **DEFAULT_ARGS}
-    logger.info(f"Fetching voyages with args: {args}")
-
-    resp = requests.get(
-        url,
-        params=args,
+    return _make_request_with_retries(
+        f"{API_BASE}/v0/voyage",
+        params={**kwargs, **DEFAULT_ARGS},
     )
-
-    if resp.status_code != 200:
-        raise build_exception(resp)
-
-    voyages_df = pd.DataFrame(resp.json())
-    return voyages_df
 
 
 def get_overland(**kwargs):
-    url = f"{API_BASE}/v0/overland"
-
-    args = {**kwargs, **DEFAULT_ARGS}
-    logger.info(f"Fetching overland with args: {args}")
-
-    resp = requests.get(
-        url,
-        params=args,
+    return _make_request_with_retries(
+        f"{API_BASE}/v0/overland",
+        params={**kwargs, **DEFAULT_ARGS},
     )
-
-    if resp.status_code != 200:
-        raise build_exception(resp)
-
-    overland_df = pd.DataFrame(resp.json())
-    return overland_df
 
 
 def get_counter(**kwargs):
-    url = f"{API_BASE}/v0/counter"
-
-    args = {**kwargs, **DEFAULT_ARGS}
-    logger.info(f"Fetching counter with args: {args}")
-
-    resp = requests.get(
-        url,
-        params=args,
+    return _make_request_with_retries(
+        f"{API_BASE}/v0/counter",
+        params={**kwargs, **DEFAULT_ARGS},
     )
-
-    if resp.status_code != 200:
-        raise build_exception(resp)
-
-    counter_df = pd.DataFrame(resp.json())
-    return counter_df
 
 
 def get_kpler_flows(**kwargs):
@@ -82,36 +67,14 @@ def get_kpler_flows(**kwargs):
         DeprecationWarning,
         stacklevel=2,
     )
-    url = f"{API_BASE}/v1/kpler_flows"
-
-    args = {**kwargs, **DEFAULT_ARGS, "api_key": API_KEY}
-    logger.info(f"Fetching kpler_flows with args: {args}")
-
-    resp = requests.get(
-        url,
-        params=args,
+    return _make_request_with_retries(
+        f"{API_BASE}/v1/kpler_flows",
+        params={**kwargs, **DEFAULT_ARGS, "api_key": API_KEY},
     )
-
-    if resp.status_code != 200:
-        raise build_exception(resp)
-
-    kpler_flows_df = pd.DataFrame(resp.json())
-    return kpler_flows_df
 
 
 def get_kpler_trades(**kwargs):
-    url = f"{API_BASE}/v1/kpler_trades"
-
-    args = {**kwargs, **DEFAULT_ARGS, "api_key": API_KEY}
-    logger.info(f"Fetching kpler_trades with args: {args}")
-
-    resp = requests.get(
-        url,
-        params=args,
+    return _make_request_with_retries(
+        f"{API_BASE}/v1/kpler_trades",
+        params={**kwargs, **DEFAULT_ARGS, "api_key": API_KEY},
     )
-
-    if resp.status_code != 200:
-        raise build_exception(resp)
-
-    kpler_trades_df = pd.DataFrame(resp.json())
-    return kpler_trades_df
