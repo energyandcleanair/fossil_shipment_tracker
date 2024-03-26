@@ -15,17 +15,24 @@ register_adapter(np.int64, AsIs)
 
 environment = get_env("ENVIRONMENT", "test").lower()  # development, production, test
 
-envs_to_connection_keys = {
-    "test": "DB_URL_TEST",
-    "development": "DB_URL_DEVELOPMENT",
-    "production": "DB_URL_PRODUCTION",
-}
 
-connection = get_env(envs_to_connection_keys.get(environment), default=None)
+def get_connection_string_from_env():
+    envs_to_connection_keys = {
+        "test": "DB_URL_TEST",
+        "development": "DB_URL_DEVELOPMENT",
+        "production": "DB_URL_PRODUCTION",
+    }
 
-if connection is None:
-    logger.fatal(f"Database connection string not specified for {environment}")
-    sys.exit(1)
+    connection_env_key = envs_to_connection_keys.get(environment)
+    logger.info(f"Getting connection string for {environment}")
+    connection = get_env(connection_env_key, default=None)
+    if connection is None:
+        logger.fatal(f"Database connection string not specified for {environment}")
+        raise RuntimeError(f"Database connection string not specified for {environment}")
+    return connection
+
+
+connection = get_connection_string_from_env()
 
 engine = None
 try:
