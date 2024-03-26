@@ -1,3 +1,4 @@
+import sys
 from sqlalchemy import create_engine
 import sqlalchemy
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -23,7 +24,8 @@ connections = {
 connection = connections.get(environment)
 
 if connection is None:
-    logger.warning("Database connection string not specified")
+    logger.fatal(f"Database connection string not specified for {environment}")
+    sys.exit(1)
 
 engine = None
 try:
