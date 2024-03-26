@@ -36,11 +36,11 @@ def get_env(key, default=None):
             logger.info("...Looking for %s in Google Secret" % (key,))
             # Build the resource name of the parent secret.
             parent = client.secret_path(project_id, key)
-            versions = client.list_secret_versions(parent)
+            versions = client.list_secret_versions(parent=parent)
             names = [x.name for x in versions if (x.State.Name(x.state) == "ENABLED")]
 
             if len(names) == 1:
-                response = client.access_secret_version(names[0])
+                response = client.access_secret_version(name=names[0])
                 g = response.payload.data.decode("UTF-8")
                 logger.info("Found key: %s" % (key,))
 
