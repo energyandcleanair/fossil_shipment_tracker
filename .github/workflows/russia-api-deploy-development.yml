@@ -1,7 +1,11 @@
 # Deploy development
 name: russia-api-deploy-development
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
 
 jobs:
   build:
@@ -10,7 +14,6 @@ jobs:
     env:
       PYTHON_VERSION: 3.9
       POETRY_VERSION: 1.8.2
-
 
     steps:
     - uses: actions/checkout@v3
