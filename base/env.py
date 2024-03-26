@@ -45,7 +45,7 @@ def get_env(key, default=None):
                 logger.info("Found key: %s" % (key,))
 
         except Exception as e:
-            logger.info("Failed: %s" % (str(e),), exc_info=True, stack_info=True)
+            logger.info("Could not get value from Secret Manager", exc_info=True)
             pass
 
     if c or g:

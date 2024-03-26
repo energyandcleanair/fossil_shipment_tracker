@@ -14,14 +14,14 @@ register_adapter(np.int64, AsIs)
 
 
 environment = get_env("ENVIRONMENT", "test").lower()  # development, production, test
-connections = {
-    "test": get_env("DB_URL_TEST", default=None),
-    "development": get_env("DB_URL_DEVELOPMENT", default=None),
-    "production": get_env("DB_URL_PRODUCTION", default=None),
+
+envs_to_connection_keys = {
+    "test": "DB_URL_TEST",
+    "development": "DB_URL_DEVELOPMENT",
+    "production": "DB_URL_PRODUCTION",
 }
 
-
-connection = connections.get(environment)
+connection = get_env(envs_to_connection_keys.get(environment), default=None)
 
 if connection is None:
     logger.fatal(f"Database connection string not specified for {environment}")
