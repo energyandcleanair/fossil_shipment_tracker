@@ -34,7 +34,7 @@ jobs:
         working-directory: ./engine
 
       - name: Run tests
-        run: python -m pytest -c ./engine/tests/pytest.ini -v
+        run: poetry run pytest -c ./tests/pytest.ini -v
         env:
           PROJECT_ID: ${{ vars.PROJECT_ID }}
           ENVIRONMENT: ${{ vars.ENVIRONMENT }}

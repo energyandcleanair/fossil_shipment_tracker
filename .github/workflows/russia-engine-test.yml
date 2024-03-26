@@ -55,4 +55,4 @@ jobs:
         EQUASIS_ACCOUNT_RANGE_END: ${{ vars.EQUASIS_ACCOUNT_RANGE_END }}
 
       run: |
-        pytest -c ./engine/tests/pytest.ini -v
+        poetry run pytest -c ./tests/pytest.ini -v

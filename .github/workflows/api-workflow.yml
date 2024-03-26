@@ -46,7 +46,7 @@ jobs:
           PGPORT_PRODUCTION: ${{ secrets.PGPORT_PRODUCTION }}
           PGUSER_PRODUCTION: ${{ secrets.PGUSER_PRODUCTION }}
           PGPASSWORD_PRODUCTION: ${{ secrets.PGPASSWORD_PRODUCTION }}
-        run: python -m pytest -c ./tests/pytest.ini -v
+        run: poetry run pytest -c ./tests/pytest.ini -v
 
   deploy:
     runs-on: ubuntu-latest

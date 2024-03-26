@@ -47,4 +47,4 @@ jobs:
         PGUSER_PRODUCTION: ${{ secrets.PGUSER_PRODUCTION }}
         PGPASSWORD_PRODUCTION: ${{ secrets.PGPASSWORD_PRODUCTION }}
       run: |
-        pytest -c ./tests/pytest.ini -v
+        poetry run pytest -c ./tests/pytest.ini -v
