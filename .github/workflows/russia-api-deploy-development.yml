@@ -42,6 +42,7 @@ jobs:
       id: deploy
       uses: google-github-actions/deploy-appengine@v1
       with:
+        project_id: ${{ vars.PROJECT_ID }}
         deliverables: ./api/api_development.yaml
         promote: true
         flags: '--stop-previous-version'
