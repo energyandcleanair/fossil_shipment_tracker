@@ -23,6 +23,7 @@ geoalchemy2 = "^0.13.1"
 flask-cors = "^3.0.10"
 flask-mail = "^0.9.1"
 gunicorn = "^20.1.0"
+python-decouple = "^3.8"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0.1"
