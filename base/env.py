@@ -2,7 +2,7 @@
 # depending on the infrastructure (e.g. GCE, GAE, local etc.)
 import os
 from decouple import config
-from google.cloud.secretmanager_v1 import SecretManagerServiceClient
+from google.cloud.secretmanager_v1 import SecretManagerServiceClient, SecretVersion
 
 
 project_id = config("PROJECT_ID")
@@ -37,7 +37,7 @@ def get_env(key, default=None):
             # Build the resource name of the parent secret.
             parent = client.secret_path(project_id, key)
             versions = client.list_secret_versions(parent=parent)
-            names = [x.name for x in versions if (x.State.Name(x.state) == "ENABLED")]
+            names = [x.name for x in versions if (x.state == SecretVersion.State.ENABLED)]
 
             if len(names) == 1:
                 response = client.access_secret_version(name=names[0])
