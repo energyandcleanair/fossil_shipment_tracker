@@ -26,12 +26,19 @@ def _build_exception(response):
     )
 
 
+def _replace_list_params_with_csv(params):
+    for k, v in params.items():
+        if isinstance(v, list):
+            params[k] = ",".join(v)
+    return params
+
+
 def _make_request_with_retries(url, params):
     params_for_logs = {k: (v if k != "api_key" else "***API_KEY***") for k, v in params.items()}
     logger.info(f"Fetching {url} with params: {params_for_logs}")
-    for i in range(3):
+    for _ in range(3):
         try:
-            resp = requests.get(url, params=params)
+            resp = requests.get(url, params=_replace_list_params_with_csv(params))
             if resp.status_code not in [200, 204]:
                 raise _build_exception(resp)
             return pd.DataFrame(resp.json())
