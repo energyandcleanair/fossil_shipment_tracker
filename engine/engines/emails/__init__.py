@@ -1,6 +1,8 @@
 from flask import Flask
 from flask_mail import Mail, Message
 
+from base.env import get_env
+
 app = Flask(__name__)
 
 app.config["MAIL_SERVER"] = "smtp.sendgrid.net"

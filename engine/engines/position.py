@@ -16,7 +16,6 @@ from sqlalchemy.orm import aliased
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
-import pygeos
 
 
 import base

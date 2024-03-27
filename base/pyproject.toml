@@ -12,10 +12,8 @@ packages = [
 python = "^3.9"
 sqlalchemy = "^1.4.52"
 geoalchemy2 = "^0.13.3"
-shapely = "^2.0.1"
 pyproj = "^3.6.1"
 pandas = "^1.4.2"
-geopandas = "^0.12.2"
 tqdm = "^4.65.0"
 python-decouple = "^3.8"
 slack-logger = "^0.3.1"
@@ -23,9 +21,9 @@ slack-sdk = "^3.20.2"
 requests = "^2.28.2"
 google-cloud-secret-manager = "^2.19.0"
 psycopg2 = "^2.9.3"
+geopandas = "^0.12.2"
+shapely = "^2.0.3"
 
-
-[tool.poetry.group.dev.dependencies]
 
 [build-system]
 requires = ["poetry-core"]
