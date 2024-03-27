@@ -103,7 +103,6 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
                 ],
                 currency="EUR",
                 pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
-                bypass_maintenance=True,
             )
             .loc[lambda df: df.commodity_origin_iso2 == "RU"]
             .loc[lambda df: df.destination_iso2 != "RU"]
@@ -166,7 +165,6 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
                     ],
                     "currency": "EUR",
                     "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
-                    "bypass_maintenance": True,
                 }
             )
             .loc[lambda df: df.commodity_origin_iso2 == "RU"]
