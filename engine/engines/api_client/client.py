@@ -75,13 +75,13 @@ def get_kpler_flows(**kwargs):
         stacklevel=2,
     )
     return _make_request_with_retries(
-        f"{API_BASE}/v1/kpler_flows",
+        f"{API_BASE}/v1/kpler_flow",
         params={**kwargs, **DEFAULT_ARGS, "api_key": API_KEY},
     )
 
 
 def get_kpler_trades(**kwargs):
     return _make_request_with_retries(
-        f"{API_BASE}/v1/kpler_trades",
+        f"{API_BASE}/v1/kpler_trade",
         params={**kwargs, **DEFAULT_ARGS, "api_key": API_KEY},
     )

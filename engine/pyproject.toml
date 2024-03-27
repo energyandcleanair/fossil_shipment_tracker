@@ -38,6 +38,7 @@ python-decouple = "^3.8"
 pymongo = "^4.6.2"
 seaborn = "^0.13.2"
 base = {path = "../base"}
+google-cloud-storage = "^2.16.0"
 
 
 [build-system]
