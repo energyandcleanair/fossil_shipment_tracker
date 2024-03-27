@@ -214,7 +214,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
             ],
             dropna=False,
         )
-        .apply(lambda x: x.set_index("date").resample("D").sum().fillna(0))
+        .apply(lambda x: x.set_index("date").resample("D").sum(numeric_only=True).fillna(0))
         .reset_index()
     )
 
@@ -528,7 +528,7 @@ def add_estimates(result):
     daterange = pd.date_range(min(result.date), dt.datetime.today()).rename("date")
 
     def resample_and_fill(x):
-        x = x.set_index("date").resample("D").sum().fillna(0)
+        x = x.set_index("date").resample("D").sum(numeric_only=True).fillna(0)
         # cut 2 last days and take the 7-day mean
         means = x[["value_tonne", "value_eur"]].shift(2).tail(7).mean()
         x = x.reindex(daterange).fillna(means)
