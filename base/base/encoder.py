@@ -3,6 +3,7 @@ import json
 import decimal
 import pandas as pd
 
+
 class JsonEncoder(json.JSONEncoder):
     def default(self, o):
         if pd.isnull(o):

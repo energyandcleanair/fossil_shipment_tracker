@@ -18,6 +18,9 @@ RUN pip install poetry
 COPY engine/poetry.lock engine/pyproject.toml ./
 ENV POETRY_VIRTUALENVS_IN_PROJECT=true
 ENV PYTHONUNBUFFERED=1
+
+COPY base /app/base
+
 RUN poetry install --no-dev
 
 # Build the app
@@ -51,7 +54,6 @@ COPY engine/ .
 # Assets and cache can be writen to the engine
 COPY --chown=engine engine/assets ./assets
 COPY --chown=engine api/assets/kpler ./assets/kpler
-COPY base/ ./base
 
 RUN mkdir -p cache/kpler cache/datalastic cache/marinetraffic && \
   chown -R engine:engine cache
