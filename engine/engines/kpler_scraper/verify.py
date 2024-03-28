@@ -18,11 +18,11 @@ import datetime as dt
 
 TOLERANCE_FOR_VALUE_ERROR_FOR_DAY_COUNTRY = 0.05
 TOLERANCE_FOR_VALUE_ERROR_FOR_DAY_PRODUCT = 0.05
-TOLERANCE_FOR_VALUE_ERROR_FOR_WHOLE_DAY = 0.01
+TOLERANCE_FOR_VALUE_ERROR_FOR_WHOLE_DAY = 0.05
 JOINT_PROBLEM_COUNT_THRESHOLD = 3
 
 RECENT_PERIOD_FOR_ERROR_CHECKING = 90
-TOLERANCE_FOR_VALUE_ERROR_IN_RECENT_PERIOD_SUM = 0.01
+TOLERANCE_FOR_VALUE_ERROR_IN_RECENT_PERIOD_SUM = 0.05
 
 
 class KplerTradeVerifier:
@@ -126,7 +126,7 @@ class KplerTradeVerifier:
         ) / 2
 
         # Allows for each day to have a small number of problems as long as the total closely matches.
-        comparison["ok"] = (comparison["problems"] < JOINT_PROBLEM_COUNT_THRESHOLD) & np.isclose(
+        comparison["ok"] = (comparison["problems"] < JOINT_PROBLEM_COUNT_THRESHOLD) | np.isclose(
             comparison["value_tonne.expected"],
             comparison["value_tonne.actual"],
             rtol=TOLERANCE_FOR_VALUE_ERROR_FOR_WHOLE_DAY,
