@@ -6,9 +6,9 @@ from base.logger import logger
 from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 from base.models.kpler import KplerProduct, KplerSyncHistory, KplerTrade, KplerZone
 from base.utils import to_datetime
+from base.models import DB_TABLE_KPLER_SYNC_COMPARISON_DETAILS
 
 from engines.kpler_scraper.scraper_flow import KplerFlowScraper
-
 
 from sqlalchemy import func
 from sqlalchemy.orm import aliased
@@ -19,7 +19,10 @@ import datetime as dt
 TOLERANCE_FOR_VALUE_ERROR_FOR_DAY_COUNTRY = 0.05
 TOLERANCE_FOR_VALUE_ERROR_FOR_DAY_PRODUCT = 0.05
 TOLERANCE_FOR_VALUE_ERROR_FOR_WHOLE_DAY = 0.01
-SPLIT_PROBLEM_COUNT_THRESHOLD = 3
+JOINT_PROBLEM_COUNT_THRESHOLD = 3
+
+RECENT_PERIOD_FOR_ERROR_CHECKING = 90
+TOLERANCE_FOR_VALUE_ERROR_IN_RECENT_PERIOD_SUM = 0.01
 
 
 class KplerTradeVerifier:
@@ -43,7 +46,7 @@ class KplerTradeVerifier:
         for country in origin_iso2s:
             for platform in platforms:
                 logger.info(f"Verifying {country} {platform} from {date_from} to {date_to}")
-                comparison = self.compare_to_live_flows(
+                comparison, comparison_details = self.compare_to_live_flows(
                     origin_iso2=country, platform=platform, date_from=date_from, date_to=date_to
                 )
 
@@ -59,6 +62,13 @@ class KplerTradeVerifier:
                     checked_time=checked_time,
                 )
 
+                self.update_sync_comparison_details(
+                    origin_iso2=country,
+                    platform=platform,
+                    comparison_details=comparison_details,
+                    checked_time=checked_time,
+                )
+
                 comparisons = pd.concat([comparisons, comparison])
 
         failed_comparisons = comparisons[~comparisons["ok"]]
@@ -69,13 +79,36 @@ class KplerTradeVerifier:
 
     def compare_to_live_flows(self, origin_iso2=None, platform=None, date_from=None, date_to=None):
 
-        dest_comparison = self.compare_to_live_flows_for_dest(
+        comparison_per_dest = self.compare_to_live_flows_for_dest(
             origin_iso2, platform, date_from, date_to
         )
-        product_comparison = self.compare_to_live_flows_for_product(
+        comparison_per_product = self.compare_to_live_flows_for_product(
             origin_iso2, platform, date_from, date_to
         )
 
+        dest_comparison = self._aggregate_to_check_period(comparison_per_dest)
+        product_comparison = self._aggregate_to_check_period(comparison_per_product)
+
+        return self.summarise_comparisons(
+            dest_comparison, product_comparison
+        ), self.combine_comparison_details(comparison_per_dest, comparison_per_product)
+
+    def combine_comparison_details(self, comparison_per_dest, comparison_per_product):
+
+        comparison_per_dest = comparison_per_dest.rename(columns={"country_iso2": "factor"})
+        comparison_per_product = comparison_per_product.rename(columns={"product": "factor"})
+
+        comparison_per_dest["factor_type"] = "dest"
+        comparison_per_product["factor_type"] = "product"
+
+        return pd.concat([comparison_per_dest, comparison_per_product]).rename(
+            columns={
+                "value_tonne.expected": "value_tonne_expected",
+                "value_tonne.actual": "value_tonne_actual",
+            }
+        )
+
+    def summarise_comparisons(self, dest_comparison, product_comparison):
         comparison = pd.merge(
             dest_comparison,
             product_comparison,
@@ -93,7 +126,7 @@ class KplerTradeVerifier:
         ) / 2
 
         # Allows for each day to have a small number of problems as long as the total closely matches.
-        comparison["ok"] = (comparison["problems"] < SPLIT_PROBLEM_COUNT_THRESHOLD) & np.isclose(
+        comparison["ok"] = (comparison["problems"] < JOINT_PROBLEM_COUNT_THRESHOLD) & np.isclose(
             comparison["value_tonne.expected"],
             comparison["value_tonne.actual"],
             rtol=TOLERANCE_FOR_VALUE_ERROR_FOR_WHOLE_DAY,
@@ -129,6 +162,26 @@ class KplerTradeVerifier:
 
         session.commit()
 
+    def update_sync_comparison_details(
+        self,
+        origin_iso2=None,
+        platform=None,
+        comparison_details=None,
+        checked_time=None,
+    ):
+        comparison_details["origin"] = origin_iso2
+        comparison_details["platform"] = platform
+        comparison_details["checked_time"] = checked_time
+
+        comparison_details.to_sql(
+            DB_TABLE_KPLER_SYNC_COMPARISON_DETAILS,
+            session.bind,
+            if_exists="append",
+            index=False,
+        )
+
+        session.commit()
+
     def compare_to_live_flows_for_dest(self, origin_iso2, platform, date_from, date_to):
 
         logger.info(
@@ -140,7 +193,7 @@ class KplerTradeVerifier:
             origin_iso2=origin_iso2,
             granularity=FlowsPeriod.Daily,
             unit=FlowsMeasurementUnit.T,
-            date_from=date_from,
+            date_from=date_from - dt.timedelta(days=RECENT_PERIOD_FOR_ERROR_CHECKING),
             date_to=date_to,
             split=FlowsSplit.DestinationCountries,
         )[["date", "to_iso2", "value"]]
@@ -182,6 +235,17 @@ class KplerTradeVerifier:
         )
         expected.country_iso2 = expected.country_iso2.fillna("unknown")
 
+        expected["recent_sum"] = (
+            expected.groupby("country_iso2", dropna=False)
+            .rolling(
+                window=dt.timedelta(days=RECENT_PERIOD_FOR_ERROR_CHECKING),
+                min_periods=1,
+                on="departure_day",
+            )
+            .sum()["value_tonne"]
+            .reset_index(0, drop=True)
+        )
+
         # Using pandas, merge actual and expected
         comparison = pd.merge(
             expected,
@@ -191,22 +255,23 @@ class KplerTradeVerifier:
             suffixes=(".expected", ".actual"),
         )
 
-        comparison["problems"] = ~np.isclose(
+        departure_date = pd.to_datetime(comparison["departure_day"]).dt.date
+        comparison = comparison[(departure_date >= date_from) & (departure_date <= date_to)]
+
+        not_close = ~np.isclose(
             comparison["value_tonne.expected"],
             comparison["value_tonne.actual"],
             rtol=TOLERANCE_FOR_VALUE_ERROR_FOR_DAY_COUNTRY,
         )
 
-        # Group comparison by departure_day counting the number of "not ok"
-        comparison_per_day = (
-            comparison.groupby("departure_day")
-            .aggregate(
-                {"problems": "sum", "value_tonne.expected": "sum", "value_tonne.actual": "sum"}
-            )
-            .reset_index()
+        error_is_significant_in_recent = (
+            np.abs(comparison["value_tonne.expected"] - comparison["value_tonne.actual"])
+            > comparison["recent_sum"] * TOLERANCE_FOR_VALUE_ERROR_IN_RECENT_PERIOD_SUM
         )
 
-        return comparison_per_day
+        comparison["problems"] = not_close & error_is_significant_in_recent
+
+        return comparison
 
     def compare_to_live_flows_for_product(self, origin_iso2, platform, date_from, date_to):
 
@@ -265,6 +330,17 @@ class KplerTradeVerifier:
             .reset_index()
         )
 
+        expected["recent_sum"] = (
+            expected.groupby("product", dropna=False)
+            .rolling(
+                window=dt.timedelta(days=RECENT_PERIOD_FOR_ERROR_CHECKING),
+                min_periods=1,
+                on="departure_day",
+            )
+            .sum()["value_tonne"]
+            .reset_index(0, drop=True)
+        )
+
         # Using pandas, merge actual and expected
         comparison = pd.merge(
             expected,
@@ -274,19 +350,29 @@ class KplerTradeVerifier:
             suffixes=(".expected", ".actual"),
         )
 
-        comparison["problems"] = ~np.isclose(
+        departure_date = pd.to_datetime(comparison["departure_day"]).dt.date
+        comparison = comparison[(departure_date >= date_from) & (departure_date <= date_to)]
+
+        not_close = ~np.isclose(
             comparison["value_tonne.expected"],
             comparison["value_tonne.actual"],
             rtol=TOLERANCE_FOR_VALUE_ERROR_FOR_DAY_PRODUCT,
         )
 
-        # Group comparison by departure_day counting the number of "not ok"
-        comparison_per_day = (
+        error_is_significant_in_recent = (
+            np.abs(comparison["value_tonne.expected"] - comparison["value_tonne.actual"])
+            > comparison["recent_sum"] * TOLERANCE_FOR_VALUE_ERROR_IN_RECENT_PERIOD_SUM
+        )
+
+        comparison["problems"] = not_close & error_is_significant_in_recent
+
+        return comparison
+
+    def _aggregate_to_check_period(self, comparison):
+        return (
             comparison.groupby("departure_day")
             .aggregate(
                 {"problems": "sum", "value_tonne.expected": "sum", "value_tonne.actual": "sum"}
             )
             .reset_index()
         )
-
-        return comparison_per_day

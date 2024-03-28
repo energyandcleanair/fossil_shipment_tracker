@@ -14,10 +14,7 @@ from base.db import session
 
 
 def update_trades(
-    date_from=None,
-    date_to=None,
-    platforms=None,
-    origin_iso2s=["RU"],
+    date_from=None, date_to=None, platforms=None, origin_iso2s=["RU"], update_time=dt.datetime.now()
 ):
     scraper = KplerTradeScraper()
     date_from = to_datetime(date_from).date() if date_from is not None else dt.date(2020, 1, 1)
@@ -25,8 +22,6 @@ def update_trades(
     periods = pd.period_range(start=date_from, end=date_to, freq="M").astype(str)
 
     _platforms = scraper.platforms if platforms is None else platforms
-
-    update_time = dt.datetime.now()
 
     with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
         warnings.simplefilter("ignore")

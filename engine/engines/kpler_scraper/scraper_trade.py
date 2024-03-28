@@ -85,9 +85,8 @@ class KplerTradeScraper(KplerScraper):
 
         # Get zone dict
         params_raw = {
+            **KplerScraper.default_params(platform=platform),
             "exchangeType": "export",
-            "filters": {},
-            "flowDirection": "export",
             "from": query_from,
             "fromLocations": from_locations,
             "interIntra": "interintra",
@@ -99,18 +98,9 @@ class KplerTradeScraper(KplerScraper):
             "toLocations": [],
             "vesselClassifications": [],
             "vessels": [],
-            "onlyRealized": False,
-            "withBetaVessels": False,
-            "withForecasted": True,
-            "withFreightView": False,
-            "withIncompleteTrades": True,
-            "withIntraCountry": True,
-            "withProductEstimation": False,
             "granularity": "months",
             "period": month,
         }
-        default_products = {"liquids": [1400, 1328, 1370], "lng": [1750], "dry": [1334]}
-        params_raw["filters"] = {"product": default_products[platform]}
 
         token = self.token  # get_env("KPLER_TOKEN_BRUTE")
         url = {

@@ -67,10 +67,10 @@ def update():
     )
 
     kpler_scraper.update(
-        date_from=date_from,
-        date_to=-1,
+        recent_date_from=date_from,
+        recent_date_to=-1,
         origin_iso2s=countries_to_update,
-        parts=[UpdateParts.TRADES, UpdateParts.CLEAN_OUTDATED_ENTRIES],
+        parts=[UpdateParts.UPDATE_RECENT_TRADES],
         platforms=["lng"],
     )
     kpler_trade_computed.update()

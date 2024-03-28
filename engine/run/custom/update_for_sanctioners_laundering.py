@@ -155,10 +155,10 @@ def update(continue_from=None, date_from=None, date_to=None):
         countries_to_update = countries_to_update[countries_to_update.index(continue_from) :]
 
     result = kpler_scraper.update(
-        date_from=date_from,
-        date_to=date_to,
+        recent_date_from=date_from,
+        recent_date_to=date_to,
         origin_iso2s=countries_to_update,
-        parts=[UpdateParts.TRADES, UpdateParts.CLEAN_OUTDATED_ENTRIES],
+        parts=[UpdateParts.UPDATE_RECENT_TRADES],
         platforms=["liquids"],
     )
 

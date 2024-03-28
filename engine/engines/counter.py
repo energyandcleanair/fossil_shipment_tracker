@@ -30,7 +30,6 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
         nest_in_data=False,
         currency="EUR",
         pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
-        bypass_maintenance=True,
     )
 
     if version == base.COUNTER_VERSION0:
@@ -52,7 +51,6 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
                 currency="EUR",
                 status="completed",
                 pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
-                bypass_maintenance=True,
             )
             .loc[lambda df: df.commodity_origin_iso2 == "RU"]
             .loc[lambda df: df.commodity_destination_iso2 != "RU"]
@@ -78,7 +76,6 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
                 currency="EUR",
                 status="completed",
                 pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
-                bypass_maintenance=True,
                 commodity=[base.LPG],
             )
             .loc[lambda df: df.commodity_origin_iso2 == "RU"]
@@ -125,22 +122,19 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
         # Version 1: MT voyages for LPG only, Kpler TRADES for the rest
         voyages = (
             api_client.get_voyages(
-                params={
-                    "date_from": date_from,
-                    "commodity_origin_iso2": ["RU"],
-                    "aggregate_by": [
-                        "commodity_origin_iso2",
-                        "commodity_destination_iso2",
-                        "commodity",
-                        "arrival_date",
-                        "status",
-                    ],
-                    "currency": "EUR",
-                    "status": "completed",
-                    "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
-                    "bypass_maintenance": True,
-                    "commodity": [base.LPG],
-                }
+                date_from=date_from,
+                commodity_origin_iso2=["RU"],
+                aggregate_by=[
+                    "commodity_origin_iso2",
+                    "commodity_destination_iso2",
+                    "commodity",
+                    "arrival_date",
+                    "status",
+                ],
+                currency="EUR",
+                status="completed",
+                pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
+                commodity=[base.LPG],
             )
             .loc[lambda df: df.commodity_origin_iso2 == "RU"]
             .loc[lambda df: df.commodity_destination_iso2 != "RU"]
@@ -149,36 +143,48 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
         )
         assert np.all(voyages.commodity == base.LPG)
 
-        # Add Kpler trades
-        kpler_trades = (
-            api_client.get_kpler_trades(
-                params={
-                    "format": "json",
-                    "download": False,
-                    "date_from": date_from,
-                    "origin_iso2": ["RU"],
-                    "aggregate_by": [
+        # Years from date_from to today
+        years = pd.date_range(date_from, dt.datetime.today(), freq="YS")
+
+        kpler_trades = pd.DataFrame()
+
+        for year in years:
+
+            year_start = year.date()
+            year_end = (year + pd.DateOffset(years=1) - pd.DateOffset(days=1)).date()
+
+            # Add Kpler trades
+            kpler_trades_for_year = (
+                api_client.get_kpler_trades(
+                    date_from=year_start,
+                    date_to=year_end,
+                    commodity_origin_iso2=["RU"],
+                    aggregate_by=[
                         "commodity_origin_iso2",
                         "commodity_destination_iso2",
                         "commodity_equivalent",
                         "destination_date",
+                        "status",
                     ],
-                    "currency": "EUR",
-                    "pricing_scenario": [PRICING_DEFAULT, PRICING_ENHANCED],
-                }
+                    currency="EUR",
+                    pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
+                    check_complete=False,
+                )
+                .loc[lambda df: df.commodity_origin_iso2 == "RU"]
+                .loc[lambda df: df.commodity_destination_iso2 != "RU"]
+                .loc[lambda df: df.commodity_destination_iso2 != "not found"]
+                .loc[lambda df: df.status == base.COMPLETED]
+                .rename(
+                    columns={
+                        "commodity_equivalent": "commodity",
+                        "commodity_equivalent_group": "commodity_group",
+                        "destination_date": "date",
+                    }
+                )
             )
-            .loc[lambda df: df.commodity_origin_iso2 == "RU"]
-            .loc[lambda df: df.commodity_destination_iso2 != "RU"]
-            .loc[lambda df: df.commodity_destination_iso2 != "not found"]
-            .loc[lambda df: df.status == base.COMPLETED]
-            .rename(
-                columns={
-                    "commodity_equivalent": "commodity",
-                    "commodity_equivalent_group": "commodity_group",
-                    "destination_date": "date",
-                }
-            )
-        )
+
+            kpler_trades = pd.concat([kpler_trades, kpler_trades_for_year])
+
         result = pd.concat([pipelineflows, voyages, kpler_trades])
 
     else:
@@ -528,7 +534,7 @@ def add_estimates(result):
     daterange = pd.date_range(min(result.date), dt.datetime.today()).rename("date")
 
     def resample_and_fill(x):
-        x = x.set_index("date").resample("D").sum(numeric_only=True).fillna(0)
+        x = x.set_index("date").resample("D").sum().fillna(0)
         # cut 2 last days and take the 7-day mean
         means = x[["value_tonne", "value_eur"]].shift(2).tail(7).mean()
         x = x.reindex(daterange).fillna(means)

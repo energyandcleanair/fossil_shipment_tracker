@@ -196,6 +196,7 @@ def get_aggregated_trades_from_api(product, origin_iso2, date_from, date_to):
         "aggregate_by": f"origin_month,destination_iso2",
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
+        "exclude_within_country": "false",
         "check_complete": "false",
         "format": "json",
     }

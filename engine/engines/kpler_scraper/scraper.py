@@ -38,6 +38,26 @@ PLATFORMS = ["liquids", "lng", "dry"]
 ### - Koweit has duplicates:zone_id 110755 and 505
 ### Ended up removing 833 and 110755 as having the lowest values
 class KplerScraper:
+
+    default_products = {"liquids": [1400, 1328, 1370], "lng": [1750], "dry": [1334]}
+    default_trade_flow_params = {
+        "flowDirection": "export",
+        "withBetaVessels": False,
+        "onlyRealized": False,
+        "withForecasted": True,
+        "withFreightView": False,
+        "withIncompleteTrades": True,
+        "withIntraCountry": True,
+        "withProductEstimation": False,
+    }
+
+    @staticmethod
+    def default_params(platform):
+        return {
+            **KplerScraper.default_trade_flow_params,
+            "filters": {"product": KplerScraper.default_products[platform]},
+        }
+
     def __init__(self):
         self.platforms = PLATFORMS
         self.cc = coco.CountryConverter()
@@ -58,23 +78,11 @@ class KplerScraper:
         retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
-        self.login()
-
-    def login(self):
-        # r = self.session.post(
-        #     "https://terminal.kpler.com/api/login",
-        #     data={"email": get_env("KPLER_EMAIL"),
-        #           "password": get_env("KPLER_PASSWORD")},
-        #     headers={"Content-Type": "application/json",
-        #              "Accept": "application/json",
-        #              "origin": "https://terminal.kpler.com",
-        #              "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        # )
-        # if r.status_code != 200:
-        #     raise Exception("Kpler login failed")
-        # self.token = r.json()["token"]
-
         self.token = get_env("KPLER_TOKEN_BRUTE")
+        if self.token is None:
+            raise ValueError(
+                "Kpler token was not set. Is KPLER_TOKEN_BRUTE environment variable set correctly?"
+            )
 
     def get_installations(self, origin_iso2, platform, split, product=None):
         # We collect flows split by installation

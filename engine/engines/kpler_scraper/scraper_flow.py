@@ -29,9 +29,9 @@ class KplerFlowScraper(KplerScraper):
         date_from,
         date_to,
         split,
+        product=None,
         from_zone=None,
         to_zone=None,
-        product=None,
         unit=None,
         granularity=FlowsPeriod.Daily,
         include_total=True,
@@ -63,20 +63,12 @@ class KplerFlowScraper(KplerScraper):
         )
 
         params_raw = {
+            **KplerScraper.default_params(platform=platform),
             "cumulative": False,
-            "filters": {"product": []},
-            "flowDirection": "export",
             "fromLocations": from_locations,
             "toLocations": to_locations,
             "granularity": granularity.value,
             "interIntra": "interintra",
-            "onlyRealized": False,
-            "withBetaVessels": False,
-            "withForecasted": True,
-            "withFreightView": False,
-            "withIncompleteTrades": True,
-            "withIntraCountry": True,
-            "withProductEstimation": False,
             "withGrades": True,
             "vesselClassifications": [],
             "splitOn": split.value,
@@ -96,9 +88,6 @@ class KplerFlowScraper(KplerScraper):
                 params_raw["filters"] = {"product": [int(product.get("id"))]}
             else:
                 params_raw["filters"] = {"product": [self.get_product_id(name=product)]}
-        else:
-            default_products = {"liquids": [1400, 1328, 1370], "lng": [1750], "dry": [1334]}
-            params_raw["filters"] = {"product": default_products[platform]}
 
         token = self.token  # get_env("KPLER_TOKEN_BRUTE")
         url = {

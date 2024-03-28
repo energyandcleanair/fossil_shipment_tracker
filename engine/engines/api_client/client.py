@@ -50,21 +50,14 @@ def _make_request_with_retries(url, params):
 def get_voyages(**kwargs):
     return _make_request_with_retries(
         f"{API_BASE}/v0/voyage",
-        params={**kwargs, **DEFAULT_ARGS},
+        params={**kwargs, **DEFAULT_ARGS, "bypass_maintenance": True},
     )
 
 
 def get_overland(**kwargs):
     return _make_request_with_retries(
         f"{API_BASE}/v0/overland",
-        params={**kwargs, **DEFAULT_ARGS},
-    )
-
-
-def get_counter(**kwargs):
-    return _make_request_with_retries(
-        f"{API_BASE}/v0/counter",
-        params={**kwargs, **DEFAULT_ARGS},
+        params={**kwargs, **DEFAULT_ARGS, "bypass_maintenance": True},
     )
 
 
@@ -84,4 +77,11 @@ def get_kpler_trades(**kwargs):
     return _make_request_with_retries(
         f"{API_BASE}/v1/kpler_trade",
         params={**kwargs, **DEFAULT_ARGS, "api_key": API_KEY},
+    )
+
+
+def get_counter(**kwargs):
+    return _make_request_with_retries(
+        f"{API_BASE}/v0/counter",
+        params={**kwargs, **DEFAULT_ARGS},
     )

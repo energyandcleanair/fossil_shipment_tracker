@@ -962,7 +962,7 @@ class KplerTradeResource(TemplateResource):
             query = query.filter(subquery.c.group.in_(to_list(group)))
 
         if family:
-            query = query.filter(subquery.c.family_name.in_(to_list(family)))
+            query = query.filter(subquery.c.family.in_(to_list(family)))
 
         if commodity_equivalent:
             query = query.filter(subquery.c.commodity_equivalent.in_(to_list(commodity_equivalent)))

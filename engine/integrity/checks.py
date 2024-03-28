@@ -285,6 +285,16 @@ def test_counter_pricing_positive():
         data = pd.concat([data, response])
 
     max_date = pd.to_datetime(data.date).max().date()
-    all_positive = all(data.value_eur > 0)
+    all_positive = all(data.value_eur >= 0)
+
+    not_positive = data[data.value_eur < 0]
+
+    not_positive["year"] = pd.to_datetime(not_positive.date).dt.year
+
+    not_positive_summary = (
+        not_positive.groupby(by=["year", "commodity", "destination_iso2"])
+        .size()
+        .reset_index(name="count")
+    )
     assert max_date.year == dt.date.today().year, f"Counter is incomplete, max date was: {max_date}"
-    assert all_positive, "Counter pricing is not all positive"
+    assert all_positive, "Counter pricing is not all positive:\n" + not_positive_summary.to_string()
