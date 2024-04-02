@@ -31,7 +31,7 @@ jobs:
         python -m pip install --upgrade pip
         poetry export -f requirements.txt --without-hashes --without-urls | sed '/^base @/ d' > requirements.txt
         pip install -r requirements.txt
-        cp ../base/base base
+        cp -r ../base/base base
     - name: Authenticate
       id: 'auth'
       uses: 'google-github-actions/auth@v1'
