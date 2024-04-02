@@ -24,10 +24,7 @@ def update():
     clean_outdated_entries()
 
     kpler_scraper.update(
-        recent_date_from=-30,
-        historic_date_from="2021-01-01",
         origin_iso2s=["RU"],
-        platforms=["liquids"],
     )
     kpler_trade_computed.update()
 
