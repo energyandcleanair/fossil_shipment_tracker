@@ -11,7 +11,6 @@ jobs:
       PYTHON_VERSION: 3.9
       POETRY_VERSION: 1.8.2
 
-
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ env.PYTHON_VERSION }}
@@ -26,8 +25,9 @@ jobs:
       working-directory: api
       run: |
         python -m pip install --upgrade pip
-        poetry export -f requirements.txt --output requirements.txt
+        poetry export -f requirements.txt --without-hashes --without-urls | sed '/^base @/ d' > requirements.txt
         pip install -r requirements.txt
+        cp -r ../base/base base
     - name: Authenticate
       id: 'auth'
       uses: 'google-github-actions/auth@v1'
