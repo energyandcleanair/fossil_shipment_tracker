@@ -55,7 +55,11 @@ def update_insurance(insurance):
     date = scraper.get_insurance_start_date_for_ship(imo)
 
     if date != None:
-        db_insurance = session.query(ShipInsurer).filter(ShipInsurer.id == id).first()
+        db_insurance = (
+            session.query(ShipInsurer)
+            .filter(ShipInsurer.id == id, ShipInsurer.is_valid == True)
+            .first()
+        )
 
         db_insurance.date_from_insurer = date
         db_insurance.updated_on_insurer = dt.datetime.now()
@@ -72,6 +76,7 @@ def get_all_insurance_to_update():
             ShipInsurer.date_from_equasis,
             ShipInsurer.updated_on_insurer,
         )
+        .filter(ShipInsurer.is_valid == True)
         .distinct(ShipInsurer.ship_imo)
         .order_by(
             ShipInsurer.ship_imo,

@@ -24,7 +24,6 @@ from base.env import get_env
 from base.logger import logger, logger_slack
 from base.models import (
     Commodity,
-    Departure,
     ShipInsurer,
     ShipOwner,
     ShipManager,
@@ -32,11 +31,10 @@ from base.models import (
     Country,
     KplerProduct,
     KplerTrade,
-    KplerZone,
     Ship,
-    Port,
 )
 from engines.company_scraper import Equasis, CompanyImoScraper
+from sqlalchemy.sql import update
 
 import warnings
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -69,6 +67,8 @@ def update(force_unknown=False):
         )
 
         fill_country()
+
+        hide_invalid_insurance_entries()
         logger_slack.info("=== Company update done ===")
     except Exception as e:
         logger_slack.error("=== Company update failed ===", stack_info=True, exc_info=True)
@@ -284,6 +284,7 @@ def find_ships_that_need_updating(
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
         .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
+        .filter(ShipInsurer.is_valid == True)
         .distinct(filter_query.c.ship_imo)
         .order_by(filter_query.c.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
     )
@@ -459,7 +460,10 @@ def update_ship_insurer(imo, equasis_insurers):
 
             # If it's the first insurer, we enter an empty date_from insurer first.
             first_time_insurer = (
-                session.query(ShipInsurer).filter(ShipInsurer.ship_imo == imo).count() == 0
+                session.query(ShipInsurer)
+                .filter(ShipInsurer.ship_imo == imo, ShipInsurer.is_valid == True)
+                .count()
+                == 0
             )
             if first_time_insurer:
                 insert_first_time_insurer(imo, insurer_raw_name)
@@ -548,6 +552,7 @@ def get_matching_insurer(ship_imo=None, company_raw_name=None, date_from=None):
                 ShipInsurer.ship_imo == ship_imo,
                 ShipInsurer.company_raw_name == company_raw_name,
                 ShipInsurer.date_from_equasis == date_from,
+                ShipInsurer.is_valid == True,
             )
             .first()
         )
@@ -557,6 +562,7 @@ def get_matching_insurer(ship_imo=None, company_raw_name=None, date_from=None):
     else:
         latest_insurers = (
             session.query(ShipInsurer.id)
+            .filter(ShipInsurer.is_valid == True)
             .distinct(ShipInsurer.ship_imo)
             .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.date_from_equasis.desc()))
             .subquery()
@@ -566,7 +572,9 @@ def get_matching_insurer(ship_imo=None, company_raw_name=None, date_from=None):
             session.query(ShipInsurer)
             .join(latest_insurers, ShipInsurer.id == latest_insurers.c.id)
             .filter(
-                ShipInsurer.ship_imo == ship_imo, ShipInsurer.company_raw_name == company_raw_name
+                ShipInsurer.ship_imo == ship_imo,
+                ShipInsurer.company_raw_name == company_raw_name,
+                ShipInsurer.is_valid == True,
             )
             .first()
         )
@@ -647,7 +655,7 @@ def create_unknown_insurer(imo):
 def get_latest_insurer(imo):
     return (
         session.query(ShipInsurer)
-        .filter(ShipInsurer.ship_imo == imo)
+        .filter(ShipInsurer.ship_imo == imo, ShipInsurer.is_valid == True)
         .distinct(ShipInsurer.ship_imo)
         .order_by(ShipInsurer.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
         .first()
@@ -901,3 +909,47 @@ def fill_using_imo_website():
             logger.warning(
                 "Failed to parse correct information from IMO website for {}.".format(company.imo)
             )
+
+
+def hide_invalid_insurance_entries():
+    """
+    Hide unknown insurance entries that overlap with known insurance entries.
+
+    Returns
+    -------
+
+    """
+
+    logger.info("Hiding unknown insurance entries that overlap with known entries.")
+
+    unknown = (
+        session.query(ShipInsurer)
+        .filter(ShipInsurer.company_raw_name == "unknown", ShipInsurer.is_valid == True)
+        .cte("unknown")
+    )
+
+    known = (
+        session.query(ShipInsurer)
+        .filter(ShipInsurer.company_raw_name != "unknown", ShipInsurer.is_valid == True)
+        .cte("known")
+    )
+
+    problematic = (
+        session.query(unknown.c.id)
+        .outerjoin(known, unknown.c.ship_imo == known.c.ship_imo)
+        .filter(
+            sa.or_(
+                known.c.date_from_equasis < unknown.c.date_from_equasis,
+                known.c.date_from_equasis == None,
+            ),
+            known.c.updated_on > unknown.c.updated_on,
+            unknown.c.updated_on - unknown.c.date_from_equasis < dt.timedelta(days=100),
+        )
+    ).cte("problematic")
+
+    # Update ShipInsurers is_valid to false where in problematic
+    statement = (
+        update(ShipInsurer).values({"is_valid": False}).where(ShipInsurer.id.in_(problematic))
+    )
+
+    execute_statement(statement)

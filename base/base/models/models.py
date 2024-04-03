@@ -364,6 +364,8 @@ class ShipInsurer(Base):
     checked_on = Column(DateTime, server_default=func.now())
     consecutive_failures = Column(BigInteger, nullable=False, default=0)
 
+    is_valid = Column(Boolean, nullable=False, default=True)
+
     __tablename__ = DB_TABLE_SHIP_INSURER
     __table_args__ = (
         Index("idx_ship_insurer_ship_imo", "ship_imo"),

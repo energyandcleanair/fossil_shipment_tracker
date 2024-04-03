@@ -146,11 +146,11 @@ def test_insurers_no_unexpected_unknown():
     WITH unknown
      AS (SELECT *
          FROM   ship_insurer
-         WHERE  company_raw_name = 'unknown'),
+         WHERE  company_raw_name = 'unknown' and is_valid),
      known
      AS (SELECT *
          FROM   ship_insurer
-         WHERE  company_raw_name != 'unknown'),
+         WHERE  company_raw_name != 'unknown' and is_valid),
      problematic
      AS (SELECT s.commodity,
                 u.updated_on - u.date_from_equasis,
@@ -168,8 +168,7 @@ def test_insurers_no_unexpected_unknown():
                 AND u.updated_on - u.date_from_equasis < '100 days'
             )
         SELECT *
-        FROM   problematic
-        WHERE commodity != 'bulk' and commodity != 'general_cargo' and commodity != 'unknown';
+        FROM   problematic;
     """
 
     result = session.execute(raw_sql)
@@ -189,7 +188,7 @@ def build_insurers_unknown_error_info(result, query):
 def test_insurers_no_null_date_from():
     # Test that those will only one insurer have a null date_from
     raw_sql = """
-        WITH count as (select ship_imo, min(date_from_equasis), count(*) from ship_insurer group by 1)
+        WITH count as (select ship_imo, min(date_from_equasis), count(*) from ship_insurer where is_valid group by 1)
         SELECT * from count where count = 1 and min is not null
         """
 

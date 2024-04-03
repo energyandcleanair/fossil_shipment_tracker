@@ -143,6 +143,7 @@ def build_select(date_from: None, date_to: None):
             ShipInsurer,
             sa.and_(
                 ShipInsurer.ship_imo == trade_ship.c.ship_imo,
+                ShipInsurer.is_valid == True,
                 sa.or_(
                     ship_insurer_field <= KplerTrade.departure_date_utc + insurance_buffer,
                     ship_insurer_field == None,

@@ -30,19 +30,14 @@ from base import UNKNOWN_INSURER
 from base.logger import logger
 from base.db import session
 from base.models import (
-    KplerFlow,
     KplerProduct,
     Country,
-    Price,
     Currency,
     Commodity,
     KplerTrade,
     KplerTradeComputed,
     KplerInstallation,
     KplerZone,
-    Company,
-    ShipInsurer,
-    ShipOwner,
 )
 from base.utils import to_datetime, to_list, intersect, df_to_json
 
