@@ -356,55 +356,6 @@ def test_counter_sorting(app):
             )
 
 
-def test_counter_against_voyage(app):
-    with app.test_client() as test_client:
-        response = test_client.get("/v0/counter?version=v0&date_from=2022-01-01")
-        assert (
-            response.status_code == 200
-        ), f"Expected 200 response from counter v0 but got {response.status_code}"
-        data = response.json["data"]
-        counter_df = pd.DataFrame(data).sort_values(["date"], ascending=False)
-
-        response = test_client.get("/v0/overland")
-        assert (
-            response.status_code == 200
-        ), f"Expected 200 response from overland but got {response.status_code}"
-        data = response.json["data"]
-        pipeline_df = pd.DataFrame(data).sort_values(["date"], ascending=False)
-
-        response = test_client.get("/v0/voyage")
-        assert (
-            response.status_code == 200
-        ), f"Expected 200 response from voyage but got {response.status_code}"
-        data = response.json["data"]
-        voyage_df = pd.DataFrame(data)
-
-        expected = (
-            pd.concat(
-                [
-                    voyage_df.loc[
-                        (voyage_df.arrival_date_utc >= "2022-02-24")
-                        & (voyage_df.commodity_origin_iso2 == "RU")
-                        & (voyage_df.destination_iso2 != "RU")
-                    ][["destination_region", "commodity_group", "value_eur"]],
-                    pipeline_df.loc[
-                        (pipeline_df.date >= "2022-02-24")
-                        & (pipeline_df.departure_iso2.isin(["TR", "RU", "BY"]))
-                    ][["destination_region", "commodity_group", "value_eur"]],
-                ]
-            )
-            .groupby(["destination_region", "commodity_group"], dropna=False)
-            .agg(value_eur=("value_eur", lambda x: np.nansum(x) / 1e9))
-        )
-
-        actual = counter_df.groupby(["destination_region", "commodity_group"], dropna=False).agg(
-            value_eur=("value_eur", lambda x: np.nansum(x) / 1e9)
-        )
-
-        # make sure total values are within a tolerance
-        assert np.isclose(expected["value_eur"].sum(), actual["value_eur"].sum(), rtol=0.10)
-
-
 def test_pricing_gt0(app):
     with app.test_client() as test_client:
         response = test_client.get("/v0/counter")

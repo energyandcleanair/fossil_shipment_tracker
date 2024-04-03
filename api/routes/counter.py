@@ -271,7 +271,7 @@ class RussiaCounterResource(Resource):
 
     parser.add_argument(
         "version",
-        help="Which counter version to use (v0=MarineTraffic/Datalastic, v1=Kpler Flows, v2=Kpler Trades)",
+        help="Which counter version to use. Only v2 (based on Kpler Trades) is available.",
         type=str,
         default=COUNTER_VERSION_DEFAULT,
     )
@@ -286,6 +286,19 @@ class RussiaCounterResource(Resource):
     @routes_api.expect(parser)
     def get(self):
         params = RussiaCounterResource.parser.parse_args()
+
+        counter_version = params.get("version")
+        if params.get("version") in ["v0", "v1"]:
+            # Return a 401 response
+            response_body = {
+                "message": f"You cannot access counter {counter_version} as it has been removed."
+            }
+            return Response(
+                response=json.dumps(response_body),
+                status=401,
+                mimetype="application/json",
+            )
+
         return self.get_from_params(params)
 
     def get_from_params(self, params):

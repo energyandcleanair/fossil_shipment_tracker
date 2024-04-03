@@ -20,9 +20,7 @@ import datetime as dt
 
 
 def update():
-    counter.update(version=base.COUNTER_VERSION0, force=True)
-    counter.update(version=base.COUNTER_VERSION1, force=True)
-    counter.update(version=base.COUNTER_VERSION2, force=True)
+    counter.update(force=True)
     integrity.check()
     return
 

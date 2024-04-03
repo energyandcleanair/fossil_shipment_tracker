@@ -15,7 +15,7 @@ import base
 from engines import api_client
 
 
-def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
+def update(date_from="2021-01-01", version=base.COUNTER_VERSION_DEFAULT, force=False):
     """
     Fill counter
     :return:
@@ -33,93 +33,12 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION0, force=False):
     )
 
     if version == base.COUNTER_VERSION0:
-        # Version 0: MT voyages for everything
-
-        # Get shipments
-        # Very important: we aggregate by ARRIVAL_DATE for counter pricing.
-        voyages = (
-            api_client.get_voyages(
-                date_from=date_from,
-                commodity_origin_iso2=["RU"],
-                aggregate_by=[
-                    "commodity_origin_iso2",
-                    "commodity_destination_iso2",
-                    "commodity",
-                    "arrival_date",
-                    "status",
-                ],
-                currency="EUR",
-                status="completed",
-                pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
-            )
-            .loc[lambda df: df.commodity_origin_iso2 == "RU"]
-            .loc[lambda df: df.commodity_destination_iso2 != "RU"]
-            .loc[lambda df: df.status == base.COMPLETED]
-            .rename(columns={"arrival_date": "date"})
-        )
-
-        result = pd.concat([pipelineflows, voyages])
+        raise ValueError("v0 is not supported anymore")
 
     elif version == base.COUNTER_VERSION1:
-        # Version 1: MT voyages for LPG only, Kpler flows for the rest
-        voyages = (
-            api_client.get_voyages(
-                date_from=date_from,
-                commodity_origin_iso2=["RU"],
-                aggregate_by=[
-                    "commodity_origin_iso2",
-                    "commodity_destination_iso2",
-                    "commodity",
-                    "arrival_date",
-                    "status",
-                ],
-                currency="EUR",
-                status="completed",
-                pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
-                commodity=[base.LPG],
-            )
-            .loc[lambda df: df.commodity_origin_iso2 == "RU"]
-            .loc[lambda df: df.commodity_destination_iso2 != "RU"]
-            .loc[lambda df: df.status == base.COMPLETED]
-            .rename(columns={"arrival_date": "date"})
-        )
-        assert np.all(voyages.commodity == base.LPG)
-
-        # Add Kpler flows
-        kpler_flows = (
-            api_client.get_kpler_flows(
-                date_from=date_from,
-                origin_iso2=["RU"],
-                origin_type=["country"],
-                destination_type=["country"],
-                aggregate_by=[
-                    "commodity_origin_iso2",
-                    "destination_iso2",
-                    "commodity_equivalent",
-                    "date",
-                ],
-                currency="EUR",
-                pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
-            )
-            .loc[lambda df: df.commodity_origin_iso2 == "RU"]
-            .loc[lambda df: df.destination_iso2 != "RU"]
-            .loc[lambda df: df.destination_iso2 != "not found"]
-            .rename(
-                columns={
-                    "commodity_equivalent": "commodity",
-                    "commodity_equivalent_group": "commodity_group",
-                    "destination_region": "commodity_destination_region",
-                    "destination_iso2": "commodity_destination_iso2",
-                },
-                inplace=True,
-            )
-        )
-
-        kpler_flows
-        result = pd.concat([pipelineflows, voyages, kpler_flows])
+        raise ValueError("v1 is not supported anymore")
 
     elif version == base.COUNTER_VERSION2:
-        # Version 1: MT voyages for LPG only, Kpler TRADES for the rest
         voyages = (
             api_client.get_voyages(
                 date_from=date_from,

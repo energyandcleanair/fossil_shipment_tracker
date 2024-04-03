@@ -8,8 +8,6 @@ def update():
     insurance.update()
     kpler_trade_computed.update()
     counter.update()
-    counter.update(version=base.COUNTER_VERSION1)
-    counter.update(version=base.COUNTER_VERSION2)
     integrity.check()
     return
 

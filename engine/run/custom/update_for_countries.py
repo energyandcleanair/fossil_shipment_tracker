@@ -52,8 +52,6 @@ def update(countries=None, continue_from=None, date_from=None, date_to=None):
 
     kpler_trade_computed.update()
     counter.update()
-    counter.update(version=base.COUNTER_VERSION1)
-    counter.update(version=base.COUNTER_VERSION2)
 
     return
 

@@ -107,7 +107,7 @@ class RussiaCounterLastResource(Resource):
     )
     parser.add_argument(
         "version",
-        help="Which counter version to use",
+        help="Which counter version to use. Only v2 (KplerTrades is available).",
         type=str,
         default=base.COUNTER_VERSION_DEFAULT,
     )
@@ -118,6 +118,19 @@ class RussiaCounterLastResource(Resource):
         response = self.get_from_params(params)
         response.headers["Cache-Control"] = "public"
         response.cache_control.max_age = 600
+
+        counter_version = params.get("version")
+        if params.get("version") in ["v0", "v1"]:
+            # Return a 401 response
+            response_body = {
+                "message": f"You cannot access counter {counter_version} as it has been removed."
+            }
+            return Response(
+                response=json.dumps(response_body),
+                status=401,
+                mimetype="application/json",
+            )
+
         return response
 
     def get_from_params(self, params):
