@@ -43,7 +43,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 import logging
 
 
-UPDATE_LIMIT: int = 500
+UPDATE_LIMIT: int = int(get_env("EQUASIS_UPDATE_LIMIT", 1000))
 
 
 def update(force_unknown=False):

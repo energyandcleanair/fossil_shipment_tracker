@@ -29,6 +29,11 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: EQUASIS_USERNAME_PATTERN
+            - name: EQUASIS_UPDATE_LIMIT
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: EQUASIS_UPDATE_LIMIT
             - name: ENVIRONMENT
               value: production
             - name: MAIL_DEFAULT_SENDER
