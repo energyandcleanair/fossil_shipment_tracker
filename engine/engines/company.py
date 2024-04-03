@@ -34,7 +34,7 @@ from base.models import (
     Ship,
 )
 from engines.company_scraper import Equasis, CompanyImoScraper
-from sqlalchemy.sql import update
+from sqlalchemy.sql import update as update_sql
 
 import warnings
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -949,7 +949,7 @@ def hide_invalid_insurance_entries():
 
     # Update ShipInsurers is_valid to false where in problematic
     statement = (
-        update(ShipInsurer).values({"is_valid": False}).where(ShipInsurer.id.in_(problematic))
+        update_sql(ShipInsurer).values({"is_valid": False}).where(ShipInsurer.id.in_(problematic))
     )
 
     execute_statement(statement)
