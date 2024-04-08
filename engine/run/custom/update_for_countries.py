@@ -28,7 +28,7 @@ from argparse import ArgumentParser
 import pandas as pd
 
 
-def update(countries=None, continue_from=None, date_from=None, date_to=None):
+def update(countries=None, continue_from=None, date_from=None, date_to=None, platforms=None):
     date_from = to_datetime(date_from)
     date_to = to_datetime(date_to)
 
@@ -40,11 +40,11 @@ def update(countries=None, continue_from=None, date_from=None, date_to=None):
         countries_to_update = countries_to_update[countries_to_update.index(continue_from) :]
 
     result = kpler_scraper.update(
-        recent_date_from=date_from,
-        recent_date_to=date_to,
+        historic_date_from=date_from,
+        historic_date_to=date_to,
         origin_iso2s=countries_to_update,
-        parts=[UpdateParts.UPDATE_RECENT_TRADES],
-        platforms=["liquids"],
+        parts=[UpdateParts.UPDATE_ZONES, UpdateParts.REFETCH_OUTDATED_HISTORIC_ENTRIES],
+        platform=platforms,
     )
 
     if result == UpdateStatus.FAILED:
@@ -62,6 +62,7 @@ if __name__ == "__main__":
     parser.add_argument("--date-from", type=str, default=None)
     parser.add_argument("--date-to", type=str, default=None)
     parser.add_argument("--continue-from", type=str, default=None)
+    parser.add_argument("--platforms", nargs="*", type=str, default=None)
 
     args = parser.parse_args()
 
