@@ -62,7 +62,7 @@ if __name__ == "__main__":
     parser.add_argument("--date-from", type=str, default=None)
     parser.add_argument("--date-to", type=str, default=None)
     parser.add_argument("--continue-from", type=str, default=None)
-    parser.add_argument("--platforms", nargs="*", type=str, default=None)
+    parser.add_argument("--platforms", nargs="*", type=str, default=kpler_scraper.PLATFORMS)
 
     args = parser.parse_args()
 
@@ -85,6 +85,7 @@ if __name__ == "__main__":
             continue_from=args.continue_from,
             date_from=args.date_from,
             date_to=args.date_to,
+            platforms=args.platforms,
         )
         logger_slack.info("=== Update for report complete ===")
     except BaseException as e:
