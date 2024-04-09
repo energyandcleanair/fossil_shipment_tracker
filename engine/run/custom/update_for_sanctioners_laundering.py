@@ -124,10 +124,14 @@ def get_crude_oil_exporters(to_importers=None, date_from=None, date_to=None):
     return sorted(list(without_broken_values))
 
 
-def get_countries_to_update(date_from=None, date_to=None):
+def get_countries_to_update(filter_countries=None, date_from=None, date_to=None):
     logger.info("Getting countries to update")
+    countries_to_update = ALL_SANCTIONING_COUNTRIES
+    if filter_countries is not None:
+        countries_to_update = filter_countries
+
     exporters_of_oil_products = get_oil_products_exporters(
-        to_importers=ALL_SANCTIONING_COUNTRIES, date_from=date_from, date_to=date_to
+        to_importers=sorted(countries_to_update), date_from=date_from, date_to=date_to
     )
     crude_exporters_to_oil_products = get_crude_oil_exporters(
         to_importers=exporters_of_oil_products, date_from=date_from, date_to=date_to
@@ -143,7 +147,7 @@ def get_countries_to_update(date_from=None, date_to=None):
     )
 
 
-def update(continue_from=None, date_from=None, date_to=None):
+def update(continue_from=None, filter_countries=None, date_from=None, date_to=None):
     date_from = to_datetime(date_from)
     date_to = to_datetime(date_to)
 
@@ -155,10 +159,10 @@ def update(continue_from=None, date_from=None, date_to=None):
         countries_to_update = countries_to_update[countries_to_update.index(continue_from) :]
 
     result = kpler_scraper.update(
-        recent_date_from=date_from,
-        recent_date_to=date_to,
+        historic_date_from=date_from,
+        historic_date_to=date_to,
         origin_iso2s=countries_to_update,
-        parts=[UpdateParts.UPDATE_RECENT_TRADES],
+        parts=[UpdateParts.REFETCH_OUTDATED_HISTORIC_ENTRIES],
         platforms=["liquids"],
     )
 
@@ -176,6 +180,8 @@ if __name__ == "__main__":
     parser.add_argument("--date-from", type=str, default=None)
     parser.add_argument("--date-to", type=str, default=None)
     parser.add_argument("--continue-from", type=str, default=None)
+    # Allow multiple countries to be specified, separated by spaces or commas
+    parser.add_argument("--filter-countries", nargs="*", type=str, default=None)
 
     args = parser.parse_args()
 
@@ -189,7 +195,12 @@ if __name__ == "__main__":
 
     logger_slack.info("=== Update for report: using %s environment ===" % (base.db.environment,))
     try:
-        update(continue_from=args.continue_from, date_from=args.date_from, date_to=args.date_to)
+        update(
+            continue_from=args.continue_from,
+            filter_countries=args.filter_countries,
+            date_from=args.date_from,
+            date_to=args.date_to,
+        )
         logger_slack.info("=== Update for report complete ===")
     except BaseException as e:
         logger_slack.error("=== Update for report failed", stack_info=True, exc_info=True)
