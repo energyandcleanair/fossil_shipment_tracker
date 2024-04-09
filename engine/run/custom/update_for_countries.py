@@ -44,7 +44,7 @@ def update(countries=None, continue_from=None, date_from=None, date_to=None, pla
         historic_date_to=date_to,
         origin_iso2s=countries_to_update,
         parts=[UpdateParts.UPDATE_ZONES, UpdateParts.REFETCH_OUTDATED_HISTORIC_ENTRIES],
-        platform=platforms,
+        platforms=platforms,
     )
 
     if result == UpdateStatus.FAILED:
