@@ -577,27 +577,23 @@ class KplerTradeResource(TemplateResource):
                 KplerSyncHistory,
                 sa.and_(
                     KplerSyncHistory.country_iso2 == subquery.c.origin_iso2,
-                    KplerSyncHistory.platform == None,
                     KplerSyncHistory.date == func.date_trunc("day", subquery.c.origin_date_utc),
                 ),
             )
             .filter(
                 # Negate valid check
-                sa.and_(
-                    sa.not_(
-                        # Would be valid if it meets these requirements.
-                        sa.and_(
-                            # Check that we've updated this data.
-                            KplerSyncHistory.id != None,
-                            # Check that the data has been checked for completeness.
-                            KplerSyncHistory.last_checked != None,
-                            # Check that the data has been checked for completeness within the threshold
-                            KplerSyncHistory.last_checked > earliest_allowed_date,
-                            # Check that the data is complete.
-                            KplerSyncHistory.is_valid,
-                        )
-                    ),
-                    KplerSyncHistory.platform == None,
+                sa.not_(
+                    # Would be valid if it meets these requirements.
+                    sa.and_(
+                        # Check that we've updated this data.
+                        KplerSyncHistory.id != None,
+                        # Check that the data has been checked for completeness.
+                        KplerSyncHistory.last_checked != None,
+                        # Check that the data has been checked for completeness within the threshold
+                        KplerSyncHistory.last_checked > earliest_allowed_date,
+                        # Check that the data is complete.
+                        KplerSyncHistory.is_valid,
+                    )
                 )
             )
             .group_by(
@@ -808,7 +804,6 @@ class KplerTradeResource(TemplateResource):
 
         # Only keep valid trades
         query = query.filter(KplerTrade.is_valid == True)
-        query = query.filter(KplerTrade.platform == None)
 
         return query
 

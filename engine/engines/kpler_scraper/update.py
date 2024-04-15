@@ -149,7 +149,6 @@ def update_outdated_historic_trades(
             KplerSyncHistory.date >= date_from,
             KplerSyncHistory.date <= date_to,
             KplerSyncHistory.is_valid == False,
-            KplerSyncHistory.platform == None,
         )
         .group_by(
             KplerSyncHistory.country_iso2,

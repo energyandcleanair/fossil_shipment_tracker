@@ -55,8 +55,6 @@ class KplerFlow(Base):
 
     product = Column(String, nullable=False)
 
-    platform = Column(String, nullable=True)
-
     value = Column(Numeric, nullable=False)
 
     updated_on = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -104,7 +102,6 @@ class KplerTrade(Base):
     id = Column(BigInteger, primary_key=True)
     flow_id = Column(BigInteger, primary_key=True)
 
-    platform = Column(String, nullable=True)
     status = Column(String)
 
     departure_date_utc = Column(DateTime, nullable=False)
@@ -207,7 +204,7 @@ class KplerTradeFlow(Base):
 class KplerProduct(Base):
     id = Column(BigInteger, primary_key=True)
     name = Column(String, nullable=False)
-    platform = Column(String, nullable=True)
+
     full_name = Column(String)
     type = Column(String)
     grade_id = Column(BigInteger)
@@ -247,7 +244,6 @@ class KplerInstallation(Base):
 class KplerSyncHistory(Base):
     id = Column(BigInteger, primary_key=True)
     date = Column(Date, nullable=False)
-    platform = Column(String, nullable=True)
     country_iso2 = Column(String, nullable=False)
     last_updated = Column(String, nullable=False)
     is_valid = Column(Boolean)
