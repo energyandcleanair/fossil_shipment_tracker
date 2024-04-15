@@ -10,7 +10,6 @@ from
     left join kpler_zone departure_zone on trades.departure_zone_id = departure_zone.id
     left join kpler_sync_history on date_trunc('day', kpler_sync_history.date) = date_trunc('day', trades.departure_date_utc)
     and kpler_sync_history.country_iso2 = departure_zone.country_iso2
-    and kpler_sync_history.platform is null
 where
     kpler_trade.id = trades.id
     and kpler_trade.flow_id = trades.flow_id
