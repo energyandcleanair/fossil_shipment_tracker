@@ -29,9 +29,7 @@ class KplerTradeVerifier:
     def __init__(self):
         self.scraper = KplerFlowScraper()
 
-    def verify_sync_against_flows(
-        self, origin_iso2s=None, platforms=None, date_from=None, date_to=None
-    ):
+    def verify_sync_against_flows(self, origin_iso2s=None, date_from=None, date_to=None):
         date_from = to_datetime(date_from) if date_from is not None else dt.date(2020, 1, 1)
         date_to = to_datetime(date_to) if date_to is not None else dt.date.today()
         if isinstance(date_from, dt.datetime):
@@ -44,32 +42,28 @@ class KplerTradeVerifier:
         comparisons = pd.DataFrame()
 
         for country in origin_iso2s:
-            for platform in platforms:
-                logger.info(f"Verifying {country} {platform} from {date_from} to {date_to}")
-                comparison, comparison_details = self.compare_to_live_flows(
-                    origin_iso2=country, platform=platform, date_from=date_from, date_to=date_to
-                )
+            logger.info(f"Verifying {country} from {date_from} to {date_to}")
+            comparison, comparison_details = self.compare_to_live_flows(
+                origin_iso2=country, date_from=date_from, date_to=date_to
+            )
 
-                comparison["country"] = country
-                comparison["platform"] = platform
+            comparison["country"] = country
 
-                self.update_sync_history_with_status(
-                    origin_iso2=country,
-                    platform=platform,
-                    date_from=date_from,
-                    date_to=date_to,
-                    comparison=comparison,
-                    checked_time=checked_time,
-                )
+            self.update_sync_history_with_status(
+                origin_iso2=country,
+                date_from=date_from,
+                date_to=date_to,
+                comparison=comparison,
+                checked_time=checked_time,
+            )
 
-                self.update_sync_comparison_details(
-                    origin_iso2=country,
-                    platform=platform,
-                    comparison_details=comparison_details,
-                    checked_time=checked_time,
-                )
+            self.update_sync_comparison_details(
+                origin_iso2=country,
+                comparison_details=comparison_details,
+                checked_time=checked_time,
+            )
 
-                comparisons = pd.concat([comparisons, comparison])
+            comparisons = pd.concat([comparisons, comparison])
 
         failed_comparisons = comparisons[~comparisons["ok"]]
         if (comparisons["ok"] == False).any():
@@ -77,13 +71,11 @@ class KplerTradeVerifier:
 
         return
 
-    def compare_to_live_flows(self, origin_iso2=None, platform=None, date_from=None, date_to=None):
+    def compare_to_live_flows(self, origin_iso2=None, date_from=None, date_to=None):
 
-        comparison_per_dest = self.compare_to_live_flows_for_dest(
-            origin_iso2, platform, date_from, date_to
-        )
+        comparison_per_dest = self.compare_to_live_flows_for_dest(origin_iso2, date_from, date_to)
         comparison_per_product = self.compare_to_live_flows_for_product(
-            origin_iso2, platform, date_from, date_to
+            origin_iso2, date_from, date_to
         )
 
         dest_comparison = self._aggregate_to_check_period(comparison_per_dest)
@@ -137,7 +129,6 @@ class KplerTradeVerifier:
     def update_sync_history_with_status(
         self,
         origin_iso2=None,
-        platform=None,
         date_from=None,
         date_to=None,
         comparison=None,
@@ -145,7 +136,6 @@ class KplerTradeVerifier:
     ):
         query_for_history_entries = session.query(KplerSyncHistory).filter(
             KplerSyncHistory.country_iso2 == origin_iso2,
-            KplerSyncHistory.platform == platform,
             KplerSyncHistory.date >= date_from,
             KplerSyncHistory.date <= date_to,
         )
@@ -165,12 +155,10 @@ class KplerTradeVerifier:
     def update_sync_comparison_details(
         self,
         origin_iso2=None,
-        platform=None,
         comparison_details=None,
         checked_time=None,
     ):
         comparison_details["origin"] = origin_iso2
-        comparison_details["platform"] = platform
         comparison_details["checked_time"] = checked_time
 
         comparison_details.to_sql(
@@ -182,14 +170,11 @@ class KplerTradeVerifier:
 
         session.commit()
 
-    def compare_to_live_flows_for_dest(self, origin_iso2, platform, date_from, date_to):
+    def compare_to_live_flows_for_dest(self, origin_iso2, date_from, date_to):
 
-        logger.info(
-            f"Comparing {origin_iso2} {platform} from {date_from} to {date_to} by destination"
-        )
+        logger.info(f"Comparing {origin_iso2} from {date_from} to {date_to} by destination")
 
         flows_from_kpler = self.scraper.get_flows(
-            platform,
             origin_iso2=origin_iso2,
             granularity=FlowsPeriod.Daily,
             unit=FlowsMeasurementUnit.T,
@@ -218,7 +203,6 @@ class KplerTradeVerifier:
                 KplerTrade.arrival_zone_id == destination_zone.id,
             )
             .filter(
-                KplerTrade.platform == platform,
                 origin_zone.country_iso2 == origin_iso2,
                 departure_day >= date_from,
                 departure_day <= date_to,
@@ -273,12 +257,11 @@ class KplerTradeVerifier:
 
         return comparison
 
-    def compare_to_live_flows_for_product(self, origin_iso2, platform, date_from, date_to):
+    def compare_to_live_flows_for_product(self, origin_iso2, date_from, date_to):
 
-        logger.info(f"Comparing {origin_iso2} {platform} from {date_from} to {date_to} by product")
+        logger.info(f"Comparing {origin_iso2} from {date_from} to {date_to} by product")
 
         flows_from_kpler = self.scraper.get_flows(
-            platform,
             origin_iso2=origin_iso2,
             granularity=FlowsPeriod.Daily,
             unit=FlowsMeasurementUnit.T,
@@ -311,7 +294,6 @@ class KplerTradeVerifier:
                 KplerTrade.product_id == KplerProduct.id,
             )
             .filter(
-                KplerTrade.platform == platform,
                 origin_zone.country_iso2 == origin_iso2,
                 departure_day >= date_from,
                 departure_day <= date_to,

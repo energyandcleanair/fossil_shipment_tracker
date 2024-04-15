@@ -11,32 +11,30 @@ import argparse
 
 def update(continue_from=None):
 
-    range_for_country_platform = (
+    range_for_country = (
         session.query(
             KplerSyncHistory.country_iso2,
-            KplerSyncHistory.platform,
             func.min(KplerSyncHistory.date).label("min_date"),
             func.max(KplerSyncHistory.date).label("max_date"),
         )
-        .group_by(KplerSyncHistory.country_iso2, KplerSyncHistory.platform)
-        .order_by(KplerSyncHistory.country_iso2, KplerSyncHistory.platform)
+        .group_by(KplerSyncHistory.country_iso2)
+        .order_by(KplerSyncHistory.country_iso2)
         .all()
     )
 
     verifier = KplerTradeVerifier()
 
     if continue_from:
-        range_for_country_platform = [
-            (country, platform, min_date, max_date)
-            for country, platform, min_date, max_date in range_for_country_platform
+        range_for_country = [
+            (country, min_date, max_date)
+            for country, min_date, max_date in range_for_country
             if country >= continue_from
         ]
 
-    for country, platform, min_date, max_date in range_for_country_platform:
-        logger.info(f"Verifying {country} {platform} from {min_date} to {max_date}")
+    for country, min_date, max_date in range_for_country:
+        logger.info(f"Verifying {country} from {min_date} to {max_date}")
         verifier.verify_sync_against_flows(
             origin_iso2s=[country],
-            platforms=[platform],
             date_from=min_date,
             date_to=max_date,
         )

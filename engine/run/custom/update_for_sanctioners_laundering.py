@@ -85,7 +85,6 @@ def get_oil_products_exporters(to_importers=None, date_from=None, date_to=None):
         importer_flows = scraper.get_flows(
             date_from=date_from,
             date_to=date_to,
-            platform="liquids",
             destination_iso2=importer,
             granularity=FlowsPeriod.Annually,
             split=FlowsSplit.OriginCountries,
@@ -109,7 +108,6 @@ def get_crude_oil_exporters(to_importers=None, date_from=None, date_to=None):
         importer_flows = scraper.get_flows(
             date_from=date_from,
             date_to=date_to,
-            platform="liquids",
             destination_iso2=importer,
             product="Crude/Co",
             granularity=FlowsPeriod.Annually,
@@ -163,7 +161,6 @@ def update(continue_from=None, filter_countries=None, date_from=None, date_to=No
         historic_date_to=date_to,
         origin_iso2s=countries_to_update,
         parts=[UpdateParts.REFETCH_OUTDATED_HISTORIC_ENTRIES],
-        platforms=["liquids"],
     )
 
     if result == UpdateStatus.FAILED:

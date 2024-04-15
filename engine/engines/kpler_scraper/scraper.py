@@ -25,7 +25,6 @@ from unidecode import unidecode
 
 KPLER_TOTAL = "Total"
 CACHE_BASE_DIR = "cache/kpler/"
-PLATFORMS = ["liquids", "lng", "dry"]
 
 
 ### IMPORTANT
@@ -39,7 +38,6 @@ PLATFORMS = ["liquids", "lng", "dry"]
 ### Ended up removing 833 and 110755 as having the lowest values
 class KplerScraper:
 
-    default_products = {"liquids": [1400, 1328, 1370], "lng": [1750], "dry": [1334]}
     default_trade_flow_params = {
         "flowDirection": "export",
         "withBetaVessels": False,
@@ -49,30 +47,27 @@ class KplerScraper:
         "withIncompleteTrades": True,
         "withIntraCountry": True,
         "withProductEstimation": False,
+        "filters": {},
     }
 
     @staticmethod
-    def default_params(platform):
-        return {
-            **KplerScraper.default_trade_flow_params,
-            "filters": {"product": KplerScraper.default_products[platform]},
-        }
+    def default_params():
+        return {**KplerScraper.default_trade_flow_params}
 
     def __init__(self):
-        self.platforms = PLATFORMS
         self.cc = coco.CountryConverter()
 
         # To cache products
-        self.products = {}
+        self.products = None
 
         # Brute-force infos
-        self.products_brute = {}
-        self.zones_brute = {}
-        self.installations_brute = {}
-        self.vessels_brute = {}
+        self.products_brute = None
+        self.zones_brute = None
+        self.installations_brute = None
+        self.vessels_brute = None
 
         # Processed
-        self.zones_countries = {}
+        self.zones_countries = None
 
         self.session = requests.Session()
         retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
@@ -84,12 +79,11 @@ class KplerScraper:
                 "Kpler token was not set. Is KPLER_TOKEN_BRUTE environment variable set correctly?"
             )
 
-    def get_installations(self, origin_iso2, platform, split, product=None):
+    def get_installations(self, origin_iso2, split, product=None):
         # We collect flows split by installation
         # and get unique values
         flows = self.get_flows(
             origin_iso2=origin_iso2,
-            platform=platform,
             split=split,
             product=product,
         )
@@ -98,19 +92,15 @@ class KplerScraper:
         installations = [x for x in installations if x.lower() != "total"]
         return installations
 
-    def get_installations_brute(self, platform):
-        if self.installations_brute.get(platform) is not None:
-            return self.installations_brute[platform]
+    def get_installations_brute(self):
+        if self.installations_brute is not None:
+            return self.installations_brute
 
-        file = f"{CACHE_BASE_DIR}/{platform}_installations.csv"
+        file = f"{CACHE_BASE_DIR}/installations.csv"
 
         if not os.path.exists(file):
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-            url = {
-                "dry": "https://dry.kpler.com/api/installations",
-                "liquids": "https://terminal.kpler.com/api/installations",
-                "lng": "https://lng.kpler.com/api/installations",
-            }.get(platform)
+            url = "https://terminal.kpler.com/api/installations"
             headers = {"Authorization": f"Bearer {token}"}
             response = self.session.get(url, headers=headers)
             data_from_kpler = pd.DataFrame(response.json())
@@ -118,24 +108,20 @@ class KplerScraper:
 
         data = pd.read_csv(file)
 
-        self.installations_brute[platform] = data
+        self.installations_brute = data
         return data
 
-    def get_zones_brute(self, platform):
-        if self.zones_brute.get(platform) is not None:
-            return self.zones_brute[platform]
+    def get_zones_brute(self):
+        if self.zones_brute is not None:
+            return self.zones_brute
 
-        file = f"{CACHE_BASE_DIR}/{platform}_zones.csv"
+        file = f"{CACHE_BASE_DIR}/zones.csv"
 
         if not os.path.exists(file):
             if not os.path.exists(CACHE_BASE_DIR):
                 os.makedirs(CACHE_BASE_DIR)
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-            url = {
-                "dry": "https://dry.kpler.com/api/zones",
-                "liquids": "https://terminal.kpler.com/api/zones",
-                "lng": "https://lng.kpler.com/api/zones",
-            }.get(platform)
+            url = "https://terminal.kpler.com/api/zones"
             headers = {"Authorization": f"Bearer {token}"}
             response = self.session.get(url, headers=headers)
             data_from_kpler = pd.DataFrame(response.json())
@@ -143,12 +129,12 @@ class KplerScraper:
 
         data = pd.read_csv(file)
 
-        self.zones_brute[platform] = data
+        self.zones_brute = data
         return data
 
-    def get_zones_countries(self, platform):
-        if self.zones_countries.get(platform) is not None:
-            return self.zones_countries[platform]
+    def get_zones_countries(self):
+        if self.zones_countries is not None:
+            return self.zones_countries
 
         def parent_zones_to_zones_df(parent_zones):
             try:
@@ -170,26 +156,22 @@ class KplerScraper:
             except ValueError:
                 return pd.DataFrame()
 
-        zones = self.get_zones_brute(platform=platform)
+        zones = self.get_zones_brute()
         zones_with_country = pd.concat([parent_zones_to_zones_df(x) for x in zones.parentZones])
         zones_with_country = zones_with_country[["id", "name", "country", "iso2"]].drop_duplicates()
 
-        self.zones_countries[platform] = zones_with_country
+        self.zones_countries = zones_with_country
         return zones_with_country
 
-    def get_products_brute(self, platform):
-        if self.products_brute.get(platform) is not None:
-            return self.products_brute[platform]
+    def get_products_brute(self):
+        if self.products_brute is not None:
+            return self.products_brute
 
-        file = f"{CACHE_BASE_DIR}/{platform}_products.csv"
+        file = f"{CACHE_BASE_DIR}/products.csv"
 
         if not os.path.exists(file):
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-            url = {
-                "dry": "https://dry.kpler.com/api/products",
-                "liquids": "https://terminal.kpler.com/api/products",
-                "lng": "https://lng.kpler.com/api/products",
-            }.get(platform)
+            url = "https://terminal.kpler.com/api/products"
             headers = {"Authorization": f"Bearer {token}"}
             response = self.session.get(url, headers=headers)
             data_from_kpler = pd.DataFrame(response.json())
@@ -197,11 +179,11 @@ class KplerScraper:
 
         data = pd.read_csv(file)
 
-        self.products_brute[platform] = data
+        self.products_brute = data
         return data
 
-    def get_commodities_brute(self, platform):
-        products = self.get_products_brute(platform)
+    def get_commodities_brute(self):
+        products = self.get_products_brute()
         products = products[~pd.isna(products.closestAncestorCommodity)]
         commodities = products.closestAncestorCommodity.apply(
             lambda x: pd.Series(json.loads(x.replace("'", '"')))
@@ -209,7 +191,7 @@ class KplerScraper:
         commodities = commodities.drop_duplicates()
         return commodities
 
-    def get_zone_dict(self, platform, iso2=None, id=None, name=None):
+    def get_zone_dict(self, iso2=None, id=None, name=None):
         if id is not None and int(id) == 0:
             return None
 
@@ -238,8 +220,8 @@ class KplerScraper:
 
         found = False
         types = {
-            "zone": self.get_zones_brute(platform=platform),
-            "installation": self.get_installations_brute(platform=platform),
+            "zone": self.get_zones_brute(),
+            "installation": self.get_installations_brute(),
         }
         for type, zones in types.items():
             matching = zones
@@ -252,97 +234,55 @@ class KplerScraper:
                 break
 
         if not found:
-            logger.warning(
-                f"Zone not found: (platform: {platform}, country: {iso2}, id: {id}, name: {name})"
-            )
+            logger.warning(f"Zone not found: (country: {iso2}, id: {id}, name: {name})")
             return None
 
         return {"id": int(matching["id"].values[0]), "resourceType": type}
 
-    def get_zone_iso2(self, platform, id):
-        zones_countries = self.get_zones_countries(platform=platform)
+    def get_zone_iso2(self, id):
+        zones_countries = self.get_zones_countries()
         found = zones_countries[(zones_countries["id"] == id)]["iso2"]
         if len(found) == 1:
             return found.values[0]
         else:
             # Manual values
             manual_iso2s = {
-                "liquids": {
-                    299: "EG",
-                    943: "AE",
-                    561: "MT",
-                    261: "DJ",
-                    707: "PA",
-                    175: "CV",
-                    343: "GI",
-                },
-                "lng": {
-                    299: "EG",
-                    943: "AE",
-                    561: "MT",
-                    261: "DJ",
-                    707: "PA",
-                    175: "CV",
-                    343: "GI",
-                },
-                "dry": {
-                    299: "EG",
-                    943: "AE",
-                    561: "MT",
-                    261: "DJ",
-                    707: "PA",
-                    175: "CV",
-                    343: "GI",
-                },
+                299: "EG",
+                943: "AE",
+                561: "MT",
+                261: "DJ",
+                707: "PA",
+                175: "CV",
+                343: "GI",
             }
-            manual_iso2 = manual_iso2s.get(platform, {}).get(id, None)
+            manual_iso2 = manual_iso2s.get(id, None)
             return manual_iso2
 
-    def get_zone_name(self, platform, id, name=None):
+    def get_zone_name(self, id, name=None):
         if name is not None:
             return name
 
         manual_names = {
-            "liquids": {
-                299: "Egypt",
-                943: "United Arab Emirates",
-                561: "Malta",
-                261: "Djibouti",
-                707: "Panama",
-                175: "Cap Verde",
-                343: "Gibraltar",
-            },
-            "lng": {
-                299: "Egypt",
-                943: "United Arab Emirates",
-                561: "Malta",
-                261: "Djibouti",
-                707: "Panama",
-                175: "Cap Verde",
-                343: "Gibraltar",
-            },
-            "dry": {
-                299: "Egypt",
-                943: "United Arab Emirates",
-                561: "Malta",
-                261: "Djibouti",
-                707: "Panama",
-                175: "Cap Verde",
-                343: "Gibraltar",
-            },
+            299: "Egypt",
+            943: "United Arab Emirates",
+            561: "Malta",
+            261: "Djibouti",
+            707: "Panama",
+            175: "Cap Verde",
+            343: "Gibraltar",
         }
 
-        if manual_names.get(platform, {}).get(id, None) is not None:
-            return manual_names[platform][id]
+        if manual_names.get(id, None) is not None:
+            return manual_names[id]
 
-        zones_countries = self.get_zones_countries(platform=platform)
+        zones_countries = self.get_zones_countries()
         found = zones_countries[(zones_countries["id"] == id)]["name"]
         if len(found) == 1:
             return found.values[0]
         elif id == 0:
             return UNKNOWN_COUNTRY
         else:
-            raise ValueError(f"Zone name not found: {platform} {id}")
+            raise ValueError(f"Zone name not found: {id}")
 
     def get_vessel_raw_brute(self, kpler_vessel_id):
         """
@@ -376,25 +316,21 @@ class KplerScraper:
 
         return KplerVessel(**vessel_data)
 
-    def get_vessels_brute(self, platform):
+    def get_vessels_brute(self):
         """
         We use token from web interface to get more detailed ship info with kpler vessel id
         :param kpler_vessel_id: id of the vessel on kpler side
         :return:
         Returns KplerShip object
         """
-        if self.vessels_brute.get(platform) is not None:
-            return self.vessels_brute[platform]
+        if self.vessels_brute is not None:
+            return self.vessels_brute
 
-        file = f"{CACHE_BASE_DIR}/{platform}_vessels.csv"
+        file = f"{CACHE_BASE_DIR}/vessels.csv"
 
         if not os.path.exists(file):
             token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-            url = {
-                "dry": "https://dry.kpler.com/api/vessels",
-                "liquids": "https://terminal.kpler.com/api/vessels",
-                "lng": "https://lng.kpler.com/api/vessels",
-            }.get(platform)
+            url = "https://terminal.kpler.com/api/vessels"
             headers = {"Authorization": f"Bearer {token}"}
             response = self.session.get(url, headers=headers)
             data_from_kpler = pd.DataFrame(response.json())
@@ -402,7 +338,7 @@ class KplerScraper:
 
         data = pd.read_csv(file)
 
-        self.vessels_brute[platform] = data
+        self.vessels_brute = data
         return data
 
     def get_products(self):
@@ -440,42 +376,38 @@ class KplerProductInfo:
     token = get_env("KPLER_TOKEN_BRUTE")
 
     @classmethod
-    def get_infos(cls, platform, id):
+    def get_infos(cls, id):
         if id in KplerProductInfo.cache:
             return KplerProductInfo.cache[id]
         else:
-            infos = KplerProductInfo.collect_infos(platform=platform, id=id)
+            infos = KplerProductInfo.collect_infos(id=id)
             KplerProductInfo.cache[id] = infos
             return infos
 
     @classmethod
-    def get_grade_name(cls, platform, id):
-        infos = cls.get_infos(platform=platform, id=id)
+    def get_grade_name(cls, id):
+        infos = cls.get_infos(id=id)
         return infos.get("closestAncestorGrade", {}).get("name")
 
     @classmethod
-    def get_commodity_name(cls, platform, id):
-        infos = cls.get_infos(platform=platform, id=id)
+    def get_commodity_name(cls, id):
+        infos = cls.get_infos(id=id)
         return infos.get("closestAncestorCommodity", {}).get("name")
 
     @classmethod
-    def get_group_name(cls, platform, id):
-        infos = cls.get_infos(platform=platform, id=id)
+    def get_group_name(cls, id):
+        infos = cls.get_infos(id=id)
         return infos.get("closestAncestorGroup", {}).get("name")
 
     @classmethod
-    def get_family_name(cls, platform, id):
-        infos = cls.get_infos(platform=platform, id=id)
+    def get_family_name(cls, id):
+        infos = cls.get_infos(id=id)
         return infos.get("closestAncestorFamily", {}).get("name")
 
     @classmethod
-    def collect_infos(cls, platform, id):
+    def collect_infos(cls, id):
         token = KplerProductInfo.token  # get_env("KPLER_TOKEN_BRUTE")
-        url = {
-            "dry": "https://dry.kpler.com/api/products",
-            "liquids": "https://terminal.kpler.com/api/products",
-            "lng": "https://lng.kpler.com/api/products",
-        }.get(platform)
+        url = "https://terminal.kpler.com/api/products"
         headers = {
             "Authorization": f"Bearer {token}",
             "x-web-application-version": "v21.316.0",

@@ -18,39 +18,30 @@ scraper = KplerFlowScraper()
 
 class KplerCheckerProducts(Enum):
     CRUDE = {
-        "platform": "liquids",
         "kpler_product": "Crude/Co",
         "our_type": "group",
         "our_product": "Crude/Co",
     }
     LNG = {
-        "platform": "lng",
-        "kpler_product": None,
+        "kpler_product": "lng",
         "our_type": "commodity",
         "our_product": "lng",
     }
     GASOIL_DIESEL = {
-        "platform": "liquids",
         "kpler_product": "Gasoil/Diesel",
         "our_type": "group",
         "our_product": "Gasoil/Diesel",
     }
     METALLURGICAL_COAL = {
-        "platform": "dry",
         "kpler_product": "Metallurgical",
         "our_type": "commodity",
         "our_product": "Metallurgical",
     }
     THERMAL_COAL = {
-        "platform": "dry",
         "kpler_product": "Thermal",
         "our_type": "commodity",
         "our_product": "Thermal",
     }
-
-    @property
-    def platform(self):
-        return self.value["platform"]
 
     @property
     def kpler_product(self):
@@ -155,7 +146,6 @@ def compare_flows_to_trades(flows, aggregated_trades):
 
 def get_flows_from_kpler(product, origin_iso2, date_from, date_to):
     df = scraper.get_flows(
-        product.platform,
         origin_iso2=origin_iso2,
         product=product.kpler_product,
         granularity=FlowsPeriod.Monthly,

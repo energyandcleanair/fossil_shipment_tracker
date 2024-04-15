@@ -29,7 +29,6 @@ def update():
         historic_date_from="2021-01-01",
         historic_date_to=-30,
         origin_iso2s=["RU"],
-        platforms=["liquids"],
         parts=[
             kpler_scraper.UpdateParts.REFETCH_OUTDATED_HISTORIC_ENTRIES,
         ],

@@ -134,14 +134,6 @@ class KplerFlowResource(TemplateResource):
         default=None,
     )
 
-    parser.add_argument(
-        "platform",
-        type=str,
-        help="platform",
-        default=None,
-        required=False,
-    )
-
     must_group_by = ["origin_type", "destination_type", "currency", "pricing_scenario"]
     date_cols = ["date"]
     value_cols = ["value_tonne", "value_eur", "value_currency"]
@@ -341,7 +333,6 @@ class KplerFlowResource(TemplateResource):
                 KplerFlow.to_split.label("destination_type"),
                 KplerFlow.to_zone_name.label("destination_name"),
                 KplerFlow.date,
-                # KplerFlow.product.label("product"),
                 KplerFlow.grade.label("grade"),
                 KplerFlow.commodity.label("commodity"),
                 KplerFlow.group.label("group"),
@@ -351,8 +342,6 @@ class KplerFlowResource(TemplateResource):
                 value_eur_field,
                 Currency.currency,
                 (value_eur_field * Currency.per_eur).label("value_currency"),
-                # Commodity.name.label("commodity"),
-                # Commodity.group.label("commodity_group"),
                 Commodity.equivalent_id.label("commodity_equivalent"),  # For filtering
                 CommodityEquivalent.name.label("commodity_equivalent_name"),
                 CommodityEquivalent.group.label("commodity_equivalent_group"),
@@ -374,20 +363,6 @@ class KplerFlowResource(TemplateResource):
                 CommodityDestinationCountry,
                 CommodityDestinationCountry.iso2 == commodity_destination_iso2_field,
             )
-            # join to avoid double counting (we collected both by product and by group)
-            # but this isn't perfect, as sometimes, kpler is using group when not knowing product
-            # .outerjoin(
-            #     KplerProduct,
-            #     sa.and_(
-            #         sa.or_(
-            #             KplerProduct.name == KplerFlow.product,
-            #             # TODO CHECK this is not creating double counting
-            #             # or removing rows because of no pricing for the group
-            #             KplerProduct.group == KplerFlow.product,
-            #         ),
-            #         KplerProduct.platform == KplerFlow.platform,
-            #     ),
-            # )
             .join(Commodity, commodity_id_field == Commodity.id)
             .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
             .join(
@@ -441,7 +416,6 @@ class KplerFlowResource(TemplateResource):
 
         date_from = params.get("date_from")
         date_to = params.get("date_to")
-        platform = params.get("platform")
         pricing_scenario = params.get("pricing_scenario")
         currency = params.get("currency")
 
@@ -468,9 +442,6 @@ class KplerFlowResource(TemplateResource):
 
         if destination_type:
             query = query.filter(KplerFlow.to_split.in_(to_list(destination_type)))
-
-        if platform:
-            query = query.filter(KplerFlow.platform.in_(to_list(platform)))
 
         if date_from:
             query = query.filter(KplerFlow.date >= str(to_datetime(date_from)))

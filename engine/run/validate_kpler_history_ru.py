@@ -24,7 +24,6 @@ def update():
     verifier = KplerTradeVerifier()
     verifier.verify_sync_against_flows(
         origin_iso2s=["RU"],
-        platforms=["liquids", "dry", "lng"],
         date_from=dt.date(2021, 1, 1),
         date_to=dt.date.today(),
     )

@@ -56,7 +56,7 @@ def fill_kpler_commodities(commodities_df):
         columns={"group_name": "group", "family_name": "family"}
     )
 
-    kpler_products.drop_duplicates(subset=["id", "platform"], inplace=True)
+    kpler_products.drop_duplicates(subset=["id"], inplace=True)
 
     def add_groups_as_commodities(kpler_products):
         # Adding the couple products that correspond to a group or family

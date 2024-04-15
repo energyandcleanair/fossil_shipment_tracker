@@ -55,9 +55,6 @@ def upload_products(products):
     if not isinstance(products, pd.DataFrame):
         products = pd.DataFrame(products)
 
-    # if "platform" in products.columns:
-    #     products.drop(columns=["platform"], inplace=True)
-
     products = products.drop_duplicates(subset=["id"])
     if len(products) == 0:
         return None

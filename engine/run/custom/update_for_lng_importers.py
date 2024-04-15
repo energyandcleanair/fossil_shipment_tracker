@@ -38,7 +38,6 @@ def get_lng_sources(to_importers=None, date_from=None):
     for importer in to_importers:
         importer_flows = scraper.get_flows(
             date_from=date_from,
-            platform="lng",
             destination_iso2=importer,
             granularity=FlowsPeriod.Annually,
             split=FlowsSplit.OriginCountries,
@@ -71,7 +70,6 @@ def update():
         recent_date_to=-1,
         origin_iso2s=countries_to_update,
         parts=[UpdateParts.UPDATE_RECENT_TRADES],
-        platforms=["lng"],
     )
     kpler_trade_computed.update()
     counter.update()

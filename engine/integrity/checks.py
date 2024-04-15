@@ -199,24 +199,6 @@ def test_insurers_no_null_date_from():
     ), f"There are insurers with date_from_equasis = NULL even though these are the only ones identified: {', '.join([row[0] for row in wrong_date_from])}"
 
 
-def test_trade_platform():
-    """I've found trades with Crude/Co as a commodity
-    but LNG as a platform. Just ensuring this isn't happening anymore
-    """
-
-    raw_sql = """
-    select * from kpler_trade kt
-    left join kpler_product kp on kp.id = kt.product_id
-    where kp.platform != kt.platform;
-    """
-
-    result = session.execute(raw_sql)
-    if result.rowcount > 0:
-        logger_slack.error(
-            "Some kpler trades have a platform field not matching the platform of their products."
-        )
-
-
 def test_overland_trade_has_values():
     # create a date range for each year from the start of 2020 to today
     start_date = dt.date(2020, 1, 1)

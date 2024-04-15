@@ -42,12 +42,10 @@ def update_full():
 def update_lite(
     date_from=-30,
     origin_iso2s=["RU"],
-    platforms=kpler_scraper.PLATFORMS,
 ):
     return update(
         recent_date_from=date_from,
         origin_iso2s=origin_iso2s,
-        platforms=platforms,
     )
 
 
@@ -56,7 +54,6 @@ def update(
     recent_date_to=None,
     historic_date_from="2021-01-01",
     historic_date_to=-30,
-    platforms=kpler_scraper.PLATFORMS,
     origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG"],
     parts=[
         UpdateParts.UPDATE_ZONES,
@@ -77,7 +74,6 @@ def update(
             update_trades(
                 date_from=recent_date_from,
                 date_to=recent_date_to,
-                platforms=platforms,
                 origin_iso2s=origin_iso2s,
             )
             logger.info("Cleaning outdated entries")
@@ -85,7 +81,6 @@ def update(
             logger.info("Verifying recent against live flows")
             verifier.verify_sync_against_flows(
                 origin_iso2s=origin_iso2s,
-                platforms=platforms,
                 date_from=recent_date_to,
                 date_to=recent_date_to,
             )
@@ -96,13 +91,11 @@ def update(
             logger.info("Checking for invalid historic entries")
             verifier.verify_sync_against_flows(
                 origin_iso2s=origin_iso2s,
-                platforms=platforms,
                 date_from=historic_date_from,
                 date_to=historic_date_to,
             )
             update_outdated_historic_trades(
                 origin_iso2s=origin_iso2s,
-                platforms=platforms,
                 date_from=historic_date_from,
                 date_to=historic_date_to,
             )
@@ -111,7 +104,6 @@ def update(
             logger.info("Verifying historic against live flows")
             verifier.verify_sync_against_flows(
                 origin_iso2s=origin_iso2s,
-                platforms=platforms,
                 date_from=historic_date_from,
                 date_to=historic_date_to,
             )
@@ -130,7 +122,6 @@ def update(
 
 def update_outdated_historic_trades(
     origin_iso2s,
-    platforms,
     date_from,
     date_to,
 ):
@@ -142,7 +133,7 @@ def update_outdated_historic_trades(
         else dt.date.today() - dt.timedelta(days=1)
     )
 
-    # Get sync history for origin iso2s and platforms for the given date range
+    # Get sync history for origin iso2s for the given date range
 
     month_column = func.date_trunc("month", KplerSyncHistory.date).label("month")
     entries_count = func.count(KplerSyncHistory.id)
@@ -150,20 +141,18 @@ def update_outdated_historic_trades(
     query = (
         session.query(
             KplerSyncHistory.country_iso2,
-            KplerSyncHistory.platform,
             month_column,
             entries_count,
         )
         .filter(
             KplerSyncHistory.country_iso2.in_(origin_iso2s),
-            KplerSyncHistory.platform.in_(platforms),
             KplerSyncHistory.date >= date_from,
             KplerSyncHistory.date <= date_to,
             KplerSyncHistory.is_valid == False,
+            KplerSyncHistory.platform == None,
         )
         .group_by(
             KplerSyncHistory.country_iso2,
-            KplerSyncHistory.platform,
             month_column,
         )
         .having(
@@ -171,7 +160,6 @@ def update_outdated_historic_trades(
         )
         .order_by(
             KplerSyncHistory.country_iso2,
-            KplerSyncHistory.platform,
             month_column,
         )
     )
@@ -183,9 +171,7 @@ def update_outdated_historic_trades(
 
     with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
         for _, row in tqdm(months_with_missing_data.iterrows(), unit="missing-month"):
-            logger.info(
-                f"Updating invalid entries for {row['country_iso2']} on {row['platform']} for {row['month']}"
-            )
+            logger.info(f"Updating invalid entries for {row['country_iso2']} for {row['month']}")
 
             month_start = row["month"]
             month_end = month_start + pd.offsets.MonthEnd(0)
@@ -193,7 +179,6 @@ def update_outdated_historic_trades(
             update_trades(
                 date_from=month_start,
                 date_to=month_end,
-                platforms=[row["platform"]],
                 origin_iso2s=[row["country_iso2"]],
                 update_time=update_time,
             )

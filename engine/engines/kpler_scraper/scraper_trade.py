@@ -15,7 +15,7 @@ class KplerTradeScraper(KplerScraper):
     def __init__(self):
         super().__init__()
 
-    def get_trades(self, platform, from_iso2=None, date_from=-30, sts_only=False, month=None):
+    def get_trades(self, from_iso2=None, date_from=-30, sts_only=False, month=None):
         if sts_only:
             operational_filter = "shipToShip"
         else:
@@ -28,14 +28,13 @@ class KplerTradeScraper(KplerScraper):
 
         for current_iso2 in to_list(from_iso2):
             date_from = to_datetime(date_from)
-            from_zone = self.get_zone_dict(iso2=current_iso2, platform=platform)
+            from_zone = self.get_zone_dict(iso2=current_iso2)
             trades_raw = []
 
             query_from = 0
             while True:
                 size, query_trades_raw = self.get_trades_raw(
                     from_zone=from_zone,
-                    platform=platform,
                     query_from=query_from,
                     operational_filter=operational_filter,
                     month=month,
@@ -49,9 +48,7 @@ class KplerTradeScraper(KplerScraper):
                     break
 
             for x in tqdm(trades_raw, unit="raw-trade", leave=False):
-                trades_, vessels_, zones_, products_, installations_ = self._parse_trade(
-                    x, platform=platform
-                )
+                trades_, vessels_, zones_, products_, installations_ = self._parse_trade(x)
                 trades.extend(trades_)
                 vessels.extend(vessels_)
                 products.extend(products_)
@@ -61,7 +58,6 @@ class KplerTradeScraper(KplerScraper):
 
     def get_trades_raw(
         self,
-        platform,
         from_zone=None,
         query_from=0,
         operational_filter=None,
@@ -74,18 +70,14 @@ class KplerTradeScraper(KplerScraper):
             return 0, []
 
         from_locations = (
-            [
-                self.get_zone_dict(
-                    id=from_zone.get("id"), name=from_zone.get("name"), platform=platform
-                )
-            ]
+            [self.get_zone_dict(id=from_zone.get("id"), name=from_zone.get("name"))]
             if from_zone
             else []
         )
 
         # Get zone dict
         params_raw = {
-            **KplerScraper.default_params(platform=platform),
+            **KplerScraper.default_params(),
             "exchangeType": "export",
             "from": query_from,
             "fromLocations": from_locations,
@@ -103,11 +95,7 @@ class KplerTradeScraper(KplerScraper):
         }
 
         token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-        url = {
-            "dry": "https://dry.kpler.com/api/flows/trades",
-            "liquids": "https://terminal.kpler.com/api/flows/trades",
-            "lng": "https://lng.kpler.com/api/flows/trades",
-        }.get(platform)
+        url = "https://terminal.kpler.com/api/flows/trades"
 
         logger.info(f"Making Kpler request with URL {url} and params {params_raw}")
         headers = {
@@ -187,11 +175,10 @@ class KplerTradeScraper(KplerScraper):
             for x in vessels
         ]
 
-    def _parse_trade_trade(self, trade_raw, platform) -> List[dict]:
+    def _parse_trade_trade(self, trade_raw) -> List[dict]:
         trade = {}
         # General
         trade["id"] = trade_raw.get("id")
-        trade["platform"] = platform
         status_dict = {
             "In Transit": base.ONGOING,
             "Delivered": base.COMPLETED,
@@ -405,13 +392,13 @@ class KplerTradeScraper(KplerScraper):
         result = [dict(t) for t in {tuple(d.items()) for d in result}]
         return result
 
-    def _parse_trade_products(self, flow, platform) -> List[dict]:
+    def _parse_trade_products(self, flow) -> List[dict]:
         if not flow:
             return []
 
-        return KplerProductScraper.get_parsed_infos(platform=platform, id=flow.get("id"))
+        return KplerProductScraper.get_parsed_infos(id=flow.get("id"))
 
-    def _parse_trade(self, trade_raw, platform) -> (List[dict], List[dict], List[dict], List[dict]):
+    def _parse_trade(self, trade_raw) -> (List[dict], List[dict], List[dict], List[dict]):
         """
         Parse a single trade and return a list of dictionaries.
         At the moment, it will only return either None or a list of single dictionary,
@@ -424,7 +411,7 @@ class KplerTradeScraper(KplerScraper):
          - products
         """
 
-        trades = self._parse_trade_trade(trade_raw=trade_raw, platform=platform)
+        trades = self._parse_trade_trade(trade_raw=trade_raw)
         # #DEBUG save trades using pickle
         # import pickle
         # # with open('trades.pickle', 'wb') as outfile:
@@ -436,9 +423,7 @@ class KplerTradeScraper(KplerScraper):
         zones = self._parse_trade_zones(trade_raw=trade_raw)
         installations = self._parse_trade_installations(trade_raw=trade_raw)
         product_ids = set([x.get("product_id") for x in trades])
-        products = [
-            KplerProductScraper.get_parsed_infos(platform=platform, id=x) for x in product_ids
-        ]
+        products = [KplerProductScraper.get_parsed_infos(id=x) for x in product_ids]
 
         return trades, vessels, zones, products, installations
 

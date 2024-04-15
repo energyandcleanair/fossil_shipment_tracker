@@ -25,7 +25,6 @@ from ..kpler_scraper import KPLER_TOTAL
 class KplerFlowScraper(KplerScraper):
     def get_flows_raw_brute(
         self,
-        platform,
         date_from,
         date_to,
         split,
@@ -40,30 +39,23 @@ class KplerFlowScraper(KplerScraper):
         This one uses the token from the web interface,
         and another payload, that allows us to go back further than 1 year
         :param params:
-        :param platform:
         :return:
         """
         if from_zone and from_zone.get("name") == "Unknown":
             return None
 
         from_locations = (
-            [
-                self.get_zone_dict(
-                    id=from_zone.get("id"), name=from_zone.get("name"), platform=platform
-                )
-            ]
+            [self.get_zone_dict(id=from_zone.get("id"), name=from_zone.get("name"))]
             if from_zone
             else []
         )
 
         to_locations = (
-            [self.get_zone_dict(id=to_zone.get("id"), name=to_zone.get("name"), platform=platform)]
-            if to_zone
-            else []
+            [self.get_zone_dict(id=to_zone.get("id"), name=to_zone.get("name"))] if to_zone else []
         )
 
         params_raw = {
-            **KplerScraper.default_params(platform=platform),
+            **KplerScraper.default_params(),
             "cumulative": False,
             "fromLocations": from_locations,
             "toLocations": to_locations,
@@ -78,9 +70,7 @@ class KplerFlowScraper(KplerScraper):
 
         if to_zone is not None:
             params_raw["toLocations"] = [
-                self.get_zone_dict(
-                    id=to_zone.get("id"), name=to_zone.get("name"), platform=platform
-                )
+                self.get_zone_dict(id=to_zone.get("id"), name=to_zone.get("name"))
             ]
 
         if product is not None:
@@ -90,11 +80,7 @@ class KplerFlowScraper(KplerScraper):
                 params_raw["filters"] = {"product": [self.get_product_id(name=product)]}
 
         token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-        url = {
-            "dry": "https://dry.kpler.com/api/flows",
-            "liquids": "https://terminal.kpler.com/api/flows",
-            "lng": "https://lng.kpler.com/api/flows",
-        }.get(platform)
+        url = "https://terminal.kpler.com/api/flows"
         headers = {
             "Authorization": f"Bearer {token}",
             "x-web-application-version": "v21.316.0",
@@ -156,7 +142,6 @@ class KplerFlowScraper(KplerScraper):
 
     def get_flows(
         self,
-        platform,
         origin_iso2=None,
         destination_iso2=None,
         product=None,
@@ -172,20 +157,20 @@ class KplerFlowScraper(KplerScraper):
     ):
         if from_zone is None and origin_iso2 is not None:
             if from_split == FlowsSplit.OriginCountries:
-                from_zone = self.get_zone_dict(platform=platform, iso2=origin_iso2)
+                from_zone = self.get_zone_dict(iso2=origin_iso2)
             else:
                 raise ValueError("Wrong from_zone indication")
 
         if to_zone is None and destination_iso2 is not None:
             if to_split == FlowsSplit.DestinationCountries:
-                to_zone = self.get_zone_dict(platform=platform, iso2=destination_iso2)
+                to_zone = self.get_zone_dict(iso2=destination_iso2)
             else:
                 raise ValueError("Wrong to_zone indication")
 
         args_info = f"product: {product}, split: {split}, granularity: {granularity}, unit: {unit}, date_from: {date_from}, date_to: {date_to}"
 
         logger.debug(
-            f"Getting flows for {platform}: {from_zone}({from_split})->{to_zone}({to_split}) ({args_info})"
+            f"Getting flows: {from_zone}({from_split})->{to_zone}({to_split}) ({args_info})"
         )
 
         params = {
@@ -199,7 +184,7 @@ class KplerFlowScraper(KplerScraper):
             "date_to": date_to or dt.datetime.now(),
         }
 
-        df = self.get_flows_raw_brute(platform=platform, **params, include_total=False)
+        df = self.get_flows_raw_brute(**params, include_total=False)
         if df is None:
             return None
 
@@ -228,7 +213,6 @@ class KplerFlowScraper(KplerScraper):
         df["to_zone"] = df.apply(lambda x: to_zone or {"id": 0, "name": None}, axis=1)
         df["product"] = product_name
         df["unit"] = unit.value
-        df["platform"] = platform
         df = df.rename(columns={"Date": "date"})
 
         def split_to_column(df, split):
@@ -249,18 +233,16 @@ class KplerFlowScraper(KplerScraper):
                 df["product"] = df["split"].apply(lambda x: x.get("name"))
 
                 df["grade"] = df["split"].apply(
-                    lambda x: KplerProductScraper.get_grade_name(platform=platform, id=x.get("id"))
+                    lambda x: KplerProductScraper.get_grade_name(id=x.get("id"))
                 )
                 df["commodity"] = df["split"].apply(
-                    lambda x: KplerProductScraper.get_commodity_name(
-                        platform=platform, id=x.get("id")
-                    )
+                    lambda x: KplerProductScraper.get_commodity_name(id=x.get("id"))
                 )
                 df["group"] = df["split"].apply(
-                    lambda x: KplerProductScraper.get_group_name(platform=platform, id=x.get("id"))
+                    lambda x: KplerProductScraper.get_group_name(id=x.get("id"))
                 )
                 df["family"] = df["split"].apply(
-                    lambda x: KplerProductScraper.get_family_name(platform=platform, id=x.get("id"))
+                    lambda x: KplerProductScraper.get_family_name(id=x.get("id"))
                 )
 
             return df
@@ -271,16 +253,14 @@ class KplerFlowScraper(KplerScraper):
         df["from_zone_id"] = df.from_zone.apply(lambda x: self.fix_zone_id(int(x.get("id"))))
         df["to_zone_id"] = df.to_zone.apply(lambda x: self.fix_zone_id(int(x.get("id"))))
 
-        df["to_iso2"] = df.to_zone_id.apply(lambda x: self.get_zone_iso2(platform=platform, id=x))
-        df["from_iso2"] = df.from_zone_id.apply(
-            lambda x: self.get_zone_iso2(platform=platform, id=x)
-        )
+        df["to_iso2"] = df.to_zone_id.apply(lambda x: self.get_zone_iso2(id=x))
+        df["from_iso2"] = df.from_zone_id.apply(lambda x: self.get_zone_iso2(id=x))
 
         df["from_zone_name"] = df.from_zone.apply(
-            lambda x: self.get_zone_name(platform=platform, id=x.get("id"), name=x.get("name"))
+            lambda x: self.get_zone_name(id=x.get("id"), name=x.get("name"))
         )
         df["to_zone_name"] = df.to_zone.apply(
-            lambda x: self.get_zone_name(platform=platform, id=x.get("id"), name=x.get("name"))
+            lambda x: self.get_zone_name(id=x.get("id"), name=x.get("name"))
         )
 
         df.drop(columns=["from_zone", "to_zone"], inplace=True)

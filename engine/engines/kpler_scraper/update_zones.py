@@ -10,9 +10,8 @@ import country_converter as coco
 cc = coco.CountryConverter()
 
 
-def update_zones(platforms=None):
+def update_zones():
     scraper = KplerScraper()
-    platforms = scraper.platforms if platforms is None else platforms
 
     # A dataframe to store dfs of zones, each dataframe should contain:
     # - id
@@ -36,53 +35,52 @@ def update_zones(platforms=None):
         "country_iso2",
     ]
 
-    for platform in platforms:
-        # This is a pandas dataframe which has the columns:
-        # - name
-        # - isPort
-        # - isSupplyDemand
-        # - geo
-        # - continent
-        # - export
-        # - parentZones
-        # - range
-        # - subcontinent
-        # - shape
-        # - type
-        # - import
-        # - id
-        # - isStorageSelected
-        # - fullname
-        all_zones = scraper.get_zones_brute(platform=platform)
+    # This is a pandas dataframe which has the columns:
+    # - name
+    # - isPort
+    # - isSupplyDemand
+    # - geo
+    # - continent
+    # - export
+    # - parentZones
+    # - range
+    # - subcontinent
+    # - shape
+    # - type
+    # - import
+    # - id
+    # - isStorageSelected
+    # - fullname
+    all_zones = scraper.get_zones_brute()
 
-        zones_we_care_about = [
-            "anchorage",
-            "bay",
-            "canal",
-            "checkpoint",
-            "continent",
-            "country",
-            "country_checkpoint",
-            "custom",
-            "gulf",
-            "gulf_checkpoint",
-            "ocean",
-            "port",
-            "region",
-            "sea",
-            "storage",
-            "strait",
-            "subcontinent",
-            "subregion",
-        ]
+    zones_we_care_about = [
+        "anchorage",
+        "bay",
+        "canal",
+        "checkpoint",
+        "continent",
+        "country",
+        "country_checkpoint",
+        "custom",
+        "gulf",
+        "gulf_checkpoint",
+        "ocean",
+        "port",
+        "region",
+        "sea",
+        "storage",
+        "strait",
+        "subcontinent",
+        "subregion",
+    ]
 
-        zones = all_zones[all_zones.type.isin(zones_we_care_about)].reset_index()
+    zones = all_zones[all_zones.type.isin(zones_we_care_about)].reset_index()
 
-        zones["parentZones"] = zones.apply(parse_parent_zones, axis=1)
-        zones = attach_country_info(zones)
-        zones = attach_port_info(zones)
+    zones["parentZones"] = zones.apply(parse_parent_zones, axis=1)
+    zones = attach_country_info(zones)
+    zones = attach_port_info(zones)
 
-        collected_zones = collected_zones + [zones]
+    collected_zones = collected_zones + [zones]
 
     zones_to_upload = pd.concat(collected_zones)[columns_we_care_about]
 
@@ -102,9 +100,9 @@ def attach_country_info(zones):
         axis=1,
     )
     zones["country_name"] = zones.apply(
-        lambda x: x["name"]
-        if x["type"] in ["country", "country_checkpoint"]
-        else x["country_name"],
+        lambda x: (
+            x["name"] if x["type"] in ["country", "country_checkpoint"] else x["country_name"]
+        ),
         axis=1,
     )
 

@@ -12,7 +12,6 @@ def test_get_flow():
     scraper = KplerFlowScraper()
     # products = scraper.get_products()
     flows = scraper.get_flows(
-        platform="liquids",
         origin_iso2="RU",
         destination_iso2="DE",
         date_from="2022-03-01",
@@ -26,9 +25,8 @@ def test_get_flow():
     assert round(sum.Diesel / 1e4) == 45
     assert round(sum.Gasoil / 1e4) == 14
 
-    from_zone = scraper.get_zone_dict(name="Kozmino", platform="liquids")
+    from_zone = scraper.get_zone_dict(name="Kozmino")
     flows_kozmino = scraper.get_flows(
-        platform="liquids",
         origin_iso2="RU",
         from_zone=from_zone,
         date_from="2022-03-01",
@@ -44,7 +42,6 @@ def test_get_flow_brute():
     from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
     params = {
-        "platform": "liquids",
         # "origin_iso2": "RU",
         # "destination_iso2": "CN",
         "date_from": to_datetime("2022-03-01"),
@@ -57,9 +54,9 @@ def test_get_flow_brute():
     # flows_brute = scraper.get_flows_raw_brute(**params, include_total=False)
     # flows = scraper.get_flows_raw(**params)
     # assert flows_brute.reset_index(drop=True).equals(flows.reset_index(drop=True))
-    from_zone = scraper.get_zone_dict(iso2="RU", platform="liquids")
+    from_zone = scraper.get_zone_dict(iso2="RU")
     params["from_zone"] = from_zone
-    to_zone = scraper.get_zone_dict(iso2="CN", platform="liquids")
+    to_zone = scraper.get_zone_dict(iso2="CN")
     params["to_zone"] = to_zone
 
     # params["destination_iso2"] = None
@@ -75,12 +72,10 @@ def test_get_installations():
     scraper = KplerScraper()
     # products = scraper.get_products()
     iso2s = ["RU", "CN", "AE"]
-    platforms = scraper.platforms
     for iso2 in iso2s:
-        for platform in platforms:
-            installations = scraper.get_installations(origin_iso2=iso2, platform=platform)
-            assert installations is not None
-            assert len(installations) > 0
+        installations = scraper.get_installations(origin_iso2=iso2)
+        assert installations is not None
+        assert len(installations) > 0
 
 
 def test_get_vessel_brute():
@@ -101,7 +96,7 @@ def test_get_trades():
     date_from = dt.datetime(2023, 7, 1)
     from_iso2 = ["RU"]
     trades, vessels, zones, products = scraper.get_trades(
-        date_from=date_from, from_iso2=from_iso2, platform="liquids", sts_only=True
+        date_from=date_from, from_iso2=from_iso2, sts_only=True
     )
     assert len(trades) > 0
     assert len(vessels) > 0
@@ -125,7 +120,6 @@ def test_get_flow_cn():
     from base.utils import to_datetime
 
     params = {
-        "platform": "liquids",
         "origin_iso2": "CN",
         # "destination_iso2": "CN",
         "product": "Crude/Co",
@@ -157,7 +151,6 @@ def test_get_flow_sg_cn():
     from base.utils import to_datetime
 
     params = {
-        "platform": "liquids",
         "origin_iso2": "SG",
         "destination_iso2": "CN",
         # "product": "Crude",
@@ -188,7 +181,6 @@ def test_get_flow_sg_cn():
 
     # But there is a date where Singapore != Singapore Republic and the latter seems correct
     params = {
-        "platform": "liquids",
         "origin_iso2": "SG",
         "destination_iso2": "CN",
         # "product": "Crude",

@@ -1,7 +1,7 @@
 KPLER_TOTAL = "Total"
 
 
-from .scraper import KplerScraper, PLATFORMS
+from .scraper import KplerScraper
 from .scraper_product import KplerProductScraper
 from .scraper_flow import KplerFlowScraper
 from .scraper_trade import KplerTradeScraper

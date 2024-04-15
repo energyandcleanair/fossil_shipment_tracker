@@ -225,14 +225,6 @@ class KplerTradeResource(TemplateResource):
     )
 
     parser.add_argument(
-        "platform",
-        type=str,
-        help="platform",
-        default=None,
-        required=False,
-    )
-
-    parser.add_argument(
         "buyer",
         type=str,
         help="name of the/a buyer",
@@ -578,7 +570,6 @@ class KplerTradeResource(TemplateResource):
         failing_entries_query = (
             session.query(
                 KplerSyncHistory.country_iso2,
-                KplerSyncHistory.platform,
                 KplerSyncHistory.date,
             )
             .select_from(subquery)
@@ -586,53 +577,55 @@ class KplerTradeResource(TemplateResource):
                 KplerSyncHistory,
                 sa.and_(
                     KplerSyncHistory.country_iso2 == subquery.c.origin_iso2,
-                    KplerSyncHistory.platform == subquery.c.platform,
+                    KplerSyncHistory.platform == None,
                     KplerSyncHistory.date == func.date_trunc("day", subquery.c.origin_date_utc),
                 ),
             )
             .filter(
                 # Negate valid check
-                sa.not_(
-                    # Would be valid if it meets these requirements.
-                    sa.and_(
-                        # Check that we've updated this data.
-                        KplerSyncHistory.id != None,
-                        # Check that the data has been checked for completeness.
-                        KplerSyncHistory.last_checked != None,
-                        # Check that the data has been checked for completeness within the threshold
-                        KplerSyncHistory.last_checked > earliest_allowed_date,
-                        # Check that the data is complete.
-                        KplerSyncHistory.is_valid,
-                    )
+                sa.and_(
+                    sa.not_(
+                        # Would be valid if it meets these requirements.
+                        sa.and_(
+                            # Check that we've updated this data.
+                            KplerSyncHistory.id != None,
+                            # Check that the data has been checked for completeness.
+                            KplerSyncHistory.last_checked != None,
+                            # Check that the data has been checked for completeness within the threshold
+                            KplerSyncHistory.last_checked > earliest_allowed_date,
+                            # Check that the data is complete.
+                            KplerSyncHistory.is_valid,
+                        )
+                    ),
+                    KplerSyncHistory.platform == None,
                 )
             )
             .group_by(
                 KplerSyncHistory.country_iso2,
-                KplerSyncHistory.platform,
                 KplerSyncHistory.date,
             )
         )
 
         failing_entries = pd.read_sql(failing_entries_query.statement, session.bind)
 
-        # Convert list to country_iso2, platform, date_from, date_to for each set of sequential dates
-        grouped_entries = failing_entries.groupby(["country_iso2", "platform"])
+        # Convert list to country_iso2, date_from, date_to for each set of sequential dates
+        grouped_entries = failing_entries.groupby(["country_iso2"])
         result = []
         for group, entries in grouped_entries:
-            country_iso2, platform = group
+            country_iso2 = group
             dates = entries["date"].tolist()
             sequential_dates = []
             start_date = dates[0]
             end_date = dates[0]
             for i in range(1, len(dates)):
                 if (dates[i] - dates[i - 1]).days > 1:
-                    sequential_dates.append((country_iso2, platform, start_date, end_date))
+                    sequential_dates.append((country_iso2, start_date, end_date))
                     start_date = dates[i]
                 end_date = dates[i]
-            sequential_dates.append((country_iso2, platform, start_date, end_date))
+            sequential_dates.append((country_iso2, start_date, end_date))
             result.extend(sequential_dates)
 
-        result = pd.DataFrame(result, columns=["origin_iso2", "platform", "date_from", "date_to"])
+        result = pd.DataFrame(result, columns=["origin_iso2", "date_from", "date_to"])
 
         if len(result) > 0:
             return False, result.to_csv(index=False)
@@ -702,7 +695,6 @@ class KplerTradeResource(TemplateResource):
                 # Renaming everything in terms of "origin" and "destination"
                 KplerTrade.id.label("trade_id"),
                 KplerTrade.flow_id,
-                KplerTrade.platform,
                 KplerTrade.status,
                 KplerTrade.departure_date_utc.label("origin_date_utc"),
                 KplerTrade.departure_installation_id.label("origin_installation_id"),
@@ -816,6 +808,7 @@ class KplerTradeResource(TemplateResource):
 
         # Only keep valid trades
         query = query.filter(KplerTrade.is_valid == True)
+        query = query.filter(KplerTrade.platform == None)
 
         return query
 
@@ -846,7 +839,6 @@ class KplerTradeResource(TemplateResource):
         destination_date_to = params.get("destination_date_to")
         origin_date_from = params.get("origin_date_from")
         origin_date_to = params.get("origin_date_to")
-        platform = params.get("platform")
         pricing_scenario = params.get("pricing_scenario")
         currency = params.get("currency")
 
@@ -867,9 +859,6 @@ class KplerTradeResource(TemplateResource):
 
         if grade:
             query = query.filter(KplerProduct.grade_name.in_(to_list(grade)))
-
-        if platform:
-            query = query.filter(KplerTrade.platform.in_(to_list(platform)))
 
         if date_from:
             query = query.filter(KplerTrade.departure_date_utc >= str(to_datetime(date_from)))
