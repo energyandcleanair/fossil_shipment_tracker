@@ -85,23 +85,6 @@ def warmup():
     return "", 200, {}
 
 
-@app.route("/v0/update", methods=["POST"])
-def update():
-    from update import update
-
-    try:
-        update()
-        return Response(
-            response=json.dumps({"status": "OK", "message": "everything updated"}),
-            status=200,
-            mimetype="application/json",
-        )
-    except Exception as e:
-        return Response(
-            response={"status": "ERROR", "message": str(e)}, status=500, mimetype="application/json"
-        )
-
-
 if __name__ == "__main__":
     # This is used when running locally. Gunicorn is used to run the
     # application on Cloud Run. See entrypoint in Dockerfile.
