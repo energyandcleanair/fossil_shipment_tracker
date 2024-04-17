@@ -56,7 +56,7 @@ def update(date_from=dt.date(2022, 1, 1), date_to=None, force=False):
         exchanges = pd.melt(exchanges, id_vars="date", var_name="currency", value_name="per_eur")
         exchanges["estimated"] = False
 
-    except RatesNotAvailableError:
+    except RatesNotAvailableError | ConnectionError:
         # Prolong historical value
         last = session.query(Currency).filter(
             Currency.date == last_date, sa.not_(Currency.estimated)
