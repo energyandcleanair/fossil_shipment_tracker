@@ -52,12 +52,18 @@ def shutdown_session(exception=None):
 def exception_handler(err):
     # The error handler for api calls is in routes/__init__.py
 
+    request_context_id = None
+    if request.headers.get("X-Cloud-Trace-Context"):
+        request_context_id = request.headers.get("X-Cloud-Trace-Context")
+
     if isinstance(err, HTTPException):
         code = err.code
         response = {"message": getattr(err, "description", code) + " " + str(err)}
     else:
         code = 500
-        response = {"message": err.args[0]}
+        response = {
+            "message": f"An internal error occurred. Request trace context: {request_context_id}"
+        }
     return jsonify(response), code
 
 
