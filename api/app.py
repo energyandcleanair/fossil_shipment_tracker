@@ -53,7 +53,7 @@ def exception_handler(err):
     # The error handler for api calls is in routes/__init__.py
 
     request_context_id = None
-    if request.headers.get("X-Cloud-Trace-Context"):
+    if request.headers.get("X-Cloud-Trace-Context", None):
         request_context_id = request.headers.get("X-Cloud-Trace-Context")
 
     if isinstance(err, HTTPException):
