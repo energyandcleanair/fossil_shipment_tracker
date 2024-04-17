@@ -84,7 +84,6 @@ def update(
             stack_info=True,
             exc_info=True,
         )
-        pass
 
 
 def create_new(

@@ -607,7 +607,6 @@ def update():
             stack_info=True,
             exc_info=True,
         )
-        raise e
 
 
 def check_invalid_trade_computed():

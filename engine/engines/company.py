@@ -40,6 +40,8 @@ import warnings
 from tqdm.contrib.logging import logging_redirect_tqdm
 import logging
 
+from engines.company_scraper.equasis import EquasisSessionPoolExhausted
+
 
 UPDATE_LIMIT: int = int(get_env("EQUASIS_UPDATE_LIMIT", 1000))
 
@@ -72,7 +74,6 @@ def update(force_unknown=False):
         logger_slack.info("=== Company update done ===")
     except Exception as e:
         logger_slack.error("=== Company update failed ===", stack_info=True, exc_info=True)
-        raise e
     return
 
 
