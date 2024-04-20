@@ -42,7 +42,7 @@ def update_trades(date_from=None, date_to=None, origin_iso2s=["RU"], update_time
                 upload_installations(installations)
 
                 logger.info(f"Marking scraper history complete for {from_iso2}, {period}")
-                mark_updated(from_iso2, period)
+                mark_updated(from_iso2, period, update_time)
 
                 del trades, vessels, products, installations
 
