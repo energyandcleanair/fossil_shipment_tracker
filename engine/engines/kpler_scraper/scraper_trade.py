@@ -27,7 +27,6 @@ class KplerTradeScraper(KplerScraper):
         installations = []
 
         for current_iso2 in to_list(from_iso2):
-            date_from = to_datetime(date_from)
             from_zone = self.get_zone_dict(iso2=current_iso2)
             trades_raw = []
 
