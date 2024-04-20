@@ -15,11 +15,7 @@ class KplerTradeScraper(KplerScraper):
     def __init__(self):
         super().__init__()
 
-    def get_trades(self, from_iso2=None, sts_only=False, month=None):
-        if sts_only:
-            operational_filter = "shipToShip"
-        else:
-            operational_filter = None
+    def get_trades(self, from_iso2=None, month=None):
 
         trades = []
         vessels = []
@@ -35,7 +31,6 @@ class KplerTradeScraper(KplerScraper):
                 size, query_trades_raw = self.get_trades_raw(
                     from_zone=from_zone,
                     query_from=query_from,
-                    operational_filter=operational_filter,
                     month=month,
                 )
                 trades_raw.extend(query_trades_raw)
