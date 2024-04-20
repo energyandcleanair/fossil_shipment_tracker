@@ -32,9 +32,6 @@ def update_trades(date_from=None, date_to=None, origin_iso2s=["RU"], update_time
                 if not isinstance(trades, pd.DataFrame):
                     trades = pd.DataFrame(trades)
 
-                departure_date = pd.to_datetime(trades.departure_date_utc).dt.date
-
-                trades = trades[(departure_date >= date_from) & (departure_date <= date_to)]
                 logger.info(f"Uploading {len(vessels)} vessels for {from_iso2}, {period}")
                 upload_vessels(vessels)
                 logger.info(f"Uploading {len(trades)} trades for {from_iso2}, {period}")
@@ -45,15 +42,15 @@ def update_trades(date_from=None, date_to=None, origin_iso2s=["RU"], update_time
                 upload_installations(installations)
 
                 logger.info(f"Marking scraper history complete for {from_iso2}, {period}")
-                mark_updated(from_iso2, period, update_time, date_from, date_to)
+                mark_updated(from_iso2, period)
 
                 del trades, vessels, products, installations
 
             logger.info(f"Finished updating trades for country {from_iso2}")
 
 
-def mark_updated(from_iso2, period, update_time, date_from, date_to):
-    days = [day for day in get_days_in_month(period) if day >= date_from and day <= date_to]
+def mark_updated(from_iso2, period, update_time):
+    days = [day for day in get_days_in_month(period)]
 
     records = [
         {"date": day, "country_iso2": from_iso2, "last_updated": update_time} for day in days
