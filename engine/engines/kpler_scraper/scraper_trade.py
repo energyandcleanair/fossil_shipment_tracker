@@ -15,7 +15,7 @@ class KplerTradeScraper(KplerScraper):
     def __init__(self):
         super().__init__()
 
-    def get_trades(self, from_iso2=None, date_from=-30, sts_only=False, month=None):
+    def get_trades(self, from_iso2=None, sts_only=False, month=None):
         if sts_only:
             operational_filter = "shipToShip"
         else:
@@ -41,10 +41,7 @@ class KplerTradeScraper(KplerScraper):
                 )
                 trades_raw.extend(query_trades_raw)
                 query_from += size
-                if (
-                    size == 0
-                    or min([pd.to_datetime(x.get("start")) for x in query_trades_raw]) < date_from
-                ):
+                if size == 0:
                     break
 
             for x in tqdm(trades_raw, unit="raw-trade", leave=False):
@@ -60,7 +57,6 @@ class KplerTradeScraper(KplerScraper):
         self,
         from_zone=None,
         query_from=0,
-        operational_filter=None,
         month=None,
     ):
         if month is None:
