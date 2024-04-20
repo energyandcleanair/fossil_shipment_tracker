@@ -1,4 +1,5 @@
 from engines import (
+    commodity,
     portcall,
     departure,
     arrival,
@@ -21,7 +22,8 @@ import datetime as dt
 
 
 def update():
-    clean_outdated_entries()
+
+    commodity.fill()
 
     kpler_scraper.update(
         recent_date_from=None,

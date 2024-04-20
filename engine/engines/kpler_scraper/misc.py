@@ -38,12 +38,18 @@ def get_commodity_equivalent(row):
         row["group"] in ["Fuel Oils"] or row["family"] in ["Light Ends", "Middle Distillates"]
     ) and row["name"] != "Clean Condensate":
         return base.OIL_PRODUCTS
+    elif row["name"] == "Clean Products":
+        return base.OIL_PRODUCTS
     elif row["name"] == "Fuel Oils":
         return base.OIL_PRODUCTS
     elif row["name"] == "lng":
         return base.LNG
     elif row["name"] in ["Coal", "Thermal", "Metallurgical"]:
         return base.COAL
+    elif row["name"] == "Bitumen/Asphalt" or "Bitumen" in row["name"]:
+        return base.OIL_PRODUCTS
+    elif row["name"] == "Cutter Stock":
+        return base.OIL_PRODUCTS
     else:
         return None
 

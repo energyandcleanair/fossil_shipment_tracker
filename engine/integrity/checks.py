@@ -3,6 +3,8 @@ import sqlalchemy as sa
 import pandas as pd
 import numpy as np
 
+from sqlalchemy import func
+
 from base.db import session
 from base.models import (
     ShipmentWithSTS,
@@ -12,6 +14,7 @@ from base.models import (
     Departure,
     Arrival,
 )
+from base.models.kpler import KplerTrade, KplerTradeComputed, KplerProduct, KplerZone
 from base.logger import logger_slack, logger
 from decouple import config
 
@@ -279,3 +282,30 @@ def test_counter_pricing_positive():
     )
     assert max_date.year == dt.date.today().year, f"Counter is incomplete, max date was: {max_date}"
     assert all_positive, "Counter pricing is not all positive:\n" + not_positive_summary.to_string()
+
+
+def test_kpler_trades_without_prices():
+
+    products_missing_computed_rows = (
+        session.query(KplerProduct.name, KplerProduct.type, func.count(KplerTrade.id))
+        .select_from(KplerProduct)
+        .outerjoin(KplerTrade, KplerTrade.product_id == KplerProduct.id)
+        .outerjoin(
+            KplerTradeComputed,
+            (KplerTradeComputed.trade_id == KplerTrade.id)
+            & (KplerTradeComputed.flow_id == KplerTrade.flow_id),
+        )
+        .outerjoin(KplerZone, (KplerZone.id == KplerTrade.departure_zone_id))
+        .filter(
+            KplerTradeComputed.trade_id == None,
+            KplerTrade.is_valid == True,
+            KplerZone.country_iso2 == "RU",
+            KplerTrade.departure_date_utc >= "2022-01-01",
+        )
+        .group_by(KplerProduct.name, KplerProduct.type)
+        .all()
+    )
+
+    assert (
+        not products_missing_computed_rows
+    ), f"Some Kpler trades are missing computed rows: {products_missing_computed_rows}"

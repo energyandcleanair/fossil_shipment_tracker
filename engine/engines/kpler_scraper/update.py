@@ -11,8 +11,8 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 from engines import kpler_scraper
 
 from .update_zones import update_zones
-from .update_trade import update_trades
-from .verify import KplerTradeVerifier
+from .update_trade import mark_checked, update_trades
+from .verify import KplerTradeComparer
 from .clean_outdated_entries import clean_outdated_entries
 
 from enum import Enum
@@ -64,8 +64,6 @@ def update(
     logger_slack.info("=== Updating Kpler ===")
     try:
 
-        verifier = KplerTradeVerifier()
-
         if UpdateParts.UPDATE_ZONES in parts:
             update_zones()
 
@@ -78,22 +76,10 @@ def update(
             )
             logger.info("Cleaning outdated entries")
             clean_outdated_entries()
-            logger.info("Verifying recent against live flows")
-            verifier.verify_sync_against_flows(
-                origin_iso2s=origin_iso2s,
-                date_from=recent_date_to,
-                date_to=recent_date_to,
-            )
 
         if UpdateParts.REFETCH_OUTDATED_HISTORIC_ENTRIES in parts:
             logger.info("Fix invalid historic entries")
 
-            logger.info("Checking for invalid historic entries")
-            verifier.verify_sync_against_flows(
-                origin_iso2s=origin_iso2s,
-                date_from=historic_date_from,
-                date_to=historic_date_to,
-            )
             update_outdated_historic_trades(
                 origin_iso2s=origin_iso2s,
                 date_from=historic_date_from,
@@ -101,12 +87,6 @@ def update(
             )
             logger.info("Cleaning outdated entries")
             clean_outdated_entries()
-            logger.info("Verifying historic against live flows")
-            verifier.verify_sync_against_flows(
-                origin_iso2s=origin_iso2s,
-                date_from=historic_date_from,
-                date_to=historic_date_to,
-            )
 
         return UpdateStatus.SUCCESS
 
@@ -121,6 +101,7 @@ def update(
 
 
 def update_outdated_historic_trades(
+    *,
     origin_iso2s,
     date_from,
     date_to,
@@ -135,49 +116,42 @@ def update_outdated_historic_trades(
 
     # Get sync history for origin iso2s for the given date range
 
-    month_column = func.date_trunc("month", KplerSyncHistory.date).label("month")
-    entries_count = func.count(KplerSyncHistory.id)
+    logger.info("Checking for invalid historic entries")
 
-    query = (
-        session.query(
-            KplerSyncHistory.country_iso2,
-            month_column,
-            entries_count,
+    comparer = KplerTradeComparer()
+
+    for origin_iso2 in origin_iso2s:
+
+        comparison = comparer.compare_to_live_flows(
+            origin_iso2=origin_iso2,
+            date_from=date_from,
+            date_to=date_to,
         )
-        .filter(
-            KplerSyncHistory.country_iso2.in_(origin_iso2s),
-            KplerSyncHistory.date >= date_from,
-            KplerSyncHistory.date <= date_to,
-            KplerSyncHistory.is_valid == False,
+
+        failed_entries = comparison[comparison["problems"] > 0]
+
+        # Convert failed days to a list of failed months
+        failed_months = failed_entries["departure_day"].dt.to_period("M").unique()
+
+        update_time = dt.datetime.now()
+
+        with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
+            for month in tqdm(failed_months, unit="missing-month"):
+                logger.info(f"Updating invalid entries for {origin_iso2} for {month}")
+
+                month_start = month.start_time.date()
+                month_end = month.end_time.date()
+
+                update_trades(
+                    date_from=month_start,
+                    date_to=month_end,
+                    origin_iso2s=[origin_iso2],
+                    update_time=update_time,
+                )
+
+        mark_checked(
+            origin_iso2s=origin_iso2s,
+            date_from=date_from,
+            date_to=date_to,
+            update_time=update_time,
         )
-        .group_by(
-            KplerSyncHistory.country_iso2,
-            month_column,
-        )
-        .having(
-            entries_count > 0,
-        )
-        .order_by(
-            KplerSyncHistory.country_iso2,
-            month_column,
-        )
-    )
-
-    # Read into a dataframe
-    months_with_missing_data = pd.read_sql(query.statement, session.bind)
-
-    update_time = dt.datetime.now()
-
-    with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
-        for _, row in tqdm(months_with_missing_data.iterrows(), unit="missing-month"):
-            logger.info(f"Updating invalid entries for {row['country_iso2']} for {row['month']}")
-
-            month_start = row["month"]
-            month_end = month_start + pd.offsets.MonthEnd(0)
-
-            update_trades(
-                date_from=month_start,
-                date_to=month_end,
-                origin_iso2s=[row["country_iso2"]],
-                update_time=update_time,
-            )

@@ -1,6 +1,7 @@
 from country_converter import CountryConverter
 from base.utils import to_datetime
 from engines import (
+    commodity,
     portcall,
     departure,
     arrival,
@@ -39,6 +40,7 @@ def update(countries=None, continue_from=None, date_from=None, date_to=None):
     if continue_from is not None:
         countries_to_update = countries_to_update[countries_to_update.index(continue_from) :]
 
+    commodity.fill()
     result = kpler_scraper.update(
         historic_date_from=date_from,
         historic_date_to=date_to,

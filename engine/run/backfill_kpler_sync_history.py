@@ -3,7 +3,7 @@ from base.logger import logger
 from base.db import session
 
 from base.models.kpler import KplerSyncHistory
-from engines.kpler_scraper.verify import KplerTradeVerifier
+from engines.kpler_scraper.verify import KplerTradeComparer
 
 from sqlalchemy import func
 import argparse
@@ -22,7 +22,7 @@ def update(continue_from=None):
         .all()
     )
 
-    verifier = KplerTradeVerifier()
+    verifier = KplerTradeComparer()
 
     if continue_from:
         range_for_country = [
@@ -33,7 +33,7 @@ def update(continue_from=None):
 
     for country, min_date, max_date in range_for_country:
         logger.info(f"Verifying {country} from {min_date} to {max_date}")
-        verifier.verify_sync_against_flows(
+        verifier.compare_sync_against_flows(
             origin_iso2s=[country],
             date_from=min_date,
             date_to=max_date,

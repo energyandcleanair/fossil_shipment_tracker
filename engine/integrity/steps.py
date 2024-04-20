@@ -29,6 +29,10 @@ class IntegrityStep(Enum):
         "overland trade has values for each month", test_overland_trade_has_values
     )
 
+    KPLER_TRADES_WITHOUT_PRICES = IntegrityCheckDefinition(
+        "Kpler trades without prices", test_kpler_trades_without_prices
+    )
+
     KPLER_TRADE_CRUDE = IntegrityCheckDefinition(
         "Kpler trade crude",
         lambda: test_kpler_trades(

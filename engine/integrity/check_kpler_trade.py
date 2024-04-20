@@ -100,7 +100,7 @@ def test_kpler_trades(date_from=None, date_to=None, product=None, origin_iso2=No
 
     if failure_reasons:
         combined_reasons = "\n".join([f" - {failure}" for failure in failure_reasons])
-        raise AssertionError(f"One ore mor failure conditions occurred:\n{combined_reasons}")
+        raise AssertionError(f"One or more failure conditions occurred:\n{combined_reasons}")
 
 
 def compare_flows_to_trades(flows, aggregated_trades):
@@ -120,7 +120,7 @@ def compare_flows_to_trades(flows, aggregated_trades):
         .sort_values("month")
     )
 
-    average_total = (
+    average_month = (
         comparison_per_month["value_tonne.expected"].mean()
         + comparison_per_month["value_tonne.actual"].mean()
     ) / 2
@@ -128,17 +128,15 @@ def compare_flows_to_trades(flows, aggregated_trades):
     comparison_per_month["ok"] = np.isclose(
         comparison_per_month["value_tonne.expected"],
         comparison_per_month["value_tonne.actual"],
-        rtol=0.5,
-        # This gives a bit of flexibility for the first few days of the month.
-        atol=average_total * 0.5,
+        rtol=0.05,
+        atol=average_month * 0.1,
     )
 
     comparison_per_month["ok_strict"] = np.isclose(
         comparison_per_month["value_tonne.expected"],
         comparison_per_month["value_tonne.actual"],
-        rtol=0.025,
-        # This gives a bit of flexibility for the first few days of the month.
-        atol=average_total * 0.025,
+        rtol=0.01,
+        atol=average_month * 0.01,
     )
 
     return comparison_per_month

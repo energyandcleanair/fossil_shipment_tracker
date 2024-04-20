@@ -1,4 +1,5 @@
 from engines import (
+    commodity,
     company,
     engine_r,
     trajectory,
@@ -25,6 +26,7 @@ def update():
 
     engine_r.update()
 
+    commodity.fill()
     kpler_scraper.update_lite()
     company.update()
     kpler_trade_computed.update()

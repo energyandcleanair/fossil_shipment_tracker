@@ -1,4 +1,5 @@
 from engines import (
+    commodity,
     engine_r,
     portcall,
     departure,
@@ -30,6 +31,7 @@ def update():
     currency.update()
     engine_r.update()
 
+    commodity.fill()
     kpler_scraper.update_full()
     kpler_trade_computed.update()
 

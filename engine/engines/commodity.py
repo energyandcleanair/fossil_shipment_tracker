@@ -9,6 +9,14 @@ from base import COMMODITY_GROUPING_DEFAULT
 from base.db import session
 from sqlalchemy.dialects.postgresql import JSONB
 
+from engines.kpler_scraper import KplerProductScraper
+from engines.kpler_scraper import (
+    get_product_id,
+    get_commodity_equivalent,
+    get_commodity_pricing,
+)
+from engines.kpler_scraper.upload import upload_products
+
 
 def fill():
     """
@@ -30,22 +38,9 @@ def fill():
 
 def fill_kpler_commodities(commodities_df):
     # Add Kpler Products
-    from engines.kpler_scraper import KplerScraper, KplerProductScraper
-    from engines.kpler_scraper import (
-        get_product_id,
-        get_commodity_equivalent,
-        get_commodity_pricing,
-    )
-    from engines.kpler_scraper import upload_products
 
     kpler_products = KplerProductScraper().get_products_brute()
-    from base.models import KplerProduct
 
-    # kpler_products = pd.read_sql(
-    #     KplerProduct.query.statement,
-    #     session.bind,
-    # )
-    # commodities_df.columns
     kpler_products = [x for x in kpler_products if x is not None]
 
     # First upload in kpler_products table
@@ -69,6 +64,7 @@ def fill_kpler_commodities(commodities_df):
             "Fuel Oils",
             "Coal",
             "Blendings",
+            "Resids",
         ]
         for group in groups_to_add:
             new = kpler_products[kpler_products.group == group].head(1).copy()

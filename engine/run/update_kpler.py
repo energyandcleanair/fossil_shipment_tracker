@@ -1,4 +1,5 @@
 from engines import (
+    commodity,
     portcall,
     departure,
     arrival,
@@ -21,6 +22,7 @@ import datetime as dt
 
 
 def update():
+    commodity.fill()
     kpler_scraper.update(
         origin_iso2s=["RU"],
     )

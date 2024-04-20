@@ -45,25 +45,18 @@ def update_trades(date_from=None, date_to=None, origin_iso2s=["RU"], update_time
                 upload_installations(installations)
 
                 logger.info(f"Marking scraper history complete for {from_iso2}, {period}")
-                mark_scraper_history(from_iso2, period, update_time, date_from, date_to)
+                mark_updated(from_iso2, period, update_time, date_from, date_to)
 
                 del trades, vessels, products, installations
 
             logger.info(f"Finished updating trades for country {from_iso2}")
 
 
-def mark_scraper_history(from_iso2, period, update_time, date_from, date_to):
+def mark_updated(from_iso2, period, update_time, date_from, date_to):
     days = [day for day in get_days_in_month(period) if day >= date_from and day <= date_to]
 
     records = [
-        {
-            "date": day,
-            "country_iso2": from_iso2,
-            "last_updated": update_time,
-            "is_valid": False,
-            "last_checked": None,
-        }
-        for day in days
+        {"date": day, "country_iso2": from_iso2, "last_updated": update_time} for day in days
     ]
 
     df = pd.DataFrame.from_records(records)
@@ -74,6 +67,20 @@ def mark_scraper_history(from_iso2, period, update_time, date_from, date_to):
         constraint_name="kpler_sync_history_unique",
         show_progress=False,
     )
+
+
+def mark_checked(
+    *,
+    origin_iso2s,
+    date_from,
+    date_to,
+    update_time,
+):
+    session.query(KplerSyncHistory).filter(
+        KplerSyncHistory.country_iso2.in_(origin_iso2s),
+        KplerSyncHistory.date >= date_from,
+        KplerSyncHistory.date <= date_to,
+    ).update({KplerSyncHistory.last_updated: update_time})
 
 
 def get_days_in_month(period_as_str):
