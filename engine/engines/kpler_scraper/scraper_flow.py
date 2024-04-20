@@ -79,15 +79,8 @@ class KplerFlowScraper(KplerScraper):
             else:
                 params_raw["filters"] = {"product": [self.get_product_id(name=product)]}
 
-        token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-        url = "https://terminal.kpler.com/api/flows"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "x-web-application-version": "v21.316.0",
-            "content-type": "application/json",
-        }
         try:
-            r = self.session.post(url, json=params_raw, headers=headers)
+            r = self.client.fetch("flows", body=params_raw)
             data = r.json()["series"]
         except (
             requests.exceptions.ChunkedEncodingError,

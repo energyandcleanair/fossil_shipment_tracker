@@ -1,5 +1,7 @@
 import datetime as dt
 import time
+from typing import Optional
+import pyotp
 import requests
 import urllib3
 from requests.adapters import HTTPAdapter, Retry
@@ -21,10 +23,77 @@ from base.db import session
 from base.logger import logger
 import pandas as pd
 from unidecode import unidecode
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
+
+from urllib.parse import parse_qs
+
+from engines.kpler_scraper.token_manager import KplerCredentials, KplerTokenManager
 
 KPLER_TOTAL = "Total"
 CACHE_BASE_DIR = "cache/kpler/"
+
+
+def split_into(s, n):
+    size, remainder = divmod(len(s), n)
+    start = 0
+    for i in range(n):
+        length = size + (i < remainder)
+        yield s[start : start + length]
+        start += length
+
+
+class KplerClient:
+    def __init__(
+        self,
+        *,
+        credentials=KplerCredentials.from_env(),
+        # Allows us to inject a different token manager for testing
+        token_manager_provider=lambda credentials: KplerTokenManager(credentials=credentials),
+    ):
+        self.credentials = credentials
+        self.session = requests.Session()
+        retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
+        self.token_manager: KplerTokenManager = token_manager_provider(credentials)
+
+    def fetch(self, url, *, params=None, body=None):
+        token = self.token_manager.get_token()
+
+        access_token = token.access_token
+        parts = list(split_into(access_token, 4))
+
+        headers = {
+            "access-token-chunk-1": parts[0],
+            "access-token-chunk-2": parts[1],
+            "access-token-chunk-3": parts[2],
+            "access-token-chunk-4": parts[3],
+            "use-access-token": "true",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+        }
+
+        full_url = f"https://terminal.kpler.com/api/{url}"
+
+        logger.info(f"Making Kpler request with url={full_url}, params={params}, body={body}")
+
+        if body:
+            return self.session.post(full_url, params=params, headers=headers, json=body)
+        else:
+            return self.session.get(full_url, params=params, headers=headers)
+
+
+_kpler_client = None
+
+
+def get_singleton_kpler_client():
+    global _kpler_client
+    if _kpler_client is None:
+        _kpler_client = KplerClient()
+    return _kpler_client
 
 
 ### IMPORTANT
@@ -41,7 +110,7 @@ class KplerScraper:
     default_trade_flow_params = {
         "flowDirection": "export",
         "withBetaVessels": False,
-        "onlyRealized": False,
+        "onlyRealized": True,
         "withForecasted": True,
         "withFreightView": False,
         "withIncompleteTrades": True,
@@ -54,7 +123,7 @@ class KplerScraper:
     def default_params():
         return {**KplerScraper.default_trade_flow_params}
 
-    def __init__(self):
+    def __init__(self, client=get_singleton_kpler_client()):
         self.cc = coco.CountryConverter()
 
         # To cache products
@@ -69,15 +138,7 @@ class KplerScraper:
         # Processed
         self.zones_countries = None
 
-        self.session = requests.Session()
-        retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
-        self.session.mount("https://", HTTPAdapter(max_retries=retries))
-
-        self.token = get_env("KPLER_TOKEN_BRUTE")
-        if self.token is None:
-            raise ValueError(
-                "Kpler token was not set. Is KPLER_TOKEN_BRUTE environment variable set correctly?"
-            )
+        self.client = client
 
     def get_installations(self, origin_iso2, split, product=None):
         # We collect flows split by installation
@@ -99,10 +160,7 @@ class KplerScraper:
         file = f"{CACHE_BASE_DIR}/installations.csv"
 
         if not os.path.exists(file):
-            token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-            url = "https://terminal.kpler.com/api/installations"
-            headers = {"Authorization": f"Bearer {token}"}
-            response = self.session.get(url, headers=headers)
+            response = self.client.fetch("installations")
             data_from_kpler = pd.DataFrame(response.json())
             data_from_kpler.to_csv(file, index=False)
 
@@ -120,10 +178,7 @@ class KplerScraper:
         if not os.path.exists(file):
             if not os.path.exists(CACHE_BASE_DIR):
                 os.makedirs(CACHE_BASE_DIR)
-            token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-            url = "https://terminal.kpler.com/api/zones"
-            headers = {"Authorization": f"Bearer {token}"}
-            response = self.session.get(url, headers=headers)
+            response = self.client.fetch("zones")
             data_from_kpler = pd.DataFrame(response.json())
             data_from_kpler.to_csv(file, index=False)
 
@@ -170,10 +225,7 @@ class KplerScraper:
         file = f"{CACHE_BASE_DIR}/products.csv"
 
         if not os.path.exists(file):
-            token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-            url = "https://terminal.kpler.com/api/products"
-            headers = {"Authorization": f"Bearer {token}"}
-            response = self.session.get(url, headers=headers)
+            response = self.client.fetch("products")
             data_from_kpler = pd.DataFrame(response.json())
             data_from_kpler.to_csv(file, index=False)
 
@@ -292,11 +344,8 @@ class KplerScraper:
         Returns KplerVessel object
         """
 
-        token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-        url = "https://terminal.kpler.com/api/vessels/{}".format(kpler_vessel_id)
-        headers = {"Authorization": f"Bearer {token}"}
         try:
-            r = self.session.get(url, headers=headers)
+            r = self.client.fetch(f"vessels/{kpler_vessel_id}")
         except requests.exceptions.ChunkedEncodingError:
             logger.warning(f"Kpler request failed: {kpler_vessel_id}.")
             return None
@@ -329,10 +378,7 @@ class KplerScraper:
         file = f"{CACHE_BASE_DIR}/vessels.csv"
 
         if not os.path.exists(file):
-            token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-            url = "https://terminal.kpler.com/api/vessels"
-            headers = {"Authorization": f"Bearer {token}"}
-            response = self.session.get(url, headers=headers)
+            response = self.client.fetch("vessels")
             data_from_kpler = pd.DataFrame(response.json())
             data_from_kpler.to_csv(file, index=False)
 
@@ -366,64 +412,3 @@ class KplerScraper:
         """
         manual_fixes = {"1109": "833"}  # SINGAPORE vs SINGAPORE REPUBLIC
         return type(id)(manual_fixes.get(id, id))
-
-
-class KplerProductInfo:
-    cache = {}
-    session = requests.Session()
-    retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
-    session.mount("https://", HTTPAdapter(max_retries=retries))
-    token = get_env("KPLER_TOKEN_BRUTE")
-
-    @classmethod
-    def get_infos(cls, id):
-        if id in KplerProductInfo.cache:
-            return KplerProductInfo.cache[id]
-        else:
-            infos = KplerProductInfo.collect_infos(id=id)
-            KplerProductInfo.cache[id] = infos
-            return infos
-
-    @classmethod
-    def get_grade_name(cls, id):
-        infos = cls.get_infos(id=id)
-        return infos.get("closestAncestorGrade", {}).get("name")
-
-    @classmethod
-    def get_commodity_name(cls, id):
-        infos = cls.get_infos(id=id)
-        return infos.get("closestAncestorCommodity", {}).get("name")
-
-    @classmethod
-    def get_group_name(cls, id):
-        infos = cls.get_infos(id=id)
-        return infos.get("closestAncestorGroup", {}).get("name")
-
-    @classmethod
-    def get_family_name(cls, id):
-        infos = cls.get_infos(id=id)
-        return infos.get("closestAncestorFamily", {}).get("name")
-
-    @classmethod
-    def collect_infos(cls, id):
-        token = KplerProductInfo.token  # get_env("KPLER_TOKEN_BRUTE")
-        url = "https://terminal.kpler.com/api/products"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "x-web-application-version": "v21.316.0",
-            "content-type": "application/json",
-        }
-        try:
-            r = KplerProductInfo.session.get(f"{url}/{id}", headers=headers)
-        except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
-            logger.warning(f"Kpler request failed")
-            return None
-
-        return r.json()
-
-
-def fill_products():
-    scraper = KplerScraper()
-    products = scraper.get_products()
-    upsert(products, DB_TABLE_KPLER_PRODUCT, "kpler_product_pkey")
-    return

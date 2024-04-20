@@ -6,13 +6,12 @@ from base.logger import logger
 from base.env import get_env
 import pandas as pd
 
+from engines.kpler_scraper.scraper import get_singleton_kpler_client
+
 
 class KplerProductScraper:
     cache = {}
-    session = requests.Session()
-    retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
-    session.mount("https://", HTTPAdapter(max_retries=retries))
-    token = get_env("KPLER_TOKEN_BRUTE")
+    client = get_singleton_kpler_client()
 
     @classmethod
     def get_infos(cls, id):
@@ -95,15 +94,8 @@ class KplerProductScraper:
 
     @classmethod
     def collect_infos(cls, id):
-        token = KplerProductScraper.token  # get_env("KPLER_TOKEN_BRUTE")
-        url = "https://terminal.kpler.com/api/products"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "x-web-application-version": "v21.316.0",
-            "content-type": "application/json",
-        }
         try:
-            r = KplerProductScraper.session.get(f"{url}/{id}", headers=headers)
+            r = KplerProductScraper.client.fetch(f"products/{id}")
         except (requests.exceptions.ChunkedEncodingError, urllib3.exceptions.ReadTimeoutError):
             logger.warning(f"Kpler request failed")
             return None
@@ -111,14 +103,12 @@ class KplerProductScraper:
         return r.json()
 
     def get_products_brute(self):
-        url = "https://terminal.kpler.com/api/products"
-        headers = {"Authorization": f"Bearer {self.token}"}
         offset = 0
         ids = []
 
         while offset == 0 or len(r.json()) > 0:
             print(offset)
-            r = self.session.get(url, headers=headers, params={"size": 1000, "from": offset})
+            r = self.client.fetch("products", params={"size": 1000, "from": offset})
             ids.extend([x.get("id") for x in r.json()])
             offset += 1000
             if offset > 10000:

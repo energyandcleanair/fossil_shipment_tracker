@@ -94,17 +94,8 @@ class KplerTradeScraper(KplerScraper):
             "period": month,
         }
 
-        token = self.token  # get_env("KPLER_TOKEN_BRUTE")
-        url = "https://terminal.kpler.com/api/flows/trades"
-
-        logger.info(f"Making Kpler request with URL {url} and params {params_raw}")
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "x-web-application-version": "v21.316.0",
-            "content-type": "application/json",
-        }
         try:
-            r = requests.post(url, json=params_raw, headers=headers)
+            r = self.client.fetch("flows/trades", body=params_raw)
         except requests.exceptions.ChunkedEncodingError:
             logger.warning(f"Kpler request failed: {params_raw}. Probably empty")
             raise

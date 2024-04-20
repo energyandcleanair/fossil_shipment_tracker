@@ -87,11 +87,6 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: VNF_MINES_SECRET
-            - name: KPLER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: KPLER_TOKEN
             - name: PGUSER_PRODUCTION
               valueFrom:
                 secretKeyRef:
@@ -102,11 +97,21 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: IMO_PASSWORD
-            - name: KPLER_TOKEN_BRUTE
+            - name: KPLER_EMAIL
               valueFrom:
                 secretKeyRef:
                   key: latest
-                  name: KPLER_TOKEN_BRUTE
+                  name: KPLER_EMAIL
+            - name: KPLER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KPLER_PASSWORD
+            - name: KPLER_OTP_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: KPLER_OTP_KEY
             - name: PGHOST_PRODUCTION
               valueFrom:
                 secretKeyRef:
@@ -132,21 +137,11 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: VNF_MINES_EMAIL
-            - name: KPLER_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: KPLER_PASSWORD
             - name: KEY_MARINETRAFFIC_EV02
               valueFrom:
                 secretKeyRef:
                   key: latest
                   name: KEY_MARINETRAFFIC_EV02
-            - name: KPLER_EMAIL
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: KPLER_EMAIL
             - name: KEY_MARINETRAFFIC_EV01
               valueFrom:
                 secretKeyRef:
