@@ -19,6 +19,8 @@ import datetime as dt
 TOLERANCE_FOR_VALUE_ERROR = 0.05
 ABSOLUTE_TOLERANCE_FOR_VALUE_ERROR = 100
 
+PROBLEMS_FOR_A_DAY_THRESHOLD = 3
+
 
 class KplerTradeComparer:
     def __init__(self):
@@ -69,7 +71,7 @@ class KplerTradeComparer:
         )
 
         comparison["problems"] = comparison["problems.dest"] + comparison["problems.product"]
-        comparison["ok"] = comparison["problems"] == 0
+        comparison["ok"] = comparison["problems"] > PROBLEMS_FOR_A_DAY_THRESHOLD
 
         return comparison
 

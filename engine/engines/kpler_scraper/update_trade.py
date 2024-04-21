@@ -2,8 +2,8 @@ import datetime as dt
 import logging
 import warnings
 from base.utils import to_datetime
-from base.logger import logger, logger_slack
-from base.models.kpler import KplerSyncHistory
+
+from engines.kpler_scraper.checks_data_source import mark_updated
 from .scraper_trade import KplerTradeScraper
 from .upload import *
 
@@ -47,40 +47,3 @@ def update_trades(date_from=None, date_to=None, origin_iso2s=["RU"], update_time
                 del trades, vessels, products, installations
 
             logger.info(f"Finished updating trades for country {from_iso2}")
-
-
-def mark_updated(from_iso2, period, update_time):
-    days = [day for day in get_days_in_month(period)]
-
-    records = [
-        {"date": day, "country_iso2": from_iso2, "last_updated": update_time} for day in days
-    ]
-
-    df = pd.DataFrame.from_records(records)
-
-    upsert(
-        df,
-        table=KplerSyncHistory.__tablename__,
-        constraint_name="kpler_sync_history_unique",
-        show_progress=False,
-    )
-
-
-def mark_checked(
-    *,
-    origin_iso2s,
-    date_from,
-    date_to,
-    update_time,
-):
-    session.query(KplerSyncHistory).filter(
-        KplerSyncHistory.country_iso2.in_(origin_iso2s),
-        KplerSyncHistory.date >= date_from,
-        KplerSyncHistory.date <= date_to,
-    ).update({KplerSyncHistory.last_updated: update_time})
-
-
-def get_days_in_month(period_as_str):
-    period = pd.Period(period_as_str, freq="M")
-    days = pd.date_range(start=period.start_time.date(), end=period.end_time.date()).to_list()
-    return days

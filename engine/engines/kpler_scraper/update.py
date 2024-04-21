@@ -9,9 +9,10 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from engines import kpler_scraper
+from engines.kpler_scraper.checks_data_source import update_sync_history_with_status
 
 from .update_zones import update_zones
-from .update_trade import mark_checked, update_trades
+from .update_trade import update_trades
 from .verify import KplerTradeComparer
 from .clean_outdated_entries import clean_outdated_entries
 
@@ -77,16 +78,28 @@ def update(
             logger.info("Cleaning outdated entries")
             clean_outdated_entries()
 
+            validate_sync(
+                origin_iso2s=origin_iso2s,
+                date_from=recent_date_from,
+                date_to=recent_date_to,
+            )
+
         if UpdateParts.REFETCH_OUTDATED_HISTORIC_ENTRIES in parts:
             logger.info("Fix invalid historic entries")
 
-            update_outdated_historic_trades(
+            update_historic_trades(
                 origin_iso2s=origin_iso2s,
                 date_from=historic_date_from,
                 date_to=historic_date_to,
             )
             logger.info("Cleaning outdated entries")
             clean_outdated_entries()
+
+            validate_sync(
+                origin_iso2s=origin_iso2s,
+                date_from=historic_date_from,
+                date_to=historic_date_to,
+            )
 
         return UpdateStatus.SUCCESS
 
@@ -100,7 +113,7 @@ def update(
         return UpdateStatus.FAILED
 
 
-def update_outdated_historic_trades(
+def update_historic_trades(
     *,
     origin_iso2s,
     date_from,
@@ -149,9 +162,33 @@ def update_outdated_historic_trades(
                     update_time=update_time,
                 )
 
-        mark_checked(
-            origin_iso2s=origin_iso2s,
+
+def validate_sync(
+    origin_iso2s=None,
+    date_from=None,
+    date_to=None,
+):
+
+    date_from = to_datetime(date_from).date() if date_from is not None else dt.date(2021, 1, 1)
+    date_to = (
+        to_datetime(date_to).date()
+        if date_to is not None
+        else dt.date.today() - dt.timedelta(days=1)
+    )
+    comparer = KplerTradeComparer()
+    checked_time = dt.datetime.now()
+    for origin_iso2 in origin_iso2s:
+
+        comparison = comparer.compare_to_live_flows(
+            origin_iso2=origin_iso2,
             date_from=date_from,
             date_to=date_to,
-            update_time=update_time,
+        )
+
+        update_sync_history_with_status(
+            origin_iso2=origin_iso2,
+            date_from=date_from,
+            date_to=date_to,
+            comparison=comparison,
+            checked_time=checked_time,
         )
