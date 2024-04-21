@@ -263,9 +263,7 @@ class KplerTradeScraper(KplerScraper):
             flow = {}
             flow["trade_id"] = trade_id
             flow["flow_id"] = flow_raw.get("id")
-            flow["product_id"] = flow_raw.get("confirmedProduct").get("productId")
-            # flow["product_name"] = flow_raw.get("confirmedProduct").get("name")
-            # flow["product_type"] = flow_raw.get("confirmedProduct").get("type")
+            flow["product_id"] = flow_raw.get("id")
             flow["value_tonne"] = flow_raw.get("flowQuantity").get("mass")
             flow["value_m3"] = flow_raw.get("flowQuantity").get("volume")
             # Looks like GJ but not 100% sure

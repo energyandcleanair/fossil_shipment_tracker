@@ -115,7 +115,7 @@ class KplerScraper:
         "withFreightView": False,
         "withIncompleteTrades": True,
         "withIntraCountry": True,
-        "withProductEstimation": False,
+        "withProductEstimation": True,
         "filters": {},
     }
 
