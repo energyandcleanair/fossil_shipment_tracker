@@ -80,7 +80,7 @@ class ChartDepartureDestination(Resource):
         "aggregate_by",
         type=str,
         action="split",
-        default=["destination_country", "commodity_group_name", "departure_date", "status"],
+        default=["destination_country", "commodity_group_name", "departure_date"],
         help="which variables to aggregate by. Could be any of commodity, type, destination_region, date",
     )
 

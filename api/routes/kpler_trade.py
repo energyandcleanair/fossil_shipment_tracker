@@ -686,6 +686,8 @@ class KplerTradeResource(TemplateResource):
             KplerTrade.step_zone_ids != None,
         ).label("is_sts")
 
+        null_as_unknown = lambda field: func.coalesce(field, base.UNKNOWN)
+
         query = (
             session.query(
                 # Renaming everything in terms of "origin" and "destination"
@@ -712,15 +714,17 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.arrival_installation_name.label("destination_installation_name"),
                 DestinationInstallation.type.label("destination_installation_type"),
                 destination_zone.id.label("destination_zone_id"),
-                destination_zone.name.label("destination_zone_name"),
-                destination_zone.name.label("destination_zone_type"),
+                null_as_unknown(destination_zone.name).label("destination_zone_name"),
+                null_as_unknown(destination_zone.type).label("destination_zone_type"),
                 destination_zone.port_id.label("destination_port_id"),
-                destination_zone.port_name.label("destination_port_name"),
-                destination_zone.country_name.label("destination_country"),
-                destination_zone.country_iso2.label("destination_iso2"),
+                null_as_unknown(destination_zone.port_name).label("destination_port_name"),
+                null_as_unknown(destination_zone.country_name).label("destination_country"),
+                null_as_unknown(destination_zone.country_iso2).label("destination_iso2"),
                 destination_region_field,
-                destination_zone.country_name.label("commodity_destination_country"),
-                destination_zone.country_iso2.label("commodity_destination_iso2"),
+                null_as_unknown(destination_zone.country_name).label(
+                    "commodity_destination_country"
+                ),
+                null_as_unknown(destination_zone.country_iso2).label("commodity_destination_iso2"),
                 commodity_destination_region_field,
                 KplerTrade.departure_sts.label("origin_sts"),
                 KplerTrade.arrival_sts.label("destination_sts"),

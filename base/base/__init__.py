@@ -38,7 +38,7 @@ IN_BALLAST = "in_ballast"
 ONGOING = "ongoing"
 COMPLETED = "completed"
 UNDETECTED_ARRIVAL = "undetected_arrival"
-UNKNOWN = "unkown"
+UNKNOWN = "unknown"
 
 # COUNTER
 COUNTER_OBSERVED = "observed"
