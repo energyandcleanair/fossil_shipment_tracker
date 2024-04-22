@@ -91,6 +91,9 @@ def fill_kpler_commodities(commodities_df):
     kpler_products["grouping"] = "default"
     kpler_products = kpler_products[commodities_df.columns]
 
+    # Filter out kpler_products that don't have a name
+    kpler_products = kpler_products[kpler_products.name.notna()]
+
     upsert(
         df=kpler_products,
         table=DB_TABLE_COMMODITY,
