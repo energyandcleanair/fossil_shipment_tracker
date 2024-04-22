@@ -53,6 +53,7 @@ class KplerClient:
         credentials=KplerCredentials.from_env(),
         # Allows us to inject a different token manager for testing
         token_manager_provider=lambda credentials: KplerTokenManager(credentials=credentials),
+        max_requests_per_second=3.0,
     ):
         self.credentials = credentials
         self.session = requests.Session()
@@ -61,9 +62,30 @@ class KplerClient:
 
         self.token_manager: KplerTokenManager = token_manager_provider(credentials)
 
-    def fetch(self, url, *, params=None, body=None):
-        token = self.token_manager.get_token()
+        self.last_request_time = None
+        self.max_requests_per_second = max_requests_per_second
 
+    def fetch(
+        self,
+        url,
+        *,
+        params=None,
+        body=None,
+    ):
+        self._handle_rate_limiting()
+
+        token = self.token_manager.get_token()
+        headers = self._generate_headers(token)
+        full_url = f"https://terminal.kpler.com/api/{url}"
+
+        logger.info(f"Making Kpler request with url={full_url}, params={params}, body={body}")
+
+        if body:
+            return self.session.post(full_url, params=params, headers=headers, json=body)
+        else:
+            return self.session.get(full_url, params=params, headers=headers)
+
+    def _generate_headers(self, token):
         access_token = token.access_token
         parts = list(split_into(access_token, 4))
 
@@ -76,14 +98,16 @@ class KplerClient:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
         }
 
-        full_url = f"https://terminal.kpler.com/api/{url}"
+        return headers
 
-        logger.info(f"Making Kpler request with url={full_url}, params={params}, body={body}")
+    def _handle_rate_limiting(self):
+        if self.last_request_time is not None:
+            min_time_between_requests = 1 / self.max_requests_per_second
+            time_since_last_request = time.time() - self.last_request_time
+            if time_since_last_request < min_time_between_requests:
+                time.sleep(min_time_between_requests - time_since_last_request)
 
-        if body:
-            return self.session.post(full_url, params=params, headers=headers, json=body)
-        else:
-            return self.session.get(full_url, params=params, headers=headers)
+        self.last_request_time = time.time()
 
 
 _kpler_client = None
