@@ -154,6 +154,8 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION_DEFAULT, force=F
     # Remove Ligthuanian pipeline gas
     result = remove_pipeline_gas_lt(result)
 
+    result = remove_unknown_destinations(result)
+
     # Add version
     result["version"] = version
 
@@ -468,3 +470,11 @@ def add_estimates(result):
     result_to_upload = m[m["_merge"] == "right_only"].drop("_merge", axis=1)
     result_to_upload["type"] = base.COUNTER_ESTIMATED
     result_to_upload.to_sql(DB_TABLE_COUNTER, con=engine, if_exists="append", index=False)
+
+
+def remove_unknown_destinations(result):
+    """
+    Remove unknown destinations
+    """
+    result = result.loc[(result.commodity_destination_iso2 != base.UNKNOWN)]
+    return result
