@@ -19,7 +19,7 @@ import datetime as dt
 TOLERANCE_FOR_VALUE_ERROR = 0.05
 ABSOLUTE_TOLERANCE_FOR_VALUE_ERROR = 100
 
-PROBLEMS_FOR_A_DAY_THRESHOLD = 3
+ALLOWED_PROBLEMS_PER_DAY = 3
 
 
 class KplerTradeComparer:
@@ -71,7 +71,7 @@ class KplerTradeComparer:
         )
 
         comparison["problems"] = comparison["problems.dest"] + comparison["problems.product"]
-        comparison["ok"] = comparison["problems"] <= PROBLEMS_FOR_A_DAY_THRESHOLD
+        comparison["ok"] = comparison["problems"] <= ALLOWED_PROBLEMS_PER_DAY
 
         return comparison
 
