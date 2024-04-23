@@ -57,7 +57,17 @@ class KplerClient:
     ):
         self.credentials = credentials
         self.session = requests.Session()
-        retries = Retry(total=10, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
+        retries = Retry(
+            total=10,
+            connect=3,
+            read=3,
+            redirect=3,
+            other=3,
+            backoff_factor=2,
+            status_forcelist=[500, 502, 503, 504],
+            # We don't make any changes to the data so we can safely retry on posts.
+            allowed_methods=["GET", "POST"],
+        )
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
         self.token_manager: KplerTokenManager = token_manager_provider(credentials)
