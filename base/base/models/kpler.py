@@ -89,6 +89,7 @@ class KplerVessel(Base):
     name = Column(String)
     type = Column(String)
     dwt = Column(Numeric)  # in tonnes
+    build_date = Column(Date)
 
     country_iso2 = Column(String)
     country_name = Column(String)
@@ -176,6 +177,9 @@ class KplerTradeComputed(Base):
     step_zone_iso2s = Column(ARRAY(String))
     step_zone_regions = Column(ARRAY(String))
     step_zone_ids = Column(ARRAY(Numeric))
+
+    vessel_ages = Column(ARRAY(Numeric))
+    avg_vessel_age = Column(Numeric)
 
     __table_args__ = (
         Index(

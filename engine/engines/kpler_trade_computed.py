@@ -33,6 +33,7 @@ from base.models import (
     KplerTrade,
     KplerTradeComputed,
     KplerZone,
+    KplerVessel,
     Company,
     ShipInsurer,
     ShipOwner,
@@ -66,6 +67,11 @@ def build_select(date_from: None, date_to: None):
         .render_derived()
     )
 
+    kpler_trade_in_period = sa.and_(
+        KplerTrade.departure_date_utc >= date_from,
+        KplerTrade.departure_date_utc < date_to,
+    )
+
     # This gives us the vessel IMOs as a table
     # to make other queries possible. We sort
     # to get the best performance.
@@ -81,8 +87,7 @@ def build_select(date_from: None, date_to: None):
         .order_by(KplerTrade.id, KplerTrade.flow_id, unnested_vessels.c.ship_order)
         .filter(
             sa.and_(
-                func.date_trunc("day", KplerTrade.departure_date_utc) >= date_from,
-                func.date_trunc("day", KplerTrade.departure_date_utc) <= date_to,
+                kpler_trade_in_period,
                 KplerTrade.is_valid == True,
             )
         )
@@ -135,6 +140,7 @@ def build_select(date_from: None, date_to: None):
         .join(
             trade_ship,
             sa.and_(
+                kpler_trade_in_period,
                 KplerTrade.id == trade_ship.c.trade_id,
                 KplerTrade.flow_id == trade_ship.c.flow_id,
             ),
@@ -178,6 +184,7 @@ def build_select(date_from: None, date_to: None):
         .join(
             trade_ship,
             sa.and_(
+                kpler_trade_in_period,
                 KplerTrade.id == trade_ship.c.trade_id,
                 KplerTrade.flow_id == trade_ship.c.flow_id,
             ),
@@ -224,6 +231,7 @@ def build_select(date_from: None, date_to: None):
         .join(
             trade_ship,
             sa.and_(
+                kpler_trade_in_period,
                 KplerTrade.id == trade_ship.c.trade_id,
                 KplerTrade.flow_id == trade_ship.c.flow_id,
             ),
@@ -309,6 +317,7 @@ def build_select(date_from: None, date_to: None):
         .join(
             trade_ship_price,
             sa.and_(
+                kpler_trade_in_period,
                 KplerTrade.id == trade_ship_price.c.trade_id,
                 KplerTrade.flow_id == trade_ship_price.c.flow_id,
             ),
@@ -373,6 +382,7 @@ def build_select(date_from: None, date_to: None):
         .join(
             trade_ship,
             sa.and_(
+                kpler_trade_in_period,
                 KplerTrade.id == trade_ship.c.trade_id,
                 KplerTrade.flow_id == trade_ship.c.flow_id,
             ),
@@ -452,10 +462,41 @@ def build_select(date_from: None, date_to: None):
         .join(unnested_step_zones, true())
         .outerjoin(KplerZone, unnested_step_zones.c.step_zone_id == KplerZone.id)
         .outerjoin(Country, KplerZone.country_iso2 == Country.iso2)
+        .filter(kpler_trade_in_period)
         .group_by(KplerTrade.id, KplerTrade.flow_id)
         .order_by(KplerTrade.id, KplerTrade.flow_id)
         .cte("trade_step_zones")
         .prefix_with("MATERIALIZED")
+    )
+
+    seconds_in_a_year = 365 * 24 * 60 * 60
+
+    vessel_age_calculation = (
+        sa.extract("epoch", func.age(KplerTrade.departure_date_utc, KplerVessel.build_date))
+        / seconds_in_a_year
+    )
+
+    vessel_ages_for_trade = (
+        session.query(
+            KplerTrade.id.label("trade_id"),
+            KplerTrade.flow_id,
+            array_agg(aggregate_order_by(vessel_age_calculation, trade_ship.c.ship_order)).label(
+                "vessel_ages"
+            ),
+            func.avg(vessel_age_calculation).label("avg_vessel_age"),
+        )
+        .join(
+            trade_ship,
+            sa.and_(
+                kpler_trade_in_period,
+                KplerTrade.id == trade_ship.c.trade_id,
+                KplerTrade.flow_id == trade_ship.c.flow_id,
+            ),
+        )
+        .outerjoin(KplerVessel, trade_ship.c.ship_imo == KplerVessel.imo)
+        .group_by(KplerTrade.id, KplerTrade.flow_id)
+        .order_by(KplerTrade.id, KplerTrade.flow_id)
+        .cte("vessel_ages_for_trade")
     )
 
     query = (
@@ -486,6 +527,8 @@ def build_select(date_from: None, date_to: None):
                 "step_zone_regions"
             ),
             func.coalesce(KplerTrade.step_zone_ids, integer_array([])).label("step_zone_ids"),
+            vessel_ages_for_trade.c.vessel_ages,
+            vessel_ages_for_trade.c.avg_vessel_age,
         )
         .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
         .outerjoin(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
@@ -517,10 +560,16 @@ def build_select(date_from: None, date_to: None):
                 KplerTrade.flow_id == trade_step_zones.c.flow_id,
             ),
         )
+        .outerjoin(
+            vessel_ages_for_trade,
+            sa.and_(
+                KplerTrade.id == vessel_ages_for_trade.c.trade_id,
+                KplerTrade.flow_id == vessel_ages_for_trade.c.flow_id,
+            ),
+        )
         .filter(
             sa.and_(
-                func.date_trunc("day", KplerTrade.departure_date_utc) >= date_from,
-                func.date_trunc("day", KplerTrade.departure_date_utc) <= date_to,
+                kpler_trade_in_period,
                 KplerTrade.is_valid == True,
                 Price.scenario != None,
             )
@@ -536,7 +585,7 @@ def build_pagination_periods(earliest_date=None, more_data_date=None):
         map(
             lambda x: (
                 (x - pd.offsets.MonthBegin(n=1)).date().isoformat(),
-                x.date().isoformat(),
+                (x + dt.timedelta(days=1)).date().isoformat(),
             ),
             list(
                 pd.date_range(
@@ -549,11 +598,10 @@ def build_pagination_periods(earliest_date=None, more_data_date=None):
         0,
         (
             earliest_date.date().isoformat(),
-            (more_data_date - dt.timedelta(days=1)).isoformat(),
+            more_data_date.isoformat(),
         ),
     )
     periods.reverse()
-
     return periods
 
 
@@ -592,6 +640,8 @@ def update():
                             "step_zone_iso2s",
                             "step_zone_regions",
                             "step_zone_ids",
+                            "vessel_ages",
+                            "avg_vessel_age",
                         ],
                         build_select(date_from=start, date_to=end),
                     )

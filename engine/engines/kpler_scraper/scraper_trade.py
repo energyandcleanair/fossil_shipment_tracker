@@ -151,10 +151,24 @@ class KplerTradeScraper(KplerScraper):
                 "imo": x.get("imo"),
                 "mmsi": x.get("mmsi"),
                 "dwt": x.get("deadWeight"),
+                "build_date": self._parse_trade_vessels_build_date(x),
                 "others": x,
             }
             for x in vessels
         ]
+
+    def _parse_trade_vessels_build_date(self, vessel) -> dt.date:
+        if not vessel:
+            return None
+
+        build_year = vessel.get("buildYear")
+        if not build_year:
+            return None
+        build_month = vessel.get("buildMonth")
+        if not build_month:
+            return None
+
+        return dt.date(year=build_year, month=build_month, day=1)
 
     def _parse_trade_trade(self, trade_raw) -> List[dict]:
         trade = {}

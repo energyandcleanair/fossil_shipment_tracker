@@ -747,6 +747,8 @@ class KplerTradeResource(TemplateResource):
                 KplerTrade.vessel_imos,
                 KplerTrade.buyer_names,
                 KplerTrade.seller_names,
+                KplerTradeComputed.vessel_ages,
+                KplerTradeComputed.avg_vessel_age,
                 KplerTradeComputed.ship_insurer_names,
                 KplerTradeComputed.ship_insurer_iso2s,
                 KplerTradeComputed.ship_insurer_regions,
