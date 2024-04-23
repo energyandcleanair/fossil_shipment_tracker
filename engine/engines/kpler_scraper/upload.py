@@ -3,6 +3,8 @@ import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
+from sqlalchemy import func
+
 from ..ship import fill
 
 from base.models import (
@@ -13,8 +15,9 @@ from base.models import (
     DB_TABLE_KPLER_VESSEL,
     DB_TABLE_KPLER_INSTALLATION,
 )
+from base.models.kpler import KplerZone
 from base.db_utils import upsert
-from base.db import engine
+from base.db import engine, session
 from base.logger import logger
 
 
@@ -76,6 +79,25 @@ def upload_zones(zones):
     zones = zones[~pd.isnull(zones.id)]
     if len(zones) > 0:
         upsert(zones, DB_TABLE_KPLER_ZONE, DB_TABLE_KPLER_ZONE + "_pkey")
+
+
+def update_zone_areas():
+    session.query(KplerZone).filter(KplerZone.country_iso2 == "RU").update(
+        {
+            "area": sa.case(
+                [
+                    (func.ST_X(KplerZone.geometry) > 100, "Pacific"),
+                    (func.ST_Y(KplerZone.geometry) > 62, "Arctic"),
+                    (func.ST_Y(KplerZone.geometry) > 50, "Baltic"),
+                    (func.ST_X(KplerZone.geometry) > 47, "Caspian Sea"),
+                ],
+                else_="Black sea",
+            )
+        },
+        synchronize_session=False,
+    )
+
+    session.commit()
 
 
 def upload_installations(installations):

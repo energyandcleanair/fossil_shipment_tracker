@@ -1,28 +1,22 @@
+import numpy as np
 import pandas as pd
+from requests import session
 from engines.kpler_scraper.scraper import KplerScraper
-from engines.kpler_scraper.upload import upload_zones
+from engines.kpler_scraper.upload import update_zone_areas, upload_zones
 
 import ast
 
 
 import country_converter as coco
 
+from base.utils import latlon_to_point
+from base.models.kpler import KplerZone
+
 cc = coco.CountryConverter()
 
 
 def update_zones():
     scraper = KplerScraper()
-
-    # A dataframe to store dfs of zones, each dataframe should contain:
-    # - id
-    # - name
-    # - type
-    # - port_id (if a port)
-    # - port_name (if a port)
-    # - country_id (optional)
-    # - country_name (optional)
-    # - country_iso2 (optional)
-    collected_zones = []
 
     columns_we_care_about = [
         "id",
@@ -33,6 +27,7 @@ def update_zones():
         "country_id",
         "country_name",
         "country_iso2",
+        "geometry",
     ]
 
     # This is a pandas dataframe which has the columns:
@@ -79,14 +74,27 @@ def update_zones():
     zones["parentZones"] = zones.apply(parse_parent_zones, axis=1)
     zones = attach_country_info(zones)
     zones = attach_port_info(zones)
+    zones = attach_geo_info(zones)
 
-    collected_zones = collected_zones + [zones]
+    collected_zones = [zones]
 
     zones_to_upload = pd.concat(collected_zones)[columns_we_care_about]
-
     zones_to_upload = zones_to_upload.drop_duplicates(subset=["id"])
 
     upload_zones(zones_to_upload)
+    update_zone_areas()
+
+
+def attach_geo_info(zones):
+    zones["geo"] = zones["geo"].replace({np.nan: None})
+    zones["geo"] = zones.apply(
+        lambda zone: ast.literal_eval(zone["geo"]) if zone["geo"] is not None else None, axis=1
+    )
+    zones["geo"] = zones["geo"].apply(
+        lambda geom: latlon_to_point(lat=geom["lat"], lon=geom["lon"]) if geom is not None else None
+    )
+    zones["geometry"] = zones["geo"]
+    return zones
 
 
 def attach_country_info(zones):

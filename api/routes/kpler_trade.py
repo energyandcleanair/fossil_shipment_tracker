@@ -75,6 +75,13 @@ class KplerTradeResource(TemplateResource):
     )
 
     parser.add_argument(
+        "origin_area",
+        help="Origin area, possible options: Arctic, Baltic, Black sea. Caspian Sea, Pacific",
+        action="split",
+        default=None,
+    )
+
+    parser.add_argument(
         "commodity_origin_iso2",
         help="Commodity origin iso2",
         required=False,
@@ -351,6 +358,7 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.origin_iso2,
                 subquery.c.origin_country,
                 subquery.c.origin_region,
+                subquery.c.origin_area,
                 subquery.c.commodity_origin_iso2,
                 subquery.c.commodity_origin_country,
                 subquery.c.commodity_origin_region,
@@ -360,6 +368,7 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.origin_iso2,
                 subquery.c.origin_country,
                 subquery.c.origin_region,
+                subquery.c.origin_area,
                 subquery.c.commodity_origin_iso2,
                 subquery.c.commodity_origin_country,
                 subquery.c.commodity_origin_region,
@@ -373,6 +382,12 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.origin_iso2,
                 subquery.c.origin_country,
                 subquery.c.origin_region,
+            ],
+            "origin_area": [
+                subquery.c.origin_iso2,
+                subquery.c.origin_country,
+                subquery.c.origin_region,
+                subquery.c.origin_area,
             ],
             "commodity_origin_country": [
                 subquery.c.commodity_origin_iso2,
@@ -388,6 +403,7 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.origin_installation_name,
                 subquery.c.origin_port_name,
                 subquery.c.origin_zone_name,
+                subquery.c.origin_area,
                 subquery.c.origin_iso2,
                 subquery.c.origin_country,
                 subquery.c.origin_region,
@@ -713,6 +729,7 @@ class KplerTradeResource(TemplateResource):
                 origin_zone.port_name.label("origin_port_name"),
                 origin_zone.country_name.label("origin_country"),
                 origin_zone.country_iso2.label("origin_iso2"),
+                origin_zone.area.label("origin_area"),
                 OriginCountry.region.label("origin_region"),
                 commodity_origin_iso2_field,
                 CommodityOriginCountry.name.label("commodity_origin_country"),
@@ -825,6 +842,7 @@ class KplerTradeResource(TemplateResource):
         origin_iso2 = params.get("origin_iso2")
         origin_region = params.get("origin_region")
         origin_port_name = params.get("origin_port_name")
+        origin_area = params.get("origin_area")
         commodity_origin_iso2 = params.get("commodity_origin_iso2")
         destination_iso2 = params.get("destination_iso2")
         destination_iso2_not = params.get("destination_iso2_not")
@@ -937,6 +955,9 @@ class KplerTradeResource(TemplateResource):
 
         if origin_region:
             query = query.filter(subquery.c.origin_region.in_(to_list(origin_region)))
+
+        if origin_area:
+            query = query.filter(subquery.c.origin_area.in_(to_list(origin_area)))
 
         if destination_port_name:
             query = query.filter(

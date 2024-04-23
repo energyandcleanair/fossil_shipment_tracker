@@ -231,6 +231,8 @@ class KplerZone(Base):
     country_id = Column(BigInteger)
     country_name = Column(String)
     country_iso2 = Column(String)
+    geometry = Column(Geometry("POINT", srid=4326))
+    area = Column(String)
 
     __tablename__ = DB_TABLE_KPLER_ZONE
 

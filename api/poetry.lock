@@ -40,7 +40,7 @@ description = ""
 optional = false
 python-versions = "^3.9"
 files = []
-develop = false
+develop = true
 
 [package.dependencies]
 geoalchemy2 = "^0.13.3"
@@ -1744,4 +1744,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "2867cca0275ccc726702b199bf6e892a67ad02e9f7b372b6d7e534de918017dc"
+content-hash = "a82f9d26c2f33cb02657f997e67a58315186805676b990e97c70ff482ba26feb"
