@@ -312,7 +312,14 @@ class KplerTradeResource(TemplateResource):
 
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date", "origin_date", "destination_date"]
-    value_cols = ["value_tonne", "value_m3", "value_gas_m3", "value_eur", "value_currency"]
+    value_cols = [
+        "value_tonne",
+        "value_m3",
+        "value_gas_m3",
+        "value_eur",
+        "value_currency",
+        "avg_vessel_age",
+    ]
 
     pivot_dependencies = {
         "grade": ["commodity", "group", "family", "commodity_equivalent"],
@@ -524,6 +531,7 @@ class KplerTradeResource(TemplateResource):
             func.sum(subquery.c.value_gas_m3).label("value_gas_m3"),
             func.sum(subquery.c.value_eur).label("value_eur"),
             func.sum(subquery.c.value_currency).label("value_currency"),
+            func.avg(subquery.c.avg_vessel_age).label("avg_vessel_age"),
             # func.sum(subquery.c.value_energy).label("value_energy"),
             # func.sum(subquery.c.value_gas_m3).label("value_gas_m3")
         ]
