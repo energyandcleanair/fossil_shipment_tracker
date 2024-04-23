@@ -26,7 +26,9 @@ class KplerTradeComparer:
     def __init__(self):
         self.scraper = KplerFlowScraper()
 
-    def compare_to_live_flows(self, origin_iso2=None, date_from=None, date_to=None):
+    def compare_to_live_flows(
+        self, origin_iso2=None, date_from=None, date_to=None, checked_time=dt.datetime.now()
+    ):
 
         comparison_per_dest = self.compare_to_live_flows_for_dest(origin_iso2, date_from, date_to)
         comparison_per_product = self.compare_to_live_flows_for_product(
@@ -38,7 +40,7 @@ class KplerTradeComparer:
             comparison_details=self.combine_comparison_details(
                 comparison_per_dest, comparison_per_product
             ),
-            checked_time=dt.datetime.now(),
+            checked_time=checked_time,
         )
 
         dest_comparison = self._aggregate_to_check_period(comparison_per_dest)

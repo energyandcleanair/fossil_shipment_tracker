@@ -183,6 +183,7 @@ def validate_sync(
             origin_iso2=origin_iso2,
             date_from=date_from,
             date_to=date_to,
+            checked_time=checked_time,
         )
 
         update_sync_history_with_status(
