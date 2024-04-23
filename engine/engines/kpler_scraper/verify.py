@@ -71,7 +71,7 @@ class KplerTradeComparer:
         )
 
         comparison["problems"] = comparison["problems.dest"] + comparison["problems.product"]
-        comparison["ok"] = comparison["problems"] > PROBLEMS_FOR_A_DAY_THRESHOLD
+        comparison["ok"] = comparison["problems"] <= PROBLEMS_FOR_A_DAY_THRESHOLD
 
         return comparison
 
