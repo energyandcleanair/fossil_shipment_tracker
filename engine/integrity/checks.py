@@ -1,9 +1,12 @@
+import re
+from typing import List
 import requests
 import sqlalchemy as sa
 import pandas as pd
 import numpy as np
 
-from sqlalchemy import func
+from sqlalchemy import func, tablesample
+from sqlalchemy.orm import aliased
 
 from base.db import session
 from base.models import (
@@ -21,6 +24,8 @@ from decouple import config
 import datetime as dt
 
 from engines import api_client
+
+from base.models import Price, Commodity
 
 
 def test_shipment_portcall_integrity():

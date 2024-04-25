@@ -1,0 +1,46 @@
+INSERT INTO
+  kpler_trade_computed (
+    trade_id,
+    flow_id,
+    product_id,
+    pricing_scenario,
+    eur_per_tonne,
+    pricing_commodity,
+    kpler_product_commodity_id,
+    ship_insurer_names,
+    ship_insurer_iso2s,
+    ship_insurer_regions,
+    ship_owner_names,
+    ship_owner_iso2s,
+    ship_owner_regions,
+    ownership_sanction_coverage,
+    step_zone_names,
+    step_zone_iso2s,
+    step_zone_regions,
+    step_zone_ids,
+    vessel_ages,
+    avg_vessel_age
+  )
+SELECT
+  trade_id,
+  flow_id,
+  product_id,
+  pricing_scenario,
+  eur_per_tonne,
+  pricing_commodity,
+  kpler_product_commodity_id,
+  ship_insurer_names,
+  ship_insurer_iso2s,
+  ship_insurer_regions,
+  ship_owner_names,
+  ship_owner_iso2s,
+  ship_owner_regions,
+  ownership_sanction_coverage,
+  step_zone_names,
+  step_zone_iso2s,
+  step_zone_regions,
+  step_zone_ids,
+  vessel_ages,
+  avg_vessel_age
+FROM
+  ktc_kpler_trade_computed;

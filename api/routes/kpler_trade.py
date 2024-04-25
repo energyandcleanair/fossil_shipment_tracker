@@ -548,6 +548,7 @@ class KplerTradeResource(TemplateResource):
             func.sum(subquery.c.value_eur).label("value_eur"),
             func.sum(subquery.c.value_currency).label("value_currency"),
             func.avg(subquery.c.avg_vessel_age).label("avg_vessel_age"),
+            func.count(func.distinct(subquery.c.trade_id)).label("trade_count"),
             # func.sum(subquery.c.value_energy).label("value_energy"),
             # func.sum(subquery.c.value_gas_m3).label("value_gas_m3")
         ]

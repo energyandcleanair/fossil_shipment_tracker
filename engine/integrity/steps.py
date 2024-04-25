@@ -1,5 +1,6 @@
 from enum import Enum
 
+from integrity.check_kpler_trade_computed import test_sample_computed
 from integrity.checks import *
 from integrity.check_kpler_trade import test_kpler_trades, KplerCheckerProducts
 from integrity.integrity_check_definition import IntegrityCheckDefinition
@@ -27,6 +28,10 @@ class IntegrityStep(Enum):
 
     OVERLAND_TRADE_HAS_VALUES = IntegrityCheckDefinition(
         "overland trade has values for each month", test_overland_trade_has_values
+    )
+
+    KPLER_TRADE_COMPUTED_SAMPLE_CORRECT = IntegrityCheckDefinition(
+        "Kpler trade computed is correct", test_sample_computed
     )
 
     KPLER_TRADES_WITHOUT_PRICES = IntegrityCheckDefinition(
