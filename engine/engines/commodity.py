@@ -5,6 +5,7 @@ from base.db_utils import upsert
 from base.utils import to_list
 from base.models import DB_TABLE_COMMODITY
 from base.models import Commodity
+from base.models.kpler import KplerProduct
 from base import COMMODITY_GROUPING_DEFAULT
 from base.db import session
 from sqlalchemy.dialects.postgresql import JSONB
@@ -39,9 +40,11 @@ def fill():
 def fill_kpler_commodities(commodities_df):
     # Add Kpler Products
 
-    kpler_products = KplerProductScraper().get_products_brute()
+    kpler_products: list[KplerProduct] = KplerProductScraper().get_products_brute()
 
-    kpler_products = [x for x in kpler_products if x is not None]
+    kpler_products = [
+        product for product in kpler_products if product is not None and product.name is not None
+    ]
 
     # First upload in kpler_products table
     upload_products(kpler_products)
