@@ -364,6 +364,7 @@ class TemplateResource(Resource):
                 x
                 for x in result.columns
                 if not x.startswith("value")
+                and x not in self.value_cols
                 and x not in to_list(pivot_by)
                 and x not in pivot_by_dependencies
             ]
