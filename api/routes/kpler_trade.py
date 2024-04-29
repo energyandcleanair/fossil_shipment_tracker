@@ -326,6 +326,7 @@ class KplerTradeResource(TemplateResource):
         "value_eur",
         "value_currency",
         "avg_vessel_age",
+        "trade_count",
     ]
 
     pivot_dependencies = {
