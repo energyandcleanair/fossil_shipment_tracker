@@ -6,7 +6,7 @@ import seaborn as sns
 import tempfile
 import os
 
-from engines import api_client, departure
+from engines import fossil_tracker_api_client, departure
 from base.db_utils import execute_statement
 from base.utils import to_list, to_datetime
 from base.logger import logger_slack, slacker
@@ -76,7 +76,7 @@ def send_diagnostic_chart():
         "commodity_grouping": "default",
     }
 
-    v = api_client.get_voyages(**params)
+    v = fossil_tracker_api_client.get_voyages(**params)
 
     v["value_tonne"] = pd.to_numeric(v.value_tonne)
     v["departure_date"] = pd.to_datetime(v.departure_date)

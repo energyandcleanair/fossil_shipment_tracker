@@ -12,7 +12,7 @@ from base import PRICING_DEFAULT, PRICING_ENHANCED
 from base.db_utils import upsert
 
 import base
-from engines import api_client
+from engines import fossil_tracker_api_client
 
 
 def update(date_from="2021-01-01", version=base.COUNTER_VERSION_DEFAULT, force=False):
@@ -23,7 +23,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION_DEFAULT, force=F
     logger_slack.info(f"=== Counter update {version} ===")
 
     # Get pipeline flows
-    pipelineflows = api_client.get_overland(
+    pipelineflows = fossil_tracker_api_client.get_overland(
         date_from=date_from,
         commodity_origin_iso2=["RU"],
         aggregate_by=["commodity_origin_iso2", "commodity_destination_iso2", "commodity", "date"],
@@ -40,7 +40,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION_DEFAULT, force=F
 
     elif version == base.COUNTER_VERSION2:
         voyages = (
-            api_client.get_voyages(
+            fossil_tracker_api_client.get_voyages(
                 date_from=date_from,
                 commodity_origin_iso2=["RU"],
                 aggregate_by=[
@@ -74,7 +74,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION_DEFAULT, force=F
 
             # Add Kpler trades
             kpler_trades_for_year = (
-                api_client.get_kpler_trades(
+                fossil_tracker_api_client.get_kpler_trades(
                     date_from=year_start,
                     date_to=year_end,
                     commodity_origin_iso2=["RU"],

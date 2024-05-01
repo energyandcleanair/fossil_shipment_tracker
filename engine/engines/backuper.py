@@ -10,7 +10,7 @@ from base.env import get_env
 
 import tempfile
 
-from engines import api_client
+from engines import fossil_tracker_api_client
 
 
 def update(bucket="russia_fossil_tracker", folder="backup"):
@@ -48,7 +48,7 @@ def upload(df, client_bucket, folder, filename, exts=["RDS", "csv.gz"]):
 
 def backup_voyages(client_bucket, folder, now):
 
-    voyages_df = api_client.get_voyages(
+    voyages_df = fossil_tracker_api_client.get_voyages(
         date_from="2021-01-01",
         commodity_grouping="default",
         currency=["USD", "EUR"],
@@ -60,7 +60,7 @@ def backup_voyages(client_bucket, folder, now):
 
 def backup_overland(client_bucket, folder, now):
 
-    overland_df = api_client.get_overland(
+    overland_df = fossil_tracker_api_client.get_overland(
         date_from="2021-01-01",
         commodity_grouping="default",
         currency=["USD", "EUR"],
@@ -73,7 +73,7 @@ def backup_overland(client_bucket, folder, now):
 
 def backup_counter(client_bucket, folder, now):
 
-    counter_df = api_client.get_counter(
+    counter_df = fossil_tracker_api_client.get_counter(
         date_from="2021-01-01",
         commodity_grouping="default",
         currency=["USD", "EUR"],

@@ -23,7 +23,7 @@ from decouple import config
 
 import datetime as dt
 
-from engines import api_client
+from engines import fossil_tracker_api_client
 
 from base.models import Price, Commodity
 
@@ -222,7 +222,7 @@ def test_overland_trade_has_values():
 
         params = {"date_from": year_start.isoformat(), "date_to": year_end.isoformat()}
 
-        response = api_client.get_overland(**params)
+        response = fossil_tracker_api_client.get_overland(**params)
 
         dfs = dfs + [response]
 
@@ -268,7 +268,7 @@ def test_counter_pricing_positive():
 
     data = pd.DataFrame()
     for year in range(2022, dt.date.today().year + 1):
-        response = api_client.get_counter(
+        response = fossil_tracker_api_client.get_counter(
             date_from=f"{year}-01-01", date_to=f"{year}-12-31"
         ).sort_values(["date"], ascending=False)
         data = pd.concat([data, response])
