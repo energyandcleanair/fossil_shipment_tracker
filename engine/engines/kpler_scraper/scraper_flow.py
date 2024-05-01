@@ -2,7 +2,7 @@ import datetime as dt
 import requests
 import urllib3
 import pandas as pd
-from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+from base.kpler import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from base.utils import to_datetime
 from base.logger import logger

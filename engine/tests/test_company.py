@@ -1,17 +1,21 @@
 import base
+import pytest
 from engines.company import *
 from engines.equasis import equasis
 from base.env import get_env
 
 
+@pytest.mark.system
 def test_equasis_update():
     update_info_from_equasis()
 
 
+@pytest.mark.system
 def test_equasis_scraper():
     infos = equasis.Equasis().get_ship_infos(imo="9698953")
 
 
+@pytest.mark.system
 def test_imo_scraper():
     scraper = CompanyImoScraper(base_url=base.IMO_BASE_URL, service=None)
 
@@ -33,5 +37,6 @@ def test_imo_scraper():
     assert address[0][0] == expected_address
 
 
+@pytest.mark.system
 def test_company_registration_scraper():
     fill_using_imo_website()

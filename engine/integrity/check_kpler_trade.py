@@ -1,7 +1,7 @@
 from enum import Enum
 import requests
 from engines.kpler_scraper.scraper_flow import KplerFlowScraper
-from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+from base.kpler import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 from decouple import config
 import datetime as dt
 from base.utils import to_datetime

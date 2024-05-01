@@ -16,7 +16,7 @@ from engines import (
 )
 from engines.kpler_scraper.scraper_flow import KplerFlowScraper
 from engines.kpler_scraper.update import UpdateParts
-from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+from base.kpler import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 import integrity
 import base

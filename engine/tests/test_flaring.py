@@ -1,9 +1,11 @@
 import pandas as pd
+import pytest
 from engines.flaring import *
 from base.models import Shipment, Departure
 from base.db import init_db
 
 
+@pytest.mark.system
 def test_flaring():
     init_db(drop_first=False)
     update()

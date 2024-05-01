@@ -10,7 +10,7 @@ from base.logger import logger, logger_slack
 import pandas as pd
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
-from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+from base.kpler import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from . import KplerScraper
 from . import KplerFlowScraper

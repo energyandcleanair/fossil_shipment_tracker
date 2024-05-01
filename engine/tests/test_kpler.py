@@ -1,13 +1,15 @@
 import datetime as dt
 import numpy as np
 import pandas as pd
-from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+from base.kpler import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
 from base.db import session, engine
+import pytest
 
 from engines.kpler_scraper import KplerScraper, KplerFlowScraper, KplerTradeScraper
 
 
+@pytest.mark.system
 def test_get_flow():
     scraper = KplerFlowScraper()
     # products = scraper.get_products()
@@ -37,9 +39,10 @@ def test_get_flow():
     assert flows_kozmino.origin_iso2.unique() == ["RU"]
 
 
+@pytest.mark.system
 def test_get_flow_brute():
     from base.utils import to_datetime
-    from kpler.sdk import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+    from base.kpler import FlowsDirection, FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 
     params = {
         # "origin_iso2": "RU",
@@ -68,6 +71,7 @@ def test_get_flow_brute():
     assert destinations.unique() == ["China"]
 
 
+@pytest.mark.system
 def test_get_installations():
     scraper = KplerScraper()
     # products = scraper.get_products()
@@ -78,6 +82,7 @@ def test_get_installations():
         assert len(installations) > 0
 
 
+@pytest.mark.system
 def test_get_vessel_brute():
     scraper = KplerScraper()
 
@@ -89,6 +94,7 @@ def test_get_vessel_brute():
     assert len([x for x in found_vessels if x.id in vessel_ids]) == len(vessel_ids)
 
 
+@pytest.mark.system
 def test_get_trades():
     scraper = KplerTradeScraper()
 
@@ -107,6 +113,7 @@ def test_get_trades():
     assert not any(pd.isna(trades_df.departure_zone_id))
 
 
+@pytest.mark.system
 def test_update_trades():
     from base.db import init_db
 
@@ -116,6 +123,7 @@ def test_update_trades():
     update_trades(date_from=-5)
 
 
+@pytest.mark.system
 def test_get_flow_cn():
     from base.utils import to_datetime
 
@@ -147,6 +155,7 @@ def test_get_flow_cn():
     )
 
 
+@pytest.mark.system
 def test_get_flow_sg_cn():
     from base.utils import to_datetime
 

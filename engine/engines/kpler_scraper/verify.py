@@ -3,7 +3,7 @@ from tqdm import tqdm
 from base.db import session
 from base.logger import logger
 
-from kpler.sdk import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
+from base.kpler import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
 from base.models.kpler import KplerProduct, KplerSyncHistory, KplerTrade, KplerZone
 from base.utils import to_datetime
 from base.models import DB_TABLE_KPLER_SYNC_COMPARISON_DETAILS

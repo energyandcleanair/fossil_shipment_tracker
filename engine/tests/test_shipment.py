@@ -1,13 +1,16 @@
+import pytest
 from engines.shipment import rebuild, update
 from base.db import session, check_if_table_exists
 from base.models import Shipment, Arrival, Departure, ShipmentWithSTS
 import sqlalchemy as sa
 
 
+@pytest.mark.system
 def test_update():
     update()
 
 
+@pytest.mark.system
 def test_shipment_rebuild():
     """
     Test rebuilding shipment table
