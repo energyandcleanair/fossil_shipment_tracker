@@ -1,7 +1,7 @@
 import base
 import pytest
 from engines.company import *
-from engines.equasis import equasis
+from engines.company_scraper import equasis
 from base.env import get_env
 
 
