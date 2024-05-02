@@ -1,5 +1,5 @@
 import datetime as dt
-from decouple import config
+from base.env import get_env
 from sqlalchemy import func
 from sqlalchemy import or_
 import sqlalchemy as sa
@@ -421,8 +421,8 @@ def get_routing_cost():
 def to_3857(coords):
     from pyproj import Proj, Transformer, datadir
 
-    if config("PROJ_DIR", default=None):
-        datadir.set_data_dir(config("PROJ_DIR"))
+    if get_env("PROJ_DIR", default=None):
+        datadir.set_data_dir(get_env("PROJ_DIR"))
 
     transformer = Transformer.from_crs(4326, 3857)
     return list(transformer.itransform([[x[1], x[0]] for x in coords]))
@@ -431,8 +431,8 @@ def to_3857(coords):
 def to_4326(coords):
     from pyproj import Proj, Transformer, datadir
 
-    if config("PROJ_DIR", default=None):
-        datadir.set_data_dir(config("PROJ_DIR"))
+    if get_env("PROJ_DIR", default=None):
+        datadir.set_data_dir(get_env("PROJ_DIR"))
 
     transformer = Transformer.from_crs(3857, 4326)
     return [[x[1], x[0]] for x in list(transformer.itransform(coords))]

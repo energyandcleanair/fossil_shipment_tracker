@@ -19,7 +19,6 @@ from base.models import (
 )
 from base.models.kpler import KplerTrade, KplerTradeComputed, KplerProduct, KplerZone
 from base.logger import logger_slack, logger
-from decouple import config
 
 import datetime as dt
 

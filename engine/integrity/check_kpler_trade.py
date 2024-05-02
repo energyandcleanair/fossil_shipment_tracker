@@ -2,7 +2,7 @@ from enum import Enum
 import requests
 from engines.kpler_scraper.scraper_flow import KplerFlowScraper
 from base.kpler import FlowsSplit, FlowsPeriod, FlowsMeasurementUnit
-from decouple import config
+from base.env import get_env
 import datetime as dt
 from base.utils import to_datetime
 import pandas as pd
@@ -10,8 +10,8 @@ import numpy as np
 
 from base.logger import logger
 
-FST_API_URL = config("FOSSIL_SHIPMENT_TRACKER_API_URL")
-FST_API_KEY = config("API_KEY")
+FST_API_URL = get_env("FOSSIL_SHIPMENT_TRACKER_API_URL")
+FST_API_KEY = get_env("API_KEY")
 
 scraper = KplerFlowScraper()
 

@@ -10,12 +10,12 @@ import base
 from base.env import get_env
 from base.logger import logger_slack, logger
 from base.utils import to_list
-from decouple import config
+from base.env import get_env
 
-ACCOUNT_PASSWORD = config("EQUASIS_PASSWORD")
-ACCOUNT_USERNAME_PATTERN = config("EQUASIS_USERNAME_PATTERN")
-ACCOUNT_START_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_START", "1"))
-ACCOUNT_END_RANGE = int(config("EQUASIS_ACCOUNT_RANGE_END", "200"))
+ACCOUNT_PASSWORD = get_env("EQUASIS_PASSWORD")
+ACCOUNT_USERNAME_PATTERN = get_env("EQUASIS_USERNAME_PATTERN")
+ACCOUNT_START_RANGE = int(get_env("EQUASIS_ACCOUNT_RANGE_START", "1"))
+ACCOUNT_END_RANGE = int(get_env("EQUASIS_ACCOUNT_RANGE_END", "200"))
 
 SLEEP_PERIOD_AFTER_FAILURE = 5
 

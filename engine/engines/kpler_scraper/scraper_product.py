@@ -102,7 +102,7 @@ class KplerProductScraper:
 
         return r.json()
 
-    def get_products_brute(self):
+    def get_products_brute(self) -> dict:
         offset = 0
         ids = []
 

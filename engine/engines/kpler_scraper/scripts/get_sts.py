@@ -4,7 +4,7 @@ import csv
 import time
 from typing import Dict, Any
 import os
-from decouple import config
+from base.env import get_env
 from tqdm import tqdm
 
 
@@ -12,7 +12,7 @@ def get_trades(from_: int, size: int = 1000) -> Dict[str, Any]:
     url = f"https://terminal.kpler.com/api/trades?from={from_}&size={size}&view=kpler&withForecasted=false&withFreightView=false&withProductEstimation=false&operationalFilter=shipToShip"
     headers = {
         "Accept": "text/csv",
-        "Authorization": f'Bearer {config("KPLER_TOKEN_BRUTE")}',
+        "Authorization": f'Bearer {get_env("KPLER_TOKEN_BRUTE")}',
         "DNT": "1",
         "Referer": "https://terminal.kpler.com/map/search/trades?fields=location&locations=z757",
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36",
