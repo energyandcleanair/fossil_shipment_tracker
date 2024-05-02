@@ -53,7 +53,7 @@ def upload_flows(flows):
         upsert(flows, DB_TABLE_KPLER_FLOW, "unique_kpler_flow")
 
 
-def upload_products(products):
+def upload_products(products: dict | pd.DataFrame):
     # Ensure this is a pandas dataframe
     if not isinstance(products, pd.DataFrame):
         products = pd.DataFrame(products)

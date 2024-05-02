@@ -40,10 +40,12 @@ def fill():
 def fill_kpler_commodities(commodities_df):
     # Add Kpler Products
 
-    kpler_products: list[KplerProduct] = KplerProductScraper().get_products_brute()
+    kpler_products: list[dict] = KplerProductScraper().get_products_brute()
 
     kpler_products = [
-        product for product in kpler_products if product is not None and product.name is not None
+        product
+        for product in kpler_products
+        if product is not None and product.get("name", None) is not None
     ]
 
     # First upload in kpler_products table
