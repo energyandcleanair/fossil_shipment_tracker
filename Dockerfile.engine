@@ -1,5 +1,5 @@
 # Share the base version across the multiple layers
-FROM python:3.9-slim-bookworm as base
+FROM python:3.10-slim-bookworm as base
 
 # Install dependencies, best practice to do this separately so that
 # we decrease the attack surface of the image.
