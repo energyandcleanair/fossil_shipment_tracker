@@ -21,3 +21,5 @@ FROM
 CREATE INDEX ON ktc_kpler_commodity (product_id);
 
 CREATE INDEX ON ktc_kpler_commodity (commodity_id);
+
+ANALYZE ktc_kpler_commodity;

@@ -65,3 +65,5 @@ ORDER BY
 CREATE INDEX ON ktc_insurers_and_owners_for_trade (trade_id);
 
 CREATE INDEX ON ktc_insurers_and_owners_for_trade (flow_id);
+
+ANALYZE ktc_insurers_and_owners_for_trade;

@@ -27,3 +27,5 @@ ORDER BY
 CREATE INDEX ON ktc_vessel_age (trade_id);
 
 CREATE INDEX ON ktc_vessel_age (flow_id);
+
+ANALYZE ktc_vessel_age;

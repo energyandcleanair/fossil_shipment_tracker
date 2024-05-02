@@ -81,3 +81,5 @@ ORDER BY
 CREATE INDEX ON ktc_kpler_trade_computed (trade_id);
 
 CREATE INDEX ON ktc_kpler_trade_computed (flow_id);
+
+ANALYZE ktc_kpler_trade_computed;

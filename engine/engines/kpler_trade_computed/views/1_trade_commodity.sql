@@ -39,3 +39,5 @@ CREATE INDEX ON ktc_trade_commodity (trade_id);
 CREATE INDEX ON ktc_trade_commodity (flow_id);
 
 CREATE INDEX ON ktc_trade_commodity (pricing_commodity);
+
+ANALYZE ktc_trade_commodity;

@@ -34,3 +34,5 @@ ORDER BY
 CREATE INDEX ON ktc_trade_step_zones (trade_id);
 
 CREATE INDEX ON ktc_trade_step_zones (flow_id);
+
+ANALYZE ktc_trade_step_zones;

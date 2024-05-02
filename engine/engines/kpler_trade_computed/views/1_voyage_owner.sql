@@ -37,3 +37,5 @@ CREATE INDEX ON ktc_voyage_owner (flow_id);
 CREATE INDEX ON ktc_voyage_owner (ship_imo);
 
 CREATE INDEX ON ktc_voyage_owner (iso2);
+
+ANALYZE ktc_voyage_owner;

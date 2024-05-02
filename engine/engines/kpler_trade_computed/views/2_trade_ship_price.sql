@@ -35,38 +35,26 @@ FROM
   JOIN price ON (
     price.date = date_trunc('day', kpler_trade.departure_date_utc)
     AND price.commodity = ktc_trade_commodity.pricing_commodity
-  )
-  JOIN ktc_price_destination_iso2 ON (
-    --- This will filter down the prices to matching destination_iso2s or the default price if there isn't one.
-    price.id = ktc_price_destination_iso2.id
     AND (
       (
         departure_zone.country_iso2 = 'RU'
-        AND ktc_price_destination_iso2.destination_iso2 = arrival_zone.country_iso2
+        AND arrival_zone.country_iso2 = ANY(price.destination_iso2s)
       )
-      OR ktc_price_destination_iso2.destination_iso2 IS NULL
+      OR price.destination_iso2s = ARRAY [NULL :: VARCHAR]
     )
-  )
-  JOIN ktc_price_ship_insurer_iso2 ON (
-    --- This will filter down the prices to matching ship_insurer_iso2s or the default price value if there isn't one.
-    price.id = ktc_price_ship_insurer_iso2.id
     AND (
       (
         departure_zone.country_iso2 = 'RU'
-        AND ktc_price_ship_insurer_iso2.ship_insurer_iso2 = ktc_voyage_insurer.iso2
+        AND ktc_voyage_insurer.iso2 = ANY(price.ship_insurer_iso2s)
       )
-      OR ktc_price_ship_insurer_iso2.ship_insurer_iso2 IS NULL
+      OR price.ship_insurer_iso2s = ARRAY [NULL :: VARCHAR]
     )
-  )
-  JOIN ktc_price_ship_owner_iso2 ON (
-    --- This will filter down the prices to matching ship_owner_iso2s or the default price if there isn't one.
-    price.id = ktc_price_ship_owner_iso2.id
     AND (
       (
         departure_zone.country_iso2 = 'RU'
-        AND ktc_price_ship_owner_iso2.ship_owner_iso2 = ktc_voyage_owner.iso2
+        AND ktc_voyage_owner.iso2 = ANY(price.ship_owner_iso2s)
       )
-      OR ktc_price_ship_owner_iso2.ship_owner_iso2 IS NULL
+      OR price.ship_owner_iso2s = ARRAY [NULL :: VARCHAR]
     )
   )
 WHERE
@@ -87,3 +75,5 @@ CREATE INDEX ON ktc_trade_ship_price (flow_id);
 CREATE INDEX ON ktc_trade_ship_price (ship_imo);
 
 CREATE INDEX ON ktc_trade_ship_price (price_id);
+
+ANALYZE ktc_trade_ship_price;

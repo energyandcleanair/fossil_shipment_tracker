@@ -19,3 +19,5 @@ CREATE INDEX ON ktc_trade_ship (trade_id);
 CREATE INDEX ON ktc_trade_ship (flow_id);
 
 CREATE INDEX ON ktc_trade_ship (ship_imo);
+
+ANALYZE ktc_trade_ship;
