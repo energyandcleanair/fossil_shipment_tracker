@@ -43,7 +43,7 @@ def _make_request_with_retries(url, params):
                 raise _build_exception(resp)
             return pd.DataFrame(resp.json())
         except Exception as e:
-            logger.error(f"Error fetching {_build_log_url(resp.url)}: {e}")
+            logger.error(f"Error fetching {_build_log_url(url)}: {e}")
     raise Exception(f"Failed to fetch {url} after 3 retries")
 
 
