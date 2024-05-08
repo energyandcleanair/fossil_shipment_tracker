@@ -24,8 +24,6 @@ import datetime as dt
 def update():
 
     kpler_scraper.update(
-        recent_date_from=dt.date.today() - dt.timedelta(days=30),
-        recent_date_to=dt.date.today(),
         origin_iso2s=["RU"],
         parts=[
             kpler_scraper.UpdateParts.UPDATE_RECENT_TRADES,

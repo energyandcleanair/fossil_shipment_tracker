@@ -28,8 +28,6 @@ def update():
     kpler_scraper.update(
         recent_date_from=None,
         recent_date_to=None,
-        historic_date_from="2021-01-01",
-        historic_date_to=-30,
         origin_iso2s=["RU"],
         parts=[
             kpler_scraper.UpdateParts.REFETCH_OUTDATED_HISTORIC_ENTRIES,

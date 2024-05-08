@@ -22,6 +22,17 @@ import datetime as dt
 from sqlalchemy import func
 
 
+def get_start_of_last_month() -> dt.date:
+    today = dt.date.today()
+    first = today.replace(day=1)
+    lastMonth = first - dt.timedelta(days=1)
+    return lastMonth.replace(day=1)
+
+
+def get_day_before_start_of_last_month() -> dt.date:
+    return get_start_of_last_month() - dt.timedelta(days=1)
+
+
 class UpdateStatus(Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
@@ -35,26 +46,24 @@ class UpdateParts(Enum):
 
 def update_full():
     return update(
-        recent_date_from=-30,
         origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG", "QA", "US", "DZ", "NO"],
     )
 
 
 def update_lite(
-    date_from=-30,
     origin_iso2s=["RU"],
 ):
     return update(
-        recent_date_from=date_from,
         origin_iso2s=origin_iso2s,
     )
 
 
 def update(
-    recent_date_from=-30,
-    recent_date_to=None,
+    *,
     historic_date_from="2021-01-01",
-    historic_date_to=-30,
+    historic_date_to=get_day_before_start_of_last_month(),
+    recent_date_from=get_start_of_last_month(),
+    recent_date_to=None,
     origin_iso2s=["RU", "TR", "CN", "MY", "EG", "AE", "SA", "IN", "SG"],
     parts=[
         UpdateParts.UPDATE_ZONES,
