@@ -41,7 +41,7 @@ description = ""
 optional = false
 python-versions = "^3.9"
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 geoalchemy2 = "^0.13.3"
@@ -2774,4 +2774,4 @@ h11 = ">=0.9.0,<1"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "887795f867cc12951d46eb22a9d092b2dc30e838ecac0060cd56d413848ea074"
+content-hash = "13c6b0bb2e8d09f94ef9707e8b742ae84a26a908ed9e6c428b5371dd5b596f44"
