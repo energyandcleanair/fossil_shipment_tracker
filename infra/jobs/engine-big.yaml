@@ -1,7 +1,7 @@
 apiVersion: run.googleapis.com/v1
 kind: Job
 metadata:
-  name: engine-big
+  name: engine
   labels:
     cloud.googleapis.com/location: europe-west1
 spec:
@@ -14,16 +14,6 @@ spec:
           containers:
           - image: europe-west1-docker.pkg.dev/fossil-shipment-tracker/tracker/engine
             env:
-            - name: EQUASIS_ACCOUNT_RANGE_START
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: EQUASIS_ACCOUNT_RANGE_START
-            - name: EQUASIS_ACCOUNT_RANGE_END
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: EQUASIS_ACCOUNT_RANGE_END
             - name: EQUASIS_USERNAME_PATTERN
               valueFrom:
                 secretKeyRef:
@@ -34,6 +24,27 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: EQUASIS_UPDATE_LIMIT
+            - name: RECEIVER_EMAIL_USERNAME
+              value:
+                secretKeyRef:
+                  key: latest
+                  name: RECEIVER_EMAIL_USERNAME
+            - name: RECEIVER_EMAIL_PASSWORD
+              value:
+                secretKeyRef:
+                  key: latest
+                  name: RECEIVER_EMAIL_PASSWORD
+            - name: RECEIVER_EMAIL_POP_SERVER
+              value: pop.gmail.com
+            - name: RECEIVER_EMAIL_POP_PORT
+              value: "995"
+            - name: RECEIVER_EMAIL_POP_SECURE
+              value: "true"
+            - name: AZCAPTCHA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: AZCAPTCHA_API_KEY
             - name: ENVIRONMENT
               value: production
             - name: MAIL_DEFAULT_SENDER
@@ -87,11 +98,6 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: VNF_MINES_SECRET
-            - name: KPLER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: KPLER_TOKEN
             - name: PGUSER_PRODUCTION
               valueFrom:
                 secretKeyRef:

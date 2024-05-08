@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import time
+from typing import Callable, List
 import requests
 from requests import RequestException
 from bs4 import BeautifulSoup
@@ -12,10 +13,7 @@ from base.logger import logger_slack, logger
 from base.utils import to_list
 from base.env import get_env
 
-ACCOUNT_PASSWORD = get_env("EQUASIS_PASSWORD")
-ACCOUNT_USERNAME_PATTERN = get_env("EQUASIS_USERNAME_PATTERN")
-ACCOUNT_START_RANGE = int(get_env("EQUASIS_ACCOUNT_RANGE_START", "1"))
-ACCOUNT_END_RANGE = int(get_env("EQUASIS_ACCOUNT_RANGE_END", "200"))
+from .accounts import EquasisAccount, default_from_env_generator
 
 SLEEP_PERIOD_AFTER_FAILURE = 5
 
@@ -148,14 +146,11 @@ class EquasisSessionPoolExhausted(Exception):
 
 class EquasisSessionPool:
     @staticmethod
-    def from_env():
-        emails = [
-            ACCOUNT_USERNAME_PATTERN % (x) for x in range(ACCOUNT_START_RANGE, ACCOUNT_END_RANGE)
-        ]
-        password = ACCOUNT_PASSWORD
-
-        sessions = [EquasisSession(x, password) for x in emails]
-
+    def with_account_generator(
+        n_accounts=5, generator: Callable[[int], list[EquasisAccount]] = default_from_env_generator
+    ):
+        accounts = generator(n_accounts)
+        sessions = [EquasisSession(x.username, x.password) for x in accounts]
         return EquasisSessionPool(sessions)
 
     def __init__(self, sessions):
@@ -192,7 +187,7 @@ class EquasisSessionPool:
 
 class Equasis:
     def __init__(self):
-        self.sessions = EquasisSessionPool.from_env()
+        self.sessions = EquasisSessionPool.with_account_generator()
 
     def _clean_text(self, text):
         text = text.replace("\t", "").replace("\r", "").replace("\n", "")

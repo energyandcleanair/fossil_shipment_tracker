@@ -34,17 +34,18 @@ matplotlib = "^3.8.3"
 python-decouple = "^3.8"
 pymongo = "^4.6.2"
 seaborn = "^0.13.2"
-base = {path = "../base"}
+base = {path = "../base", develop = true}
 google-cloud-storage = "^2.16.0"
 comtradeapicall = "^1.2.0"
 pyotp = "^2.9.0"
+fake-useragent = "^1.5.1"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest-mock = "^3.14.0"
 responses = "^0.25.0"
 pytest-dotenv = "^0.5.2"
-pytest = "^8.2.0"
+pytest = "^8.1.0"
 
 [build-system]
 requires = ["poetry-core"]
