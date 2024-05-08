@@ -25,12 +25,12 @@ spec:
                   key: latest
                   name: EQUASIS_UPDATE_LIMIT
             - name: RECEIVER_EMAIL_USERNAME
-              value:
+              valueFrom:
                 secretKeyRef:
                   key: latest
                   name: RECEIVER_EMAIL_USERNAME
             - name: RECEIVER_EMAIL_PASSWORD
-              value:
+              valueFrom:
                 secretKeyRef:
                   key: latest
                   name: RECEIVER_EMAIL_PASSWORD
