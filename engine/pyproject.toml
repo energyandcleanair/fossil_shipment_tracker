@@ -39,6 +39,7 @@ google-cloud-storage = "^2.16.0"
 comtradeapicall = "^1.2.0"
 pyotp = "^2.9.0"
 fake-useragent = "^1.5.1"
+currencyconverter = "^0.17.21"
 
 
 [tool.poetry.group.dev.dependencies]
