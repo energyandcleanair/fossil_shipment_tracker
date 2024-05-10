@@ -95,12 +95,12 @@ class ChartTotalPayments(Resource):
         params["date_from"] = "2022-02-24"
         response = RussiaCounterResource().get_from_params(params)
         data1 = pd.DataFrame(response.json["data"])
-        data1["period"] = f"From beginning of the war until {date_to}"
+        data1["period"] = f"From beginning of the war until {date_to.strftime('%d %B %Y')}"
 
         # Period 2
         data2 = data1.copy()
         data2 = data2[data2.month >= "2023-01-01"]
-        data2["period"] = f"From 1 January 2023 until {date_to}"
+        data2["period"] = f"From 1 January 2023 until {date_to.strftime('%d %B %Y')}"
 
         data = pd.concat([data1, data2])
         data = (
