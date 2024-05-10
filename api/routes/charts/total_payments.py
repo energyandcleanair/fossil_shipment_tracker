@@ -12,6 +12,8 @@ from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from ..counter import RussiaCounterResource
 
+import datetime as dt
+
 
 @ns_charts.route("/v0/chart/total_payments", strict_slashes=False)
 class ChartTotalPayments(Resource):
@@ -68,10 +70,14 @@ class ChartTotalPayments(Resource):
         format = params_chart.get("format")
         nest_in_data = params_chart.get("nest_in_data")
 
+        date_to = to_datetime(params_chart.get("date_to"))
+        if not date_to:
+            date_to = dt.datetime.now()
+
         params.update(**params_chart)
         params.update(
             **{
-                "aggregate_by": ["destination_country", "commodity_group", "date"],
+                "aggregate_by": ["destination_country", "commodity_group", "month"],
                 "pivot_by": ["commodity_group_name"],
                 "pivot_value": "value_eur",
                 "use_eu": True,
@@ -89,16 +95,12 @@ class ChartTotalPayments(Resource):
         params["date_from"] = "2022-02-24"
         response = RussiaCounterResource().get_from_params(params)
         data1 = pd.DataFrame(response.json["data"])
-        data1[
-            "period"
-        ] = f"From beginning of the war until {pd.to_datetime(data1.date.max()).strftime('%d %B %Y')}"
+        data1["period"] = f"From beginning of the war until {date_to}"
 
         # Period 2
         data2 = data1.copy()
-        data2 = data2[data2.date >= "2023-01-01"]
-        data2[
-            "period"
-        ] = f"From 1 January 2023 until {pd.to_datetime(data2.date.max()).strftime('%d %B %Y')}"
+        data2 = data2[data2.month >= "2023-01-01"]
+        data2["period"] = f"From 1 January 2023 until {date_to}"
 
         data = pd.concat([data1, data2])
         data = (
