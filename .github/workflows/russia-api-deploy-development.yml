@@ -38,7 +38,7 @@ jobs:
         poetry export -f requirements.txt --without-hashes --without-urls \
           | sed \
             -e '/^base @/ d' \
-            -e '/^-e file' \
+            -e '/^-e file/ d' \
           > requirements.txt
 
         pip install -r requirements.txt
