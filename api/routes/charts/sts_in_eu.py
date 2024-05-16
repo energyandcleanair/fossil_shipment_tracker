@@ -123,6 +123,7 @@ class ChartStsInEu(Resource):
                 "use_eu": True,
                 "commodity_origin_iso2": "RU",
                 "pivot_by": "ownership_sanction_coverage",
+                "sts_region": "EU",
                 "pricing_scenario": [base.PRICING_DEFAULT],
                 "currency": "EUR",
                 "keep_zeros": True,
