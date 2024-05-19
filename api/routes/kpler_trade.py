@@ -333,6 +333,7 @@ class KplerTradeResource(TemplateResource):
         "grade": ["commodity", "group", "family", "commodity_equivalent"],
         "commodity": ["group", "family", "commodity_equivalent"],
         "group": ["family", "commodity_equivalent"],
+        "family": ["commodity_equivalent"],
         "origin_country": ["origin_iso2", "origin_region"],
         "commodity_origin_country": ["commodity_origin_iso2", "commodity_origin_region"],
         "origin_iso2": ["origin_country", "origin_region"],
@@ -488,6 +489,11 @@ class KplerTradeResource(TemplateResource):
             ],
             "group": [
                 subquery.c.group,
+                subquery.c.commodity_equivalent_group,
+                subquery.c.commodity_equivalent_group_name,
+            ],
+            "family": [
+                subquery.c.family,
                 subquery.c.commodity_equivalent_group,
                 subquery.c.commodity_equivalent_group_name,
             ],
