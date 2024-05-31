@@ -1,300 +1,623 @@
-from numpy import NaN
 import pandas as pd
-import pytest
-from engines.comtrade_client.comtrade import (
-    ComtradeClient,
-    ComtradeCommodities,
-)
 
 from pandas.testing import assert_frame_equal
 
-from datetime import datetime, date
+import datetime as dt
 
-import comtradeapicall
+import pytest
 
-availability__basic_response = pd.DataFrame(
-    columns=["reporterISO", "period", "lastReleased"], data=[["USA", "202101", "2021-01-01"]]
-)
+from engines import comtrade
 
-availability__no_results = pd.DataFrame(columns=["reporterISO", "period", "lastReleased"], data=[])
+from base.models.comtrade import ComtradeHsTradeRecord, ComtradeSyncHistory
 
-availability__multiple_repeated_results = pd.DataFrame(
-    columns=["reporterISO", "period", "lastReleased", "extra"],
-    data=[
-        ["USA", "202101", "2021-01-01", "extra"],
-        ["USA", "202101", "2021-01-01", "extra"],
-    ],
-)
-
-availability__multiple_countries_some_empty = pd.DataFrame(
-    columns=["reporterISO", "period", "lastReleased", "extra"],
-    data=[
-        ["USA", "202101", "2021-01-01", "extra"],
-        ["USA", "202102", "2021-02-01", "extra"],
-        ["USA", "202103", "2021-03-01", "extra"],
-        ["NZL", "202103", "2021-03-01", "extra"],
-    ],
-)
-
-availability__r4_and_eur_countries = pd.DataFrame(
-    columns=["reporterISO", "period", "lastReleased", "extra"],
-    data=[
-        ["USA", "202101", "2021-01-01", "extra"],
-        ["USA", "202102", "2021-02-01", "extra"],
-        ["USA", "202103", "2021-03-01", "extra"],
-        ["NZL", "202101", "2021-01-01", "extra"],
-        ["NZL", "202102", "2021-02-01", "extra"],
-        ["NZL", "202103", "2021-03-01", "extra"],
-        ["R4", "202101", "2021-01-01", "extra"],
-        ["R4", "202102", "2021-02-01", "extra"],
-        ["R4", "202103", "2021-03-01", "extra"],
-        ["EUR", "202101", "2021-01-01", "extra"],
-        ["EUR", "202102", "2021-02-01", "extra"],
-        ["EUR", "202103", "2021-03-01", "extra"],
-    ],
-)
-
-data__no_results = pd.DataFrame(columns=[], data=[])
-
-data__basic_response = pd.DataFrame(
-    data=[
+availability__response__multiple_countries_one_month = lambda **_: pd.DataFrame(
+    [
         {
-            "period": "202101",
-            "reporterISO": "USA",
-            "partnerISO": "NZL",
-            "cmdCode": "2701",
-            "flowDesc": "Import",
-            "qty": 1000,
-            "qtyUnitAbbr": "kg",
-            "primaryValue": 1000,
-            "extra": "extra",
+            "reporter_iso2": "US",
+            "period": pd.Period("2021-01"),
+            "last_released": dt.date(2021, 1, 31),
+        }
+    ]
+)
+
+availability__response__multiple_countries_one_month = lambda **_: pd.DataFrame(
+    [
+        {
+            "reporter_iso2": "US",
+            "period": pd.Period("2021-01"),
+            "last_released": dt.date(2021, 1, 31),
         },
         {
-            "period": "202101",
-            "reporterISO": "USA",
-            "partnerISO": "NZL",
-            "cmdCode": "2701",
-            "flowDesc": "Export",
-            "qty": 1000,
-            "qtyUnitAbbr": "kg",
-            "primaryValue": 1000,
-            "extra": "extra",
+            "reporter_iso2": "CA",
+            "period": pd.Period("2021-01"),
+            "last_released": dt.date(2021, 1, 31),
+        },
+    ]
+)
+
+availability__response__us_two_months = lambda **_: pd.DataFrame(
+    [
+        {
+            "reporter_iso2": "US",
+            "period": pd.Period("2021-01"),
+            "last_released": dt.date(2021, 1, 31),
+        },
+        {
+            "reporter_iso2": "US",
+            "period": pd.Period("2021-02"),
+            "last_released": dt.date(2021, 2, 28),
+        },
+    ]
+)
+
+availability__response__us_months_with_gap = lambda **_: pd.DataFrame(
+    [
+        {
+            "reporter_iso2": "US",
+            "period": pd.Period("2021-01"),
+            "last_released": dt.date(2021, 3, 31),
+        },
+        {
+            "reporter_iso2": "US",
+            "period": pd.Period("2021-02"),
+            "last_released": dt.date(2021, 1, 1),
+        },
+        {
+            "reporter_iso2": "US",
+            "period": pd.Period("2021-03"),
+            "last_released": dt.date(2021, 3, 31),
         },
     ]
 )
 
 
-def test_ComtradeClient_get_data_availability__called_with_correct_arguments(mocker):
-    mocked_getFinalDataAvailability = mocker.patch("engines.comtrade.getFinalDataAvailability")
-    mocked_getFinalDataAvailability.return_value = availability__basic_response
-
-    client = ComtradeClient(api_key="api_key")
-
-    expected_month_args = "202101,202102,202103"
-
-    client.get_data_availability(start="2021-01-01", end="2021-03-31")
-
-    # Check mock arguments
-    _, kwargs = mocked_getFinalDataAvailability.call_args
-
-    assert kwargs.get("subscription_key") == "api_key"
-    assert kwargs.get("typeCode") == "C"
-    assert kwargs.get("freqCode") == "M"
-    assert kwargs.get("clCode") == "HS"
-    assert kwargs.get("reporterCode") is None
-    assert kwargs.get("period") == expected_month_args
-
-
-def test_ComtradeClient_get_data_availability__no_results__assertion_error(mocker):
-    mocked_getFinalDataAvailability = mocker.patch("engines.comtrade.getFinalDataAvailability")
-    mocked_getFinalDataAvailability.return_value = availability__no_results
-
-    client = ComtradeClient(api_key="api_key")
-
-    with pytest.raises(AssertionError):
-        client.get_data_availability(start="2021-01-01", end="2021-03-31")
-
-
-def test_ComtradeClient_get_data_availability__multiple_repeated_results__assertion_error(mocker):
-    mocked_getFinalDataAvailability = mocker.patch("engines.comtrade.getFinalDataAvailability")
-    mocked_getFinalDataAvailability.return_value = availability__multiple_repeated_results
-
-    client = ComtradeClient(api_key="api_key")
-
-    with pytest.raises(AssertionError):
-        client.get_data_availability(start="2021-01-01", end="2021-03-31")
-
-
-def test_ComtradeClient_get_data_availability__multiple_countries_some_empty__correct_response(
-    mocker,
+def trade__responses__row_per_request_combination(
+    reporter: str,
+    periods: list[pd.Period],
+    commodities: list[comtrade.ComtradeCommodities],
 ):
-    mocked_getFinalDataAvailability = mocker.patch("engines.comtrade.getFinalDataAvailability")
-    mocked_getFinalDataAvailability.return_value = availability__multiple_countries_some_empty
-
-    client = ComtradeClient(api_key="api_key")
-
-    result = client.get_data_availability(start="2021-01-01", end="2021-03-31")
-
-    expected = pd.DataFrame(
-        columns=["reporter_iso", "period", "last_released"],
-        data=[
-            ["US", to_month("2021-01-01"), to_date("2021-01-01")],
-            ["US", to_month("2021-02-01"), to_date("2021-02-01")],
-            ["US", to_month("2021-03-01"), to_date("2021-03-01")],
-            ["NZ", to_month("2021-01-01"), None],
-            ["NZ", to_month("2021-02-01"), None],
-            ["NZ", to_month("2021-03-01"), to_date("2021-03-01")],
-        ],
-    )
-
-    assert_frame_equal(result, expected)
-
-
-def test_ComtradeClient_get_data_availability__r4_and_eur_countries_returned__r4_and_eur_excluded(
-    mocker,
-):
-    mocked_getFinalDataAvailability = mocker.patch("engines.comtrade.getFinalDataAvailability")
-    mocked_getFinalDataAvailability.return_value = availability__r4_and_eur_countries
-
-    client = ComtradeClient(api_key="api_key")
-
-    result = client.get_data_availability(start="2021-01-01", end="2021-03-31")
-
-    expected = pd.DataFrame(
-        columns=["reporter_iso", "period", "last_released"],
-        data=[
-            ["US", to_month("2021-01-01"), to_date("2021-01-01")],
-            ["US", to_month("2021-02-01"), to_date("2021-02-01")],
-            ["US", to_month("2021-03-01"), to_date("2021-03-01")],
-            ["NZ", to_month("2021-01-01"), to_date("2021-01-01")],
-            ["NZ", to_month("2021-02-01"), to_date("2021-02-01")],
-            ["NZ", to_month("2021-03-01"), to_date("2021-03-01")],
-        ],
-    )
-
-    assert_frame_equal(result, expected)
-
-
-def test_ComtradeClient_get_monthly_trades_for_periods__called_with_correct_arguments(mocker):
-    mocked_getFinalData = mocker.patch("engines.comtrade.getFinalData")
-    mocked_getFinalData.return_value = availability__basic_response
-
-    client = ComtradeClient(api_key="api_key")
-
-    client._get_monthly_imports_for_period_subset(
-        reporter="US",
-        periods=[to_month("2021-01"), to_month("2021-02")],
-        commodities=[ComtradeCommodities.COAL],
-    )
-
-    # Check mock arguments
-    _, kwargs = mocked_getFinalData.call_args
-    assert kwargs.get("subscription_key") == "api_key"
-    assert kwargs.get("typeCode") == "C"
-    assert kwargs.get("freqCode") == "M"
-    assert kwargs.get("clCode") == "HS"
-    assert kwargs.get("flowCode") == "M,X"
-    assert kwargs.get("period") == "202101,202102"
-    assert kwargs.get("reporterCode") == comtradeapicall.convertCountryIso3ToCode("USA")
-    assert kwargs.get("cmdCode") == "2701"
-    assert kwargs.get("partnerCode") is None
-    assert kwargs.get("partner2Code") is None
-    assert kwargs.get("customsCode") == "C00"
-    assert kwargs.get("motCode") == "0"
-    assert kwargs.get("includeDesc") == True
-
-
-def test_ComtradeClient_get_monthly_trades_for_periods__no_results__empty_results_returned(mocker):
-    mocked_getFinalData = mocker.patch("engines.comtrade.getFinalData")
-    mocked_getFinalData.return_value = availability__no_results
-
-    client = ComtradeClient(api_key="api_key")
-
-    result = client.get_monthly_trades_for_periods(
-        reporter="US",
-        periods=[to_month("2021-01"), to_month("2021-02")],
-        commodities=[ComtradeCommodities.COAL],
-    )
-
-    expected = pd.DataFrame(
-        columns=[
-            "reporter_iso",
-            "partner_iso",
-            "commodity_code",
-            "flow_direction",
-            "period",
-            "quantity",
-            "quantity_unit",
-            "value_usd",
-        ],
-        data=[],
-    )
-
-    assert_frame_equal(result, expected)
-
-
-def test_ComtradeClient_get_monthly_trades_for_periods__basic_response__correct_response(mocker):
-    mocked_getFinalData = mocker.patch("engines.comtrade.getFinalData")
-    mocked_getFinalData.return_value = data__basic_response
-
-    client = ComtradeClient(api_key="api_key")
-
-    result = client.get_monthly_trades_for_periods(
-        reporter="US",
-        periods=[to_month("2021-01")],
-        commodities=[ComtradeCommodities.COAL],
-    )
-
-    expected = pd.DataFrame(
-        data=[
+    return pd.DataFrame(
+        [
             {
-                "reporter_iso": "US",
-                "partner_iso": "NZ",
-                "commodity_code": "2701",
-                "flow_direction": "Import",
-                "period": to_month("2021-01"),
-                "quantity": 1000,
+                "reporter_iso2": reporter,
+                "partner_iso2": "CA",
+                "commodity_code": commodity.value,
+                "flow_direction": "Imports",
+                "period": period,
+                "quantity": 100,
                 "quantity_unit": "kg",
-                "value_usd": 1000,
+                "value_usd": 100,
+            }
+            for period in periods
+            for commodity in commodities
+        ]
+    )
+
+
+history__no_history = lambda *_a, **_b: pd.DataFrame()
+
+history__us_one_month_updated_recently = lambda *_a, **_b: pd.DataFrame(
+    [
+        {
+            "reporter_iso2": "US",
+            "period": dt.date(2021, 1, 1),
+            "commodity_code": "2711",
+            "last_updated": dt.datetime(2023, 1, 1),
+        }
+    ]
+)
+history__us_one_month_updated_earlier = lambda *_a, **_b: pd.DataFrame(
+    [
+        {
+            "reporter_iso2": "US",
+            "period": dt.date(2021, 1, 1),
+            "commodity_code": "2711",
+            "last_updated": dt.datetime(2021, 1, 1),
+        }
+    ]
+)
+
+history__middle_month_updated = lambda *_a, **_b: pd.DataFrame(
+    [
+        {
+            "reporter_iso2": "US",
+            "period": dt.date(2021, 2, 1),
+            "commodity_code": "2711",
+            "last_updated": dt.datetime(2021, 3, 1),
+        }
+    ]
+)
+
+
+def test_create_sync_definition__single_month_commodity_country__single_entry():
+    sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US"],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 1, 31),
+    )
+
+    assert_frame_equal(
+        sync_definition,
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "US",
+                    "period": pd.Period("2021-01"),
+                    "commodity_code": "2711",
+                }
+            ]
+        ),
+    )
+
+
+def test_create_sync_definition__multiple_month_multiple_commodities__multiple_entries():
+    # Act
+    actual_sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US", "CA"],
+        commodities=[
+            comtrade.ComtradeCommodities.NATURAL_GAS,
+            comtrade.ComtradeCommodities.COAL,
+        ],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 2, 28),
+    )
+
+    # Assert
+    def ignoring_order(df):
+        return df.sort_values(by=["reporter_iso2", "period", "commodity_code"]).reset_index(
+            drop=True
+        )
+
+    expected_sync_definition = pd.DataFrame(
+        [
+            {
+                "reporter_iso2": "US",
+                "period": pd.Period("2021-01"),
+                "commodity_code": "2711",
             },
             {
-                "reporter_iso": "US",
-                "partner_iso": "NZ",
+                "reporter_iso2": "CA",
+                "period": pd.Period("2021-01"),
+                "commodity_code": "2711",
+            },
+            {
+                "reporter_iso2": "US",
+                "period": pd.Period("2021-02"),
+                "commodity_code": "2711",
+            },
+            {
+                "reporter_iso2": "CA",
+                "period": pd.Period("2021-02"),
+                "commodity_code": "2711",
+            },
+            {
+                "reporter_iso2": "US",
+                "period": pd.Period("2021-01"),
                 "commodity_code": "2701",
-                "flow_direction": "Export",
-                "period": to_month("2021-01"),
-                "quantity": 1000,
-                "quantity_unit": "kg",
-                "value_usd": 1000,
+            },
+            {
+                "reporter_iso2": "CA",
+                "period": pd.Period("2021-01"),
+                "commodity_code": "2701",
+            },
+            {
+                "reporter_iso2": "US",
+                "period": pd.Period("2021-02"),
+                "commodity_code": "2701",
+            },
+            {
+                "reporter_iso2": "CA",
+                "period": pd.Period("2021-02"),
+                "commodity_code": "2701",
             },
         ]
     )
 
-    assert_frame_equal(result, expected)
-
-
-def test_ComtradeClient_get_monthly_trades_for_periods__called_with_more_than_12_months__requests_twice(
-    mocker,
-):
-    mocked_getFinalData = mocker.patch("engines.comtrade.getFinalData")
-    mocked_getFinalData.return_value = data__basic_response
-
-    client = ComtradeClient(api_key="api_key")
-
-    periods = pd.period_range(start="2021-01", end="2022-12", freq="M")
-
-    client.get_monthly_trades_for_periods(
-        reporter="US",
-        periods=periods,
-        commodities=[ComtradeCommodities.COAL],
+    assert_frame_equal(
+        ignoring_order(actual_sync_definition),
+        ignoring_order(expected_sync_definition),
     )
 
-    assert mocked_getFinalData.call_count == 2
+
+def test_comtrade_engine__nothing_yet_synced__syncs_new_data(mocker):
+
+    # Arrange
+    mocked_client = create_mocked_comtrade_responses(
+        mocker,
+        availability_response=availability__response__multiple_countries_one_month,
+        trade_responses=trade__responses__row_per_request_combination,
+    )
+    create_mocked_db_sync_history(
+        mocker,
+        history=history__no_history,
+    )
+    mocked_upsert = mocker.patch("engines.comtrade.upsert")
+
+    sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US"],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 1, 31),
+    )
+
+    start_time = dt.datetime(2021, 1, 1)
+
+    # Act
+    comtrade.update_comtrade_data(sync_definition)
+
+    # Assert
+    mocked_client.get_monthly_trades_for_periods.assert_called_once_with(
+        reporter="US",
+        periods=[pd.Period("2021-01")],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS],
+    )
+
+    upsert_records = mocked_upsert.call_args_list[0][1]
+    assert upsert_records["table"] == ComtradeHsTradeRecord.__tablename__
+    assert upsert_records["constraint_name"] == "comtrade_hs_record_unique"
+    assert_frame_equal(
+        upsert_records["df"],
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "US",
+                    "partner_iso2": "CA",
+                    "commodity_code": "2711",
+                    "flow_direction": "Imports",
+                    "period": dt.datetime(2021, 1, 1),
+                    "quantity": 100,
+                    "quantity_unit": "kg",
+                    "value_usd": 100,
+                }
+            ]
+        ),
+    )
+
+    upsert_history = mocked_upsert.call_args_list[1][1]
+    assert upsert_history["table"] == ComtradeSyncHistory.__tablename__
+    assert upsert_history["constraint_name"] == "comtrade_sync_history_unique"
+    assert_frame_equal(
+        upsert_history["df"].drop(columns=["last_updated"]),
+        pd.DataFrame(
+            [{"reporter_iso2": "US", "period": dt.datetime(2021, 1, 1), "commodity_code": "2711"}]
+        ),
+    )
+    assert upsert_history["df"]["last_updated"].iloc[0] is not None
+    assert (
+        upsert_history["df"]["last_updated"].iloc[0] >= start_time
+        and upsert_history["df"]["last_updated"].iloc[0] <= dt.datetime.now()
+    )
 
 
-def to_month(date: str) -> pd.Period:
-    return pd.Period(date, freq="M")
+def test_comtrade_engine__data_already_synced__does_not_sync(mocker):
+
+    # Arrange
+    mocked_client = create_mocked_comtrade_responses(
+        mocker,
+        availability_response=availability__response__multiple_countries_one_month,
+        trade_responses=trade__responses__row_per_request_combination,
+    )
+    create_mocked_db_sync_history(
+        mocker,
+        history=history__us_one_month_updated_recently,
+    )
+    mocked_upsert = mocker.patch("engines.comtrade.upsert")
+
+    sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US"],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 1, 31),
+    )
+
+    # Act
+    comtrade.update_comtrade_data(sync_definition)
+
+    # Assert
+    mocked_upsert.assert_not_called()
 
 
-def to_date(date: str) -> date:
-    return datetime.fromisoformat(date).date()
+def test_comtrade_engine__data_already_synced__force_sync(mocker):
+
+    # Arrange
+    create_mocked_comtrade_responses(
+        mocker,
+        availability_response=availability__response__multiple_countries_one_month,
+        trade_responses=trade__responses__row_per_request_combination,
+    )
+    create_mocked_db_sync_history(
+        mocker,
+        history=history__us_one_month_updated_recently,
+    )
+    mocked_upsert = mocker.patch("engines.comtrade.upsert")
+
+    sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US"],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 2, 1),
+    )
+
+    # Act
+    comtrade.update_comtrade_data(sync_definition, force=True)
+
+    # Assert
+    assert mocked_upsert.call_count == 2
+
+
+def test_comtrade_engine__new_month_available__syncs_new_month(mocker):
+
+    # Arrange
+    create_mocked_comtrade_responses(
+        mocker,
+        availability_response=availability__response__us_two_months,
+        trade_responses=trade__responses__row_per_request_combination,
+    )
+    create_mocked_db_sync_history(
+        mocker,
+        history=history__us_one_month_updated_recently,
+    )
+    mocked_upsert = mocker.patch("engines.comtrade.upsert")
+
+    sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US"],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 2, 28),
+    )
+
+    # Act
+    comtrade.update_comtrade_data(sync_definition)
+
+    # Assert
+    upsert_records = mocked_upsert.call_args_list[0][1]
+    assert upsert_records["table"] == ComtradeHsTradeRecord.__tablename__
+    assert upsert_records["constraint_name"] == "comtrade_hs_record_unique"
+    assert_frame_equal(
+        upsert_records["df"],
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "US",
+                    "partner_iso2": "CA",
+                    "commodity_code": "2711",
+                    "flow_direction": "Imports",
+                    "period": dt.datetime(2021, 2, 1),
+                    "quantity": 100,
+                    "quantity_unit": "kg",
+                    "value_usd": 100,
+                }
+            ]
+        ),
+    )
+
+
+def test_comtrade_engine__new_commodity__syncs_new_commodity(mocker):
+
+    # Arrange
+    create_mocked_comtrade_responses(
+        mocker,
+        availability_response=availability__response__us_two_months,
+        trade_responses=trade__responses__row_per_request_combination,
+    )
+    create_mocked_db_sync_history(
+        mocker,
+        history=history__us_one_month_updated_recently,
+    )
+    mocked_upsert = mocker.patch("engines.comtrade.upsert")
+
+    sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US"],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS, comtrade.ComtradeCommodities.COAL],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 1, 31),
+    )
+
+    # Act
+    comtrade.update_comtrade_data(sync_definition)
+
+    # Assert
+    upsert_records = mocked_upsert.call_args_list[0][1]
+    assert upsert_records["table"] == ComtradeHsTradeRecord.__tablename__
+    assert upsert_records["constraint_name"] == "comtrade_hs_record_unique"
+    assert_frame_equal(
+        upsert_records["df"],
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "US",
+                    "partner_iso2": "CA",
+                    "commodity_code": "2701",
+                    "flow_direction": "Imports",
+                    "period": dt.datetime(2021, 1, 1),
+                    "quantity": 100,
+                    "quantity_unit": "kg",
+                    "value_usd": 100,
+                }
+            ]
+        ),
+    )
+
+
+def test_comtrade_engine__new_data_with_month_gaps__doesnt_update_inbetween_months(mocker):
+
+    # Arrange
+    create_mocked_comtrade_responses(
+        mocker,
+        availability_response=availability__response__us_months_with_gap,
+        trade_responses=trade__responses__row_per_request_combination,
+    )
+    create_mocked_db_sync_history(
+        mocker,
+        history=history__middle_month_updated,
+    )
+
+    mocked_upsert = mocker.patch("engines.comtrade.upsert")
+
+    sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US"],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 3, 31),
+    )
+
+    # Act
+    comtrade.update_comtrade_data(sync_definition)
+
+    # Assert
+    upsert_records = mocked_upsert.call_args_list[0][1]
+    assert upsert_records["table"] == ComtradeHsTradeRecord.__tablename__
+    assert upsert_records["constraint_name"] == "comtrade_hs_record_unique"
+    assert_frame_equal(
+        upsert_records["df"],
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "US",
+                    "partner_iso2": "CA",
+                    "commodity_code": "2711",
+                    "flow_direction": "Imports",
+                    "period": dt.datetime(2021, 1, 1),
+                    "quantity": 100,
+                    "quantity_unit": "kg",
+                    "value_usd": 100,
+                },
+                {
+                    "reporter_iso2": "US",
+                    "partner_iso2": "CA",
+                    "commodity_code": "2711",
+                    "flow_direction": "Imports",
+                    "period": dt.datetime(2021, 3, 1),
+                    "quantity": 100,
+                    "quantity_unit": "kg",
+                    "value_usd": 100,
+                },
+            ]
+        ),
+    )
+
+
+def test_comtrade_engine__multiple_countries__syncs_all(mocker):
+
+    # Arrange
+    create_mocked_comtrade_responses(
+        mocker,
+        availability_response=availability__response__multiple_countries_one_month,
+        trade_responses=trade__responses__row_per_request_combination,
+    )
+    create_mocked_db_sync_history(
+        mocker,
+        history=history__no_history,
+    )
+    mocked_upsert = mocker.patch("engines.comtrade.upsert")
+
+    sync_definition = comtrade.create_sync_definitions(
+        reporter_iso2s=["US", "CA"],
+        commodities=[comtrade.ComtradeCommodities.NATURAL_GAS],
+        start=dt.date(2021, 1, 1),
+        end=dt.date(2021, 1, 31),
+    )
+
+    # Act
+    comtrade.update_comtrade_data(sync_definition)
+
+    # Assert
+    upsert_records = mocked_upsert.call_args_list[0][1]
+    assert upsert_records["table"] == ComtradeHsTradeRecord.__tablename__
+    assert upsert_records["constraint_name"] == "comtrade_hs_record_unique"
+    assert_frame_equal(
+        upsert_records["df"],
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "CA",
+                    "partner_iso2": "CA",
+                    "commodity_code": "2711",
+                    "flow_direction": "Imports",
+                    "period": dt.datetime(2021, 1, 1),
+                    "quantity": 100,
+                    "quantity_unit": "kg",
+                    "value_usd": 100,
+                }
+            ]
+        ),
+    )
+
+    upsert_history = mocked_upsert.call_args_list[1][1]
+    assert upsert_history["table"] == ComtradeSyncHistory.__tablename__
+    assert upsert_history["constraint_name"] == "comtrade_sync_history_unique"
+    assert_frame_equal(
+        upsert_history["df"].drop(columns=["last_updated"]),
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "CA",
+                    "period": dt.datetime(2021, 1, 1),
+                    "commodity_code": "2711",
+                },
+            ]
+        ),
+    )
+
+    upsert_records = mocked_upsert.call_args_list[2][1]
+    assert upsert_records["table"] == ComtradeHsTradeRecord.__tablename__
+    assert upsert_records["constraint_name"] == "comtrade_hs_record_unique"
+    assert_frame_equal(
+        upsert_records["df"],
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "US",
+                    "partner_iso2": "CA",
+                    "commodity_code": "2711",
+                    "flow_direction": "Imports",
+                    "period": dt.datetime(2021, 1, 1),
+                    "quantity": 100,
+                    "quantity_unit": "kg",
+                    "value_usd": 100,
+                }
+            ]
+        ),
+    )
+
+    upsert_history = mocked_upsert.call_args_list[3][1]
+    assert upsert_history["table"] == ComtradeSyncHistory.__tablename__
+    assert upsert_history["constraint_name"] == "comtrade_sync_history_unique"
+    assert_frame_equal(
+        upsert_history["df"].drop(columns=["last_updated"]),
+        pd.DataFrame(
+            [
+                {
+                    "reporter_iso2": "US",
+                    "period": dt.datetime(2021, 1, 1),
+                    "commodity_code": "2711",
+                },
+            ]
+        ),
+    )
+
+
+def test_comtrade_engine__no_sync_request__value_error():
+    with pytest.raises(ValueError) as e:
+        comtrade.update_comtrade_data(pd.DataFrame())
+
+
+def create_mocked_db_sync_history(mocker, *, history: pd.DataFrame):
+    sync_history = mocker.patch("engines.comtrade.read_sql")
+    # We use side effect to return a new DataFrame each time the function is called.
+    sync_history.side_effect = history
+
+    mocker.patch("engines.comtrade.session")
+
+
+def create_mocked_comtrade_responses(
+    mocker, *, availability_response: pd.DataFrame, trade_responses: pd.DataFrame
+):
+
+    mocked_ComtradeClient = mocker.patch("engines.comtrade.client")
+    # We use side effect to return a new DataFrame each time the function is called.
+    mocked_ComtradeClient.get_data_availability.side_effect = availability_response
+    mocked_ComtradeClient.get_monthly_trades_for_periods.side_effect = trade_responses
+
+    return mocked_ComtradeClient

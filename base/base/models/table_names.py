@@ -65,3 +65,6 @@ DB_TABLE_KPLER_SYNC_COMPARISON_DETAILS = "kpler_sync_comparison_details"
 
 DB_TABLE_API_KEY = "api_key"
 DB_TABLE_GLOBAL_CACHE = "global_cache"
+
+DB_TABLE_COMTRADE_SYNC_HISTORY = "comtrade_sync_history"
+DB_TABLE_COMTRADE_HS_TRADE_RECORD = "comtrade_hs_trade_record"

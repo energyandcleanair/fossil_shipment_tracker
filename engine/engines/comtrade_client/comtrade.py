@@ -57,21 +57,27 @@ class ComtradeClient:
     Client for the Comtrade API for monthly HS reported data. It normalises the data and returns it as a DataFrame.
     """
 
+    @staticmethod
+    def from_env():
+        return ComtradeClient(api_key=get_env("COMTRADE_API_KEY"))
+
     def __init__(self, api_key):
         self.api_key = api_key
         self.cc = CountryConverter()
 
-    def get_data_availability(self, *, start, end):
+    def get_data_availability(self, *, periods: list[pd.Period]):
         """
         Get the HS data availability for the given period for all countries. It returns a DataFrame
         with the following columns:
-        - reporter_iso: ISO2 code of the reporter country
+        - reporter_iso2: ISO2 code of the reporter country
         - period: Period of the data
         - last_released: Date when the data was last released
         """
+        # Check if periods are months
+        if not all(period.freq == "M" for period in periods):
+            raise ValueError("periods must be of frequency 'M' (monthly)")
 
-        months = pd.date_range(start, end, freq="M").strftime("%Y%m").tolist()
-        period_argument = ",".join(months)
+        period_argument = ",".join([period.strftime("%Y%m") for period in periods])
 
         data_availability = getFinalDataAvailability(
             subscription_key=self.api_key,
@@ -114,17 +120,17 @@ class ComtradeClient:
             data_availability["lastReleased"].notna(), None
         )
 
-        data_availability["reporter_iso"] = data_availability["reporterISO"].apply(
+        data_availability["reporter_iso2"] = data_availability["reporterISO"].apply(
             lambda x: self.cc.convert(names=x, src="ISO3", to="ISO2")
         )
 
         # Filter rows with "not found" from data_availability
         data_availability = data_availability[
-            data_availability["reporter_iso"] != "not found"
-        ].reindex()
+            data_availability["reporter_iso2"] != "not found"
+        ].reset_index()
 
         # Select the reporter, period, and lastReleased
-        data_availability = data_availability[["reporter_iso", "period", "last_released"]]
+        data_availability = data_availability[["reporter_iso2", "period", "last_released"]]
 
         return data_availability
 
@@ -135,8 +141,8 @@ class ComtradeClient:
         Get monthly imports for a list of periods and commodities for a single reporter. Will make
         multiple requests if there are more than 12 periods.
         The data is returned as a DataFrame with the following columns:
-        - reporter_iso: ISO2 code of the reporter country
-        - partner_iso: ISO2 code of the partner country
+        - reporter_iso2: ISO2 code of the reporter country
+        - partner_iso2: ISO2 code of the partner country
         - commodity_code: HS code of the commodity
         - flow_direction: "Imports" or "Exports"
         - period: Period of the data
@@ -144,6 +150,10 @@ class ComtradeClient:
         - quantity_unit: Unit of the quantity
         - value_usd: Value of the trade in USD
         """
+
+        if not all(period.freq == "M" for period in periods):
+            raise ValueError("periods must be of frequency 'M' (monthly)")
+
         # Split periods into groups of 12
         periods_groups = [periods[i : i + 12] for i in range(0, len(periods), 12)]
 
@@ -201,8 +211,8 @@ class ComtradeClient:
     def _clean_imports(self, data: pd.DataFrame):
 
         converted_columns = [
-            "reporter_iso",
-            "partner_iso",
+            "reporter_iso2",
+            "partner_iso2",
             "commodity_code",
             "flow_direction",
             "period",
@@ -216,11 +226,11 @@ class ComtradeClient:
 
         data["period"] = pd.to_datetime(data["period"], format="%Y%m").dt.to_period("M")
 
-        data["reporter_iso"] = data["reporterISO"].apply(
+        data["reporter_iso2"] = data["reporterISO"].apply(
             lambda x: self.cc.convert(names=x, src="ISO3", to="ISO2")
         )
 
-        data["partner_iso"] = data["partnerISO"].apply(
+        data["partner_iso2"] = data["partnerISO"].apply(
             lambda x: self.cc.convert(names=x, src="ISO3", to="ISO2")
         )
 
@@ -231,9 +241,9 @@ class ComtradeClient:
 
         data["value_usd"] = data["primaryValue"]
 
-        data = data[(data["partner_iso"] != "not found") & (data["partner_iso"] != "W00")].reindex()
-
         data["flow_direction"] = data["flowDesc"]
         data = data[converted_columns]
+
+        data = data[data["partner_iso2"] != "not found"].reset_index()
 
         return data

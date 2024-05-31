@@ -11,14 +11,16 @@ from datetime import date
 def test_ComtradeClient_get_data_availability():
     client = ComtradeClient(api_key=get_env("COMTRADE_API_KEY"))
 
-    availability = client.get_data_availability(start="2021-01-01", end="2021-03-31")
+    periods = pd.date_range("2021-01-01", "2021-03-31", freq="M").to_period()
+
+    availability = client.get_data_availability(periods=periods)
 
     assert not availability.empty
     assert availability["period"].min() == pd.Period("2021-01", freq="M")
     assert availability["period"].max() == pd.Period("2021-03", freq="M")
-    assert ["reporter_iso", "period", "last_released"] == availability.columns.tolist()
+    assert ["reporter_iso2", "period", "last_released"] == availability.columns.tolist()
     # Assert reporterISO character lengths are 2
-    assert all(availability["reporter_iso"].str.len() == 2)
+    assert all(availability["reporter_iso2"].str.len() == 2)
     # Assert that period type is pd.Period
     assert all(availability["period"].apply(type) == pd.Period)
     # Assert that lastReleased is Date or None
@@ -41,7 +43,7 @@ def test_ComtradeClient_get_data():
     assert set(periods.strftime("%Y-%m").tolist()) == set(
         data["period"].unique().strftime("%Y-%m")
     ), "Expected all of the periods in the response"
-    assert set(data["reporter_iso"].unique()) == set(["US"]), "Expect only US to be the reporter"
+    assert set(data["reporter_iso2"].unique()) == set(["US"]), "Expect only US to be the reporter"
     assert set(data["commodity_code"].unique()) == set(
         [e.value for e in ComtradeCommodities]
     ), "Expect all commodities to be present"
@@ -54,7 +56,7 @@ def test_ComtradeClient_get_data():
 def test_ComtradeClient_get_data__next_month():
     client = ComtradeClient(api_key=get_env("COMTRADE_API_KEY"))
 
-    next_month = date.today().replace(day=1) + pd.offsets.MonthBegin(1)
+    next_month = pd.Period(date.today().replace(day=1) + pd.offsets.MonthBegin(1), freq="M")
 
     data = client.get_monthly_trades_for_periods(
         reporter="US",
@@ -65,8 +67,8 @@ def test_ComtradeClient_get_data__next_month():
     assert data.empty, "Expected no data to be returned for the next month"
     assert set(data.columns) == set(
         [
-            "reporter_iso",
-            "partner_iso",
+            "reporter_iso2",
+            "partner_iso2",
             "commodity_code",
             "flow_direction",
             "period",
