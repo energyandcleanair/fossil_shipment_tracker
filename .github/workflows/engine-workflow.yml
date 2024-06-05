@@ -60,6 +60,11 @@ jobs:
 
           KEY_DATALASTIC: ${{ secrets.KEY_DATALASTIC }}
 
+          EQUASIS_USERNAME_PATTERN: ${{ secrets.EQUASIS_USERNAME_PATTERN }}
           EQUASIS_PASSWORD: ${{ secrets.EQUASIS_PASSWORD }}
           EQUASIS_ACCOUNT_RANGE_START: ${{ vars.EQUASIS_ACCOUNT_RANGE_START }}
           EQUASIS_ACCOUNT_RANGE_END: ${{ vars.EQUASIS_ACCOUNT_RANGE_END }}
+
+          KPLER_EMAIL: ${{ secrets.KPLER_EMAIL }}
+          KPLER_PASSWORD: ${{ secrets.KPLER_PASSWORD }}
+          KPLER_OTP_KEY: ${{ secrets.KPLER_OTP_KEY }}
