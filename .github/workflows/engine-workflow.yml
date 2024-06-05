@@ -68,3 +68,6 @@ jobs:
           KPLER_EMAIL: ${{ secrets.KPLER_EMAIL }}
           KPLER_PASSWORD: ${{ secrets.KPLER_PASSWORD }}
           KPLER_OTP_KEY: ${{ secrets.KPLER_OTP_KEY }}
+
+          RECEIVER_EMAIL_USERNAME: ${{ secrets.RECEIVER_EMAIL_USERNAME }}
+          RECEIVER_EMAIL_PASSWORD: ${{ secrets.RECEIVER_EMAIL_PASSWORD }}
