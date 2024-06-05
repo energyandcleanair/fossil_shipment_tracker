@@ -15,25 +15,29 @@ jobs:
     env:
       PYTHON_VERSION: 3.9
       POETRY_VERSION: 1.8.2
+      POETRY_PLUGIN_EXPORT_VERSION: 1.8.0
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v3
         with:
-          python-version: "3.10"
-          cache: "pip"
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Setup Poetry ${{ env.POETRY_VERSION }}
         uses: Gr1N/setup-poetry@v9
         with:
           poetry-version: ${{ env.POETRY_VERSION }}
-
+      - name: Setup Poetry export plugin
+        working-directory: api
+        run: |
+          poetry self add poetry-plugin-export@${{ env.POETRY_PLUGIN_EXPORT_VERSION }}
       - name: Install dependencies
         run: poetry install
         working-directory: ./engine
 
       - name: Run tests
+        working-directory: ./engine
         run: poetry run pytest -c ./tests/pytest.ini -v
         env:
           PROJECT_ID: ${{ vars.PROJECT_ID }}
