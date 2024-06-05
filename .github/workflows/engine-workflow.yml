@@ -37,9 +37,13 @@ jobs:
         run: poetry install
         working-directory: ./engine
 
-      - name: Run tests
+      - name: Run unit tests
         working-directory: ./engine
-        run: poetry run pytest -c ./tests/pytest.ini -v
+        run: poetry run pytest -c ./tests/pytest-unit.ini -v
+
+      - name: Run integration tests
+        working-directory: ./engine
+        run: poetry run pytest -c ./tests/pytest-integration.ini -v
         env:
           PROJECT_ID: ${{ vars.PROJECT_ID }}
           ENVIRONMENT: ${{ vars.ENVIRONMENT }}
