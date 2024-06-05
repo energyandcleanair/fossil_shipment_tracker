@@ -74,3 +74,5 @@ jobs:
           RECEIVER_EMAIL_POP_SERVER: pop.gmail.com
           RECEIVER_EMAIL_POP_PORT: "995"
           RECEIVER_EMAIL_POP_SECURE: "true"
+
+          AZCAPTCHA_API_KEY: ${{ secrets.AZCAPTCHA_API_KEY }}
