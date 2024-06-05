@@ -40,9 +40,9 @@ def test_ComtradeClient_get_data():
     )
 
     assert not data.empty, "Expected data to be returned"
-    assert set(periods.strftime("%Y-%m").tolist()) == set(
-        data["period"].unique().strftime("%Y-%m")
-    ), "Expected all of the periods in the response"
+    expected_periods = set(periods.strftime("%Y-%m").tolist())
+    actual_periods = set(data["period"].unique().strftime("%Y-%m"))
+    assert expected_periods == actual_periods, "Expected all of the periods in the response"
     assert set(data["reporter_iso2"].unique()) == set(["US"]), "Expect only US to be the reporter"
     assert set(data["commodity_code"].unique()) == set(
         [e.value for e in ComtradeCommodities]
