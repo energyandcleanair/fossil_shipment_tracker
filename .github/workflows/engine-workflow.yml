@@ -71,3 +71,6 @@ jobs:
 
           RECEIVER_EMAIL_USERNAME: ${{ secrets.RECEIVER_EMAIL_USERNAME }}
           RECEIVER_EMAIL_PASSWORD: ${{ secrets.RECEIVER_EMAIL_PASSWORD }}
+          RECEIVER_EMAIL_POP_SERVER: pop.gmail.com
+          RECEIVER_EMAIL_POP_PORT: "995"
+          RECEIVER_EMAIL_POP_SECURE: "true"
