@@ -132,6 +132,14 @@ data__basic_with_not_found_isos = pd.DataFrame(
     ]
 )
 
+data__reporters_repsonse = pd.DataFrame(
+    columns=["reporterCodeIsoAlpha2", "extra"],
+    data=[
+        ["US", "extra"],
+        ["NZ", "extra"],
+    ],
+)
+
 
 default_periods = pd.date_range("2021-01-01", "2021-03-31", freq="M").to_period()
 
@@ -369,6 +377,36 @@ def test_ComtradeClient_get_monthly_trades_for_periods__not_found_iso2s__exclude
     )
 
     assert result.empty
+
+
+def test_ComtradeClient_get_all_reporters__called_with_correct_arguments(mocker):
+    mocked_getReference = mocker.patch("engines.comtrade_client.comtrade.getReference")
+    mocked_getReference.return_value = data__reporters_repsonse
+
+    client = ComtradeClient(api_key="api_key")
+
+    result = client.get_all_reporters()
+
+    mocked_getReference.assert_called_once_with(category="reporter")
+
+
+def test_ComtradeClient_get_all_reporters__basic_response__correct_response(mocker):
+    mocked_getReference = mocker.patch("engines.comtrade_client.comtrade.getReference")
+    mocked_getReference.return_value = data__reporters_repsonse
+
+    client = ComtradeClient(api_key="api_key")
+
+    result = client.get_all_reporters()
+
+    expected = pd.DataFrame(
+        columns=["reporter_iso2"],
+        data=[
+            ["US"],
+            ["NZ"],
+        ],
+    )
+
+    assert_frame_equal(result, expected)
 
 
 def to_month(date: str) -> pd.Period:

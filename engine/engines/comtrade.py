@@ -13,6 +13,37 @@ from base.logger import logger
 client = ComtradeClient.from_env()
 
 
+def _get_all_reporters():
+    return client.get_all_reporters()["reporter_iso2"].to_list()
+
+
+def create_sync_definitions_for_all(start: date, end: date):
+    """
+    Create a DataFrame of sync definitions to fetch data for all reporters, all commodities and the
+    given date range.
+    """
+    reporters = _get_all_reporters()
+    return create_sync_definitions(
+        reporter_iso2s=reporters, commodities=[e for e in ComtradeCommodities], start=start, end=end
+    )
+
+
+def create_sync_definitions_for_all_reporters(
+    *, commodities: list[ComtradeCommodities], start: date, end: date
+):
+    """
+    Create a DataFrame of sync definitions to fetch data for all reporters, and the given
+    commodities and date range.
+    """
+    reporters = _get_all_reporters()
+    return create_sync_definitions(
+        reporter_iso2s=reporters,
+        commodities=commodities,
+        start=start,
+        end=end,
+    )
+
+
 def create_sync_definitions(
     *, reporter_iso2s: list[str], commodities: list[ComtradeCommodities], start: date, end: date
 ):
@@ -56,20 +87,20 @@ def update_comtrade_data(sync_definitions: pd.DataFrame, force=False):
 
     if not requests.empty:
         for request in requests:
-            logger.info(f"Fetching data for {request['reporter_iso2']}")
+            logger.info(f"Updating {request['reporter_iso2']}")
 
             last_updated = pd.Timestamp.now()
 
             comtrade_results = _get_data_from_comtrade_for_request(request)
+            sync_history = _convert_request_to_sync_records(request, last_updated)
 
+            logger.info(f"Upserting {comtrade_results.shape[0]} trade records")
             upsert(
                 df=comtrade_results,
                 table=ComtradeHsTradeRecord.__tablename__,
                 constraint_name="comtrade_hs_record_unique",
             )
-
-            sync_history = _convert_request_to_sync_records(request, last_updated)
-
+            logger.info(f"Upserting sync history")
             upsert(
                 df=sync_history,
                 table=ComtradeSyncHistory.__tablename__,
@@ -106,6 +137,10 @@ def _get_data_from_comtrade_for_request(request):
         periods=request["periods"],
         commodities=request["commodities"],
     )
+
+    if data.empty:
+        logger.warning(f"No data found for {request['reporter_iso2']}")
+        return data
 
     # convert periods to datetime
     data["period"] = data["period"].dt.to_timestamp()

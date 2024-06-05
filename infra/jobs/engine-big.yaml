@@ -183,6 +183,11 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: CREA_MONGODB_URL
+            - name: COMTRADE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: COMTRADE_API_KEY
             resources:
               limits:
                 cpu: "4"

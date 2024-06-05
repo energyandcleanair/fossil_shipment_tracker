@@ -65,6 +65,24 @@ class ComtradeClient:
         self.api_key = api_key
         self.cc = CountryConverter()
 
+    def get_all_reporters(self):
+        """
+        Get all reporters available in the Comtrade API
+        """
+        return self._clean_reporters(
+            getReference(
+                category="reporter",
+            )
+        )
+
+    def _clean_reporters(self, df):
+        df["reporter_iso2"] = df["reporterCodeIsoAlpha2"]
+
+        df = df.dropna(subset=["reporter_iso2"])
+        df = df[["reporter_iso2"]]
+        df = df.drop_duplicates()
+        return df
+
     def get_data_availability(self, *, periods: list[pd.Period]):
         """
         Get the HS data availability for the given period for all countries. It returns a DataFrame
@@ -127,7 +145,7 @@ class ComtradeClient:
         # Filter rows with "not found" from data_availability
         data_availability = data_availability[
             data_availability["reporter_iso2"] != "not found"
-        ].reset_index()
+        ].reset_index(drop=True)
 
         # Select the reporter, period, and lastReleased
         data_availability = data_availability[["reporter_iso2", "period", "last_released"]]
@@ -184,7 +202,11 @@ class ComtradeClient:
         if len(periods) > 12:
             raise ValueError("periods must be less than or equal to 12")
 
-        reporter_iso3 = self.cc.convert(names=reporter, src="ISO2", to="ISO3")
+        reporter_iso3 = self._to_iso3(reporter)
+
+        if reporter_iso3 == "not found":
+            raise ValueError(f"Reporter {reporter} not found")
+
         reporter_code = convertCountryIso3ToCode(reporter_iso3)
         periods_as_str = ",".join([period.strftime("%Y%m") for period in periods])
         commodities_as_str = ",".join([commodity.value for commodity in commodities])
@@ -244,6 +266,18 @@ class ComtradeClient:
         data["flow_direction"] = data["flowDesc"]
         data = data[converted_columns]
 
-        data = data[data["partner_iso2"] != "not found"].reset_index()
+        data = data[data["partner_iso2"] != "not found"].reset_index(drop=True)
 
         return data
+
+    def _to_iso3(self, iso2: str) -> str:
+
+        if iso2 == "AN":
+            return "ANT"
+
+        result = self.cc.convert(names=iso2, src="ISO2", to="ISO3")
+
+        if result == "not found":
+            raise ValueError(f"Reporter {iso2} not found")
+
+        return result

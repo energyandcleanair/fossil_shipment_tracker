@@ -1,6 +1,7 @@
 from engines import (
     commodity,
     company,
+    comtrade,
     engine_r,
     trajectory,
     position,
@@ -23,6 +24,11 @@ import datetime as dt
 
 def update():
     currency.update()
+    comtrade.update_comtrade_data(
+        sync_definitions=comtrade.create_sync_definitions_for_all(
+            start=dt.date(2020, 1, 1), end=dt.date.today()
+        )
+    )
 
     engine_r.update()
 

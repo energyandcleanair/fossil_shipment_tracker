@@ -77,3 +77,16 @@ def test_ComtradeClient_get_data__next_month():
             "value_usd",
         ]
     ), "Expected the columns to be present"
+
+
+@pytest.mark.integration
+def test_ComtradeClient_get_all_reporters__gets_all_reporters():
+    client = ComtradeClient(api_key=get_env("COMTRADE_API_KEY"))
+
+    reporters = client.get_all_reporters()
+
+    assert reporters is not None
+    assert len(reporters) > 0
+    assert set(reporters.columns) == set(["reporter_iso2"])
+    assert all(reporters["reporter_iso2"].str.len() == 2)
+    assert "IN" in reporters["reporter_iso2"].values
