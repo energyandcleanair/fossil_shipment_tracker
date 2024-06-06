@@ -7,9 +7,16 @@ from engines.comtrade_client.comtrade import ComtradeClient, ComtradeCommodities
 from datetime import date
 
 
+@pytest.fixture(scope="module")
+def api_key():
+    key = get_env("COMTRADE_API_KEY")
+    assert key is not None, "COMTRADE_API_KEY must be set in the environment variables"
+    return key
+
+
 @pytest.mark.integration
-def test_ComtradeClient_get_data_availability():
-    client = ComtradeClient(api_key=get_env("COMTRADE_API_KEY"))
+def test_ComtradeClient_get_data_availability(api_key):
+    client = ComtradeClient(api_key=api_key)
 
     periods = pd.date_range("2021-01-01", "2021-03-31", freq="M").to_period()
 
@@ -28,8 +35,8 @@ def test_ComtradeClient_get_data_availability():
 
 
 @pytest.mark.integration
-def test_ComtradeClient_get_data():
-    client = ComtradeClient(api_key=get_env("COMTRADE_API_KEY"))
+def test_ComtradeClient_get_data(api_key):
+    client = ComtradeClient(api_key=api_key)
 
     periods = pd.date_range("2021-01-01", "2021-12-31", freq="M").to_period()
 
@@ -53,8 +60,8 @@ def test_ComtradeClient_get_data():
 
 
 @pytest.mark.integration
-def test_ComtradeClient_get_data__next_month():
-    client = ComtradeClient(api_key=get_env("COMTRADE_API_KEY"))
+def test_ComtradeClient_get_data__next_month(api_key):
+    client = ComtradeClient(api_key=api_key)
 
     next_month = pd.Period(date.today().replace(day=1) + pd.offsets.MonthBegin(1), freq="M")
 

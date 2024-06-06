@@ -274,6 +274,10 @@ class ComtradeClient:
 
         if iso2 == "AN":
             return "ANT"
+        if iso2 == "CS":
+            return "SCG"
+        if iso2 == "DD":
+            return "DDR"
 
         result = self.cc.convert(names=iso2, src="ISO2", to="ISO3")
 
