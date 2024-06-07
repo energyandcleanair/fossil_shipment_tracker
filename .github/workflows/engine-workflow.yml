@@ -10,16 +10,18 @@ on:
       - ".github/workflows/engine-workflow.yml"
   workflow_dispatch:
 
+env:
+  PROJECT_ID: ${{ vars.PROJECT_ID }}
+  ENVIRONMENT: ${{ vars.ENVIRONMENT }}
+
+  PYTHON_VERSION: 3.9
+  POETRY_VERSION: 1.8.2
+  POETRY_PLUGIN_EXPORT_VERSION: 1.8.0
+
 jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      PYTHON_VERSION: 3.9
-      POETRY_VERSION: 1.8.2
-      POETRY_PLUGIN_EXPORT_VERSION: 1.8.0
-
-      PROJECT_ID: ${{ vars.PROJECT_ID }}
-      ENVIRONMENT: ${{ vars.ENVIRONMENT }}
 
       DB_URL_PRODUCTION: ${{ secrets.DB_URL_PRODUCTION }}
 
