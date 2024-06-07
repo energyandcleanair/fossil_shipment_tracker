@@ -94,6 +94,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      - name: Authenticate
+        id: 'auth'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v1'
       - name: Build and deploy latest docker image
@@ -106,6 +111,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      - name: Authenticate
+        id: 'auth'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v1'
       - name: Deploy latest job specs
