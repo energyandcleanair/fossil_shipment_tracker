@@ -140,6 +140,16 @@ data__reporters_repsonse = pd.DataFrame(
     ],
 )
 
+data__reporters_response_with_not_found = pd.DataFrame(
+    columns=["reporterCodeIsoAlpha2", "extra"],
+    data=[
+        ["US", "extra"],
+        ["NZ", "extra"],
+        ["EU", "extra"],
+        ["AN", "extra"],
+    ],
+)
+
 
 default_periods = pd.date_range("2021-01-01", "2021-03-31", freq="M").to_period()
 
@@ -393,6 +403,25 @@ def test_ComtradeClient_get_all_reporters__called_with_correct_arguments(mocker)
 def test_ComtradeClient_get_all_reporters__basic_response__correct_response(mocker):
     mocked_getReference = mocker.patch("engines.comtrade_client.comtrade.getReference")
     mocked_getReference.return_value = data__reporters_repsonse
+
+    client = ComtradeClient(api_key="api_key")
+
+    result = client.get_all_reporters()
+
+    expected = pd.DataFrame(
+        columns=["reporter_iso2"],
+        data=[
+            ["US"],
+            ["NZ"],
+        ],
+    )
+
+    assert_frame_equal(result, expected)
+
+
+def test_ComtradeClient_get_data_availability__with_not_found__not_found_excluded(mocker):
+    mocked_getReference = mocker.patch("engines.comtrade_client.comtrade.getReference")
+    mocked_getReference.return_value = data__reporters_response_with_not_found
 
     client = ComtradeClient(api_key="api_key")
 

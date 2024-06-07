@@ -67,7 +67,8 @@ class ComtradeClient:
 
     def get_all_reporters(self):
         """
-        Get all reporters available in the Comtrade API
+        Get all reporters available in the Comtrade API. Will remove any that don't have valid ISO2s
+        in the country_converter library.
         """
         return self._clean_reporters(
             getReference(
@@ -80,6 +81,12 @@ class ComtradeClient:
 
         df = df.dropna(subset=["reporter_iso2"])
         df = df[["reporter_iso2"]]
+
+        df = df[
+            df["reporter_iso2"].apply(lambda x: self.cc.convert(names=x, src="ISO2", to="ISO3"))
+            != "not found"
+        ]
+
         df = df.drop_duplicates()
         return df
 
@@ -271,13 +278,6 @@ class ComtradeClient:
         return data
 
     def _to_iso3(self, iso2: str) -> str:
-
-        if iso2 == "AN":
-            return "ANT"
-        if iso2 == "CS":
-            return "SCG"
-        if iso2 == "DD":
-            return "DDR"
 
         result = self.cc.convert(names=iso2, src="ISO2", to="ISO3")
 
