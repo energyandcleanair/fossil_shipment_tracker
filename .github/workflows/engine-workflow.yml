@@ -59,11 +59,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v3
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: poetry
       - name: Setup Poetry ${{ env.POETRY_VERSION }}
         uses: Gr1N/setup-poetry@v9
         with:
@@ -72,6 +67,13 @@ jobs:
         working-directory: api
         run: |
           poetry self add poetry-plugin-export@${{ env.POETRY_PLUGIN_EXPORT_VERSION }}
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: poetry
+
       - name: Install dependencies
         run: poetry install
         working-directory: ./engine
