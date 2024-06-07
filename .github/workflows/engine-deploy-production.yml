@@ -1,5 +1,4 @@
-# Deploy production
-name: russia-engine-deploy-production
+name: "Engine: Force deploy production"
 
 on: workflow_dispatch
 

@@ -1,4 +1,4 @@
-name: Engine Workflow
+name: "Engine: Full test and deploy"
 
 on:
   push:

@@ -1,10 +1,11 @@
-# Run our tests for engine
-name: russia-engine-test
+name: "API: Test"
 
 on:
   pull_request:
-    branches:
-      - master
+    paths:
+      - "api/**"
+      - "base/**"
+      - ".github/workflows/russia-api-test.yml"
 
 jobs:
   build:
@@ -19,6 +20,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         ref: ${{ github.event.pull_request.head.sha }}
+
     - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v3
       with:
@@ -27,12 +29,17 @@ jobs:
       uses: Gr1N/setup-poetry@v9
       with:
         poetry-version: ${{ env.POETRY_VERSION }}
+
     - name: Install dependencies
-      run: pip install -r requirements.txt
+      run: poetry install
+      working-directory: ./api/
+
     - name: Test with pytest
+      working-directory: ./api/
       env:
         PROJECT_ID: ${{ vars.PROJECT_ID }}
         ENVIRONMENT: ${{ vars.ENVIRONMENT }}
+        API_KEY: ${{ secrets.API_KEY }}
 
         DB_URL_PRODUCTION: ${{ secrets.DB_URL_PRODUCTION }}
 
@@ -40,19 +47,5 @@ jobs:
         PGPORT_PRODUCTION: ${{ secrets.PGPORT_PRODUCTION }}
         PGUSER_PRODUCTION: ${{ secrets.PGUSER_PRODUCTION }}
         PGPASSWORD_PRODUCTION: ${{ secrets.PGPASSWORD_PRODUCTION }}
-
-        KEY_MARINETRAFFIC_EV01: ${{ secrets.KEY_MARINETRAFFIC_EV01 }}
-        KEY_MARINETRAFFIC_VI01: ${{ secrets.KEY_MARINETRAFFIC_VI01 }}
-        KEY_MARINETRAFFIC_VD02: ${{ secrets.KEY_MARINETRAFFIC_VD02 }}
-        KEY_MARINETRAFFIC_EV02: ${{ secrets.KEY_MARINETRAFFIC_EV02 }}
-        KEY_MARINETRAFFIC_PS01: ${{ secrets.KEY_MARINETRAFFIC_PS01 }}
-        KEY_MARINETRAFFIC_EV01_CALL_BASED: ${{ secrets.KEY_MARINETRAFFIC_EV01_CALL_BASED }}
-
-        KEY_DATALASTIC: ${{ secrets.KEY_DATALASTIC }}
-
-        EQUASIS_PASSWORD: ${{ secrets.EQUASIS_PASSWORD }}
-        EQUASIS_ACCOUNT_RANGE_START: ${{ vars.EQUASIS_ACCOUNT_RANGE_START }}
-        EQUASIS_ACCOUNT_RANGE_END: ${{ vars.EQUASIS_ACCOUNT_RANGE_END }}
-
       run: |
         poetry run pytest -c ./tests/pytest.ini -v

@@ -1,5 +1,4 @@
-# Deploy production
-name: russia-api-deploy-production
+name: "API: Force deploy production"
 
 on: workflow_dispatch
 

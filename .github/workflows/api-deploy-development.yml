@@ -1,11 +1,14 @@
-# Deploy development
-name: russia-api-deploy-development
+name: "API: Deploy development"
 
 on:
   workflow_dispatch:
   push:
     branches:
       - master
+    paths:
+      - "api/**"
+      - "base/**"
+      - ".github/workflows/russia-api-deploy-development.yml"
 
 jobs:
   build:
