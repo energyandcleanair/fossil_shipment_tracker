@@ -90,6 +90,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v1'
       - name: Build and deploy latest docker image
@@ -100,6 +102,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v1'
       - name: Deploy latest job specs
