@@ -5,7 +5,7 @@ on:
     paths:
       - "api/**"
       - "base/**"
-      - ".github/workflows/russia-api-test.yml"
+      - ".github/workflows/api-test.yml"
 
 jobs:
   build:

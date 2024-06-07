@@ -8,7 +8,7 @@ on:
     paths:
       - "api/**"
       - "base/**"
-      - ".github/workflows/russia-api-deploy-development.yml"
+      - ".github/workflows/api-deploy-development.yml"
 
 jobs:
   build:
