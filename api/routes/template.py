@@ -550,6 +550,10 @@ class TemplateResource(Resource):
         return result
 
     def spread_currencies(self, result, prehashed=False):
+
+        if "currency" not in result.columns:
+            return result
+
         # We simply want to pivot across currencies
         # But pandas need clean non-null and hashable data, hence this whole function...
         len_before = len(result)

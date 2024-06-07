@@ -36,6 +36,7 @@ from .entsogflow import *
 from .commodity import *
 from .alert import *
 from .flaring import *
+from .comtrade import *
 
 from .kpler_flow import *
 from .kpler_trade import *
