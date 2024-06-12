@@ -104,32 +104,3 @@ def test_ComtradeClient_get_all_reporters__gets_all_reporters():
     assert set(reporters.columns) == set(["reporter_iso2"])
     assert all(reporters["reporter_iso2"].str.len() == 2)
     assert "IN" in reporters["reporter_iso2"].values
-
-
-@pytest.mark.skip
-def test_ComtradeClient_get_all_reporters__rate_limit():
-    client = ComtradeClient(api_key=get_env("RATE_LIMIT_COMTRADE_API_KEY"))
-
-    RATE_LIMIT_PER_DAY = 500
-
-    for i in range(RATE_LIMIT_PER_DAY + 10):
-        print(f"Rate limit request {i}")
-        try:
-            results = client.get_data_availability(
-                periods=pd.date_range("2021-01-01", "2021-02-01", freq="M").to_period()
-            )
-
-            print(results)
-        except ComtradeRateLimitReached:
-            break
-
-    with pytest.raises(ComtradeRateLimitReached):
-        client.get_data_availability(
-            periods=pd.date_range("2021-01-01", "2021-12-31", freq="M").to_period()
-        )
-    with pytest.raises(ComtradeRateLimitReached):
-        client.get_monthly_trades_for_periods(
-            reporter="US",
-            periods=pd.date_range("2021-01-01", "2021-03-31", freq="M").to_period().to_list(),
-            commodities=[e for e in ComtradeCommodities],
-        )
