@@ -269,11 +269,11 @@ def test_ComtradeClient_get_data_availability__r4_and_eur_countries_returned__r4
 
 def test_ComtradeClient_get_monthly_trades_for_periods__called_with_correct_arguments(mocker):
     mocked_getFinalData = mocker.patch("engines.comtrade_client.comtrade.getFinalData")
-    mocked_getFinalData.return_value = availability__basic_response
+    mocked_getFinalData.return_value = data__basic_response
 
     client = ComtradeClient(api_key="api_key")
 
-    client._get_monthly_imports_for_period_subset(
+    client.get_monthly_trades_for_periods(
         reporter="US",
         periods=[to_month("2021-01"), to_month("2021-02")],
         commodities=[ComtradeCommodities.COAL],
@@ -287,13 +287,17 @@ def test_ComtradeClient_get_monthly_trades_for_periods__called_with_correct_argu
     assert kwargs.get("clCode") == "HS"
     assert kwargs.get("flowCode") == "M,X"
     assert kwargs.get("period") == "202101,202102"
-    assert kwargs.get("reporterCode") == comtradeapicall.convertCountryIso3ToCode("USA")
+    assert set(kwargs.get("reporterCode").split(",")) == set(
+        ["840", "841", "842"]
+    )  # Predefined codes for US
     assert kwargs.get("cmdCode") == "2701"
     assert kwargs.get("partnerCode") is None
     assert kwargs.get("partner2Code") is None
     assert kwargs.get("customsCode") == "C00"
     assert kwargs.get("motCode") == "0"
     assert kwargs.get("includeDesc") == True
+
+    assert mocked_getFinalData.call_count == 1
 
 
 def test_ComtradeClient_get_monthly_trades_for_periods__no_results__empty_results_returned(mocker):
