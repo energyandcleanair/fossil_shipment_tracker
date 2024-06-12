@@ -64,9 +64,11 @@ data__basic_response = pd.DataFrame(
             "partnerISO": "NZL",
             "cmdCode": "2701",
             "flowDesc": "Import",
-            "qty": 1000,
-            "qtyUnitAbbr": "kg",
-            "primaryValue": 1000,
+            "netWgt": 1000,
+            "isNetWgtEstimated": False,
+            "qty": 900,
+            "qtyUnitAbbr": "kg",  # no longer used
+            "primaryValue": 1000,  # no longer used
             "extra": "extra",
         },
         {
@@ -75,8 +77,10 @@ data__basic_response = pd.DataFrame(
             "partnerISO": "NZL",
             "cmdCode": "2701",
             "flowDesc": "Export",
-            "qty": 1000,
-            "qtyUnitAbbr": "kg",
+            "netWgt": 1000,
+            "isNetWgtEstimated": True,
+            "qty": 900,  # no longer used
+            "qtyUnitAbbr": "kg",  # no longer used
             "primaryValue": 1000,
             "extra": "extra",
         },
@@ -91,8 +95,10 @@ data__basic_with_not_found_isos = pd.DataFrame(
             "partnerISO": "R4",
             "cmdCode": "2701",
             "flowDesc": "Import",
-            "qty": 1000,
-            "qtyUnitAbbr": "kg",
+            "netWgt": 1000,
+            "isNetWgtEstimated": False,
+            "qty": 900,  # no longer used
+            "qtyUnitAbbr": "kg",  # no longer used
             "primaryValue": 1000,
             "extra": "extra",
         },
@@ -102,8 +108,10 @@ data__basic_with_not_found_isos = pd.DataFrame(
             "partnerISO": "W00",
             "cmdCode": "2701",
             "flowDesc": "Export",
-            "qty": 1000,
-            "qtyUnitAbbr": "kg",
+            "netWgt": 1000,
+            "isNetWgtEstimated": False,
+            "qty": 900,  # no longer used
+            "qtyUnitAbbr": "kg",  # no longer used
             "primaryValue": 1000,
             "extra": "extra",
         },
@@ -113,8 +121,10 @@ data__basic_with_not_found_isos = pd.DataFrame(
             "partnerISO": "S19",
             "cmdCode": "2701",
             "flowDesc": "Export",
-            "qty": 1000,
-            "qtyUnitAbbr": "kg",
+            "netWgt": 1000,
+            "isNetWgtEstimated": False,
+            "qty": 900,  # no longer used
+            "qtyUnitAbbr": "kg",  # no longer used
             "primaryValue": 1000,
             "extra": "extra",
         },
@@ -124,8 +134,10 @@ data__basic_with_not_found_isos = pd.DataFrame(
             "partnerISO": "EUR",
             "cmdCode": "2701",
             "flowDesc": "Export",
-            "qty": 1000,
-            "qtyUnitAbbr": "kg",
+            "netWgt": 1000,
+            "isNetWgtEstimated": False,
+            "qty": 900,  # no longer used
+            "qtyUnitAbbr": "kg",  # no longer used
             "primaryValue": 1000,
             "extra": "extra",
         },
@@ -303,8 +315,8 @@ def test_ComtradeClient_get_monthly_trades_for_periods__no_results__empty_result
             "commodity_code",
             "flow_direction",
             "period",
-            "quantity",
-            "quantity_unit",
+            "value_kg",
+            "value_kg_estimated",
             "value_usd",
         ],
         data=[],
@@ -333,8 +345,8 @@ def test_ComtradeClient_get_monthly_trades_for_periods__basic_response__correct_
                 "commodity_code": "2701",
                 "flow_direction": "Import",
                 "period": to_month("2021-01"),
-                "quantity": 1000,
-                "quantity_unit": "kg",
+                "value_kg": 1000,
+                "value_kg_estimated": False,
                 "value_usd": 1000,
             },
             {
@@ -343,8 +355,8 @@ def test_ComtradeClient_get_monthly_trades_for_periods__basic_response__correct_
                 "commodity_code": "2701",
                 "flow_direction": "Export",
                 "period": to_month("2021-01"),
-                "quantity": 1000,
-                "quantity_unit": "kg",
+                "value_kg": 1000,
+                "value_kg_estimated": True,
                 "value_usd": 1000,
             },
         ]

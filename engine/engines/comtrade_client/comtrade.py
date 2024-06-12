@@ -245,8 +245,8 @@ class ComtradeClient:
             "commodity_code",
             "flow_direction",
             "period",
-            "quantity",
-            "quantity_unit",
+            "value_kg",
+            "value_kg_estimated",
             "value_usd",
         ]
 
@@ -259,14 +259,12 @@ class ComtradeClient:
             lambda x: self.cc.convert(names=x, src="ISO3", to="ISO2")
         )
 
-        data["partner_iso2"] = data["partnerISO"].apply(
-            lambda x: self.cc.convert(names=x, src="ISO3", to="ISO2")
-        )
+        data["partner_iso2"] = self.cc.pandas_convert(data["partnerISO"], src="ISO3", to="ISO2")
 
         data["commodity_code"] = data["cmdCode"].astype(str)
 
-        data["quantity"] = data["qty"]
-        data["quantity_unit"] = data["qtyUnitAbbr"]
+        data["value_kg"] = data["netWgt"]
+        data["value_kg_estimated"] = data["isNetWgtEstimated"]
 
         data["value_usd"] = data["primaryValue"]
 

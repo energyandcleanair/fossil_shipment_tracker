@@ -5,7 +5,11 @@ from engines.comtrade_client.comtrade import ComtradeClient, ComtradeCommodities
 from datetime import date
 
 from base.db import session
-from base.models.comtrade import ComtradeSyncHistory, ComtradeHsTradeRecord
+from base.models.comtrade import (
+    ComtradeSyncHistory,
+    ComtradeHsTradeRecord,
+    CURRENT_DATA_SCHEMA_VERSION,
+)
 
 from base.db_utils import upsert
 from base.logger import logger
@@ -187,7 +191,12 @@ def _to_requests(to_fetch):
 
 def _find_records_which_need_updating(availability: pd.DataFrame):
     logger.info("Finding records which need updating")
-    sync_history = read_sql(session.query(ComtradeSyncHistory).statement, session.bind)
+    sync_history = read_sql(
+        session.query(ComtradeSyncHistory)
+        .where(ComtradeSyncHistory.data_version == CURRENT_DATA_SCHEMA_VERSION)
+        .statement,
+        session.bind,
+    )
 
     if sync_history.empty:
         sync_history = pd.DataFrame(

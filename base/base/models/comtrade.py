@@ -22,6 +22,8 @@ from base.logger import logger
 
 from .table_names import *
 
+CURRENT_DATA_SCHEMA_VERSION = "v2"
+
 
 class ComtradeSyncHistory(Base):
     __tablename__ = DB_TABLE_COMTRADE_SYNC_HISTORY
@@ -31,6 +33,7 @@ class ComtradeSyncHistory(Base):
     commodity_code = Column(String, nullable=False)
     period = Column(Date, nullable=False)
     last_updated = Column(DateTime, nullable=False)
+    data_version = Column(String, nullable=False)
 
     __table_args__ = (
         UniqueConstraint("reporter_iso2", "period", "commodity_code"),
@@ -49,9 +52,8 @@ class ComtradeHsTradeRecord(Base):
     commodity_code = Column(String, nullable=False)
     flow_direction = Column(String, nullable=False)
     period = Column(Date, nullable=False)
-    value = Column(Numeric)
-    quantity = Column(Numeric)
-    quantity_unit = Column(String)
+    value_kg = Column(Numeric)
+    value_kg_estimated = Column(Boolean)
     value_usd = Column(Numeric)
 
     __table_args__ = (

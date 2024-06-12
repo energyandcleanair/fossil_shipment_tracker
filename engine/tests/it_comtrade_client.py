@@ -57,6 +57,9 @@ def test_ComtradeClient_get_data(api_key):
     assert set(data["flow_direction"]) == set(
         ["Import", "Export"]
     ), "Expect both import and export flows"
+    assert "value_kg" in data.columns
+    assert "value_kg_estimated" in data.columns
+    assert "value_usd" in data.columns
 
 
 @pytest.mark.integration
