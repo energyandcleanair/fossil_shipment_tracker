@@ -1,0 +1,1252 @@
+{
+  "results": [
+    {
+      "country_area_code": 4,
+      "iso3": "AFG"
+    },
+    {
+      "country_area_code": 472,
+      "iso3": "_AC"
+    },
+    {
+      "country_area_code": 248,
+      "iso3": "ALA"
+    },
+    {
+      "country_area_code": 8,
+      "iso3": "ALB"
+    },
+    {
+      "country_area_code": 12,
+      "iso3": "DZA"
+    },
+    {
+      "country_area_code": 16,
+      "iso3": "ASM"
+    },
+    {
+      "country_area_code": 20,
+      "iso3": "AND"
+    },
+    {
+      "country_area_code": 24,
+      "iso3": "AGO"
+    },
+    {
+      "country_area_code": 660,
+      "iso3": "AIA"
+    },
+    {
+      "country_area_code": 10,
+      "iso3": "ATA"
+    },
+    {
+      "country_area_code": 28,
+      "iso3": "ATG"
+    },
+    {
+      "country_area_code": 886,
+      "iso3": "YEM"
+    },
+    {
+      "country_area_code": 899,
+      "iso3": "_X "
+    },
+    {
+      "country_area_code": 32,
+      "iso3": "ARG"
+    },
+    {
+      "country_area_code": 51,
+      "iso3": "ARM"
+    },
+    {
+      "country_area_code": 533,
+      "iso3": "ABW"
+    },
+    {
+      "country_area_code": 975,
+      "iso3": "R4 "
+    },
+    {
+      "country_area_code": 36,
+      "iso3": "AUS"
+    },
+    {
+      "country_area_code": 40,
+      "iso3": "AUT"
+    },
+    {
+      "country_area_code": 31,
+      "iso3": "AZE"
+    },
+    {
+      "country_area_code": 44,
+      "iso3": "BHS"
+    },
+    {
+      "country_area_code": 48,
+      "iso3": "BHR"
+    },
+    {
+      "country_area_code": 50,
+      "iso3": "BGD"
+    },
+    {
+      "country_area_code": 52,
+      "iso3": "BRB"
+    },
+    {
+      "country_area_code": 112,
+      "iso3": "BLR"
+    },
+    {
+      "country_area_code": 56,
+      "iso3": "BEL"
+    },
+    {
+      "country_area_code": 58,
+      "iso3": "BEL"
+    },
+    {
+      "country_area_code": 84,
+      "iso3": "BLZ"
+    },
+    {
+      "country_area_code": 204,
+      "iso3": "BEN"
+    },
+    {
+      "country_area_code": 60,
+      "iso3": "BMU"
+    },
+    {
+      "country_area_code": 64,
+      "iso3": "BTN"
+    },
+    {
+      "country_area_code": 68,
+      "iso3": "BOL"
+    },
+    {
+      "country_area_code": 535,
+      "iso3": "BES"
+    },
+    {
+      "country_area_code": 70,
+      "iso3": "BIH"
+    },
+    {
+      "country_area_code": 72,
+      "iso3": "BWA"
+    },
+    {
+      "country_area_code": 74,
+      "iso3": "BVT"
+    },
+    {
+      "country_area_code": 80,
+      "iso3": "ATB"
+    },
+    {
+      "country_area_code": 86,
+      "iso3": "IOT"
+    },
+    {
+      "country_area_code": 92,
+      "iso3": "VGB"
+    },
+    {
+      "country_area_code": 76,
+      "iso3": "BRA"
+    },
+    {
+      "country_area_code": 96,
+      "iso3": "BRN"
+    },
+    {
+      "country_area_code": 100,
+      "iso3": "BGR"
+    },
+    {
+      "country_area_code": 837,
+      "iso3": "X1 "
+    },
+    {
+      "country_area_code": 854,
+      "iso3": "BFA"
+    },
+    {
+      "country_area_code": 108,
+      "iso3": "BDI"
+    },
+    {
+      "country_area_code": 132,
+      "iso3": "CPV"
+    },
+    {
+      "country_area_code": 471,
+      "iso3": "R91"
+    },
+    {
+      "country_area_code": 116,
+      "iso3": "KHM"
+    },
+    {
+      "country_area_code": 120,
+      "iso3": "CMR"
+    },
+    {
+      "country_area_code": 124,
+      "iso3": "CAN"
+    },
+    {
+      "country_area_code": 129,
+      "iso3": "A49"
+    },
+    {
+      "country_area_code": 136,
+      "iso3": "CYM"
+    },
+    {
+      "country_area_code": 140,
+      "iso3": "CAF"
+    },
+    {
+      "country_area_code": 148,
+      "iso3": "TCD"
+    },
+    {
+      "country_area_code": 830,
+      "iso3": "_CI"
+    },
+    {
+      "country_area_code": 152,
+      "iso3": "CHL"
+    },
+    {
+      "country_area_code": 156,
+      "iso3": "CHN"
+    },
+    {
+      "country_area_code": 344,
+      "iso3": "HKG"
+    },
+    {
+      "country_area_code": 446,
+      "iso3": "MAC"
+    },
+    {
+      "country_area_code": 162,
+      "iso3": "CXR"
+    },
+    {
+      "country_area_code": 166,
+      "iso3": "CCK"
+    },
+    {
+      "country_area_code": 170,
+      "iso3": "COL"
+    },
+    {
+      "country_area_code": 174,
+      "iso3": "COM"
+    },
+    {
+      "country_area_code": 178,
+      "iso3": "COG"
+    },
+    {
+      "country_area_code": 184,
+      "iso3": "COK"
+    },
+    {
+      "country_area_code": 188,
+      "iso3": "CRI"
+    },
+    {
+      "country_area_code": 384,
+      "iso3": "CIV"
+    },
+    {
+      "country_area_code": 191,
+      "iso3": "HRV"
+    },
+    {
+      "country_area_code": 192,
+      "iso3": "CUB"
+    },
+    {
+      "country_area_code": 531,
+      "iso3": "CUW"
+    },
+    {
+      "country_area_code": 196,
+      "iso3": "CYP"
+    },
+    {
+      "country_area_code": 203,
+      "iso3": "CZE"
+    },
+    {
+      "country_area_code": 200,
+      "iso3": "CSK"
+    },
+    {
+      "country_area_code": 408,
+      "iso3": "PRK"
+    },
+    {
+      "country_area_code": 278,
+      "iso3": "DDR"
+    },
+    {
+      "country_area_code": 180,
+      "iso3": "COD"
+    },
+    {
+      "country_area_code": 866,
+      "iso3": "VDR"
+    },
+    {
+      "country_area_code": 720,
+      "iso3": "YMD"
+    },
+    {
+      "country_area_code": 208,
+      "iso3": "DNK"
+    },
+    {
+      "country_area_code": 262,
+      "iso3": "DJI"
+    },
+    {
+      "country_area_code": 212,
+      "iso3": "DMA"
+    },
+    {
+      "country_area_code": 214,
+      "iso3": "DOM"
+    },
+    {
+      "country_area_code": 588,
+      "iso3": "PAK"
+    },
+    {
+      "country_area_code": 221,
+      "iso3": "E29"
+    },
+    {
+      "country_area_code": 218,
+      "iso3": "ECU"
+    },
+    {
+      "country_area_code": 818,
+      "iso3": "EGY"
+    },
+    {
+      "country_area_code": 222,
+      "iso3": "SLV"
+    },
+    {
+      "country_area_code": 226,
+      "iso3": "GNQ"
+    },
+    {
+      "country_area_code": 232,
+      "iso3": "ERI"
+    },
+    {
+      "country_area_code": 233,
+      "iso3": "EST"
+    },
+    {
+      "country_area_code": 748,
+      "iso3": "SWZ"
+    },
+    {
+      "country_area_code": 231,
+      "iso3": "ETH"
+    },
+    {
+      "country_area_code": 230,
+      "iso3": "ETH"
+    },
+    {
+      "country_area_code": 697,
+      "iso3": "R20"
+    },
+    {
+      "country_area_code": 492,
+      "iso3": "MCO"
+    },
+    {
+      "country_area_code": 97,
+      "iso3": "EUR"
+    },
+    {
+      "country_area_code": 234,
+      "iso3": "FRO"
+    },
+    {
+      "country_area_code": 238,
+      "iso3": "FLK"
+    },
+    {
+      "country_area_code": 280,
+      "iso3": "DEU"
+    },
+    {
+      "country_area_code": 242,
+      "iso3": "FJI"
+    },
+    {
+      "country_area_code": 246,
+      "iso3": "FIN"
+    },
+    {
+      "country_area_code": 260,
+      "iso3": "ATF"
+    },
+    {
+      "country_area_code": 251,
+      "iso3": "FRA"
+    },
+    {
+      "country_area_code": 838,
+      "iso3": "X2 "
+    },
+    {
+      "country_area_code": 254,
+      "iso3": "GUF"
+    },
+    {
+      "country_area_code": 258,
+      "iso3": "PYF"
+    },
+    {
+      "country_area_code": 583,
+      "iso3": "FSM"
+    },
+    {
+      "country_area_code": 266,
+      "iso3": "GAB"
+    },
+    {
+      "country_area_code": 270,
+      "iso3": "GMB"
+    },
+    {
+      "country_area_code": 268,
+      "iso3": "GEO"
+    },
+    {
+      "country_area_code": 276,
+      "iso3": "DEU"
+    },
+    {
+      "country_area_code": 288,
+      "iso3": "GHA"
+    },
+    {
+      "country_area_code": 292,
+      "iso3": "GIB"
+    },
+    {
+      "country_area_code": 300,
+      "iso3": "GRC"
+    },
+    {
+      "country_area_code": 304,
+      "iso3": "GRL"
+    },
+    {
+      "country_area_code": 308,
+      "iso3": "GRD"
+    },
+    {
+      "country_area_code": 312,
+      "iso3": "GLP"
+    },
+    {
+      "country_area_code": 316,
+      "iso3": "GUM"
+    },
+    {
+      "country_area_code": 320,
+      "iso3": "GTM"
+    },
+    {
+      "country_area_code": 831,
+      "iso3": "GGY"
+    },
+    {
+      "country_area_code": 324,
+      "iso3": "GIN"
+    },
+    {
+      "country_area_code": 624,
+      "iso3": "GNB"
+    },
+    {
+      "country_area_code": 328,
+      "iso3": "GUY"
+    },
+    {
+      "country_area_code": 332,
+      "iso3": "HTI"
+    },
+    {
+      "country_area_code": 334,
+      "iso3": "HMD"
+    },
+    {
+      "country_area_code": 336,
+      "iso3": "VAT"
+    },
+    {
+      "country_area_code": 340,
+      "iso3": "HND"
+    },
+    {
+      "country_area_code": 348,
+      "iso3": "HUN"
+    },
+    {
+      "country_area_code": 352,
+      "iso3": "ISL"
+    },
+    {
+      "country_area_code": 699,
+      "iso3": "IND"
+    },
+    {
+      "country_area_code": 356,
+      "iso3": "IND"
+    },
+    {
+      "country_area_code": 360,
+      "iso3": "IDN"
+    },
+    {
+      "country_area_code": 364,
+      "iso3": "IRN"
+    },
+    {
+      "country_area_code": 368,
+      "iso3": "IRQ"
+    },
+    {
+      "country_area_code": 372,
+      "iso3": "IRL"
+    },
+    {
+      "country_area_code": 833,
+      "iso3": "IMN"
+    },
+    {
+      "country_area_code": 376,
+      "iso3": "ISR"
+    },
+    {
+      "country_area_code": 380,
+      "iso3": "ITA"
+    },
+    {
+      "country_area_code": 388,
+      "iso3": "JAM"
+    },
+    {
+      "country_area_code": 392,
+      "iso3": "JPN"
+    },
+    {
+      "country_area_code": 832,
+      "iso3": "JEY"
+    },
+    {
+      "country_area_code": 400,
+      "iso3": "JOR"
+    },
+    {
+      "country_area_code": 398,
+      "iso3": "KAZ"
+    },
+    {
+      "country_area_code": 404,
+      "iso3": "KEN"
+    },
+    {
+      "country_area_code": 296,
+      "iso3": "KIR"
+    },
+    {
+      "country_area_code": 412,
+      "iso3": "_KS"
+    },
+    {
+      "country_area_code": 414,
+      "iso3": "KWT"
+    },
+    {
+      "country_area_code": 417,
+      "iso3": "KGZ"
+    },
+    {
+      "country_area_code": 473,
+      "iso3": "A79"
+    },
+    {
+      "country_area_code": 418,
+      "iso3": "LAO"
+    },
+    {
+      "country_area_code": 428,
+      "iso3": "LVA"
+    },
+    {
+      "country_area_code": 422,
+      "iso3": "LBN"
+    },
+    {
+      "country_area_code": 426,
+      "iso3": "LSO"
+    },
+    {
+      "country_area_code": 430,
+      "iso3": "LBR"
+    },
+    {
+      "country_area_code": 434,
+      "iso3": "LBY"
+    },
+    {
+      "country_area_code": 438,
+      "iso3": "LIE"
+    },
+    {
+      "country_area_code": 440,
+      "iso3": "LTU"
+    },
+    {
+      "country_area_code": 442,
+      "iso3": "LUX"
+    },
+    {
+      "country_area_code": 450,
+      "iso3": "MDG"
+    },
+    {
+      "country_area_code": 454,
+      "iso3": "MWI"
+    },
+    {
+      "country_area_code": 458,
+      "iso3": "MYS"
+    },
+    {
+      "country_area_code": 462,
+      "iso3": "MDV"
+    },
+    {
+      "country_area_code": 466,
+      "iso3": "MLI"
+    },
+    {
+      "country_area_code": 470,
+      "iso3": "MLT"
+    },
+    {
+      "country_area_code": 584,
+      "iso3": "MHL"
+    },
+    {
+      "country_area_code": 474,
+      "iso3": "MTQ"
+    },
+    {
+      "country_area_code": 478,
+      "iso3": "MRT"
+    },
+    {
+      "country_area_code": 480,
+      "iso3": "MUS"
+    },
+    {
+      "country_area_code": 175,
+      "iso3": "MYT"
+    },
+    {
+      "country_area_code": 250,
+      "iso3": "FRA"
+    },
+    {
+      "country_area_code": 484,
+      "iso3": "MEX"
+    },
+    {
+      "country_area_code": 488,
+      "iso3": "_MI"
+    },
+    {
+      "country_area_code": 496,
+      "iso3": "MNG"
+    },
+    {
+      "country_area_code": 499,
+      "iso3": "MNE"
+    },
+    {
+      "country_area_code": 500,
+      "iso3": "MSR"
+    },
+    {
+      "country_area_code": 504,
+      "iso3": "MAR"
+    },
+    {
+      "country_area_code": 508,
+      "iso3": "MOZ"
+    },
+    {
+      "country_area_code": 104,
+      "iso3": "MMR"
+    },
+    {
+      "country_area_code": 580,
+      "iso3": "MNP"
+    },
+    {
+      "country_area_code": 516,
+      "iso3": "NAM"
+    },
+    {
+      "country_area_code": 520,
+      "iso3": "NRU"
+    },
+    {
+      "country_area_code": 524,
+      "iso3": "NPL"
+    },
+    {
+      "country_area_code": 528,
+      "iso3": "NLD"
+    },
+    {
+      "country_area_code": 530,
+      "iso3": "ANT"
+    },
+    {
+      "country_area_code": 532,
+      "iso3": "ANT"
+    },
+    {
+      "country_area_code": 536,
+      "iso3": "NTZ"
+    },
+    {
+      "country_area_code": 540,
+      "iso3": "NCL"
+    },
+    {
+      "country_area_code": 554,
+      "iso3": "NZL"
+    },
+    {
+      "country_area_code": 558,
+      "iso3": "NIC"
+    },
+    {
+      "country_area_code": 562,
+      "iso3": "NER"
+    },
+    {
+      "country_area_code": 566,
+      "iso3": "NGA"
+    },
+    {
+      "country_area_code": 570,
+      "iso3": "NIU"
+    },
+    {
+      "country_area_code": 574,
+      "iso3": "NFK"
+    },
+    {
+      "country_area_code": 637,
+      "iso3": "A59"
+    },
+    {
+      "country_area_code": 807,
+      "iso3": "MKD"
+    },
+    {
+      "country_area_code": 290,
+      "iso3": "F49"
+    },
+    {
+      "country_area_code": 579,
+      "iso3": "NOR"
+    },
+    {
+      "country_area_code": 578,
+      "iso3": "NOR"
+    },
+    {
+      "country_area_code": 527,
+      "iso3": "O19"
+    },
+    {
+      "country_area_code": 512,
+      "iso3": "OMN"
+    },
+    {
+      "country_area_code": 577,
+      "iso3": "F19"
+    },
+    {
+      "country_area_code": 490,
+      "iso3": "S19"
+    },
+    {
+      "country_area_code": 568,
+      "iso3": "E19"
+    },
+    {
+      "country_area_code": 582,
+      "iso3": "PCI"
+    },
+    {
+      "country_area_code": 586,
+      "iso3": "PAK"
+    },
+    {
+      "country_area_code": 585,
+      "iso3": "PLW"
+    },
+    {
+      "country_area_code": 591,
+      "iso3": "PAN"
+    },
+    {
+      "country_area_code": 590,
+      "iso3": "PAN"
+    },
+    {
+      "country_area_code": 592,
+      "iso3": "PCZ"
+    },
+    {
+      "country_area_code": 598,
+      "iso3": "PNG"
+    },
+    {
+      "country_area_code": 600,
+      "iso3": "PRY"
+    },
+    {
+      "country_area_code": 459,
+      "iso3": "_PM"
+    },
+    {
+      "country_area_code": 604,
+      "iso3": "PER"
+    },
+    {
+      "country_area_code": 608,
+      "iso3": "PHL"
+    },
+    {
+      "country_area_code": 612,
+      "iso3": "PCN"
+    },
+    {
+      "country_area_code": 616,
+      "iso3": "POL"
+    },
+    {
+      "country_area_code": 620,
+      "iso3": "PRT"
+    },
+    {
+      "country_area_code": 630,
+      "iso3": "PRI"
+    },
+    {
+      "country_area_code": 634,
+      "iso3": "QAT"
+    },
+    {
+      "country_area_code": 410,
+      "iso3": "KOR"
+    },
+    {
+      "country_area_code": 498,
+      "iso3": "MDA"
+    },
+    {
+      "country_area_code": 868,
+      "iso3": "VNM"
+    },
+    {
+      "country_area_code": 636,
+      "iso3": "A79"
+    },
+    {
+      "country_area_code": 638,
+      "iso3": "REU"
+    },
+    {
+      "country_area_code": 717,
+      "iso3": "_RN"
+    },
+    {
+      "country_area_code": 642,
+      "iso3": "ROU"
+    },
+    {
+      "country_area_code": 643,
+      "iso3": "RUS"
+    },
+    {
+      "country_area_code": 646,
+      "iso3": "RWA"
+    },
+    {
+      "country_area_code": 647,
+      "iso3": "_RI"
+    },
+    {
+      "country_area_code": 461,
+      "iso3": "_SH"
+    },
+    {
+      "country_area_code": 652,
+      "iso3": "BLM"
+    },
+    {
+      "country_area_code": 654,
+      "iso3": "SHN"
+    },
+    {
+      "country_area_code": 659,
+      "iso3": "KNA"
+    },
+    {
+      "country_area_code": 658,
+      "iso3": "KNA"
+    },
+    {
+      "country_area_code": 662,
+      "iso3": "LCA"
+    },
+    {
+      "country_area_code": 534,
+      "iso3": "SXM"
+    },
+    {
+      "country_area_code": 663,
+      "iso3": "MAF"
+    },
+    {
+      "country_area_code": 666,
+      "iso3": "SPM"
+    },
+    {
+      "country_area_code": 670,
+      "iso3": "VCT"
+    },
+    {
+      "country_area_code": 882,
+      "iso3": "WSM"
+    },
+    {
+      "country_area_code": 674,
+      "iso3": "SMR"
+    },
+    {
+      "country_area_code": 678,
+      "iso3": "STP"
+    },
+    {
+      "country_area_code": 457,
+      "iso3": "_SK"
+    },
+    {
+      "country_area_code": 682,
+      "iso3": "SAU"
+    },
+    {
+      "country_area_code": 686,
+      "iso3": "SEN"
+    },
+    {
+      "country_area_code": 688,
+      "iso3": "SRB"
+    },
+    {
+      "country_area_code": 891,
+      "iso3": "SCG"
+    },
+    {
+      "country_area_code": 690,
+      "iso3": "SYC"
+    },
+    {
+      "country_area_code": 694,
+      "iso3": "SLE"
+    },
+    {
+      "country_area_code": 698,
+      "iso3": "_SM"
+    },
+    {
+      "country_area_code": 702,
+      "iso3": "SGP"
+    },
+    {
+      "country_area_code": 703,
+      "iso3": "SVK"
+    },
+    {
+      "country_area_code": 705,
+      "iso3": "SVN"
+    },
+    {
+      "country_area_code": 90,
+      "iso3": "SLB"
+    },
+    {
+      "country_area_code": 706,
+      "iso3": "SOM"
+    },
+    {
+      "country_area_code": 710,
+      "iso3": "ZAF"
+    },
+    {
+      "country_area_code": 239,
+      "iso3": "SGS"
+    },
+    {
+      "country_area_code": 728,
+      "iso3": "SSD"
+    },
+    {
+      "country_area_code": 711,
+      "iso3": "ZA1"
+    },
+    {
+      "country_area_code": 724,
+      "iso3": "ESP"
+    },
+    {
+      "country_area_code": 839,
+      "iso3": "XX "
+    },
+    {
+      "country_area_code": 144,
+      "iso3": "LKA"
+    },
+    {
+      "country_area_code": 275,
+      "iso3": "PSE"
+    },
+    {
+      "country_area_code": 729,
+      "iso3": "SDN"
+    },
+    {
+      "country_area_code": 736,
+      "iso3": "SDN"
+    },
+    {
+      "country_area_code": 740,
+      "iso3": "SUR"
+    },
+    {
+      "country_area_code": 744,
+      "iso3": "SJM"
+    },
+    {
+      "country_area_code": 752,
+      "iso3": "SWE"
+    },
+    {
+      "country_area_code": 756,
+      "iso3": "CHE"
+    },
+    {
+      "country_area_code": 757,
+      "iso3": "CHE"
+    },
+    {
+      "country_area_code": 760,
+      "iso3": "SYR"
+    },
+    {
+      "country_area_code": 158,
+      "iso3": "TWN"
+    },
+    {
+      "country_area_code": 762,
+      "iso3": "TJK"
+    },
+    {
+      "country_area_code": 835,
+      "iso3": "_TK"
+    },
+    {
+      "country_area_code": 764,
+      "iso3": "THA"
+    },
+    {
+      "country_area_code": 626,
+      "iso3": "TLS"
+    },
+    {
+      "country_area_code": 768,
+      "iso3": "TGO"
+    },
+    {
+      "country_area_code": 772,
+      "iso3": "TKL"
+    },
+    {
+      "country_area_code": 776,
+      "iso3": "TON"
+    },
+    {
+      "country_area_code": 780,
+      "iso3": "TTO"
+    },
+    {
+      "country_area_code": 788,
+      "iso3": "TUN"
+    },
+    {
+      "country_area_code": 792,
+      "iso3": "TUR"
+    },
+    {
+      "country_area_code": 795,
+      "iso3": "TKM"
+    },
+    {
+      "country_area_code": 796,
+      "iso3": "TCA"
+    },
+    {
+      "country_area_code": 798,
+      "iso3": "TUV"
+    },
+    {
+      "country_area_code": 800,
+      "iso3": "UGA"
+    },
+    {
+      "country_area_code": 804,
+      "iso3": "UKR"
+    },
+    {
+      "country_area_code": 784,
+      "iso3": "ARE"
+    },
+    {
+      "country_area_code": 826,
+      "iso3": "GBR"
+    },
+    {
+      "country_area_code": 834,
+      "iso3": "TZA"
+    },
+    {
+      "country_area_code": 581,
+      "iso3": "UMI"
+    },
+    {
+      "country_area_code": 840,
+      "iso3": "USA"
+    },
+    {
+      "country_area_code": 858,
+      "iso3": "URY"
+    },
+    {
+      "country_area_code": 849,
+      "iso3": "PUS"
+    },
+    {
+      "country_area_code": 850,
+      "iso3": "VIR"
+    },
+    {
+      "country_area_code": 842,
+      "iso3": "USA"
+    },
+    {
+      "country_area_code": 841,
+      "iso3": "USA"
+    },
+    {
+      "country_area_code": 810,
+      "iso3": "SUN"
+    },
+    {
+      "country_area_code": 860,
+      "iso3": "UZB"
+    },
+    {
+      "country_area_code": 548,
+      "iso3": "VUT"
+    },
+    {
+      "country_area_code": 862,
+      "iso3": "VEN"
+    },
+    {
+      "country_area_code": 704,
+      "iso3": "VNM"
+    },
+    {
+      "country_area_code": 872,
+      "iso3": "_WI"
+    },
+    {
+      "country_area_code": 876,
+      "iso3": "WLF"
+    },
+    {
+      "country_area_code": 879,
+      "iso3": "F97"
+    },
+    {
+      "country_area_code": 732,
+      "iso3": "ESH"
+    },
+    {
+      "country_area_code": 0,
+      "iso3": "W00"
+    },
+    {
+      "country_area_code": 887,
+      "iso3": "YEM"
+    },
+    {
+      "country_area_code": 890,
+      "iso3": "YUG"
+    },
+    {
+      "country_area_code": 894,
+      "iso3": "ZMB"
+    },
+    {
+      "country_area_code": 836,
+      "iso3": "_ZP"
+    },
+    {
+      "country_area_code": 716,
+      "iso3": "ZWE"
+    }
+  ]
+}

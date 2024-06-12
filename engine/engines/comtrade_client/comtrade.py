@@ -1,9 +1,10 @@
 from enum import Enum
+import json
+import os
 from comtradeapicall import (
     getFinalDataAvailability,
     getFinalData,
     getReference,
-    convertCountryIso3ToCode,
 )
 
 from base.env import get_env
@@ -50,6 +51,21 @@ class FlowCodes(Enum):
 
 total_customs_procedure_code = "C00"
 all_modes_of_supply_code = "0"  # All other codes for mode of supply are not supported
+
+DATA_PATH_ISO3_TO_COMTRADE_CODE = os.path.join(
+    os.path.split(os.path.abspath(__file__))[0], "country_area_code_iso.json"
+)
+
+with open(DATA_PATH_ISO3_TO_COMTRADE_CODE) as f:
+    ISO3_TO_COMTRADE_CODE_JSON = json.load(f)["results"]
+ISO3_TO_COMTRADE_CODE = pd.DataFrame.from_records(ISO3_TO_COMTRADE_CODE_JSON)
+ISO3_TO_COMTRADE_CODE["country_area_code"] = ISO3_TO_COMTRADE_CODE["country_area_code"].astype(str)
+
+
+def convertCountryIso3ToCode(countryIsoCode: str):
+    df = ISO3_TO_COMTRADE_CODE
+    matching_codes = df[df["iso3"] == countryIsoCode]["country_area_code"].tolist()
+    return ",".join(matching_codes)
 
 
 class ComtradeClient:
