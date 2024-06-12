@@ -12,7 +12,7 @@ from base.models.comtrade import (
 )
 
 from base.db_utils import upsert
-from base.logger import logger
+from base.logger import logger, logger_slack
 
 client = ComtradeClient.from_env()
 
@@ -76,6 +76,8 @@ def update_comtrade_data(sync_definitions: pd.DataFrame, force=False):
 
     If force is True, the data will be fetched regardless of whether it has been fetched before.
     """
+
+    logger_slack.info("=== Updating Comtrade ===")
 
     if sync_definitions.empty:
         raise ValueError("No sync definitions provided")
