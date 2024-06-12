@@ -4,6 +4,7 @@ import pytest
 from engines.comtrade_client.comtrade import (
     ComtradeClient,
     ComtradeCommodities,
+    ComtradeRateLimitReached,
 )
 
 from pandas.testing import assert_frame_equal
@@ -165,6 +166,8 @@ data__reporters_response_with_not_found = pd.DataFrame(
 
 default_periods = pd.date_range("2021-01-01", "2021-03-31", freq="M").to_period()
 
+rate_limit_error = {"statusCode": 403, "message": "Rate limit reached"}
+
 
 def test_ComtradeClient_get_data_availability__called_with_correct_arguments(mocker):
     mocked_getFinalDataAvailability = mocker.patch(
@@ -265,6 +268,18 @@ def test_ComtradeClient_get_data_availability__r4_and_eur_countries_returned__r4
     )
 
     assert_frame_equal(result, expected)
+
+
+def test_ComtradeClient_get_data_availability__rate_limit_reached__throws_exception(mocker):
+    mocked_getFinalDataAvailability = mocker.patch(
+        "engines.comtrade_client.comtrade.getFinalDataAvailability"
+    )
+    mocked_getFinalDataAvailability.return_value = rate_limit_error
+
+    client = ComtradeClient(api_key="api_key")
+
+    with pytest.raises(ComtradeRateLimitReached):
+        client.get_data_availability(periods=default_periods)
 
 
 def test_ComtradeClient_get_monthly_trades_for_periods__called_with_correct_arguments(mocker):
@@ -403,6 +418,20 @@ def test_ComtradeClient_get_monthly_trades_for_periods__not_found_iso2s__exclude
     )
 
     assert result.empty
+
+
+def test_ComtradeClient_get_monthly_trades_for_period__rate_limit_error__throws_exception(mocker):
+    mocked_getFinalData = mocker.patch("engines.comtrade_client.comtrade.getFinalData")
+    mocked_getFinalData.return_value = rate_limit_error
+
+    client = ComtradeClient(api_key="api_key")
+
+    with pytest.raises(ComtradeRateLimitReached):
+        client.get_monthly_trades_for_periods(
+            reporter="US",
+            periods=[to_month("2021-01")],
+            commodities=[ComtradeCommodities.COAL],
+        )
 
 
 def test_ComtradeClient_get_all_reporters__called_with_correct_arguments(mocker):

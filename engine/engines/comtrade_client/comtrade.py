@@ -1,6 +1,7 @@
 from enum import Enum
 import json
 import os
+from typing import Union
 from comtradeapicall import (
     getFinalDataAvailability,
     getFinalData,
@@ -16,6 +17,10 @@ import pandas as pd
 
 
 from country_converter import CountryConverter
+
+
+class ComtradeRateLimitReached(Exception):
+    pass
 
 
 class ComtradeCommodities(Enum):
@@ -129,6 +134,8 @@ class ComtradeClient:
             reporterCode=None,
         )
 
+        _handle_rate_limit(data_availability)
+
         return self._clean_availability(data_availability)
 
     def _clean_availability(self, data_availability):
@@ -200,11 +207,11 @@ class ComtradeClient:
 
         period_group_results = []
         for periods_group in periods_groups:
-            period_group_results.append(
-                self._get_monthly_imports_for_period_subset(
-                    reporter=reporter, periods=periods_group, commodities=commodities
-                )
+            period_group_result = self._get_monthly_imports_for_period_subset(
+                reporter=reporter, periods=periods_group, commodities=commodities
             )
+            _handle_rate_limit(period_group_result)
+            period_group_results.append(period_group_result)
 
         joined_results = pd.concat(period_group_results)
 
@@ -299,3 +306,8 @@ class ComtradeClient:
             raise ValueError(f"Reporter {iso2} not found")
 
         return result
+
+
+def _handle_rate_limit(response: Union[pd.DataFrame, dict]):
+    if not isinstance(response, pd.DataFrame) and response["statusCode"] == 403:
+        raise ComtradeRateLimitReached(response["message"])
