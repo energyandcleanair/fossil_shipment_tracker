@@ -80,23 +80,19 @@ def update_comtrade_data(sync_definitions: pd.DataFrame, force=False):
 
     If force is True, the data will be fetched regardless of whether it has been fetched before.
     """
+    logger_slack.info("=== Updating Comtrade ===")
+
+    if sync_definitions.empty:
+        raise ValueError("No sync definitions provided")
+
+    if not all(
+        [col in sync_definitions.columns for col in ["reporter_iso2", "period", "commodity_code"]]
+    ):
+        raise ValueError(
+            "sync_definitions must have columns: reporter_iso2, period, commodity_code"
+        )
 
     try:
-
-        logger_slack.info("=== Updating Comtrade ===")
-
-        if sync_definitions.empty:
-            raise ValueError("No sync definitions provided")
-
-        if not all(
-            [
-                col in sync_definitions.columns
-                for col in ["reporter_iso2", "period", "commodity_code"]
-            ]
-        ):
-            raise ValueError(
-                "sync_definitions must have columns: reporter_iso2, period, commodity_code"
-            )
 
         requests = _identify_requests_to_make(sync_definitions, force=force)
 
