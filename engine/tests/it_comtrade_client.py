@@ -86,8 +86,8 @@ def test_ComtradeClient_get_data__next_month(api_key):
             "commodity_code",
             "flow_direction",
             "period",
-            "quantity",
-            "quantity_unit",
+            "value_kg",
+            "value_kg_estimated",
             "value_usd",
         ]
     ), "Expected the columns to be present"
