@@ -1,6 +1,10 @@
 import pandas as pd
 from pandas import read_sql
-from engines.comtrade_client.comtrade import ComtradeClient, ComtradeCommodities
+from engines.comtrade_client.comtrade import (
+    ComtradeClient,
+    ComtradeCommodities,
+    ComtradeRateLimitReached,
+)
 
 from datetime import date
 
@@ -77,43 +81,58 @@ def update_comtrade_data(sync_definitions: pd.DataFrame, force=False):
     If force is True, the data will be fetched regardless of whether it has been fetched before.
     """
 
-    logger_slack.info("=== Updating Comtrade ===")
+    try:
 
-    if sync_definitions.empty:
-        raise ValueError("No sync definitions provided")
+        logger_slack.info("=== Updating Comtrade ===")
 
-    if not all(
-        [col in sync_definitions.columns for col in ["reporter_iso2", "period", "commodity_code"]]
-    ):
-        raise ValueError(
-            "sync_definitions must have columns: reporter_iso2, period, commodity_code"
-        )
+        if sync_definitions.empty:
+            raise ValueError("No sync definitions provided")
 
-    requests = _identify_requests_to_make(sync_definitions, force=force)
-
-    if not requests.empty:
-        for request in requests:
-            logger.info(f"Updating {request['reporter_iso2']}")
-
-            last_updated = pd.Timestamp.now()
-
-            comtrade_results = _get_data_from_comtrade_for_request(request)
-            sync_history = _convert_request_to_sync_records(request, last_updated)
-
-            logger.info(f"Upserting {comtrade_results.shape[0]} trade records")
-            upsert(
-                df=comtrade_results,
-                table=ComtradeHsTradeRecord.__tablename__,
-                constraint_name="comtrade_hs_record_unique",
+        if not all(
+            [
+                col in sync_definitions.columns
+                for col in ["reporter_iso2", "period", "commodity_code"]
+            ]
+        ):
+            raise ValueError(
+                "sync_definitions must have columns: reporter_iso2, period, commodity_code"
             )
-            logger.info(f"Upserting sync history")
-            upsert(
-                df=sync_history,
-                table=ComtradeSyncHistory.__tablename__,
-                constraint_name="comtrade_sync_history_unique",
-            )
-    else:
-        logger.info("No new data to fetch")
+
+        requests = _identify_requests_to_make(sync_definitions, force=force)
+
+        if not requests.empty:
+            for request in requests:
+                logger.info(f"Updating {request['reporter_iso2']}")
+
+                last_updated = pd.Timestamp.now()
+
+                comtrade_results = _get_data_from_comtrade_for_request(request)
+                sync_history = _convert_request_to_sync_records(request, last_updated)
+
+                logger.info(f"Upserting {comtrade_results.shape[0]} trade records")
+                upsert(
+                    df=comtrade_results,
+                    table=ComtradeHsTradeRecord.__tablename__,
+                    constraint_name="comtrade_hs_record_unique",
+                )
+                logger.info(f"Upserting sync history")
+                upsert(
+                    df=sync_history,
+                    table=ComtradeSyncHistory.__tablename__,
+                    constraint_name="comtrade_sync_history_unique",
+                )
+        else:
+            logger.info("No new data to fetch")
+    except ComtradeRateLimitReached as e:
+        msg = f"Comtrade rate limit reached, stopping: {e}"
+        logger.error(msg)
+        logger_slack.warn(msg)
+        return
+    except Exception as e:
+        msg = f"Error updating comtrade data: {e}"
+        logger.error(msg)
+        logger_slack.error(msg)
+        return
 
 
 def _convert_request_to_sync_records(request, last_updated):
