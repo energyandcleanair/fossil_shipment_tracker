@@ -794,6 +794,8 @@ class KplerTradeResource(TemplateResource):
                 KplerTradeComputed.step_zone_regions,
                 KplerTradeComputed.step_zone_ids,
                 is_sts_field,
+                KplerTradeComputed.largest_vessel_type,
+                KplerTradeComputed.largest_vessel_capacity_cm,
             )
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
