@@ -183,6 +183,9 @@ class KplerTradeComputed(Base):
     step_zone_regions = Column(ARRAY(String))
     step_zone_ids = Column(ARRAY(Numeric))
 
+    largest_vessel_type = Column(String)
+    largest_vessel_capacity_cm = Column(Numeric)
+
     vessel_ages = Column(ARRAY(Numeric))
     avg_vessel_age = Column(Numeric)
 

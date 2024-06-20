@@ -7,7 +7,7 @@ from sqlalchemy import func, tablesample, nulls_last, case
 from sqlalchemy.orm import aliased
 
 from base.db import session
-from base.models.kpler import KplerTrade, KplerTradeComputed, KplerProduct, KplerZone
+from base.models.kpler import KplerTrade, KplerTradeComputed, KplerProduct, KplerZone, KplerVessel
 
 import sqlalchemy as sa
 
@@ -34,7 +34,7 @@ def test_sample_computed():
             except AssertionError as e:
                 errors.append(e)
     if errors:
-        all_errors = "\n".join(errors)
+        all_errors = "\n".join([str(error) for error in errors])
         raise AssertionError(f"Errors found in {len(errors)} samples: {all_errors}")
 
 
@@ -129,9 +129,36 @@ def test_sample(sample: KplerTradeComputed):
         owner_details=owner_companies,
     )
 
-    assert (
-        sample.eur_per_tonne == expected_price.eur_per_tonne
+    assert sample.eur_per_tonne == (
+        expected_price.eur_per_tonne if expected_price else None
     ), f"Computed price is wrong for {sample_id}: expected {expected_price.eur_per_tonne} got {sample.eur_per_tonne}"
+
+    kpler_vessels_for_trade = (
+        session.query(
+            KplerVessel.imo,
+            KplerVessel.type_class_name,
+            KplerVessel.type_name,
+            KplerVessel.capacity_cm,
+        )
+        .filter(KplerVessel.imo.in_(trade.vessel_imos))
+        .all()
+    )
+
+    largest_vessel = max(kpler_vessels_for_trade, key=lambda x: x.capacity_cm, default=None)
+
+    expected_name = "unknown"
+    if largest_vessel:
+        if largest_vessel.type_class_name:
+            expected_name = largest_vessel.type_class_name
+        elif largest_vessel.type_name:
+            expected_name = largest_vessel.type_name
+
+    assert (
+        sample.largest_vessel_type == expected_name
+    ), f"Computed largest vessel type is wrong for {sample_id}: expected {largest_vessel.type_class_name} got {sample.largest_vessel_type}"
+    assert (
+        sample.largest_vessel_capacity_cm == largest_vessel.capacity_cm
+    ), f"Computed largest vessel capacity is wrong for {sample_id}: expected {largest_vessel.capacity_cm} got {sample.largest_vessel_capacity_cm}"
 
 
 def get_expected_price(

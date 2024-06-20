@@ -19,7 +19,9 @@ INSERT INTO
     step_zone_regions,
     step_zone_ids,
     vessel_ages,
-    avg_vessel_age
+    avg_vessel_age,
+    largest_vessel_type,
+    largest_vessel_capacity_cm
   )
 SELECT
   trade_id,
@@ -41,6 +43,8 @@ SELECT
   step_zone_regions,
   step_zone_ids,
   vessel_ages,
-  avg_vessel_age
+  avg_vessel_age,
+  largest_vessel_type,
+  largest_vessel_capacity_cm
 FROM
   ktc_kpler_trade_computed;

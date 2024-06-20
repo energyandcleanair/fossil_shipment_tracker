@@ -39,7 +39,9 @@ SELECT
     ARRAY [] :: numeric []
   ) AS step_zone_ids,
   ktc_vessel_ages_for_trade.vessel_ages,
-  ktc_vessel_ages_for_trade.avg_vessel_age
+  ktc_vessel_ages_for_trade.avg_vessel_age,
+  ktc_trade_vessel_type.largest_vessel_type,
+  ktc_trade_vessel_type.largest_vessel_capacity_cm
 FROM
   kpler_trade
   LEFT OUTER JOIN kpler_product ON kpler_trade.product_id = kpler_product.id
@@ -69,6 +71,8 @@ FROM
   AND kpler_trade.flow_id = ktc_trade_step_zones.flow_id
   LEFT OUTER JOIN ktc_vessel_ages_for_trade ON kpler_trade.id = ktc_vessel_ages_for_trade.trade_id
   AND kpler_trade.flow_id = ktc_vessel_ages_for_trade.flow_id
+  LEFT OUTER JOIN ktc_trade_vessel_type ON kpler_trade.id = ktc_trade_vessel_type.trade_id
+  AND kpler_trade.flow_id = ktc_trade_vessel_type.flow_id
 WHERE
   kpler_trade.is_valid
   AND price.scenario IS NOT NULL
