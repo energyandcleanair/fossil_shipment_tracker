@@ -81,12 +81,14 @@ class KplerClient:
         *,
         params=None,
         body=None,
+        base_path="/api/",
     ):
         self._handle_rate_limiting()
 
         token = self.token_manager.get_token()
         headers = self._generate_headers(token)
-        full_url = f"https://terminal.kpler.com/api/{url}"
+
+        full_url = f"https://terminal.kpler.com{base_path}{url}"
 
         logger.info(f"Making Kpler request with url={full_url}, params={params}, body={body}")
 
