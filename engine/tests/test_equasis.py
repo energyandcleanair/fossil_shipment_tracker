@@ -1,4 +1,7 @@
+from datetime import date
+from unittest.mock import MagicMock
 from engines.company_scraper.equasis import (
+    Equasis,
     EquasisSession,
     EquasisSessionPool,
     EquasisSessionUnavailable,
@@ -31,6 +34,12 @@ def session_expired_body():
 @pytest.fixture(scope="session")
 def session_cancelled_body():
     with open("tests/equasis_responses/session_cancelled.html") as f:
+        return f.read()
+
+
+@pytest.fixture(scope="session")
+def ship_details_body():
+    with open("tests/equasis_responses/ship_details.html") as f:
         return f.read()
 
 
@@ -269,3 +278,37 @@ def test_EquasisSessionPool__make_request__can_use_more_sessions_more_than_once(
 
     response = session_pool.make_request(example_url, {})
     assert response == "test2 response"
+
+
+def test_Equasis__get_ship_infos__has_ship_infos(ship_details_body):
+
+    mocked_pool = MagicMock()
+
+    mocked_pool.make_request.return_value = ship_details_body
+
+    equasis = Equasis(session_pool=mocked_pool)
+
+    actual = equasis.get_ship_infos("example_imo")
+
+    assert actual["imo"] == "example_imo"
+    assert len(actual["insurers"]) == 1
+    assert actual["insurers"][0]["name"] == "Japan Ship Owners' P&I Association"
+    assert actual["insurers"][0]["date_from"] == date(2024, 6, 7)
+
+    assert actual["manager"]["name"] == "NORSTAR SHIP MANAGEMENT PTE"
+    assert actual["manager"]["imo"] == "5441828"
+    assert (
+        actual["manager"]["address"]
+        == "13-01, Singapore Post Centre, 10, Eunos Road 8, Singapore 408600"
+    )
+    assert actual["manager"]["date_from"].date() == date(2020, 7, 27)
+
+    assert actual["owner"]["name"] == "YAOKI SHIPPING & MH PROGRESS"
+    assert actual["owner"]["imo"] == "5994067"
+    assert (
+        actual["owner"]["address"]
+        == "Care of Uni-Tankers A/S , Turbinevej 10, 5500 Middelfart, Denmark."
+    )
+    assert actual["owner"]["date_from"].date() == date(2017, 8, 9)
+
+    assert actual["current_flag"] == "Panama"

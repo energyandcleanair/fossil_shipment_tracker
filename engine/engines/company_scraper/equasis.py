@@ -186,8 +186,11 @@ class EquasisSessionPool:
 
 
 class Equasis:
-    def __init__(self):
-        self.sessions = EquasisSessionPool.with_account_generator()
+    def __init__(self, session_pool=None):
+        if session_pool is None:
+            self.sessions = EquasisSessionPool.with_account_generator()
+        else:
+            self.sessions = session_pool
 
     def _clean_text(self, text):
         text = text.replace("\t", "").replace("\r", "").replace("\n", "")
@@ -321,6 +324,18 @@ class Equasis:
             if "insurers" not in ship_data or len(ship_data["insurers"]) == 0:
                 logger.debug("No owner, manager or insurer found for ship %s:" % (imo))
                 ship_data["insurers"] = [{"name": base.UNKNOWN_INSURER}]
+
+        # Flag
+        flag = None
+        flag_label_div = html_obj.body.find("b", string=re.compile("Flag"))
+        if flag_label_div:
+            flag_wrapper_div = flag_label_div.parent.parent
+            if flag_wrapper_div:
+                flag_text = flag_wrapper_div.find_all("div")[-1].get_text()
+                if flag_text:
+                    flag = self._clean_text(flag_text.replace("(", "").replace(")", ""))
+
+        ship_data["current_flag"] = flag
 
         return ship_data
 

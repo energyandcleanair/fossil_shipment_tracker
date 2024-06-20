@@ -281,13 +281,19 @@ def find_ships_that_need_updating(
             ShipInsurer.checked_on,
             ShipInsurer.updated_on.label("last_updated"),
             ShipInsurer.consecutive_failures,
+            ShipOwner.updated_on.label("last_updated_owner"),
             filter_query.c.commodity,
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
+        .outerjoin(ShipOwner, ShipOwner.ship_imo == Ship.imo)
         .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
         .filter(ShipInsurer.is_valid == True)
         .distinct(filter_query.c.ship_imo)
-        .order_by(filter_query.c.ship_imo, nullslast(ShipInsurer.updated_on.desc()))
+        .order_by(
+            filter_query.c.ship_imo,
+            nullslast(ShipInsurer.updated_on.desc()),
+            nullslast(ShipOwner.updated_on.desc()),
+        )
     )
 
     if commodities:
@@ -345,15 +351,21 @@ def find_ships_that_need_updating(
         force_unknown, imo_query.c.company_raw_name == base.UNKNOWN_INSURER
     )
 
+    needs_update_insurance = sa.or_(
+        not_yet_searched,
+        unknown_and_needs_update,
+        known_and_needs_update,
+        expected_insurance_expiry_and_needs_update,
+        forced_unknown_update,
+    )
+
+    needs_update_ship_info = sa.or_(
+        imo_query.c.last_updated_owner != None
+        and imo_query.c.last_updated_owner <= dt.date.today() - dt.timedelta(days=30 * 9),
+    )
+
     needs_update = sa.and_(
-        not_in_backoff_period,
-        sa.or_(
-            not_yet_searched,
-            unknown_and_needs_update,
-            known_and_needs_update,
-            expected_insurance_expiry_and_needs_update,
-            forced_unknown_update,
-        ),
+        not_in_backoff_period, sa.or_(needs_update_insurance, needs_update_ship_info)
     )
 
     imo_query = session.query(imo_query).filter(needs_update)
