@@ -91,6 +91,11 @@ class KplerVessel(Base):
     dwt = Column(Numeric)  # in tonnes
     build_date = Column(Date)
 
+    type_class_name = Column(String)
+    class_name = Column(String)
+    type_name = Column(String)
+    capacity_cm = Column(Numeric)
+
     country_iso2 = Column(String)
     country_name = Column(String)
     others = Column(JSONB)

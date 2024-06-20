@@ -152,6 +152,10 @@ class KplerTradeScraper(KplerScraper):
                 "mmsi": x.get("mmsi"),
                 "dwt": x.get("deadWeight"),
                 "build_date": self._parse_trade_vessels_build_date(x),
+                "type_name": x.get("vesselType"),
+                "type_class_name": x.get("vesselTypeClass"),
+                "class_name": x.get("vesselClass"),
+                "capacity_cm": x.get("capacity"),
                 "others": x,
             }
             for x in vessels
