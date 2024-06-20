@@ -1,8 +1,9 @@
 import datetime as dt
 import logging
 import re
+from typing import TypedDict
 
-from sqlalchemy import func, tablesample, nulls_last
+from sqlalchemy import func, tablesample, nulls_last, case
 from sqlalchemy.orm import aliased
 
 from base.db import session
@@ -168,8 +169,13 @@ def get_expected_price(
             get_price_for_trade_ship(prices, destination_zone, insurer_details[i], owner_details[i])
             for (i, _) in enumerate(trade.vessel_imos)
         ]
+
+        not_null_prices = [price for price in prices if price.eur_per_tonne is not None]
+
+        min_price = min(not_null_prices, key=lambda x: x.eur_per_tonne, default=None)
+
         # Get minimum price
-        return sorted(prices, key=lambda x: x.eur_per_tonne)[0]
+        return min_price
 
 
 def get_price_for_trade_ship(
