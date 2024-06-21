@@ -305,6 +305,7 @@ def find_ships_that_need_updating(
             ShipInsurer.consecutive_failures,
             ShipOwner.updated_on.label("last_updated_owner"),
             ShipFlag.updated_on.label("last_updated_flag"),
+            ShipFlag.flag_iso2,
             filter_query.c.commodity,
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
@@ -390,6 +391,7 @@ def find_ships_that_need_updating(
     )
 
     needs_update_ship_flag = sa.or_(
+        imo_query.c.flag_iso2 == None,
         imo_query.c.last_updated_flag != None,
         imo_query.c.last_updated_flag <= dt.date.today() - dt.timedelta(days=30 * 3),
     )
