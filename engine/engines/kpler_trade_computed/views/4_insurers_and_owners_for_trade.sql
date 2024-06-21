@@ -17,11 +17,8 @@ SELECT
     ORDER BY
       ktc_trade_ship.ship_order
   ) AS ship_owner_regions,
-  bool_or(
-    ktc_voyage_owner.region = 'EU'
-    OR ktc_voyage_owner.iso2 IN ('CA', 'FR', 'DE', 'IT', 'JP', 'GB', 'US')
-  ) AS owned_in_pcc,
-  bool_or(ktc_voyage_owner.iso2 = 'NO') AS owned_in_norway,
+  bool_or(ktc_voyage_owner.in_pcc) AS owned_in_pcc,
+  bool_or(ktc_voyage_owner.in_norway) AS owned_in_norway,
   bool_or(ktc_voyage_owner.iso2 IS NOT NULL) AS owner_known,
   array_agg(
     coalesce(ktc_voyage_insurer.name, 'unknown')
@@ -38,11 +35,15 @@ SELECT
     ORDER BY
       ktc_trade_ship.ship_order
   ) AS ship_insurer_regions,
-  bool_or(
-    ktc_voyage_insurer.region = 'EU'
-    OR ktc_voyage_insurer.iso2 IN ('CA', 'FR', 'DE', 'IT', 'JP', 'GB', 'US')
-  ) AS insured_in_pcc,
-  bool_or(ktc_voyage_insurer.iso2 = 'NO') AS insured_in_norway
+  bool_or(ktc_voyage_insurer.in_pcc) AS insured_in_pcc,
+  bool_or(ktc_voyage_insurer.in_norway) AS insured_in_norway,
+  array_agg(
+    coalesce(ktc_voyage_flag.iso2, 'unknown')
+    ORDER BY
+      ktc_trade_ship.ship_order
+  ) AS ship_flag_iso2s,
+  bool_or(ktc_voyage_flag.in_pcc) AS flag_in_pcc,
+  bool_or(ktc_voyage_flag.in_norway) AS flag_in_norway
 FROM
   kpler_trade
   JOIN ktc_trade_ship ON kpler_trade.id = ktc_trade_ship.trade_id
@@ -53,6 +54,9 @@ FROM
   LEFT OUTER JOIN ktc_voyage_insurer ON ktc_voyage_insurer.trade_id = kpler_trade.id
   AND ktc_voyage_insurer.flow_id = kpler_trade.flow_id
   AND ktc_voyage_insurer.ship_imo = ktc_trade_ship.ship_imo
+  LEFT OUTER JOIN ktc_voyage_flag ON ktc_voyage_flag.trade_id = kpler_trade.id
+  AND ktc_voyage_flag.flow_id = kpler_trade.flow_id
+  AND ktc_voyage_flag.ship_imo = ktc_trade_ship.ship_imo
 WHERE
   kpler_trade.is_valid
 GROUP BY

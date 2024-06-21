@@ -9,7 +9,9 @@ SELECT
   ktc_trade_ship.ship_imo AS ship_imo,
   coalesce(company.name, 'unknown') AS name,
   coalesce(company.country_iso2, 'unknown') AS iso2,
-  coalesce(country.region, 'unknown') AS region
+  coalesce(country.region, 'unknown') AS region,
+  'PCC' = any(country.regions) AS in_pcc,
+  country.iso2 = 'NO' AS in_norway
 FROM
   kpler_trade
   JOIN ktc_trade_ship ON kpler_trade.id = ktc_trade_ship.trade_id

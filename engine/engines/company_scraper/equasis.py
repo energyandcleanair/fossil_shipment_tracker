@@ -269,6 +269,7 @@ class Equasis:
         return None
 
     def get_ship_infos(self, imo, itry=1, max_try=11):
+        logger.info(f"Getting ship info for IMO {imo}")
         if itry > max_try:
             return None
 
@@ -325,19 +326,22 @@ class Equasis:
                 logger.debug("No owner, manager or insurer found for ship %s:" % (imo))
                 ship_data["insurers"] = [{"name": base.UNKNOWN_INSURER}]
 
-        # Flag
-        flag = None
-        flag_label_div = html_obj.body.find("b", string=re.compile("Flag"))
-        if flag_label_div:
-            flag_wrapper_div = flag_label_div.parent.parent
-            if flag_wrapper_div:
-                flag_text = flag_wrapper_div.find_all("div")[-1].get_text()
-                if flag_text:
-                    flag = self._clean_text(flag_text.replace("(", "").replace(")", ""))
-
-        ship_data["current_flag"] = flag
+        ship_data["current_flag"] = self._extract_flag(html_obj)
 
         return ship_data
+
+    def _extract_flag(self, html_obj):
+        flag_label_div = html_obj.body.find("b", string=re.compile("Flag"))
+        if not flag_label_div:
+            return None
+        flag_wrapper_div = flag_label_div.parent.parent
+        flag_divs = flag_wrapper_div.find_all("div")
+        if not flag_divs:
+            return None
+        flag_text = flag_divs[-1].get_text()
+        if not flag_text:
+            return None
+        return self._clean_text(flag_text.replace("(", "").replace(")", ""))
 
     def get_ship_history(self, imo, itry=1, max_try=11):
         if itry > max_try:

@@ -416,6 +416,16 @@ class ShipManager(Base):
     )
 
 
+class ShipFlag(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    imo = Column(String)
+    flag_iso2 = Column(String)
+    first_seen = Column(DateTime)
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
+    __tablename__ = DB_TABLE_SHIP_FLAG
+
+
 class Position(Base):
     id = Column(BigInteger, autoincrement=True, primary_key=True)
     ship_imo = Column(String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"))

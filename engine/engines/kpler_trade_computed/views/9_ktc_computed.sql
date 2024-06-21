@@ -22,6 +22,16 @@ SELECT
     WHEN ktc_insurers_and_owners_for_trade.owner_known THEN 'Others'
     ELSE 'Unknown'
   END AS ownership_sanction_coverage,
+  ktc_insurers_and_owners_for_trade.ship_flag_iso2s,
+  CASE
+    WHEN (
+      ktc_insurers_and_owners_for_trade.flag_in_pcc
+      OR ktc_insurers_and_owners_for_trade.flag_in_norway
+    ) THEN 'Flag in PCC'
+    WHEN ktc_insurers_and_owners_for_trade.flag_in_norway THEN 'Flag in Norway'
+    ELSE 'Others'
+  END AS flag_sanction_coverage,
+  ktc_insurers_and_owners_for_trade.flag_in_pcc,
   coalesce(
     ktc_trade_step_zones.step_zone_names,
     ARRAY [] :: varchar []

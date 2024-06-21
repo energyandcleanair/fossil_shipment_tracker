@@ -27,6 +27,7 @@ from base.models import (
     ShipInsurer,
     ShipOwner,
     ShipManager,
+    ShipFlag,
     Company,
     Country,
     KplerProduct,
@@ -40,32 +41,40 @@ import warnings
 from tqdm.contrib.logging import logging_redirect_tqdm
 import logging
 
+import country_converter as coco
+
 from engines.company_scraper.equasis import EquasisSessionPoolExhausted
 
 
-UPDATE_LIMIT: int = int(get_env("EQUASIS_UPDATE_LIMIT", 1000))
+DEFAULT_UPDATE_LIMIT: int = int(get_env("EQUASIS_UPDATE_LIMIT", 1000))
+
+COMMODITY_SETTINGS = {
+    base.CRUDE_OIL: {"known": 30, "unknown": 3, "update_priority": 0},
+    base.OIL_PRODUCTS: {"known": 30, "unknown": 3, "update_priority": 0},
+    base.OIL_OR_CHEMICAL: {"known": 30, "unknown": 3, "update_priority": 0},
+    base.LNG: {"known": 30, "unknown": 3, "update_priority": 1},
+    base.COAL: {"known": 30, "unknown": 15, "update_priority": 2},
+    base.BULK: {"known": 30, "unknown": 15, "update_priority": 2},
+    base.LPG: {"known": 30, "unknown": 3, "update_priority": 3},
+}
 
 
-def update(force_unknown=False):
+def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT):
+    """
+    This function updates the company information in the database from Equasis and insurers.
+    @param force_unknown: whether to force update of unknown insurers
+    @param max_updates: maximum number of ships to update, defaults to environment variable
+    `EQUASIS_UPDATE_LIMIT`. negative value means no limit
+    """
     logger_slack.info("=== Company update ===")
     # For crude oil and oil products, force a daily refresh
     # given the importance for price caps and bans
 
     try:
 
-        commodity_settings = {
-            base.CRUDE_OIL: {"known": 30, "unknown": 3, "update_priority": 0},
-            base.OIL_PRODUCTS: {"known": 30, "unknown": 3, "update_priority": 0},
-            base.OIL_OR_CHEMICAL: {"known": 30, "unknown": 3, "update_priority": 0},
-            base.LNG: {"known": 30, "unknown": 3, "update_priority": 1},
-            base.COAL: {"known": 30, "unknown": 15, "update_priority": 2},
-            base.BULK: {"known": 30, "unknown": 15, "update_priority": 2},
-            base.LPG: {"known": 30, "unknown": 3, "update_priority": 3},
-        }
-
         update_info_from_equasis(
-            commodity_settings=commodity_settings,
             force_unknown=force_unknown,
+            max_updates=max_updates,
         )
 
         fill_country()
@@ -165,8 +174,9 @@ class CommoditySettings(TypedDict):
 
 
 def update_info_from_equasis(
-    commodity_settings: "dict[str, CommoditySettings]" = None,
-    force_unknown: "bool" = False,
+    *,
+    force_unknown: "bool",
+    max_updates: int,
 ):
     """
     Collect infos from equasis about shipments that either don't have infos,
@@ -174,10 +184,10 @@ def update_info_from_equasis(
     :return:
     """
 
-    top_ships = get_ships_to_update(commodity_settings, force_unknown)
+    top_ships = get_ships_to_update(force_unknown=force_unknown, max_updates=max_updates)
 
     if len(top_ships) == 0:
-        commodities = ",".join(commodity_settings.keys())
+        commodities = ",".join(COMMODITY_SETTINGS.keys())
         logger.info(f"No ships to update for {commodities}")
         return
 
@@ -213,17 +223,53 @@ def update_info_from_equasis(
                 # Owner
                 owner_info = equasis_infos.get("owner")
                 update_ship_owner(imo, owner_info)
+
+                flag = equasis_infos.get("current_flag")
+                update_flag(imo, flag)
             else:
                 logger.info("Failed to get response from equasis")
 
 
-def get_ships_to_update(commodity_settings: "dict[str, CommoditySettings]", force_unknown: "bool"):
+def get_ships_to_update(*, force_unknown: "bool", max_updates: int):
 
     logger.info("Finding the ships to update")
+    ships_to_update = collect_all_ships_that_need_updates(force_unknown)
+
+    if max_updates > 0 and len(ships_to_update) > DEFAULT_UPDATE_LIMIT:
+        logger_slack.warn(
+            f"Too many ships to update, limiting to {DEFAULT_UPDATE_LIMIT} ships. "
+            + f"It will take {len(ships_to_update) / DEFAULT_UPDATE_LIMIT} iterations to update all ships. "
+            + f"Prioritising by commodity type's priority, fewest consecutive failures, then oldest checked."
+        )
+        return limit_ships_to_update(ships_to_update)
+    else:
+        return ships_to_update.drop_duplicates(subset="imo", keep="first").reset_index(drop=True)
+
+
+def limit_ships_to_update(ships_to_update):
+    commodity_settings_df = pd.DataFrame.from_dict(COMMODITY_SETTINGS, orient="index").reset_index(
+        names=["commodity"]
+    )
+
+    top_ships = (
+        ships_to_update.merge(commodity_settings_df, left_on="commodity", right_on="commodity")
+        .sort_values(
+            by=["update_priority", "consecutive_failures", "checked_on"],
+            na_position="first",
+            ascending=[True, True, True],
+        )
+        .drop_duplicates(subset="imo", keep="first")
+        .head(DEFAULT_UPDATE_LIMIT)
+        .reset_index(drop=True)
+    )
+
+    return top_ships
+
+
+def collect_all_ships_that_need_updates(force_unknown):
     ships_to_update = pd.DataFrame()
 
-    for commodity, settings in commodity_settings.items():
-
+    for commodity, settings in COMMODITY_SETTINGS.items():
         logger.info(f"Finding ships to update for {commodity}")
         known_update_period = settings["known"]
         unknown_update_period = settings["unknown"]
@@ -236,31 +282,7 @@ def get_ships_to_update(commodity_settings: "dict[str, CommoditySettings]", forc
         )
 
         ships_to_update = pd.concat([ships_to_update, ships_for_commodity])
-
-    if len(ships_to_update) > UPDATE_LIMIT:
-        logger_slack.warn(
-            f"Too many ships to update, limiting to {UPDATE_LIMIT} ships. "
-            + f"It will take {len(ships_to_update) / UPDATE_LIMIT} iterations to update all ships. "
-            + f"Prioritising by commodity type's priority, fewest consecutive failures, then oldest checked."
-        )
-
-    commodity_settings_df = pd.DataFrame.from_dict(commodity_settings, orient="index").reset_index(
-        names=["commodity"]
-    )
-
-    top_ships = (
-        ships_to_update.merge(commodity_settings_df, left_on="commodity", right_on="commodity")
-        .sort_values(
-            by=["update_priority", "consecutive_failures", "checked_on"],
-            na_position="first",
-            ascending=[True, True, True],
-        )
-        .drop_duplicates(subset="imo", keep="first")
-        .head(UPDATE_LIMIT)
-        .reset_index(drop=True)
-    )
-
-    return top_ships
+    return ships_to_update
 
 
 def find_ships_that_need_updating(
@@ -282,10 +304,12 @@ def find_ships_that_need_updating(
             ShipInsurer.updated_on.label("last_updated"),
             ShipInsurer.consecutive_failures,
             ShipOwner.updated_on.label("last_updated_owner"),
+            ShipFlag.updated_on.label("last_updated_flag"),
             filter_query.c.commodity,
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
         .outerjoin(ShipOwner, ShipOwner.ship_imo == Ship.imo)
+        .outerjoin(ShipFlag, ShipFlag.imo == Ship.imo)
         .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
         .filter(ShipInsurer.is_valid == True)
         .distinct(filter_query.c.ship_imo)
@@ -293,6 +317,7 @@ def find_ships_that_need_updating(
             filter_query.c.ship_imo,
             nullslast(ShipInsurer.updated_on.desc()),
             nullslast(ShipOwner.updated_on.desc()),
+            nullslast(ShipFlag.updated_on.desc()),
         )
     )
 
@@ -360,12 +385,21 @@ def find_ships_that_need_updating(
     )
 
     needs_update_ship_info = sa.or_(
-        imo_query.c.last_updated_owner != None
-        and imo_query.c.last_updated_owner <= dt.date.today() - dt.timedelta(days=30 * 9),
+        imo_query.c.last_updated_owner != None,
+        imo_query.c.last_updated_owner <= dt.date.today() - dt.timedelta(days=30 * 3),
     )
 
-    needs_update = sa.and_(
-        not_in_backoff_period, sa.or_(needs_update_insurance, needs_update_ship_info)
+    needs_update_ship_flag = sa.or_(
+        imo_query.c.last_updated_flag != None,
+        imo_query.c.last_updated_flag <= dt.date.today() - dt.timedelta(days=30 * 3),
+    )
+
+    needs_update = sa.or_(
+        needs_update_ship_flag,
+        sa.and_(
+            not_in_backoff_period,
+            sa.or_(needs_update_insurance, needs_update_ship_info),
+        ),
     )
 
     imo_query = session.query(imo_query).filter(needs_update)
@@ -632,6 +666,36 @@ def update_failed_insurer(imo, insurer):
             stack_info=True,
             exc_info=True,
         )
+
+
+def update_flag(imo, flag):
+
+    flag_iso2 = coco.convert(names=flag, to="ISO2") if flag is not None else None
+    latest_existing_flag = (
+        session.query(ShipFlag)
+        .filter(ShipFlag.imo == imo)
+        .order_by(ShipFlag.updated_on.desc())
+        .first()
+    )
+    update_time = dt.datetime.now()
+
+    if not latest_existing_flag:
+        # Add dummy record for history
+        new_flag = ShipFlag(imo=imo, flag_iso2=flag_iso2, first_seen=None, updated_on=update_time)
+        session.add(new_flag)
+        session.commit()
+        latest_existing_flag = new_flag
+
+    if latest_existing_flag.flag_iso2 != flag_iso2 or latest_existing_flag.first_seen == None:
+        # Add new record
+        new_flag = ShipFlag(
+            imo=imo, flag_iso2=flag_iso2, first_seen=update_time, updated_on=update_time
+        )
+        session.add(new_flag)
+        session.commit()
+    else:
+        latest_existing_flag.updated_on = update_time
+        session.commit()
 
 
 def create_unknown_insurer(imo):

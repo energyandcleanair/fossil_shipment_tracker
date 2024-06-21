@@ -789,6 +789,8 @@ class KplerTradeResource(TemplateResource):
                 KplerTradeComputed.ship_owner_iso2s,
                 KplerTradeComputed.ship_owner_regions,
                 KplerTradeComputed.ownership_sanction_coverage,
+                KplerTradeComputed.ship_flag_iso2s,
+                KplerTradeComputed.flag_sanction_coverage,
                 KplerTradeComputed.step_zone_names,
                 KplerTradeComputed.step_zone_iso2s,
                 KplerTradeComputed.step_zone_regions,

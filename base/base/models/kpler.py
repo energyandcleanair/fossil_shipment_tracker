@@ -178,6 +178,8 @@ class KplerTradeComputed(Base):
     ship_owner_iso2s = Column(ARRAY(String))
     ship_owner_regions = Column(ARRAY(String))
     ownership_sanction_coverage = Column(String)
+    ship_flag_iso2s = Column(ARRAY(String))
+    flag_sanction_coverage = Column(String)
     step_zone_names = Column(ARRAY(String))
     step_zone_iso2s = Column(ARRAY(String))
     step_zone_regions = Column(ARRAY(String))

@@ -7,11 +7,17 @@ from sqlalchemy import func, tablesample, nulls_last, case
 from sqlalchemy.orm import aliased
 
 from base.db import session
-from base.models.kpler import KplerTrade, KplerTradeComputed, KplerProduct, KplerZone, KplerVessel
+from base.models.kpler import (
+    KplerTrade,
+    KplerTradeComputed,
+    KplerProduct,
+    KplerZone,
+    KplerVessel,
+)
 
 import sqlalchemy as sa
 
-from base.models import Commodity, ShipInsurer, ShipOwner, Company, Price
+from base.models import Commodity, ShipInsurer, ShipOwner, Company, Price, ShipFlag
 
 from base.logger import logger
 from tqdm import tqdm
@@ -118,6 +124,15 @@ def test_sample(sample: KplerTradeComputed):
     destination_zone = (
         session.query(KplerZone).filter(KplerZone.id == trade.arrival_zone_id).first()
     )
+
+    flag_for_trade = get_flags_for_trade(trade)
+
+    for i, flag in enumerate(flag_for_trade):
+        expected_iso2 = flag.country_iso2 if flag else "unknown"
+        actual_iso2 = sample.ship_flag_iso2s[i]
+        assert (
+            actual_iso2 == expected_iso2
+        ), f"Computed flag country is wrong for {sample_id}: expected {expected_iso2} got {actual_iso2}"
 
     expected_price = get_expected_price(
         sample=sample,
@@ -248,6 +263,21 @@ def get_price_for_trade_ship(
     ranked_prices = sorted(matched_prices, key=rank_price, reverse=True)
 
     return ranked_prices[0]
+
+
+def get_flags_for_trade(trade: KplerTrade):
+    return [get_flag_for_trade_ship(trade, ship_imo) for ship_imo in trade.vessel_imos]
+
+
+def get_flag_for_trade_ship(trade: KplerTrade, ship_imo: str):
+    flag: ShipFlag = (
+        session.query(ShipFlag)
+        .filter(ShipFlag.ship_imo == ship_imo, ShipFlag.first_seen < trade.departure_date_utc)
+        .order_by(nulls_last(ShipFlag.first_seen.desc()))
+        .first()
+    )
+
+    return flag
 
 
 def get_insurers_for_trade(trade: KplerTrade):
