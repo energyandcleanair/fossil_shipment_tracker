@@ -272,7 +272,7 @@ def get_flags_for_trade(trade: KplerTrade):
 def get_flag_for_trade_ship(trade: KplerTrade, ship_imo: str):
     flag: ShipFlag = (
         session.query(ShipFlag)
-        .filter(ShipFlag.ship_imo == ship_imo, ShipFlag.first_seen < trade.departure_date_utc)
+        .filter(ShipFlag.imo == ship_imo, ShipFlag.first_seen < trade.departure_date_utc)
         .order_by(nulls_last(ShipFlag.first_seen.desc()))
         .first()
     )
