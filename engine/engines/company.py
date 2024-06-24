@@ -198,6 +198,8 @@ def update_info_from_equasis(
     def random_wait():
         time.sleep(random.uniform(0.25, 0.5))
 
+    logger.info(f"Updating {len(imos_to_update)} ships from Equasis")
+
     with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
         for imo in tqdm(imos_to_update, unit="ships"):
             imo_equasis = imo.replace("NOTFOUND_", "")
