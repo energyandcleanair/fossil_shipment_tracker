@@ -543,6 +543,8 @@ class KplerTradeResource(TemplateResource):
                 subquery.c.ship_owner_regions,
             ],
             "ownership_sanction_coverage": [subquery.c.ownership_sanction_coverage],
+            "flag_sanction_coverage": [subquery.c.flag_sanction_coverage],
+            "largest_vessel_type": [subquery.c.largest_vessel_type],
             "status": [subquery.c.status],
             "is_sts": [subquery.c.is_sts],
         }
