@@ -127,8 +127,7 @@ def test_sample(sample: KplerTradeComputed):
 
     flag_for_trade = get_flags_for_trade(trade)
 
-    for i, flag in enumerate(flag_for_trade):
-        expected_iso2 = flag.flag_iso2 if flag else "unknown"
+    for i, expected_iso2 in enumerate(flag_for_trade):
         actual_iso2 = sample.ship_flag_iso2s[i]
         assert (
             actual_iso2 == expected_iso2
@@ -265,8 +264,19 @@ def get_price_for_trade_ship(
     return ranked_prices[0]
 
 
+def extract_flag_iso2(flag: ShipFlag):
+    if not flag:
+        return "unknown"
+    if not flag.flag_iso2:
+        return "unknown"
+    return flag.flag_iso2
+
+
 def get_flags_for_trade(trade: KplerTrade):
-    return [get_flag_for_trade_ship(trade, ship_imo) for ship_imo in trade.vessel_imos]
+    return [
+        extract_flag_iso2(get_flag_for_trade_ship(trade, ship_imo))
+        for ship_imo in trade.vessel_imos
+    ]
 
 
 def get_flag_for_trade_ship(trade: KplerTrade, ship_imo: str):
