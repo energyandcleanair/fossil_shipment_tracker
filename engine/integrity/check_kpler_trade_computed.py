@@ -128,7 +128,7 @@ def test_sample(sample: KplerTradeComputed):
     flag_for_trade = get_flags_for_trade(trade)
 
     for i, flag in enumerate(flag_for_trade):
-        expected_iso2 = flag.country_iso2 if flag else "unknown"
+        expected_iso2 = flag.flag_iso2 if flag else "unknown"
         actual_iso2 = sample.ship_flag_iso2s[i]
         assert (
             actual_iso2 == expected_iso2
@@ -272,7 +272,13 @@ def get_flags_for_trade(trade: KplerTrade):
 def get_flag_for_trade_ship(trade: KplerTrade, ship_imo: str):
     flag: ShipFlag = (
         session.query(ShipFlag)
-        .filter(ShipFlag.imo == ship_imo, ShipFlag.first_seen < trade.departure_date_utc)
+        .filter(
+            ShipFlag.imo == ship_imo,
+            sa.or_(
+                ShipFlag.first_seen < trade.departure_date_utc,
+                ShipFlag.first_seen == None,
+            ),
+        )
         .order_by(nulls_last(ShipFlag.first_seen.desc()))
         .first()
     )
