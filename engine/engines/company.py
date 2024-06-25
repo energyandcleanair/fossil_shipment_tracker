@@ -315,9 +315,9 @@ def find_ships_that_need_updating(
         .outerjoin(ShipFlag, ShipFlag.imo == Ship.imo)
         .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
         .filter(ShipInsurer.is_valid == True)
-        .distinct(filter_query.c.ship_imo)
+        .distinct(Ship.imo)
         .order_by(
-            filter_query.c.ship_imo,
+            Ship.imo,
             nullslast(ShipInsurer.updated_on.desc()),
             nullslast(ShipOwner.updated_on.desc()),
             nullslast(ShipFlag.updated_on.desc()),
@@ -388,7 +388,7 @@ def find_ships_that_need_updating(
     )
 
     needs_update_ship_info = sa.or_(
-        imo_query.c.last_updated_owner != None,
+        imo_query.c.last_updated_owner == None,
         imo_query.c.last_updated_owner <= dt.date.today() - dt.timedelta(days=30 * 3),
     )
 
