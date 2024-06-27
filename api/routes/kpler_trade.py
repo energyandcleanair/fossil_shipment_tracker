@@ -317,6 +317,14 @@ class KplerTradeResource(TemplateResource):
         default=35,
     )
 
+    parser.add_argument(
+        "vessel_imos",
+        type=str,
+        help="Filters trades where the vessel IMO is any of the provided",
+        required=False,
+        action="split",
+    )
+
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date", "origin_date", "destination_date"]
     value_cols = [
@@ -895,6 +903,8 @@ class KplerTradeResource(TemplateResource):
         sts_region = params.get("sts_region")
         sts_iso2 = params.get("sts_iso2")
 
+        vessel_imos = params.get("vessel_imos")
+
         if trade_ids:
             query = query.filter(KplerTrade.id.in_(to_list(trade_ids)))
 
@@ -1034,5 +1044,8 @@ class KplerTradeResource(TemplateResource):
                 | ((subquery.c.origin_iso2 == sts_iso2) & (subquery.c.origin_sts == True))
                 | subquery.c.step_zone_iso2s.any(sts_iso2)
             )
+
+        if vessel_imos:
+            query = query.filter(subquery.c.vessel_imos.overlap(to_list(vessel_imos)))
 
         return query
