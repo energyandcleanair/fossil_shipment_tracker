@@ -313,3 +313,21 @@ def test_kpler_trades_without_prices():
     assert (
         not products_missing_computed_rows
     ), f"Some Kpler trades are missing computed rows: {products_missing_computed_rows}"
+
+
+def check_china_russia_source():
+    max_age_months = 3
+    max_age_days = max_age_months * 30
+    three_months_ago = dt.date.today() - dt.timedelta(days=max_age_days)
+
+    # Get oldest date in spreadsheet
+    url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQunCwQmOpGXSLWiToq6zZDLi3VFqknU2fyDrRCtURFCT2QS1oer4H9i_eCXnyZfw/pub?output=csv"
+    df = pd.read_csv(url, skiprows=1)
+    df = df[df["Name"].str.match(r"\d{4}-\d{2}")]
+    assert len(df) > 0, "China Russia spreadsheet is empty"
+    df["date"] = pd.to_datetime(df["Name"], format="%Y-%m")
+    max_date = df["date"].max().date()
+
+    assert (
+        max_date > three_months_ago
+    ), f"China Russia spreadsheet is more than {max_age_months} months old, last date was {max_date}"

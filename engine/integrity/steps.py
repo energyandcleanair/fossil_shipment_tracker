@@ -30,6 +30,10 @@ class IntegrityStep(Enum):
         "overland trade has values for each month", test_overland_trade_has_values
     )
 
+    CHINA_RUSSIA_SPREADSHEET_UP_TO_DATE = IntegrityCheckDefinition(
+        "China Russia spreadsheet up to date", check_china_russia_source
+    )
+
     KPLER_TRADE_COMPUTED_SAMPLE_CORRECT = IntegrityCheckDefinition(
         "Kpler trade computed is correct", test_sample_computed
     )
