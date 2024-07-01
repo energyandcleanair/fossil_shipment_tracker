@@ -32,6 +32,7 @@ from base.models import (
     Country,
     KplerProduct,
     KplerTrade,
+    KplerVessel,
     Ship,
 )
 from engines.company_scraper import Equasis, CompanyImoScraper
@@ -297,7 +298,7 @@ def find_ships_that_need_updating(
 
     imo_query = (
         session.query(
-            Ship.imo,
+            KplerVessel.imo,
             ShipInsurer.company_raw_name,
             func.coalesce(ShipInsurer.date_from_insurer, ShipInsurer.date_from_equasis).label(
                 "date_from"
@@ -310,14 +311,14 @@ def find_ships_that_need_updating(
             ShipFlag.flag_iso2,
             filter_query.c.commodity,
         )
-        .outerjoin(ShipInsurer, ShipInsurer.ship_imo == Ship.imo)
-        .outerjoin(ShipOwner, ShipOwner.ship_imo == Ship.imo)
-        .outerjoin(ShipFlag, ShipFlag.imo == Ship.imo)
-        .outerjoin(filter_query, filter_query.c.ship_imo == Ship.imo)
+        .outerjoin(ShipInsurer, ShipInsurer.ship_imo == KplerVessel.imo)
+        .outerjoin(ShipOwner, ShipOwner.ship_imo == KplerVessel.imo)
+        .outerjoin(ShipFlag, ShipFlag.imo == KplerVessel.imo)
+        .outerjoin(filter_query, filter_query.c.ship_imo == KplerVessel.imo)
         .filter(ShipInsurer.is_valid == True)
-        .distinct(Ship.imo)
+        .distinct(KplerVessel.imo)
         .order_by(
-            Ship.imo,
+            KplerVessel.imo,
             nullslast(ShipInsurer.updated_on.desc()),
             nullslast(ShipOwner.updated_on.desc()),
             nullslast(ShipFlag.updated_on.desc()),
@@ -636,6 +637,11 @@ def update_ship_record_with_raw_equasis(
     equasis_infos=None,
 ):
     ship = session.query(Ship).filter(Ship.imo == ship_imo).first()
+
+    if ship == None:
+        ship = Ship(imo=ship_imo)
+        session.add(ship)
+
     others = dict(ship.others) if ship.others else {}
     others.update({"equasis": equasis_infos})
     # To convert datetimes to str

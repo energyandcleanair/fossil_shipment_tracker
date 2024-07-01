@@ -1,7 +1,6 @@
 from itertools import chain
 import pandas as pd
 
-from ..voyage import VoyageResource
 from ..kpler_trade import KplerTradeResource
 
 # voyage: trade
@@ -37,10 +36,7 @@ def get_kpler_name(name):
 
 
 def get_voyages(params, use_kpler=False):
-    if use_kpler:
-        return get_voyages_kpler(params)
-    else:
-        return get_voyages_mt(params)
+    return get_voyages_kpler(params)
 
 
 def get_voyages_kpler(params):
@@ -86,13 +82,3 @@ def get_voyages_kpler(params):
             data.drop(trade_name, axis=1)
 
     return data
-
-
-def get_voyages_mt(params):
-    params_voyages = params.copy()
-
-    response = VoyageResource().get_from_params(params_voyages)
-    if response.status_code != 200:
-        return pd.DataFrame()
-
-    return pd.DataFrame(response.json["data"])

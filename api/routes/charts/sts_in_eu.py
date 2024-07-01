@@ -14,7 +14,7 @@ from base import COMMODITY_GROUPING_DEFAULT, COMMODITY_GROUPING_CHOICES, COMMODI
 
 from .voyage_data_proxy import get_voyages
 from .. import routes_api, ns_charts
-from ..voyage import VoyageResource
+from .voyage_parser import voyage_parser
 
 
 @ns_charts.route("/v0/chart/sts_in_eu", strict_slashes=False)
@@ -110,7 +110,7 @@ class ChartStsInEu(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-        params = VoyageResource.parser.parse_args()
+        params = voyage_parser.parser.parse_args()
         params_chart = ChartStsInEu.parser.parse_args()
         format = params_chart.get("format")
         language = params_chart.get("language")

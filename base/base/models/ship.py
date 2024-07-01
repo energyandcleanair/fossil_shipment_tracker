@@ -25,6 +25,9 @@ from .table_names import *
 
 class Ship(Base):
     imo = Column(String, primary_key=True)
+    others = Column(JSONB)
+
+    # The rest of these fields may have values but are no longer updated.
     mmsi = Column(ARRAY(String))
     name = Column(ARRAY(String))
     type = Column(String)
@@ -36,11 +39,6 @@ class Ship(Base):
     home_port = Column(String)
     liquid_gas = Column(Numeric)
     liquid_oil = Column(Numeric)
-    others = Column(JSONB)
-
-    # owner = Column(String)
-    # manager = Column(String)
-    # insurer = Column(String)
 
     # Estimated commodity, quantity etc
     commodity = Column(String)

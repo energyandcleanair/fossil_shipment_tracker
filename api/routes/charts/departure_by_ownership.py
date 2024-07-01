@@ -17,10 +17,10 @@ from base import (
 from base.logger import logger
 from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
-from ..voyage import VoyageResource
 from .. import routes_api, ns_charts
 
 from .voyage_data_proxy import get_voyages
+from .voyage_parser import voyage_parser
 
 
 @ns_charts.route("/v0/chart/departure_by_ownership", strict_slashes=False)
@@ -147,7 +147,7 @@ class ChartDepartureOwnership(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-        params = VoyageResource.parser.parse_args()
+        params = voyage_parser.parse_args()
         params_chart = ChartDepartureOwnership.parser.parse_args()
         format = params_chart.get("format")
         nest_in_data = params_chart.get("nest_in_data")

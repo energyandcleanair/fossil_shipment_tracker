@@ -10,7 +10,7 @@ from sqlalchemy.orm import aliased
 from base.utils import df_to_json
 from . import routes_api, ns_alerts
 from base.db import session
-from base.models import Ship, Country, Shipment, Commodity, Port, Departure, Arrival
+from base.models import KplerVessel, Country, Shipment, Commodity, Port, Departure, Arrival
 from base.utils import to_list, to_datetime
 
 
@@ -88,7 +88,6 @@ class AlertTestResource(Resource):
         destination_iso2 = params.get("destination_iso2")
         destination_name_pattern = params.get("destination_name_pattern")
         departure_port_id = params.get("departure_port_id")
-        commodity = params.get("commodity")
         min_dwt = params.get("min_dwt")
         date_from = params.get("date_from")
         format = params.get("format")
@@ -104,14 +103,10 @@ class AlertTestResource(Resource):
         if departure_port_id and "" in departure_port_id:
             departure_port_id.remove("")
 
-        if commodity and "" in commodity:
-            commodity.remove("")
-
         alerts_df = self.manual_alert(
             destination_name_pattern=destination_name_pattern,
             destination_iso2=destination_iso2,
             date_from=to_datetime(date_from),
-            commodity=commodity,
             min_dwt=min_dwt,
             departure_port_id=departure_port_id,
         )
@@ -141,7 +136,6 @@ class AlertTestResource(Resource):
         destination_iso2=None,
         destination_name_pattern=None,
         min_dwt=None,
-        commodity=None,
         date_from=None,
         departure_port_id=None,
     ):
@@ -168,24 +162,21 @@ class AlertTestResource(Resource):
             session.query(
                 Shipment.id.label("shipment_id"),
                 Shipment.status,
-                Ship.imo,
-                Ship.name,
-                Ship.dwt,
-                Ship.commodity,
+                KplerVessel.imo,
+                KplerVessel.name,
+                KplerVessel.dwt,
                 Departure.port_id.label("departure_port_id"),
                 DeparturePort.name.label("departure_port_name"),
                 destination_iso2_field,
                 destination_name_field,
                 destination_date_field,
                 ArrivalPort.iso2.label("arrival_iso2"),
-                Commodity.name.label("commodity_name"),
             )
             .join(Departure, Departure.id == Shipment.departure_id)
             .join(DeparturePort, DeparturePort.id == Departure.port_id)
             .outerjoin(Arrival, Arrival.id == Shipment.arrival_id)
             .outerjoin(ArrivalPort, Arrival.port_id == ArrivalPort.id)
-            .join(Ship, Ship.imo == Departure.ship_imo)
-            .outerjoin(Commodity, Commodity.id == Ship.commodity)
+            .join(KplerVessel, KplerVessel.imo == Departure.ship_imo)
             .subquery()
         )
 
@@ -251,9 +242,6 @@ class AlertTestResource(Resource):
 
         if min_dwt:
             query3 = query3.filter(query2.c.dwt >= min_dwt)
-
-        if commodity:
-            query3 = query3.filter(query2.c.commodity.in_(to_list(commodity)))
 
         if departure_port_id:
             query3 = query3.filter(query2.c.departure_port_id.in_(to_list(departure_port_id)))

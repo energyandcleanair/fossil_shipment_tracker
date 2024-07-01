@@ -21,13 +21,6 @@ routes_api.add_namespace(ns_flaring)
 routes_api.add_namespace(ns_alerts)
 
 from .template import *
-from .ship import *
-from .port import *
-from .voyage import *
-from .position import *
-from .berth import *
-from .portcall import *
-from .departure import *
 from .counter import *
 from .counter_last import *
 from .overland import *

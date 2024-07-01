@@ -20,7 +20,7 @@ from base.encoder import JsonEncoder
 from base.utils import to_list
 from .. import postcompute
 from .. import routes_api, ns_charts
-from ..voyage import VoyageResource
+from .voyage_parser import voyage_parser
 from ..overland import PipelineFlowResource
 
 from .voyage_data_proxy import get_voyages
@@ -142,7 +142,7 @@ class ChartDepartureDestination(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-        params = VoyageResource.parser.parse_args()
+        params = voyage_parser.parse_args()
         params_chart = ChartDepartureDestination.parser.parse_args()
         params_overland = PipelineFlowResource.parser.parse_args()
 

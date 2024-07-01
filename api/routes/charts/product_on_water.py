@@ -14,7 +14,7 @@ from base import COMMODITY_GROUPING_DEFAULT, COMMODITY_GROUPING_CHOICES, COMMODI
 
 from .voyage_data_proxy import get_voyages
 from .. import routes_api, ns_charts
-from ..voyage import VoyageResource
+from .voyage_parser import voyage_parser
 
 
 @ns_charts.route("/v0/chart/product_on_water", strict_slashes=False)
@@ -147,7 +147,7 @@ class ChartProductOnWater(Resource):
 
     @routes_api.expect(parser)
     def get(self):
-        params = VoyageResource.parser.parse_args()
+        params = voyage_parser.parse_args()
         params_chart = ChartProductOnWater.parser.parse_args()
         format = params_chart.get("format")
         language = params_chart.get("language")
