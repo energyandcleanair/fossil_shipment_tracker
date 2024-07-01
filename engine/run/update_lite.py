@@ -3,10 +3,6 @@ from engines import (
     company,
     comtrade,
     engine_r,
-    trajectory,
-    position,
-    destination,
-    berth,
     currency,
     counter,
     entsog,
@@ -36,13 +32,7 @@ def update():
     company.update()
     kpler_trade_computed.update()
 
-    position.update(date_from=dt.date.today() - dt.timedelta(days=90))
-    destination.update()
-    berth.update()
-
     entsog.update(date_from=-21, nodata_error_date_from=-4)
-
-    trajectory.update()
 
     counter.update()
     integrity.check()

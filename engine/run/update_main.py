@@ -1,11 +1,6 @@
 from engines import (
     commodity,
     engine_r,
-    portcall,
-    departure,
-    arrival,
-    shipment,
-    position,
     ship,
     counter,
     alert,
@@ -13,10 +8,7 @@ from engines import (
     kpler_scraper,
     kpler_trade_computed,
     currency,
-    destination,
-    berth,
     entsog,
-    trajectory,
     flaring,
 )
 
@@ -35,14 +27,7 @@ def update():
     kpler_scraper.update_full()
     kpler_trade_computed.update()
 
-    ship.update()
-
-    position.update(date_from=dt.date.today() - dt.timedelta(days=90))
-    destination.update()
-    berth.update()
-
     entsog.update(date_from=-21, nodata_error_date_from=-4)
-    trajectory.update()
 
     alert.update()
 

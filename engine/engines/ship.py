@@ -17,7 +17,7 @@ from base.models import (
     Arrival,
 )
 from base.utils import to_datetime, to_list
-from engines.datalastic import default_datalastic
+from engines.datalastic_client import default_datalastic
 import numpy as np
 
 import sqlalchemy as sa
