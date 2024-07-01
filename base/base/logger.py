@@ -30,6 +30,8 @@ logger.setLevel(logging.INFO)
 def slack_webhook_ok(url):
     if url is None:
         return False
+    if url == "":
+        return False
     r = requests.post(url)
     return r.status_code == 400  # Would be 403 if address is invalid
 

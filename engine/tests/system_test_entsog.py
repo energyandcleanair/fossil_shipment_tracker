@@ -3,7 +3,6 @@ import pytest
 from engines.entsog import *
 
 
-@pytest.mark.system
 def test_interconnections():
     ic = get_interconnections()
     assert isinstance(ic, pd.DataFrame)
@@ -11,7 +10,6 @@ def test_interconnections():
     return
 
 
-@pytest.mark.system
 def test_bulgaria_greece():
     date_from = "2020-01-01"
     date_to = "2020-01-31"
@@ -34,7 +32,6 @@ def test_bulgaria_greece():
     poi2 = opd.loc[opd.pointLabel.isin(["Dornum / NETRA (OGE)", "Dornum GASPOOL"])]
 
 
-@pytest.mark.system
 def test_get_crossborder_flows():
     # flows = update(date_from='2018-01-01',
     #                date_to='2019-12-31',

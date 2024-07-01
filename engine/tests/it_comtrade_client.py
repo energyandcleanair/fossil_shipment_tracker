@@ -18,7 +18,6 @@ def api_key():
     return key
 
 
-@pytest.mark.integration
 def test_ComtradeClient_get_data_availability(api_key):
     client = ComtradeClient(api_key=api_key)
 
@@ -38,7 +37,6 @@ def test_ComtradeClient_get_data_availability(api_key):
     assert all(availability["last_released"].apply(lambda x: x is None or isinstance(x, date)))
 
 
-@pytest.mark.integration
 def test_ComtradeClient_get_data(api_key):
     client = ComtradeClient(api_key=api_key)
 
@@ -66,7 +64,6 @@ def test_ComtradeClient_get_data(api_key):
     assert "value_usd" in data.columns
 
 
-@pytest.mark.integration
 def test_ComtradeClient_get_data__next_month(api_key):
     client = ComtradeClient(api_key=api_key)
 
@@ -93,7 +90,6 @@ def test_ComtradeClient_get_data__next_month(api_key):
     ), "Expected the columns to be present"
 
 
-@pytest.mark.integration
 def test_ComtradeClient_get_all_reporters__gets_all_reporters():
     client = ComtradeClient(api_key=get_env("COMTRADE_API_KEY"))
 

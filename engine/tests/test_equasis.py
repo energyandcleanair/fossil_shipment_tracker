@@ -1,3 +1,5 @@
+from .mock_db_module import *
+
 from datetime import date
 from unittest.mock import MagicMock
 from engines.company_scraper.equasis import (

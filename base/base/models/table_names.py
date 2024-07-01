@@ -69,3 +69,6 @@ DB_TABLE_GLOBAL_CACHE = "global_cache"
 
 DB_TABLE_COMTRADE_SYNC_HISTORY = "comtrade_sync_history"
 DB_TABLE_COMTRADE_HS_TRADE_RECORD = "comtrade_hs_trade_record"
+
+DB_TABLE_SHIP_SANCTION = "ship_sanction"
+DB_TABLE_SANCTION_PACKAGE = "sanction_package"

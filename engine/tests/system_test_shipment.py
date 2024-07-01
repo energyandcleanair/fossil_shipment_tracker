@@ -5,12 +5,10 @@ from base.models import Shipment, Arrival, Departure, ShipmentWithSTS
 import sqlalchemy as sa
 
 
-@pytest.mark.system
 def test_update():
     update()
 
 
-@pytest.mark.system
 def test_shipment_rebuild():
     """
     Test rebuilding shipment table

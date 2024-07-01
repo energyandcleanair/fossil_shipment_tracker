@@ -1,3 +1,5 @@
+from .mock_db_module import *
+
 from numpy import NaN
 import pandas as pd
 import pytest

@@ -7,7 +7,6 @@ from engines import ship, port
 from engines.marinetraffic import Marinetraffic
 
 
-@pytest.mark.system
 def test_get_ship_events():
     events = Marinetraffic.get_ship_events_between_dates(
         imo="9417177",
@@ -20,7 +19,6 @@ def test_get_ship_events():
         assert e.ship_imo is not None and e.ship_name is not None and e.content is not None
 
 
-@pytest.mark.system
 def test_ship():
     mmsi = "642122016"
 
@@ -31,7 +29,6 @@ def test_ship():
     assert ship_noncached.mmsi[0] == mmsi
 
 
-@pytest.mark.system
 def test_query_portcall():
     # This will cost few credits each time...
     # We took an actual port call from Russia

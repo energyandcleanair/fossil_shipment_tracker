@@ -9,7 +9,6 @@ from base.db import init_db
 #     imos = session.query(Arrival.)
 
 
-@pytest.mark.system
 def test_alerts():
     init_db(drop_first=False)
     update()

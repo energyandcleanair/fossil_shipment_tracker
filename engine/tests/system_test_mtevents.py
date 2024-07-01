@@ -11,14 +11,12 @@ from engines.marinetraffic import Marinetraffic
 from base.db import check_if_table_exists
 
 
-@pytest.mark.system
 def test_find_ships_by_name():
     ships = find_ships_in_db("BLUEFISH")
 
     assert ships is not None
 
 
-@pytest.mark.system
 def test_upload_events():
     update(
         ship_imo="9417177",
@@ -30,7 +28,6 @@ def test_upload_events():
     return
 
 
-@pytest.mark.system
 def test_process_ship_events():
     events = Marinetraffic.get_ship_events_between_dates(
         imo="9417177",
