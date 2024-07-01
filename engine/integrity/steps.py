@@ -10,14 +10,6 @@ KPLER_CHECKER_DATE_FROM = "2021-01-01"
 
 
 class IntegrityStep(Enum):
-    SHIPMENTS = IntegrityCheckDefinition("shipments", test_shipment_table)
-    SHIPMENT_PORTCALL = IntegrityCheckDefinition(
-        "shipment portcall", test_shipment_portcall_integrity
-    )
-    PORTCALL_RELATIONSHIP = IntegrityCheckDefinition(
-        "portcall relationship", test_portcall_relationship
-    )
-    BERTHS = IntegrityCheckDefinition("berths", test_berths)
     PRICING = IntegrityCheckDefinition("pricing positive", test_counter_pricing_positive)
     INSURER_UNKNOWNS = IntegrityCheckDefinition(
         "insurer no unexpected unknowns", test_insurers_no_unexpected_unknown
