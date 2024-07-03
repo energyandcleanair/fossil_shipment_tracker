@@ -1,8 +1,5 @@
 import sys
 from base.db_utils import upsert
-from engines import (
-    kpler_scraper,
-)
 
 import base
 from base.db import engine

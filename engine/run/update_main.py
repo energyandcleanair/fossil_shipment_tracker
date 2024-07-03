@@ -1,7 +1,6 @@
 from engines import (
     commodity,
     engine_r,
-    ship,
     counter,
     alert,
     backuper,
@@ -9,7 +8,6 @@ from engines import (
     kpler_trade_computed,
     currency,
     entsog,
-    flaring,
 )
 
 import integrity
