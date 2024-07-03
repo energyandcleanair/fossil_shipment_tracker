@@ -12,9 +12,8 @@ from base.utils import to_list, df_to_json, to_datetime
 
 from base import COMMODITY_GROUPING_DEFAULT, COMMODITY_GROUPING_CHOICES, COMMODITY_GROUPING_HELP
 
-from .voyage_data_proxy import get_voyages
+from .back_compat import voyage_parser, get_voyages
 from .. import routes_api, ns_charts
-from .voyage_parser import voyage_parser
 
 
 @ns_charts.route("/v0/chart/product_on_water", strict_slashes=False)

@@ -19,8 +19,7 @@ from base.encoder import JsonEncoder
 from base.utils import to_list, df_to_json, to_datetime
 from .. import routes_api, ns_charts
 
-from .voyage_data_proxy import get_voyages
-from .voyage_parser import voyage_parser
+from .back_compat import voyage_parser, get_voyages
 
 
 @ns_charts.route("/v0/chart/departure_by_ownership", strict_slashes=False)

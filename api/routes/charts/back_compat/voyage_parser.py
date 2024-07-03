@@ -9,6 +9,9 @@ from base import (
 
 import datetime as dt
 
+# For backwards compatibility, this is the request parser for the voyage endpoint. We shared this
+# parser with the chart endpoints. To avoid breaking changes, we keep it here.
+
 voyage_parser = reqparse.RequestParser()
 
 # Query content

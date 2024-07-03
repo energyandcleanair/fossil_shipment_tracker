@@ -1,7 +1,7 @@
 from itertools import chain
 import pandas as pd
 
-from ..kpler_trade import KplerTradeResource
+from ...kpler_trade import KplerTradeResource
 
 # voyage: trade
 KPLER_PARAMS_RENAMED = {
