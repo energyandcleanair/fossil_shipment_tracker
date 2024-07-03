@@ -21,6 +21,8 @@ import numpy as np
 
 import sqlalchemy as sa
 
+from base.db_utils import upsert
+
 
 def fill(imos=[]):
     """
@@ -29,9 +31,15 @@ def fill(imos=[]):
     :param source: what data source to use
     :return:
     """
-    imos = list(set([str(x) for x in imos]))
 
-    ships = [Ship(imo=imo) for imo in imos if imo]
+    not_null_imos = [imo for imo in imos if imo]  # Filter out nones
+    deduped_imos = list(set([str(x) for x in not_null_imos]))
+
+    existing_ships = session.query(Ship).filter(Ship.imo.in_(deduped_imos)).all()
+    existing_ship_imos = [ship.imo for ship in existing_ships]
+    new_imos = [imo for imo in deduped_imos if imo not in existing_ship_imos]
+
+    ships = [Ship(imo=imo) for imo in new_imos]
 
     session.add_all(ships)
     session.commit()
