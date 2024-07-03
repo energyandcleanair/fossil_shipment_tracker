@@ -1,27 +1,5 @@
-from tqdm import tqdm
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
-import base
-import json
-
 from base.db import session
-from base.logger import logger, logger_slack
-from base.models import (
-    Ship,
-    PortCall,
-    Departure,
-    Shipment,
-    ShipmentDepartureBerth,
-    Trajectory,
-    MTVoyageInfo,
-    Arrival,
-)
-from base.utils import to_datetime, to_list
-import numpy as np
-
-import sqlalchemy as sa
-
-from base.db_utils import upsert
+from base.models import Ship
 
 
 def fill(imos=[]):
