@@ -46,18 +46,6 @@ def upload(df, client_bucket, folder, filename, exts=["RDS", "csv.gz"]):
             blob.upload_from_filename(filepath)
 
 
-def backup_voyages(client_bucket, folder, now):
-
-    voyages_df = fossil_tracker_api_client.get_voyages(
-        date_from="2021-01-01",
-        commodity_grouping="default",
-        currency=["USD", "EUR"],
-        pricing_scenario=base.PRICING_DEFAULT,
-    )
-    filename = "voyages_%s" % (now.strftime("%Y%m%d_%H%M"))
-    upload(df=voyages_df, client_bucket=client_bucket, folder=folder, filename=filename)
-
-
 def backup_overland(client_bucket, folder, now):
 
     overland_df = fossil_tracker_api_client.get_overland(

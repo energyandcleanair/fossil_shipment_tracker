@@ -47,13 +47,6 @@ def _make_request_with_retries(url, params):
     raise Exception(f"Failed to fetch {url} after 3 retries")
 
 
-def get_voyages(**kwargs):
-    return _make_request_with_retries(
-        f"{API_BASE}/v0/voyage",
-        params={**kwargs, **DEFAULT_ARGS, "bypass_maintenance": True},
-    )
-
-
 def get_overland(**kwargs):
     return _make_request_with_retries(
         f"{API_BASE}/v0/overland",

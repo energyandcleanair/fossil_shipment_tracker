@@ -39,28 +39,6 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION_DEFAULT, force=F
         raise ValueError("v1 is not supported anymore")
 
     elif version == base.COUNTER_VERSION2:
-        voyages = (
-            fossil_tracker_api_client.get_voyages(
-                date_from=date_from,
-                commodity_origin_iso2=["RU"],
-                aggregate_by=[
-                    "commodity_origin_iso2",
-                    "commodity_destination_iso2",
-                    "commodity",
-                    "arrival_date",
-                    "status",
-                ],
-                currency="EUR",
-                status="completed",
-                pricing_scenario=[PRICING_DEFAULT, PRICING_ENHANCED],
-                commodity=[base.LPG],
-            )
-            .loc[lambda df: df.commodity_origin_iso2 == "RU"]
-            .loc[lambda df: df.commodity_destination_iso2 != "RU"]
-            .loc[lambda df: df.status == base.COMPLETED]
-            .rename(columns={"arrival_date": "date"})
-        )
-        assert np.all(voyages.commodity == base.LPG)
 
         # Years from date_from to today
         years = pd.date_range(date_from, dt.datetime.today(), freq="YS")
@@ -104,7 +82,7 @@ def update(date_from="2021-01-01", version=base.COUNTER_VERSION_DEFAULT, force=F
 
             kpler_trades = pd.concat([kpler_trades, kpler_trades_for_year])
 
-        result = pd.concat([pipelineflows, voyages, kpler_trades])
+        result = pd.concat([pipelineflows, kpler_trades])
 
     else:
         raise ValueError(f"Unknown counter version {version}")
