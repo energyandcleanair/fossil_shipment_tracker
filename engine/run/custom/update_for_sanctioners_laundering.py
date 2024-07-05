@@ -169,7 +169,7 @@ def update(continue_from=None, filter_countries=None, date_from=None, date_to=No
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--date-from", type=str, default=None)
-    parser.add_argument("--date-to", type=str, default=None)
+    parser.add_argument("--date-to", type=str, default=dt.datetime.now().strftime("%Y-%m-%d"))
     parser.add_argument("--continue-from", type=str, default=None)
     # Allow multiple countries to be specified, separated by spaces or commas
     parser.add_argument("--filter-countries", nargs="*", type=str, default=None)
@@ -178,10 +178,6 @@ if __name__ == "__main__":
 
     if args.date_from is None:
         print("Please specify --date-from")
-        exit(1)
-
-    if args.date_to is None:
-        print("Please specify --date-to")
         exit(1)
 
     logger_slack.info("=== Update for report: using %s environment ===" % (base.db.environment,))
