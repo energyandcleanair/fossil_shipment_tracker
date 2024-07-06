@@ -156,9 +156,12 @@ class KplerTradeComparer:
         departure_date = pd.to_datetime(comparison["departure_day"]).dt.date
         comparison = comparison[(departure_date >= date_from) & (departure_date <= date_to)]
 
+        expected_as_floats = np.array(comparison["value_tonne.expected"], dtype=float)
+        actual_as_floats = np.array(comparison["value_tonne.actual"], dtype=float)
+
         not_close = ~np.isclose(
-            comparison["value_tonne.expected"],
-            comparison["value_tonne.actual"],
+            expected_as_floats,
+            actual_as_floats,
             rtol=TOLERANCE_FOR_VALUE_ERROR,
             atol=ABSOLUTE_TOLERANCE_FOR_VALUE_ERROR,
         )
@@ -234,9 +237,12 @@ class KplerTradeComparer:
         departure_date = pd.to_datetime(comparison["departure_day"]).dt.date
         comparison = comparison[(departure_date >= date_from) & (departure_date <= date_to)]
 
+        expected_as_floats = np.array(comparison["value_tonne.expected"], dtype=float)
+        actual_as_floats = np.array(comparison["value_tonne.actual"], dtype=float)
+
         not_close = ~np.isclose(
-            comparison["value_tonne.expected"],
-            comparison["value_tonne.actual"],
+            expected_as_floats,
+            actual_as_floats,
             rtol=TOLERANCE_FOR_VALUE_ERROR,
             atol=ABSOLUTE_TOLERANCE_FOR_VALUE_ERROR,
         )

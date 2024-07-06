@@ -149,7 +149,6 @@ def update(continue_from=None, filter_countries=None, date_from=None, date_to=No
     if continue_from is not None:
         countries_to_update = countries_to_update[countries_to_update.index(continue_from) :]
 
-    commodity.fill()
     result = kpler_scraper.update(
         historic_date_from=date_from,
         historic_date_to=date_to,
