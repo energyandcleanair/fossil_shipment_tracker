@@ -318,6 +318,14 @@ class KplerTradeResource(TemplateResource):
     )
 
     parser.add_argument(
+        "completeness_check_error_percentage_days_threshold",
+        type=float,
+        help="The percentage of records that must be complete for the check to pass.",
+        required=False,
+        default=0.01,
+    )
+
+    parser.add_argument(
         "vessel_imos",
         type=str,
         help="Filters trades where the vessel IMO is any of the provided",
@@ -608,6 +616,17 @@ class KplerTradeResource(TemplateResource):
 
         max_age = params.get("completeness_checked_age_threshold")
         earliest_allowed_date = (dt.datetime.now() - dt.timedelta(days=max_age)).date()
+        percentage_threshold = params.get("completeness_check_error_percentage_days_threshold")
+
+        n_countries = session.query(subquery.c.origin_iso2).group_by(subquery.c.origin_iso2).count()
+        n_days = (
+            session.query(func.date_trunc("day", subquery.c.origin_date_utc))
+            .group_by(func.date_trunc("day", subquery.c.origin_date_utc))
+            .count()
+        )
+
+        total_entries_count = n_countries * n_days
+        max_errors_count = total_entries_count * percentage_threshold
 
         failing_entries_query = (
             session.query(
@@ -665,7 +684,7 @@ class KplerTradeResource(TemplateResource):
 
         result = pd.DataFrame(result, columns=["origin_iso2", "date_from", "date_to"])
 
-        if len(result) > 0:
+        if len(failing_entries) > max_errors_count:
             return False, result.to_csv(index=False)
         else:
             return True, None
@@ -856,7 +875,9 @@ class KplerTradeResource(TemplateResource):
         )
 
         # Only keep valid trades
-        query = query.filter(KplerTrade.is_valid == True)
+        query = query.filter(KplerTrade.is_valid == True).filter(
+            origin_zone.country_iso2 != "not found"
+        )
 
         return query
 
