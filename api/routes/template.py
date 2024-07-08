@@ -131,10 +131,10 @@ class TemplateResource(Resource):
 
         return True, None
 
-    def get_aggregate_cols_dict(self, subquery):
+    def get_aggregate_cols_dict(self, subquery, params):
         return {}
 
-    def get_agg_value_cols(self, subquery):
+    def get_agg_value_cols(self, subquery, params):
         return []
 
     @abstractmethod
@@ -161,8 +161,8 @@ class TemplateResource(Resource):
             aggregate_by.remove("")
 
         # Aggregating
-        agg_cols_dict = self.get_aggregate_cols_dict(subquery=subquery)
-        agg_value_cols = self.get_agg_value_cols(subquery=subquery)
+        agg_cols_dict = self.get_aggregate_cols_dict(subquery=subquery, params=params)
+        agg_value_cols = self.get_agg_value_cols(subquery=subquery, params=params)
 
         if any([x not in agg_cols_dict for x in aggregate_by]):
             missing = ",".join(filter(lambda x: x not in agg_cols_dict, aggregate_by))

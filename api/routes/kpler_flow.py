@@ -158,7 +158,7 @@ class KplerFlowResource(TemplateResource):
     }
     filename = "kpler_flow"
 
-    def get_aggregate_cols_dict(self, subquery):
+    def get_aggregate_cols_dict(self, subquery, params):
         return {
             "origin_country": [
                 subquery.c.origin_iso2,
@@ -241,7 +241,7 @@ class KplerFlowResource(TemplateResource):
             "pricing_scenario": [subquery.c.pricing_scenario],
         }
 
-    def get_agg_value_cols(self, subquery):
+    def get_agg_value_cols(self, subquery, params):
         return [
             func.sum(subquery.c.value_tonne).label("value_tonne"),
             func.sum(subquery.c.value_eur).label("value_eur"),

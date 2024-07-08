@@ -57,7 +57,7 @@ class ComtradeResource(TemplateResource):
     value_cols = ["value", "quantity", "usd_per_tonne"]
     pivot_dependencies = {}
 
-    def get_aggregate_cols_dict(self, subquery):
+    def get_aggregate_cols_dict(self, subquery, params):
         return {
             "commodity_code": [subquery.c.commodity_code],
             "partner_iso2": [subquery.c.partner_iso2],

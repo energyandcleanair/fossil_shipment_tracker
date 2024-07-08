@@ -36,6 +36,7 @@ from base.models import (
     Commodity,
     KplerTrade,
     KplerTradeComputed,
+    KplerTradeComputedShips,
     KplerInstallation,
     KplerZone,
 )
@@ -333,6 +334,15 @@ class KplerTradeResource(TemplateResource):
         action="split",
     )
 
+    parser.add_argument(
+        "nest_ships",
+        type=inputs.boolean,
+        help="Ships are nested by default. Unnest ships means that there's one row per ship."
+        + "Sum aggregates will double count trades where there are multiple ships per trade.",
+        required=False,
+        default=True,
+    )
+
     must_group_by = ["currency", "pricing_scenario"]
     date_cols = ["date", "origin_date", "destination_date"]
     value_cols = [
@@ -367,8 +377,9 @@ class KplerTradeResource(TemplateResource):
     }
     filename = "kpler_trade"
 
-    def get_aggregate_cols_dict(self, subquery):
-        return {
+    def get_aggregate_cols_dict(self, subquery, params):
+
+        base_aggregates = {
             "flow_origin_port": [
                 subquery.c.origin_port_name.label("origin_name"),
                 subquery.c.origin_port_name,
@@ -550,33 +561,58 @@ class KplerTradeResource(TemplateResource):
                 func.extract("year", subquery.c.destination_date_utc).label("year")
             ],
             "pricing_scenario": [subquery.c.pricing_scenario],
-            "ship_insurer_country": [
-                subquery.c.ship_insurer_iso2s,
-                subquery.c.ship_insurer_regions,
-            ],
-            "ship_owner_country": [
-                subquery.c.ship_owner_iso2s,
-                subquery.c.ship_owner_regions,
-            ],
             "ownership_sanction_coverage": [subquery.c.ownership_sanction_coverage],
             "flag_sanction_coverage": [subquery.c.flag_sanction_coverage],
-            "largest_vessel_type": [subquery.c.largest_vessel_type],
             "status": [subquery.c.status],
             "is_sts": [subquery.c.is_sts],
         }
 
-    def get_agg_value_cols(self, subquery):
-        return [
+        nest_ships = params.get("nest_ships")
+
+        ktc_aggregates = (
+            {
+                "largest_vessel_type": [subquery.c.largest_vessel_type],
+            }
+            if nest_ships
+            else {
+                "vessel_imo": [subquery.c.vessel_imo],
+                "ship_insurer": [
+                    subquery.c.ship_insurer_name,
+                    subquery.c.ship_insurer_iso2,
+                    subquery.c.ship_insurer_region,
+                ],
+                "ship_owner": [
+                    subquery.c.ship_owner_name,
+                    subquery.c.ship_owner_iso2,
+                    subquery.c.ship_owner_region,
+                ],
+            }
+        )
+
+        return base_aggregates | ktc_aggregates
+
+    def get_agg_value_cols(self, subquery, params):
+
+        base_values = [
             func.sum(subquery.c.value_tonne).label("value_tonne"),
             func.sum(subquery.c.value_m3).label("value_m3"),
             func.sum(subquery.c.value_gas_m3).label("value_gas_m3"),
             func.sum(subquery.c.value_eur).label("value_eur"),
             func.sum(subquery.c.value_currency).label("value_currency"),
-            func.avg(subquery.c.avg_vessel_age).label("avg_vessel_age"),
             func.count(func.distinct(subquery.c.trade_id)).label("trade_count"),
-            # func.sum(subquery.c.value_energy).label("value_energy"),
-            # func.sum(subquery.c.value_gas_m3).label("value_gas_m3")
         ]
+
+        nest_ships = params.get("nest_ships")
+
+        ktc_values = (
+            [
+                func.avg(subquery.c.avg_vessel_age).label("avg_vessel_age"),
+            ]
+            if nest_ships
+            else []
+        )
+
+        return base_values + ktc_values
 
     @routes_api.expect(parser)
     @key_required
@@ -711,10 +747,6 @@ class KplerTradeResource(TemplateResource):
             else_=origin_zone.country_iso2,
         ).label("commodity_origin_iso2")
 
-        value_eur_field = (KplerTrade.value_tonne * KplerTradeComputed.eur_per_tonne).label(
-            "value_eur"
-        )
-
         destination_region_field = DestinationCountry.region.label("destination_region")
         commodity_destination_region_field = CommodityDestinationCountry.region.label(
             "commodity_destination_region"
@@ -749,66 +781,13 @@ class KplerTradeResource(TemplateResource):
 
         null_as_unknown = lambda field: func.coalesce(field, base.UNKNOWN)
 
-        query = (
-            session.query(
-                # Renaming everything in terms of "origin" and "destination"
-                KplerTrade.id.label("trade_id"),
-                KplerTrade.flow_id,
-                KplerTrade.status,
-                KplerTrade.departure_date_utc.label("origin_date_utc"),
-                KplerTrade.departure_installation_id.label("origin_installation_id"),
-                KplerTrade.departure_installation_name.label("origin_installation_name"),
-                OriginInstallation.type.label("origin_installation_type"),
-                KplerTrade.departure_zone_id.label("origin_zone_id"),
-                origin_zone.name.label("origin_zone_name"),
-                origin_zone.name.label("origin_zone_type"),
-                origin_zone.port_id.label("origin_port_id"),
-                origin_zone.port_name.label("origin_port_name"),
-                origin_zone.country_name.label("origin_country"),
-                origin_zone.country_iso2.label("origin_iso2"),
-                origin_zone.area.label("origin_area"),
-                OriginCountry.region.label("origin_region"),
-                commodity_origin_iso2_field,
-                CommodityOriginCountry.name.label("commodity_origin_country"),
-                CommodityOriginCountry.region.label("commodity_origin_region"),
-                KplerTrade.arrival_date_utc.label("destination_date_utc"),
-                KplerTrade.arrival_installation_id.label("destination_installation_id"),
-                KplerTrade.arrival_installation_name.label("destination_installation_name"),
-                DestinationInstallation.type.label("destination_installation_type"),
-                destination_zone.id.label("destination_zone_id"),
-                null_as_unknown(destination_zone.name).label("destination_zone_name"),
-                null_as_unknown(destination_zone.type).label("destination_zone_type"),
-                destination_zone.port_id.label("destination_port_id"),
-                null_as_unknown(destination_zone.port_name).label("destination_port_name"),
-                null_as_unknown(destination_zone.country_name).label("destination_country"),
-                null_as_unknown(destination_zone.country_iso2).label("destination_iso2"),
-                destination_region_field,
-                null_as_unknown(destination_zone.country_name).label(
-                    "commodity_destination_country"
-                ),
-                null_as_unknown(destination_zone.country_iso2).label("commodity_destination_iso2"),
-                commodity_destination_region_field,
-                KplerTrade.departure_sts.label("origin_sts"),
-                KplerTrade.arrival_sts.label("destination_sts"),
-                KplerProduct.grade_name.label("grade"),
-                KplerProduct.commodity_name.label("commodity"),
-                KplerProduct.group_name.label("group"),
-                KplerProduct.family_name.label("family"),
-                Commodity.equivalent_id.label("commodity_equivalent"),  # For filtering
-                CommodityEquivalent.name.label("commodity_equivalent_name"),
-                CommodityEquivalent.group.label("commodity_equivalent_group"),
-                CommodityEquivalent.group_name.label("commodity_equivalent_group_name"),
+        nest_ships = params.get("nest_ships")
+
+        kpler_trade_computed_table = KplerTradeComputed if nest_ships else KplerTradeComputedShips
+
+        kpler_trade_computed_columns = (
+            [
                 KplerTradeComputed.pricing_scenario,
-                KplerTrade.value_tonne,
-                KplerTrade.value_m3,
-                KplerTrade.value_gas_m3,
-                value_eur_field,
-                Currency.currency,
-                (value_eur_field * Currency.per_eur).label("value_currency"),
-                KplerTradeComputed.pricing_commodity,
-                KplerTrade.vessel_imos,
-                KplerTrade.buyer_names,
-                KplerTrade.seller_names,
                 KplerTradeComputed.vessel_ages,
                 KplerTradeComputed.avg_vessel_age,
                 KplerTradeComputed.ship_insurer_names,
@@ -824,10 +803,92 @@ class KplerTradeResource(TemplateResource):
                 KplerTradeComputed.step_zone_iso2s,
                 KplerTradeComputed.step_zone_regions,
                 KplerTradeComputed.step_zone_ids,
-                is_sts_field,
                 KplerTradeComputed.largest_vessel_type,
                 KplerTradeComputed.largest_vessel_capacity_cm,
-            )
+            ]
+            if nest_ships
+            else [
+                KplerTradeComputedShips.pricing_scenario,
+                KplerTradeComputedShips.ownership_sanction_coverage,
+                KplerTradeComputedShips.pricing_commodity,
+                KplerTradeComputedShips.kpler_product_commodity_id,
+                KplerTradeComputedShips.flag_sanction_coverage,
+                KplerTradeComputedShips.vessel_imo,
+                KplerTradeComputedShips.ship_insurer_name,
+                KplerTradeComputedShips.ship_insurer_iso2,
+                KplerTradeComputedShips.ship_insurer_region,
+                KplerTradeComputedShips.ship_owner_name,
+                KplerTradeComputedShips.ship_owner_iso2,
+                KplerTradeComputedShips.ship_owner_region,
+                KplerTradeComputedShips.vessel_age,
+                KplerTradeComputedShips.ship_flag_iso2,
+            ]
+        )
+
+        value_eur_field = (KplerTrade.value_tonne * kpler_trade_computed_table.eur_per_tonne).label(
+            "value_eur"
+        )
+
+        columns = [
+            # Renaming everything in terms of "origin" and "destination"
+            KplerTrade.id.label("trade_id"),
+            KplerTrade.flow_id,
+            KplerTrade.status,
+            KplerTrade.departure_date_utc.label("origin_date_utc"),
+            KplerTrade.departure_installation_id.label("origin_installation_id"),
+            KplerTrade.departure_installation_name.label("origin_installation_name"),
+            OriginInstallation.type.label("origin_installation_type"),
+            KplerTrade.departure_zone_id.label("origin_zone_id"),
+            origin_zone.name.label("origin_zone_name"),
+            origin_zone.name.label("origin_zone_type"),
+            origin_zone.port_id.label("origin_port_id"),
+            origin_zone.port_name.label("origin_port_name"),
+            origin_zone.country_name.label("origin_country"),
+            origin_zone.country_iso2.label("origin_iso2"),
+            origin_zone.area.label("origin_area"),
+            OriginCountry.region.label("origin_region"),
+            commodity_origin_iso2_field,
+            CommodityOriginCountry.name.label("commodity_origin_country"),
+            CommodityOriginCountry.region.label("commodity_origin_region"),
+            KplerTrade.arrival_date_utc.label("destination_date_utc"),
+            KplerTrade.arrival_installation_id.label("destination_installation_id"),
+            KplerTrade.arrival_installation_name.label("destination_installation_name"),
+            DestinationInstallation.type.label("destination_installation_type"),
+            destination_zone.id.label("destination_zone_id"),
+            null_as_unknown(destination_zone.name).label("destination_zone_name"),
+            null_as_unknown(destination_zone.type).label("destination_zone_type"),
+            destination_zone.port_id.label("destination_port_id"),
+            null_as_unknown(destination_zone.port_name).label("destination_port_name"),
+            null_as_unknown(destination_zone.country_name).label("destination_country"),
+            null_as_unknown(destination_zone.country_iso2).label("destination_iso2"),
+            destination_region_field,
+            null_as_unknown(destination_zone.country_name).label("commodity_destination_country"),
+            null_as_unknown(destination_zone.country_iso2).label("commodity_destination_iso2"),
+            commodity_destination_region_field,
+            KplerTrade.departure_sts.label("origin_sts"),
+            KplerTrade.arrival_sts.label("destination_sts"),
+            KplerProduct.grade_name.label("grade"),
+            KplerProduct.commodity_name.label("commodity"),
+            KplerProduct.group_name.label("group"),
+            KplerProduct.family_name.label("family"),
+            Commodity.equivalent_id.label("commodity_equivalent"),  # For filtering
+            CommodityEquivalent.name.label("commodity_equivalent_name"),
+            CommodityEquivalent.group.label("commodity_equivalent_group"),
+            CommodityEquivalent.group_name.label("commodity_equivalent_group_name"),
+            KplerTrade.value_tonne,
+            KplerTrade.value_m3,
+            KplerTrade.value_gas_m3,
+            value_eur_field,
+            Currency.currency,
+            (value_eur_field * Currency.per_eur).label("value_currency"),
+            KplerTrade.vessel_imos,
+            KplerTrade.buyer_names,
+            KplerTrade.seller_names,
+            is_sts_field,
+        ] + kpler_trade_computed_columns
+
+        query = (
+            session.query(*columns)
             .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
             .join(origin_zone, KplerTrade.departure_zone_id == origin_zone.id)
             .outerjoin(destination_zone, KplerTrade.arrival_zone_id == destination_zone.id)
@@ -848,15 +909,15 @@ class KplerTradeResource(TemplateResource):
                 CommodityDestinationCountry.iso2 == destination_zone.country_iso2,
             )
             .join(
-                KplerTradeComputed,
+                kpler_trade_computed_table,
                 sa.and_(
-                    KplerTradeComputed.trade_id == KplerTrade.id,
-                    KplerTradeComputed.flow_id == KplerTrade.flow_id,
-                    KplerTradeComputed.product_id == KplerTrade.product_id,
-                    KplerTradeComputed.eur_per_tonne != None,
+                    kpler_trade_computed_table.trade_id == KplerTrade.id,
+                    kpler_trade_computed_table.flow_id == KplerTrade.flow_id,
+                    kpler_trade_computed_table.product_id == KplerTrade.product_id,
+                    kpler_trade_computed_table.eur_per_tonne != None,
                 ),
             )
-            .join(Commodity, KplerTradeComputed.kpler_product_commodity_id == Commodity.id)
+            .join(Commodity, kpler_trade_computed_table.kpler_product_commodity_id == Commodity.id)
             .join(CommodityEquivalent, Commodity.equivalent_id == CommodityEquivalent.id)
             .outerjoin(Currency, Currency.date == price_date)
             .outerjoin(
@@ -869,7 +930,7 @@ class KplerTradeResource(TemplateResource):
             .order_by(
                 KplerTrade.id,
                 KplerTrade.flow_id,
-                KplerTradeComputed.pricing_scenario,
+                kpler_trade_computed_table.pricing_scenario,
                 Currency.currency,
             )
         )
@@ -926,6 +987,10 @@ class KplerTradeResource(TemplateResource):
 
         vessel_imos = params.get("vessel_imos")
 
+        nest_ships = params.get("nest_ships")
+
+        kpler_trade_computed_table = KplerTradeComputed if nest_ships else KplerTradeComputedShips
+
         if trade_ids:
             query = query.filter(KplerTrade.id.in_(to_list(trade_ids)))
 
@@ -962,7 +1027,9 @@ class KplerTradeResource(TemplateResource):
             )
 
         if pricing_scenario:
-            query = query.filter(KplerTradeComputed.pricing_scenario.in_(to_list(pricing_scenario)))
+            query = query.filter(
+                kpler_trade_computed_table.pricing_scenario.in_(to_list(pricing_scenario))
+            )
 
         if currency is not None:
             query = query.filter(Currency.currency.in_(to_list(currency)))

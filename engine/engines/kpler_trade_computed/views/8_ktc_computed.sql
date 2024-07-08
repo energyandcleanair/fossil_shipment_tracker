@@ -3,6 +3,7 @@ SELECT
   kpler_trade.id AS trade_id,
   kpler_trade.flow_id,
   kpler_trade.product_id,
+  kpler_trade.vessel_imos,
   commodity.id AS kpler_product_commodity_id,
   price.scenario AS pricing_scenario,
   price.commodity AS pricing_commodity,

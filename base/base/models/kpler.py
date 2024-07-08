@@ -19,16 +19,19 @@ import datetime as dt
 import base
 from base.db import Base
 from base.logger import logger
-
-from . import DB_TABLE_COMMODITY, DB_TABLE_KPLER_PRODUCT
-from . import DB_TABLE_KPLER_FLOW
-from . import DB_TABLE_KPLER_VESSEL
-from . import DB_TABLE_KPLER_TRADE
-from . import DB_TABLE_KPLER_TRADE_FLOW
-from . import DB_TABLE_KPLER_ZONE
-from . import DB_TABLE_KPLER_INSTALLATION
-from . import DB_TABLE_KPLER_TRADE_COMPUTED
-from . import DB_TABLE_KPLER_SYNC_HISTORY
+from base.models.table_names import (
+    DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS,
+    DB_TABLE_COMMODITY,
+    DB_TABLE_KPLER_PRODUCT,
+    DB_TABLE_KPLER_FLOW,
+    DB_TABLE_KPLER_VESSEL,
+    DB_TABLE_KPLER_TRADE,
+    DB_TABLE_KPLER_TRADE_FLOW,
+    DB_TABLE_KPLER_ZONE,
+    DB_TABLE_KPLER_INSTALLATION,
+    DB_TABLE_KPLER_TRADE_COMPUTED,
+    DB_TABLE_KPLER_SYNC_HISTORY,
+)
 
 
 class KplerFlow(Base):
@@ -201,6 +204,29 @@ class KplerTradeComputed(Base):
     )
 
     __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED
+
+
+class KplerTradeComputedShips(Base):
+    trade_id = Column(BigInteger, primary_key=True)
+    flow_id = Column(BigInteger, primary_key=True)
+    product_id = Column(BigInteger, primary_key=True)
+    pricing_scenario = Column(String, primary_key=True)
+    ownership_sanction_coverage = Column(String)
+    pricing_commodity = Column(BigInteger)
+    kpler_product_commodity_id = Column(BigInteger)
+    flag_sanction_coverage = Column(String)
+    vessel_imo = Column(String)
+    ship_insurer_name = Column(String)
+    ship_insurer_iso2 = Column(String)
+    ship_insurer_region = Column(String)
+    ship_owner_name = Column(String)
+    ship_owner_iso2 = Column(String)
+    ship_owner_region = Column(String)
+    vessel_age = Column(Numeric)
+    ship_flag_iso2 = Column(String)
+    eur_per_tonne = Column(Numeric)
+
+    __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS
 
 
 class KplerTradeFlow(Base):

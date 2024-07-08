@@ -52,3 +52,50 @@ SELECT
   largest_vessel_capacity_cm
 FROM
   ktc_kpler_trade_computed;
+
+INSERT INTO
+  kpler_trade_computed_ships (
+    trade_id,
+    flow_id,
+    product_id,
+    vessel_imo,
+    pricing_scenario,
+    ownership_sanction_coverage,
+    pricing_commodity,
+    kpler_product_commodity_id,
+    flag_sanction_coverage,
+    ship_insurer_name,
+    ship_insurer_iso2,
+    ship_insurer_region,
+    ship_owner_name,
+    ship_owner_iso2,
+    ship_owner_region,
+    vessel_age,
+    ship_flag_iso2,
+    eur_per_tonne
+  )
+SELECT
+  trade_id,
+  flow_id,
+  product_id,
+  vessel_imo,
+  pricing_scenario,
+  ownership_sanction_coverage,
+  pricing_commodity,
+  kpler_product_commodity_id,
+  flag_sanction_coverage,
+  ship_insurer_name,
+  ship_insurer_iso2,
+  ship_insurer_region,
+  ship_owner_name,
+  ship_owner_iso2,
+  ship_owner_region,
+  vessel_age,
+  ship_flag_iso2,
+  eur_per_tonne
+FROM
+  ktc_kpler_trade_computed_ships;
+
+ANALYZE kpler_trade_computed;
+
+ANALYZE kpler_trade_computed_ships;
