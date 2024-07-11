@@ -128,6 +128,7 @@ def check_invalid_trade_computed():
     ]
     # Not all commodities have old pricing
     date_from = dt.datetime(2015, 1, 1)
+    date_now = dt.datetime.now()
 
     # Commodity used for pricing
     commodity_id_field = build_commodity_id_field()
@@ -154,6 +155,7 @@ def check_invalid_trade_computed():
                 commodity_id_field != None,
                 commodity_id_field.notin_(ignorable_commodities),
                 KplerTrade.departure_date_utc >= date_from,
+                KplerTrade.departure_date_utc <= date_now,
             )
         )
         .all()
