@@ -581,8 +581,16 @@ class KplerTradeResource(TemplateResource):
                     subquery.c.ship_insurer_iso2,
                     subquery.c.ship_insurer_region,
                 ],
+                "ship_insurer_iso2": [
+                    subquery.c.ship_insurer_iso2,
+                    subquery.c.ship_insurer_region,
+                ],
                 "ship_owner": [
                     subquery.c.ship_owner_name,
+                    subquery.c.ship_owner_iso2,
+                    subquery.c.ship_owner_region,
+                ],
+                "ship_owner_iso2": [
                     subquery.c.ship_owner_iso2,
                     subquery.c.ship_owner_region,
                 ],
