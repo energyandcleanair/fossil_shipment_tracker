@@ -13,6 +13,8 @@ import responses
 import requests
 
 from responses.registries import OrderedRegistry
+import pandas as pd
+from pandas.testing import assert_frame_equal
 
 
 @pytest.fixture(scope="session")
@@ -43,6 +45,18 @@ def session_cancelled_body():
 def ship_details_body():
     with open("tests/equasis_responses/ship_details.html") as f:
         return f.read()
+
+
+@pytest.fixture(scope="session")
+def ship_inspection_body():
+    with open("tests/equasis_responses/ship_inspection.html") as f:
+        return f.read()
+
+
+@pytest.fixture(scope="session")
+def ship_inspection_expected_data():
+    with open("tests/equasis_data/ship_inspection.csv") as f:
+        return pd.read_csv(f).drop(columns=["Details"])
 
 
 example_url = "https://www.equasis.org/example"
@@ -314,3 +328,29 @@ def test_Equasis__get_ship_infos__has_ship_infos(ship_details_body):
     assert actual["owner"]["date_from"].date() == date(2017, 8, 9)
 
     assert actual["current_flag"] == "Panama"
+
+    mocked_pool.make_request.assert_called_once_with(
+        "https://www.equasis.org/EquasisWeb/restricted/ShipInfo?fs=Search", {"P_IMO": "example_imo"}
+    )
+
+
+def test_Equasis__get_inspections__has_inspection_details(
+    ship_inspection_body, ship_inspection_expected_data
+):
+
+    mocked_pool = MagicMock()
+    mocked_pool.make_request.return_value = ship_inspection_body
+    equasis = Equasis(session_pool=mocked_pool)
+
+    actual = equasis.get_inspections("example_imo")
+
+    assert actual["imo"] == "example_imo"
+    assert len(actual["inspections"]) == 18
+    assert isinstance(actual["inspections"], pd.DataFrame)
+
+    assert_frame_equal(actual["inspections"], ship_inspection_expected_data)
+
+    mocked_pool.make_request.assert_called_once_with(
+        "https://www.equasis.org/EquasisWeb/restricted/ShipInspection?fs=ShipInfo",
+        {"P_IMO": "example_imo"},
+    )

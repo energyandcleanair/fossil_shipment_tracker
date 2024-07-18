@@ -343,6 +343,45 @@ class Equasis:
             return None
         return self._clean_text(flag_text.replace("(", "").replace(")", ""))
 
+    def get_inspections(self, imo, itry=1, max_try=11):
+        if itry > max_try:
+            return None
+
+        url = "https://www.equasis.org/EquasisWeb/restricted/ShipInspection?fs=ShipInfo"
+        ship_data = {}
+        ship_data["imo"] = imo
+        payload = {"P_IMO": imo}
+
+        resp = self.sessions.make_request(url, payload)
+
+        html_obj = BeautifulSoup(resp, "html.parser")
+
+        if not html_obj or not html_obj.body:
+            return None
+
+        # Find the table containing the inspections
+        table = html_obj.find("table", {"class": "tableLSDD"})
+
+        # Extract the table headers
+        headers = [header.text.strip() for header in table.find_all("th")]
+
+        # Extract the table rows
+        rows = []
+        for row in table.find_all("tr")[1:]:
+            cells = row.find_all(["td", "th"])
+            rows.append([cell.text.strip() for cell in cells])
+
+        # Create a DataFrame from the extracted data
+        df = pd.DataFrame(rows, columns=headers).drop(columns=["Details"])
+        df.replace("", pd.NA, inplace=True)
+        # Convert number of deficiencies to number
+        df["Number of deficiencies"] = pd.to_numeric(df["Number of deficiencies"], errors="coerce")
+        df["Duration (days)"] = pd.to_numeric(df["Duration (days)"], errors="coerce")
+
+        ship_data["inspections"] = df
+
+        return ship_data
+
     def get_ship_history(self, imo, itry=1, max_try=11):
         if itry > max_try:
             return None
