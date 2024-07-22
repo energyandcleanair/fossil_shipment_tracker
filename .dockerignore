@@ -2,7 +2,8 @@
 __pycache__
 .pytest_cache
 
-assets
+!assets/2024_07_recent_vessel_subset.csv
+assets/
 
 .vscode
 .env

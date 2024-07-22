@@ -19,7 +19,7 @@ import json
 from base.db_utils import execute_statement
 from base.encoder import JsonEncoder
 from base.utils import to_list
-from base.db import session
+from base.db import session, engine
 from base.env import get_env
 from base.logger import logger, logger_slack
 from base.models import (
@@ -28,6 +28,7 @@ from base.models import (
     ShipOwner,
     ShipManager,
     ShipFlag,
+    ShipInspection,
     Company,
     Country,
     KplerProduct,
@@ -35,6 +36,7 @@ from base.models import (
     KplerVessel,
     Ship,
 )
+from base.models.table_names import DB_TABLE_SHIP_INSPECTIONS
 from engines.company_scraper import Equasis, CompanyImoScraper
 from sqlalchemy.sql import update as update_sql
 
@@ -44,7 +46,7 @@ import logging
 
 import country_converter as coco
 
-from engines.company_scraper.equasis import EquasisSessionPoolExhausted
+from engines.company_scraper.equasis import EquasisSessionPool, EquasisSessionPoolExhausted
 
 
 DEFAULT_UPDATE_LIMIT: int = int(get_env("EQUASIS_UPDATE_LIMIT", 1000))
@@ -58,6 +60,15 @@ COMMODITY_SETTINGS = {
     base.BULK: {"known": 30, "unknown": 15, "update_priority": 2},
     base.LPG: {"known": 30, "unknown": 3, "update_priority": 3},
 }
+
+global_equasis_client: Equasis | None = None
+
+
+def get_global_equasis_client() -> Equasis:
+    global global_equasis_client
+    if global_equasis_client is None:
+        global_equasis_client = Equasis(session_pool=EquasisSessionPool.with_account_generator(1))
+    return global_equasis_client
 
 
 def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT):
@@ -85,6 +96,78 @@ def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT):
     except Exception as e:
         logger_slack.error("=== Company update failed ===", stack_info=True, exc_info=True)
     return
+
+
+def update_ships_inspections_sample(max_updates: int = 500):
+    # This is already in a random order
+    ships_to_update = choose_ships_to_update(max_updates)
+
+    equasis = get_global_equasis_client()
+
+    with logging_redirect_tqdm(loggers=[logging.root]), warnings.catch_warnings():
+        for _, row in tqdm(ships_to_update.iterrows(), unit="ships"):
+            imo = row["ship_imo"]
+            logger.info(f"Updating inspections for {imo}")
+
+            inspection_info = equasis.get_inspections(imo=imo)
+
+            if inspection_info is not None:
+                update_ships_inspections(imo, inspection_info)
+
+
+def choose_ships_to_update(max_updates):
+    ships = pd.read_csv("assets/2024_07_recent_vessel_subset.csv")
+
+    ships_to_update = ships.head(max_updates)
+    ships_to_update["ship_imo"] = ships_to_update["ship_imo"].astype(str)
+
+    updated_date_query = (
+        session.query(
+            ShipInspection.ship_imo, func.max(ShipInspection.updated_on).label("updated_on")
+        )
+        .group_by(ShipInspection.ship_imo)
+        .filter(ShipInspection.ship_imo.in_(ships_to_update.ship_imo))
+    )
+
+    ship_updated_on = pd.read_sql(updated_date_query.statement, updated_date_query.session.bind)
+
+    ships_to_update = ships_to_update.merge(ship_updated_on, on="ship_imo", how="left")
+    ships_to_update = ships_to_update[
+        ships_to_update.updated_on.isnull()
+        | (ships_to_update.updated_on < dt.datetime.now() - dt.timedelta(days=3 * 30))
+    ]
+    return ships_to_update
+
+
+def update_ships_inspections(imo, inspection_info):
+    inspection_df = convert_inspections_to_df(imo, inspection_info)
+    inspection_df["updated_on"] = dt.datetime.now()
+
+    with session.begin_nested():
+        # Delete existing inspections for ship
+        session.query(ShipInspection).filter(ShipInspection.ship_imo == imo).delete()
+        # Insert updated inspections
+        inspection_df.to_sql(DB_TABLE_SHIP_INSPECTIONS, con=engine, if_exists="append", index=False)
+    session.commit()
+
+
+def convert_inspections_to_df(imo, inspection_info):
+    inspection_df = inspection_info["inspections"]
+    inspection_df["ship_imo"] = imo
+    inspection_df = inspection_df.rename(
+        columns={
+            "Authority": "authority",
+            "Port of inspection": "port_of_inspection",
+            "Date of report": "date_of_report",
+            "Detention": "detention",
+            "PSC Organisation": "psc_organisation",
+            "Type of inspection": "type_of_inspection",
+            "Duration (days)": "duration_days",
+            "Number of deficiencies": "number_of_deficiencies",
+        }
+    )
+
+    return inspection_df
 
 
 def find_or_create_company_id(raw_name, imo=None, address=None):
@@ -194,7 +277,7 @@ def update_info_from_equasis(
 
     imos_to_update = top_ships.imo.unique().tolist()
 
-    equasis = Equasis()
+    equasis = get_global_equasis_client()
 
     def random_wait():
         time.sleep(random.uniform(0.25, 0.5))

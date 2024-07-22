@@ -59,6 +59,18 @@ def ship_inspection_expected_data():
         return pd.read_csv(f).drop(columns=["Details"])
 
 
+@pytest.fixture(scope="session")
+def ship_inspection_multiple_entries_per_row():
+    with open("tests/equasis_responses/ship_inspection_multiple_entries_per_row.html") as f:
+        return f.read()
+
+
+@pytest.fixture(scope="session")
+def ship_inspection_multiple_entries_per_row_expected_data():
+    with open("tests/equasis_data/ship_inspection_multiple_entries_per_row.csv") as f:
+        return pd.read_csv(f).drop(columns=["Details"])
+
+
 example_url = "https://www.equasis.org/example"
 
 
@@ -349,6 +361,27 @@ def test_Equasis__get_inspections__has_inspection_details(
     assert isinstance(actual["inspections"], pd.DataFrame)
 
     assert_frame_equal(actual["inspections"], ship_inspection_expected_data)
+
+    mocked_pool.make_request.assert_called_once_with(
+        "https://www.equasis.org/EquasisWeb/restricted/ShipInspection?fs=ShipInfo",
+        {"P_IMO": "example_imo"},
+    )
+
+
+def test_Equasis__get_inspections__has_inspection_details_multiple_entries_per_row(
+    ship_inspection_multiple_entries_per_row, ship_inspection_multiple_entries_per_row_expected_data
+):
+
+    mocked_pool = MagicMock()
+    mocked_pool.make_request.return_value = ship_inspection_multiple_entries_per_row
+    equasis = Equasis(session_pool=mocked_pool)
+
+    actual = equasis.get_inspections("example_imo")
+
+    assert actual["imo"] == "example_imo"
+    assert_frame_equal(
+        actual["inspections"], ship_inspection_multiple_entries_per_row_expected_data
+    )
 
     mocked_pool.make_request.assert_called_once_with(
         "https://www.equasis.org/EquasisWeb/restricted/ShipInspection?fs=ShipInfo",

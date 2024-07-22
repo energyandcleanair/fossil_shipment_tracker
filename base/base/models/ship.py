@@ -143,3 +143,23 @@ class ShipFlag(Base):
     updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     __tablename__ = DB_TABLE_SHIP_FLAG
+
+
+class ShipInspection(Base):
+    id = Column(BigInteger, autoincrement=True, primary_key=True)
+    ship_imo = Column(
+        String, ForeignKey(DB_TABLE_SHIP + ".imo", onupdate="CASCADE"), nullable=False
+    )
+    authority = Column(String)
+    port_of_inspection = Column(String)
+    date_of_report = Column(DateTime(timezone=False))
+    detention = Column(Boolean)
+    psc_organisation = Column(String)
+    type_of_inspection = Column(String)
+    duration_days = Column(Integer)
+    number_of_deficiencies = Column(Integer)
+
+    updated_on = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
+
+    __tablename__ = DB_TABLE_SHIP_INSPECTIONS
+    __table_args__ = (Index("idx_ship_inspection_ship_imo", "ship_imo"),)

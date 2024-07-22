@@ -362,17 +362,43 @@ class Equasis:
         # Find the table containing the inspections
         table = html_obj.find("table", {"class": "tableLSDD"})
 
+        if not table:
+            return None
+
         # Extract the table headers
         headers = [header.text.strip() for header in table.find_all("th")]
 
+        assert headers == [
+            "Authority",
+            "Port of inspection",
+            "Date of report",
+            "Detention",
+            "PSC Organisation",
+            "Type of inspection",
+            "Duration (days)",
+            "Number of deficiencies",
+            "Details",
+        ]
+
         # Extract the table rows
-        rows = []
-        for row in table.find_all("tr")[1:]:
-            cells = row.find_all(["td", "th"])
-            rows.append([cell.text.strip() for cell in cells])
+        rows_data = []
+        shared_columns_length = 4
+        row_elements = table.find("tbody").find_all("tr", recursive=False)
+        for row in row_elements:
+            cells = row.find_all(["td", "th"], recursive=False)
+            contents = [cell.text.strip() for cell in cells]
+            rows_data.append(contents)
+
+            child_rows = row.find_all("tr", recursive=False)
+            for child_row in child_rows:
+                child_cells = child_row.find_all(["td", "th"], recursive=False)
+                child_contents = contents[:shared_columns_length] + [
+                    child_cell.text.strip() for child_cell in child_cells
+                ]
+                rows_data.append(child_contents)
 
         # Create a DataFrame from the extracted data
-        df = pd.DataFrame(rows, columns=headers).drop(columns=["Details"])
+        df = pd.DataFrame(rows_data, columns=headers).drop(columns=["Details"])
         df.replace("", pd.NA, inplace=True)
         # Convert number of deficiencies to number
         df["Number of deficiencies"] = pd.to_numeric(df["Number of deficiencies"], errors="coerce")

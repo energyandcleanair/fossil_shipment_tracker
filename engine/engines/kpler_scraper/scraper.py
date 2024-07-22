@@ -99,13 +99,9 @@ class KplerClient:
 
     def _generate_headers(self, token):
         access_token = token.access_token
-        parts = list(split_into(access_token, 4))
 
         headers = {
-            "access-token-chunk-1": parts[0],
-            "access-token-chunk-2": parts[1],
-            "access-token-chunk-3": parts[2],
-            "access-token-chunk-4": parts[3],
+            "x-access-token": access_token,
             "use-access-token": "true",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
         }
