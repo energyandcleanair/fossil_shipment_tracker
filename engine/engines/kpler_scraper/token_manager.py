@@ -221,15 +221,6 @@ class KplerTokenManager:
         # Click the login button
         driver.find_element(By.CSS_SELECTOR, '[data-action-button-primary="true"]').click()
 
-        # Wait for the OTP input to appear
-        wait.until(EC.presence_of_element_located((By.NAME, "code")))
-
-        # Input the OTP value
-        driver.find_element(By.NAME, "code").send_keys(self._credentials.get_otp_value())
-        random_wait()
-        # Click the submit button
-        driver.find_element(By.CSS_SELECTOR, '[data-action-button-primary="true"]').click()
-
         # Wait for the page to load
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".map-search-input")))
 
