@@ -195,18 +195,8 @@ class KplerFlowScraper(KplerScraper):
         df["to_split"] = get_split_name(to_split)
         df["from_iso2"] = origin_iso2 if origin_iso2 else KPLER_TOTAL
 
-        if product is None:
-            product_name = KPLER_TOTAL
-        elif isinstance(product, str):
-            product_name = product
-        elif isinstance(product, dict):
-            product_name = product.get("name")
-        else:
-            raise ValueError(f"Unknown product type: {type(product)}")
-
         df["from_zone"] = df.apply(lambda x: from_zone or {"id": 0, "name": None}, axis=1)
         df["to_zone"] = df.apply(lambda x: to_zone or {"id": 0, "name": None}, axis=1)
-        df["product"] = product_name
         df["unit"] = unit.value
         df = df.rename(columns={"Date": "date"})
 
