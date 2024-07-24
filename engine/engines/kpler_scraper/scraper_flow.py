@@ -76,6 +76,8 @@ class KplerFlowScraper(KplerScraper):
         if product is not None:
             if isinstance(product, dict):
                 params_raw["filters"] = {"product": [int(product.get("id"))]}
+            elif isinstance(product, list):
+                params_raw["filters"] = {"product": [self.get_product_id(name=p) for p in product]}
             else:
                 params_raw["filters"] = {"product": [self.get_product_id(name=product)]}
 

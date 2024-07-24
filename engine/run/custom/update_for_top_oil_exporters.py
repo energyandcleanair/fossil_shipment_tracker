@@ -28,7 +28,7 @@ def get_crude_oil_exporters(filter_percentile=None, date_from=None, date_to=None
     importer_flows: pd.DataFrame = scraper.get_flows(
         date_from=date_from,
         date_to=date_to,
-        product="Crude/Co",
+        product=["Crude/Co", "DPP", "Clean Products"],
         granularity=FlowsPeriod.Annually,
         split=FlowsSplit.OriginCountries,
     )
