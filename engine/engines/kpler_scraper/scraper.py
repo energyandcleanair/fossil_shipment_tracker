@@ -82,20 +82,30 @@ class KplerClient:
         params=None,
         body=None,
         base_path="/api/",
+        reauth=False,
     ):
         self._handle_rate_limiting()
 
-        token = self.token_manager.get_token()
+        token = self.token_manager.get_token(reauth=reauth)
         headers = self._generate_headers(token)
 
         full_url = f"https://terminal.kpler.com{base_path}{url}"
 
         logger.info(f"Making Kpler request with url={full_url}, params={params}, body={body}")
 
-        if body:
-            return self.session.post(full_url, params=params, headers=headers, json=body)
-        else:
-            return self.session.get(full_url, params=params, headers=headers)
+        result = (
+            self.session.post(full_url, params=params, headers=headers, json=body)
+            if body
+            else self.session.get(full_url, params=params, headers=headers)
+        )
+
+        if reauth and result.status_code == 401:
+            raise RuntimeError(f"Request failed with 401 even after reauth. url={full_url}")
+
+        if result.status_code == 401:
+            return self.fetch(url, params=params, body=body, base_path=base_path, reauth=True)
+
+        return result
 
     def _generate_headers(self, token):
         access_token = token.access_token

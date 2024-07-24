@@ -98,7 +98,7 @@ class KplerTokenManager:
         self._client_id: Optional[str] = None
         self._headers: Optional[dict] = None
 
-    def get_token(self):
+    def get_token(self, *, reauth: bool = False):
         """
         Retrieves the authentication token, ensuring that it is valid and not expired.
 
@@ -109,7 +109,10 @@ class KplerTokenManager:
 
         :returns: An instance of the KplerToken class representing the authentication token.
         """
-        if self._token is None:
+        if reauth:
+            logger.info("Reauthenticating with Kpler.")
+            self._login()
+        elif self._token is None:
             logger.info("No Kpler token available, logging in.")
             self._login()
         elif self._token.should_refresh():
