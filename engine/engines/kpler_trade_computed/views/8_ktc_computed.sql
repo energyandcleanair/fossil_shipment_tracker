@@ -8,31 +8,31 @@ SELECT
   price.scenario AS pricing_scenario,
   price.commodity AS pricing_commodity,
   price.eur_per_tonne,
-  ktc_insurers_and_owners_for_trade.ship_insurer_names,
-  ktc_insurers_and_owners_for_trade.ship_insurer_iso2s,
-  ktc_insurers_and_owners_for_trade.ship_insurer_regions,
-  ktc_insurers_and_owners_for_trade.ship_owner_names,
-  ktc_insurers_and_owners_for_trade.ship_owner_iso2s,
-  ktc_insurers_and_owners_for_trade.ship_owner_regions,
+  ktc_trade_designations.ship_insurer_names,
+  ktc_trade_designations.ship_insurer_iso2s,
+  ktc_trade_designations.ship_insurer_regions,
+  ktc_trade_designations.ship_owner_names,
+  ktc_trade_designations.ship_owner_iso2s,
+  ktc_trade_designations.ship_owner_regions,
   CASE
     WHEN (
-      ktc_insurers_and_owners_for_trade.insured_in_pcc
-      OR ktc_insurers_and_owners_for_trade.owned_in_pcc
+      ktc_trade_designations.insured_in_pcc
+      OR ktc_trade_designations.owned_in_pcc
     ) THEN 'Owned and / or insured in EU & G7'
-    WHEN ktc_insurers_and_owners_for_trade.insured_in_norway THEN 'Insured in Norway'
-    WHEN ktc_insurers_and_owners_for_trade.owner_known THEN 'Others'
+    WHEN ktc_trade_designations.insured_in_norway THEN 'Insured in Norway'
+    WHEN ktc_trade_designations.owner_known THEN 'Others'
     ELSE 'Unknown'
   END AS ownership_sanction_coverage,
-  ktc_insurers_and_owners_for_trade.ship_flag_iso2s,
+  ktc_trade_designations.ship_flag_iso2s,
   CASE
     WHEN (
-      ktc_insurers_and_owners_for_trade.flag_in_pcc
-      OR ktc_insurers_and_owners_for_trade.flag_in_norway
+      ktc_trade_designations.flag_in_pcc
+      OR ktc_trade_designations.flag_in_norway
     ) THEN 'Flag in PCC'
-    WHEN ktc_insurers_and_owners_for_trade.flag_in_norway THEN 'Flag in Norway'
+    WHEN ktc_trade_designations.flag_in_norway THEN 'Flag in Norway'
     ELSE 'Others'
   END AS flag_sanction_coverage,
-  ktc_insurers_and_owners_for_trade.flag_in_pcc,
+  ktc_trade_designations.flag_in_pcc,
   coalesce(
     ktc_trade_step_zones.step_zone_names,
     ARRAY [] :: varchar []
@@ -52,7 +52,11 @@ SELECT
   ktc_vessel_ages_for_trade.vessel_ages,
   ktc_vessel_ages_for_trade.avg_vessel_age,
   ktc_trade_vessel_type.largest_vessel_type,
-  ktc_trade_vessel_type.largest_vessel_capacity_cm
+  ktc_trade_vessel_type.largest_vessel_capacity_cm,
+  coalesce(
+    ktc_trade_designations.crea_designations,
+    ARRAY [] :: varchar []
+  ) AS crea_designations
 FROM
   kpler_trade
   LEFT OUTER JOIN kpler_product ON kpler_trade.product_id = kpler_product.id
@@ -76,8 +80,8 @@ FROM
   LEFT OUTER JOIN ktc_trade_price ON kpler_trade.id = ktc_trade_price.trade_id
   AND kpler_trade.flow_id = ktc_trade_price.flow_id
   LEFT OUTER JOIN price ON ktc_trade_price.price_id = price.id
-  LEFT OUTER JOIN ktc_insurers_and_owners_for_trade ON kpler_trade.id = ktc_insurers_and_owners_for_trade.trade_id
-  AND kpler_trade.flow_id = ktc_insurers_and_owners_for_trade.flow_id
+  LEFT OUTER JOIN ktc_trade_designations ON kpler_trade.id = ktc_trade_designations.trade_id
+  AND kpler_trade.flow_id = ktc_trade_designations.flow_id
   LEFT OUTER JOIN ktc_trade_step_zones ON kpler_trade.id = ktc_trade_step_zones.trade_id
   AND kpler_trade.flow_id = ktc_trade_step_zones.flow_id
   LEFT OUTER JOIN ktc_vessel_ages_for_trade ON kpler_trade.id = ktc_vessel_ages_for_trade.trade_id

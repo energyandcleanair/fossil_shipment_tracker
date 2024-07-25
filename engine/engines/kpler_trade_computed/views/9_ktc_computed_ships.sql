@@ -17,7 +17,8 @@ SELECT
     ships.ship_owner_iso2,
     ships.ship_owner_region,
     ships.vessel_age,
-    ships.ship_flag_iso2
+    ships.ship_flag_iso2,
+    ships.crea_designation
 FROM
     ktc_kpler_trade_computed,
     unnest(
@@ -29,7 +30,8 @@ FROM
         ship_owner_iso2s,
         ship_owner_regions,
         vessel_ages,
-        ship_flag_iso2s
+        ship_flag_iso2s,
+        crea_designations
     ) as ships(
         vessel_imo,
         ship_insurer_name,
@@ -39,7 +41,8 @@ FROM
         ship_owner_iso2,
         ship_owner_region,
         vessel_age,
-        ship_flag_iso2
+        ship_flag_iso2,
+        crea_designation
     );
 
 CREATE INDEX ON ktc_kpler_trade_computed_ships (trade_id);

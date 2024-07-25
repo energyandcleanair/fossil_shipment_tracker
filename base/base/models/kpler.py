@@ -194,6 +194,8 @@ class KplerTradeComputed(Base):
     vessel_ages = Column(ARRAY(Numeric))
     avg_vessel_age = Column(Numeric)
 
+    crea_designations = Column(ARRAY(String))
+
     __table_args__ = (
         Index(
             "kpler_trade_computed_ownership_sanction_coverage_idx", "ownership_sanction_coverage"
@@ -225,8 +227,17 @@ class KplerTradeComputedShips(Base):
     vessel_age = Column(Numeric)
     ship_flag_iso2 = Column(String)
     eur_per_tonne = Column(Numeric)
+    crea_designation = Column(String)
 
     __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS
+
+    __table_args__ = (
+        Index("kpler_trade_computed_ships_trade_id_idx", "trade_id"),
+        Index("kpler_trade_computed_ships_flow_id_idx", "flow_id"),
+        Index("kpler_trade_computed_ships_product_id_idx", "product_id"),
+        Index("kpler_trade_computed_ships_pricing_scenario_idx", "pricing_scenario"),
+        Index("kpler_trade_computed_ships_vessel_imo_idx", "vessel_imo"),
+    )
 
 
 class KplerTradeFlow(Base):

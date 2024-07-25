@@ -1,4 +1,4 @@
-CREATE MATERIALIZED VIEW ktc_insurers_and_owners_for_trade AS
+CREATE MATERIALIZED VIEW ktc_trade_designations AS
 SELECT
   kpler_trade.id AS trade_id,
   kpler_trade.flow_id AS flow_id,
@@ -43,7 +43,12 @@ SELECT
       ktc_trade_ship.ship_order
   ) AS ship_flag_iso2s,
   bool_or(ktc_voyage_flag.in_pcc) AS flag_in_pcc,
-  bool_or(ktc_voyage_flag.in_norway) AS flag_in_norway
+  bool_or(ktc_voyage_flag.in_norway) AS flag_in_norway,
+  array_agg(
+    ktc_crea_designation.crea_designation
+    ORDER BY
+      ktc_trade_ship.ship_order
+  ) AS crea_designations
 FROM
   kpler_trade
   JOIN ktc_trade_ship ON kpler_trade.id = ktc_trade_ship.trade_id
@@ -57,6 +62,9 @@ FROM
   LEFT OUTER JOIN ktc_voyage_flag ON ktc_voyage_flag.trade_id = kpler_trade.id
   AND ktc_voyage_flag.flow_id = kpler_trade.flow_id
   AND ktc_voyage_flag.ship_imo = ktc_trade_ship.ship_imo
+  LEFT OUTER JOIN ktc_crea_designation ON ktc_crea_designation.trade_id = kpler_trade.id
+  AND ktc_crea_designation.flow_id = kpler_trade.flow_id
+  AND ktc_crea_designation.ship_imo = ktc_trade_ship.ship_imo
 WHERE
   kpler_trade.is_valid
 GROUP BY
@@ -66,8 +74,8 @@ ORDER BY
   kpler_trade.id,
   kpler_trade.flow_id;
 
-CREATE INDEX ON ktc_insurers_and_owners_for_trade (trade_id);
+CREATE INDEX ON ktc_trade_designations (trade_id);
 
-CREATE INDEX ON ktc_insurers_and_owners_for_trade (flow_id);
+CREATE INDEX ON ktc_trade_designations (flow_id);
 
-ANALYZE ktc_insurers_and_owners_for_trade;
+ANALYZE ktc_trade_designations;

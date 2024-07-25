@@ -25,6 +25,7 @@ from base.models import (
     KplerProduct,
     KplerTrade,
     KplerTradeComputed,
+    KplerTradeComputedShips,
 )
 
 from sqlalchemy import Column, String, Integer, Numeric, BigInteger
