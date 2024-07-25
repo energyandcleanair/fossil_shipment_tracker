@@ -56,10 +56,10 @@ def update(
             with session.begin_nested():
                 logger.info(f"Deleting all entries from {KplerTradeComputed.__tablename__}")
                 session.execute(delete(KplerTradeComputed))
+                logger.info(f"Deleting all entries from {KplerTradeComputedShips.__tablename__}")
+                session.execute(delete(KplerTradeComputedShips))
 
-                logger.info(
-                    f"Copying all entries from ktc_kpler_trade_computed to {KplerTradeComputed.__tablename__}"
-                )
+                logger.info(f"Copying all entries to tables")
                 update_kpler_trade_computed_table_from_view()
 
                 check_invalid_trade_computed()
