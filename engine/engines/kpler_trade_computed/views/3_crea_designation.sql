@@ -20,9 +20,11 @@ FROM
     ktc_recent_ru_trade_percent percent
     LEFT JOIN ktc_voyage_insurer ON percent.trade_id = ktc_voyage_insurer.trade_id
     AND percent.flow_id = ktc_voyage_insurer.flow_id
+    AND percent.ship_order = ktc_voyage_insurer.ship_order
     AND percent.ship_imo = ktc_voyage_insurer.ship_imo
     LEFT JOIN ktc_voyage_owner ON percent.trade_id = ktc_voyage_owner.trade_id
     AND percent.flow_id = ktc_voyage_owner.flow_id
+    AND percent.ship_order = ktc_voyage_insurer.ship_order
     AND percent.ship_imo = ktc_voyage_owner.ship_imo
 ORDER BY
     percent.trade_id,
