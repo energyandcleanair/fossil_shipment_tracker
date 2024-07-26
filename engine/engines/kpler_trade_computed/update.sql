@@ -75,7 +75,9 @@ INSERT INTO
     vessel_age,
     ship_flag_iso2,
     eur_per_tonne,
-    crea_designation
+    crea_designation,
+    step_in_trade,
+    total_steps_in_trade
   )
 SELECT
   trade_id,

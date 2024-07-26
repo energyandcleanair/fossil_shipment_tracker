@@ -18,7 +18,9 @@ SELECT
     ships.ship_owner_region,
     ships.vessel_age,
     ships.ship_flag_iso2,
-    ships.crea_designation
+    ships.crea_designation,
+    ships.step_in_trade,
+    array_length(ktc_kpler_trade_computed.vessel_imos, 1) AS total_steps_in_trade
 FROM
     ktc_kpler_trade_computed,
     unnest(
@@ -32,7 +34,7 @@ FROM
         vessel_ages,
         ship_flag_iso2s,
         crea_designations
-    ) as ships(
+    ) WITH ORDINALITY AS ships(
         vessel_imo,
         ship_insurer_name,
         ship_insurer_iso2,
@@ -42,7 +44,8 @@ FROM
         ship_owner_region,
         vessel_age,
         ship_flag_iso2,
-        crea_designation
+        crea_designation,
+        step_in_trade
     );
 
 CREATE INDEX ON ktc_kpler_trade_computed_ships (trade_id);
