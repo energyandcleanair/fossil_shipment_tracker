@@ -3,9 +3,11 @@ SELECT
   DISTINCT ON (
     kpler_trade.id,
     kpler_trade.flow_id,
+    ktc_trade_ship.ship_order,
     ktc_trade_ship.ship_imo
   ) kpler_trade.id AS trade_id,
   kpler_trade.flow_id AS flow_id,
+  ktc_trade_ship.ship_order AS ship_order,
   ktc_trade_ship.ship_imo AS ship_imo,
   coalesce(company.name, 'unknown') AS name,
   coalesce(company.country_iso2, 'unknown') AS iso2,
@@ -35,6 +37,7 @@ WHERE
 ORDER BY
   kpler_trade.id,
   kpler_trade.flow_id,
+  ktc_trade_ship.ship_order,
   ktc_trade_ship.ship_imo,
   coalesce(
     ship_insurer.date_from_insurer,

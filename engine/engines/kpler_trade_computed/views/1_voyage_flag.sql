@@ -3,9 +3,11 @@ SELECT
   DISTINCT ON (
     kpler_trade.id,
     kpler_trade.flow_id,
+    ktc_trade_ship.ship_order,
     ktc_trade_ship.ship_imo
   ) kpler_trade.id AS trade_id,
   kpler_trade.flow_id AS flow_id,
+  ktc_trade_ship.ship_order AS ship_order,
   ktc_trade_ship.ship_imo AS ship_imo,
   coalesce(ship_flag.flag_iso2, 'unknown') AS iso2,
   'PCC' = any(country.regions) AS in_pcc,
@@ -25,6 +27,7 @@ WHERE
 ORDER BY
   kpler_trade.id,
   kpler_trade.flow_id,
+  ktc_trade_ship.ship_order,
   ktc_trade_ship.ship_imo,
   ship_flag.first_seen DESC NULLS LAST;
 

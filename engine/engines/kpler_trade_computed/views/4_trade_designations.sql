@@ -55,15 +55,19 @@ FROM
   AND kpler_trade.flow_id = ktc_trade_ship.flow_id
   LEFT OUTER JOIN ktc_voyage_owner ON ktc_voyage_owner.trade_id = kpler_trade.id
   AND ktc_voyage_owner.flow_id = kpler_trade.flow_id
+  AND ktc_voyage_owner.ship_order = ktc_trade_ship.ship_order
   AND ktc_voyage_owner.ship_imo = ktc_trade_ship.ship_imo
   LEFT OUTER JOIN ktc_voyage_insurer ON ktc_voyage_insurer.trade_id = kpler_trade.id
   AND ktc_voyage_insurer.flow_id = kpler_trade.flow_id
+  AND ktc_voyage_insurer.ship_order = ktc_trade_ship.ship_order
   AND ktc_voyage_insurer.ship_imo = ktc_trade_ship.ship_imo
   LEFT OUTER JOIN ktc_voyage_flag ON ktc_voyage_flag.trade_id = kpler_trade.id
   AND ktc_voyage_flag.flow_id = kpler_trade.flow_id
+  AND ktc_voyage_flag.ship_order = ktc_trade_ship.ship_order
   AND ktc_voyage_flag.ship_imo = ktc_trade_ship.ship_imo
   LEFT OUTER JOIN ktc_crea_designation ON ktc_crea_designation.trade_id = kpler_trade.id
   AND ktc_crea_designation.flow_id = kpler_trade.flow_id
+  AND ktc_crea_designation.ship_order = ktc_trade_ship.ship_order
   AND ktc_crea_designation.ship_imo = ktc_trade_ship.ship_imo
 WHERE
   kpler_trade.is_valid
