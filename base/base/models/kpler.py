@@ -229,6 +229,9 @@ class KplerTradeComputedShips(Base):
     eur_per_tonne = Column(Numeric)
     crea_designation = Column(String)
 
+    step_in_trade = Column(Numeric)
+    total_steps_in_trade = Column(Numeric)
+
     __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS
 
     __table_args__ = (

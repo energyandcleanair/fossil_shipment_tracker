@@ -594,6 +594,7 @@ class KplerTradeResource(TemplateResource):
                     subquery.c.ship_owner_iso2,
                     subquery.c.ship_owner_region,
                 ],
+                "crea_designation": [subquery.c.crea_designation],
             }
         )
 
@@ -813,6 +814,7 @@ class KplerTradeResource(TemplateResource):
                 KplerTradeComputed.step_zone_ids,
                 KplerTradeComputed.largest_vessel_type,
                 KplerTradeComputed.largest_vessel_capacity_cm,
+                KplerTradeComputed.crea_designations,
             ]
             if nest_ships
             else [
@@ -830,6 +832,9 @@ class KplerTradeResource(TemplateResource):
                 KplerTradeComputedShips.ship_owner_region,
                 KplerTradeComputedShips.vessel_age,
                 KplerTradeComputedShips.ship_flag_iso2,
+                KplerTradeComputedShips.crea_designation,
+                KplerTradeComputedShips.step_in_trade,
+                KplerTradeComputedShips.total_steps_in_trade,
             ]
         )
 
