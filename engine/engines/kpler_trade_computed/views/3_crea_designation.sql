@@ -11,6 +11,8 @@ SELECT
                 OR ktc_voyage_owner.in_norway
                 OR ktc_voyage_insurer.in_pcc
                 OR ktc_voyage_insurer.in_norway
+                OR ktc_voyage_flag.in_pcc
+                OR ktc_voyage_flag.in_norway
             ) THEN 'G7+'
             WHEN percent.recent_ru_percent = 1 THEN 'Shadow'
             ELSE 'Taxi'
@@ -26,6 +28,10 @@ FROM
     AND percent.flow_id = ktc_voyage_owner.flow_id
     AND percent.ship_order = ktc_voyage_owner.ship_order
     AND percent.ship_imo = ktc_voyage_owner.ship_imo
+    LEFT JOIN ktc_voyage_flag ON percent.trade_id = ktc_voyage_flag.trade_id
+    AND percent.flow_id = ktc_voyage_flag.flow_id
+    AND percent.ship_order = ktc_voyage_flag.ship_order
+    and percent.ship_imo = ktc_voyage_flag.ship_imo
 ORDER BY
     percent.trade_id,
     percent.flow_id,
