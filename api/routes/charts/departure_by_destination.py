@@ -187,7 +187,6 @@ class ChartDepartureDestination(Resource):
                     "value_tonne",
                     "value_eur",
                 ],
-                "nest_sts": True,
             }
         )
 

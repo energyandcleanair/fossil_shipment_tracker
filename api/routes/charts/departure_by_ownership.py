@@ -203,7 +203,6 @@ class ChartDepartureOwnership(Resource):
                 "format": "json",
                 "nest_in_data": True,
                 "aggregate_by": aggregate_by,
-                "nest_sts": True,
             }
         )
 

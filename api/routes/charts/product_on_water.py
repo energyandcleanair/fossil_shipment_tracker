@@ -165,7 +165,6 @@ class ChartProductOnWater(Resource):
                 "format": "json",
                 "nest_in_data": True,
                 "status": ["completed", "ongoing"],
-                "nest_sts": True,
             }
         )
 

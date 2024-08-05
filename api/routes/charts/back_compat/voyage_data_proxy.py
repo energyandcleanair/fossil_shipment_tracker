@@ -63,6 +63,8 @@ def get_voyages_kpler(params):
     if params_kpler["select"]:
         params_kpler["select"] = [get_kpler_name(col) for col in params_kpler["select"]]
 
+    params_kpler["nest_ships"] = True
+
     response = KplerTradeResource().get_from_params(params_kpler)
     if response.status_code != 200:
         return pd.DataFrame()

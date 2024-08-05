@@ -128,7 +128,6 @@ class ChartStsInEu(Resource):
                 "keep_zeros": True,
                 "format": "json",
                 "nest_in_data": True,
-                "nest_sts": True,
             }
         )
 
