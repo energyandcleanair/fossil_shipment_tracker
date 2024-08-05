@@ -23,6 +23,7 @@ def update():
 
     commodity.fill()
     kpler_scraper.update_full()
+    kpler_scraper.update(historic_date_from="2017-01-01", origin_iso2s=["ID"])
     kpler_trade_computed.update()
 
     entsog.update(date_from=-21, nodata_error_date_from=-4)
