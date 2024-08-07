@@ -45,7 +45,8 @@ def limit_ships_to_update(ships_to_update, max_updates: int):
         .sort_values(
             by=[
                 "commodity_update_priority",
-                "history_update_priority" "consecutive_failures",
+                "history_update_priority",
+                "consecutive_failures",
                 "checked_on",
             ],
             na_position="first",
