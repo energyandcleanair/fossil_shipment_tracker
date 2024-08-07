@@ -16,7 +16,7 @@ from base.models import (
     KplerVessel,
 )
 
-from .update_selector_base import build_filter_query, COMMODITY_SETTINGS
+from .selector_base import build_filter_query, COMMODITY_SETTINGS
 
 
 def select_ships_to_update_inspections(*, force_unknown: "bool", max_updates: int):
