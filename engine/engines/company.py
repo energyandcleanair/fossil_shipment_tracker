@@ -38,7 +38,7 @@ def get_global_equasis_client() -> Equasis:
     return global_equasis_client
 
 
-def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT / 2):
+def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT):
     """
     This function updates the company information in the database from Equasis and insurers.
     @param force_unknown: whether to force update of unknown insurers
