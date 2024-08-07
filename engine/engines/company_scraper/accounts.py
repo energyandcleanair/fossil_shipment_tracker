@@ -148,29 +148,44 @@ class EquasisWebsiteAccountDriver:
 
     @staticmethod
     def _build_web_driver():
-        user_agent = agent_generator.random
+        temp_dir = tempfile.mkdtemp()
 
-        options = webdriver.ChromeOptions()
-        options.add_argument("ignore-certificate-errors")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-infobars")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
-        options.add_argument(f"--user-agent={user_agent}")
-        options.add_argument(f"--headless")
+        log_output_location = f"{temp_dir}/chromedriver.log"
 
-        path = shutil.which("chromedriver")
+        try:
+            user_agent = agent_generator.random
 
-        if path is None:
-            service = Service(ChromeDriverManager().install())
-        else:
-            service = Service(path)
+            options = webdriver.ChromeOptions()
+            options.add_argument("ignore-certificate-errors")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-infobars")
+            options.add_argument("--disable-blink-features=AutomationControlled")
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option("useAutomationExtension", False)
+            options.add_argument(f"--user-agent={user_agent}")
+            options.add_argument(f"--headless")
 
-        driver = webdriver.Chrome(service=service, options=options)
+            path = shutil.which("chromedriver")
 
-        return driver
+            if path is None:
+                service = Service(ChromeDriverManager().install(), log_output=log_output_location)
+            else:
+                service = Service(path)
+
+            driver = webdriver.Chrome(service=service, options=options)
+
+            return driver
+        except Exception as e:
+            logger.error("Failed to create web driver. Outputting chromedriver.log.")
+            try:
+                with open(log_output_location, "r") as log_file:
+                    logger.info(f"chromedriver log contents:\n{log_file.read()}")
+            except Exception:
+                logger.warn("Failed to read chrome driver log file", exc_info=True)
+            raise e
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     def __init__(self, driver: webdriver.Chrome, captcha_solver: AzCaptchaSolverClient):
         self.driver = driver
