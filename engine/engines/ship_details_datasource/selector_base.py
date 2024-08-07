@@ -56,8 +56,10 @@ def build_filter_query() -> Subquery:
         )
         .outerjoin(
             KplerTrade,
-            KplerTradeComputedShips.trade_id == KplerTrade.id,
-            KplerTradeComputedShips.flow_id == KplerTrade.flow_id,
+            sa.and_(
+                KplerTradeComputedShips.trade_id == KplerTrade.id,
+                KplerTradeComputedShips.flow_id == KplerTrade.flow_id,
+            ),
         )
         .outerjoin(KplerProduct, KplerTrade.product_id == KplerProduct.id)
         .outerjoin(KplerZone, KplerTrade.departure_zone_id == KplerZone.id)
