@@ -55,7 +55,7 @@ def build_filter_query() -> Subquery:
             priority_field,
         )
         .outerjoin(
-            KplerTradeComputedShips,
+            KplerTrade,
             KplerTradeComputedShips.trade_id == KplerTrade.id,
             KplerTradeComputedShips.flow_id == KplerTrade.flow_id,
         )
