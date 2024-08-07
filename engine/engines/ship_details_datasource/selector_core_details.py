@@ -101,7 +101,7 @@ def find_ships_by_commodity_that_need_updates(
             ShipFlag.updated_on.label("last_updated_flag"),
             ShipFlag.flag_iso2,
             filter_query.c.commodity,
-            filter_query.c.priority,
+            filter_query.c.priority.label("history_update_priority"),
         )
         .outerjoin(ShipInsurer, ShipInsurer.ship_imo == KplerVessel.imo)
         .outerjoin(ShipOwner, ShipOwner.ship_imo == KplerVessel.imo)
