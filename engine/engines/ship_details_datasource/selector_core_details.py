@@ -50,7 +50,7 @@ def limit_ships_to_update(ships_to_update, max_updates: int):
                 "checked_on",
             ],
             na_position="first",
-            ascending=[True, True, True],
+            ascending=[True, False, True, True],
         )
         .drop_duplicates(subset="imo", keep="first")
         .head(max_updates)
