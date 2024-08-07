@@ -63,7 +63,7 @@ def build_filter_query() -> Subquery:
         .outerjoin(KplerZone, KplerTrade.departure_zone_id == KplerZone.id)
         .outerjoin(Commodity, commodity_id_field == Commodity.id)
         .filter(KplerTrade.departure_date_utc.isnot(None))
-        .orderby(
+        .order_by(
             KplerTradeComputedShips.vessel_imo,
             Commodity.equivalent_id,
             priority_field.desc(),
