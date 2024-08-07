@@ -166,18 +166,17 @@ class EquasisWebsiteAccountDriver:
             options.add_argument(f"--user-agent={user_agent}")
             options.add_argument(f"--headless")
 
-            path = shutil.which("chromedriver")
+            existing_path = shutil.which("chromedriver")
 
-            if path is None:
-                service = Service(ChromeDriverManager().install(), log_output=log_output_location)
-            else:
-                service = Service(path)
+            path = existing_path or ChromeDriverManager().install()
+
+            service = Service(path, log_output=log_output_location)
 
             driver = webdriver.Chrome(service=service, options=options)
 
             return driver
         except Exception as e:
-            logger.error("Failed to create web driver. Outputting chromedriver.log.")
+            logger.warn("Failed to create web driver. Outputting chromedriver.log.")
             try:
                 with open(log_output_location, "r") as log_file:
                     logger.info(f"chromedriver log contents:\n{log_file.read()}")
