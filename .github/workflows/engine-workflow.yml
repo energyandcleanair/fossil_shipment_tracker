@@ -113,6 +113,7 @@ jobs:
           tags: europe-west1-docker.pkg.dev/${{ secrets.PROJECT_ID }}/tracker/engine:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          push: true
 
   deploy-image:
     runs-on: ubuntu-latest
