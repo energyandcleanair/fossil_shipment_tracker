@@ -7,7 +7,8 @@ steps:
       docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest || exit 0
       docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest || exit 0
 
-  # Next, build the engine dependencies stage and then the engine stage.
+  # Next, build the engine dependencies stage and then the engine stage. We
+  # don't use the
   - name: "gcr.io/cloud-builders/docker"
     script: |
       docker buildx build \
@@ -22,7 +23,8 @@ steps:
         -f Dockerfile.engine \
         --cache-from europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest \
         .
-    automapSubstitutions: true
 images:
   - "europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:${COMMIT_SHA}"
   - "europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest"
+options:
+  automapSubstitutions: true
