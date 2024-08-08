@@ -3,7 +3,6 @@
 steps:
   # First, pull the existing images to use as the cache.
   - name: "gcr.io/cloud-builders/docker"
-    entrypoint: "bash"
     script: |
       docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest || exit 0
       docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest || exit 0
