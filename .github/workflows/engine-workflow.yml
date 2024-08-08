@@ -102,10 +102,11 @@ jobs:
         uses: "google-github-actions/setup-gcloud@v1"
       - name: Build and deploy latest docker image
         id: build-and-deploy-image
-        run: gcloud builds submit \
-          --region=europe-west1 \
-          --config=cloudbuild-engine.yaml \
-          --substitutions=_COMMIT_SHA=${{ github.sha }}
+        run: |
+          gcloud builds submit \
+            --region=europe-west1 \
+            --config=cloudbuild-engine.yaml \
+            --substitutions=_COMMIT_SHA=${{ github.sha }}
 
   deploy-image:
     runs-on: ubuntu-latest
@@ -122,7 +123,8 @@ jobs:
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
       - name: Login with artifact registry
-        run: gcloud container images add-tag \
+        run: |
+          gcloud container images add-tag \
           europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:${{ github.sha }} \
           europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest
 
