@@ -6,6 +6,7 @@ on:
       - "master"
     paths:
       - "Dockerfile.engine"
+      - "cloudbuild-engine.yaml"
       - "engine/**"
       - "base/**"
       - ".github/workflows/engine-workflow.yml"
