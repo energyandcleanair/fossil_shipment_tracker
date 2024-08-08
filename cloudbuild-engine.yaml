@@ -6,9 +6,23 @@ steps:
         "-c",
         "docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest || exit 0",
       ]
+  - name: "gcr.io/cloud-builders/docker"
+    entrypoint: "bash"
+    args:
+      [
+        "-c",
+        "docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest || exit 0",
+      ]
 
   - name: "gcr.io/cloud-builders/docker"
     script: |
+      docker buildx build \
+        -t europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest \
+        -f Dockerfile.engine \
+        --cache-from europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest \
+        --target dependencies \
+        .
+
       docker buildx build \
         -t europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:${COMMIT_SHA} \
         -f Dockerfile.engine \
@@ -17,3 +31,4 @@ steps:
     automapSubstitutions: true
 images:
   - "europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:${COMMIT_SHA}"
+  - "europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest"
