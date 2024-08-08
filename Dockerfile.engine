@@ -1,6 +1,8 @@
 # Share the base version across the multiple layers
 FROM python:3.10-slim-bookworm as base
 
+ARG CHROMIUM_VERSION=126.0.6478.182-1~deb12u1
+
 # Install dependencies, best practice to do this separately so that
 # we decrease the attack surface of the image.
 FROM base as dependencies
@@ -32,8 +34,8 @@ FROM base as app
 RUN apt-get update
 RUN apt-get install -y \
   libpq-dev \
-  chromium \
-  chromium-driver
+  chromium=${CHROMIUM_VERSION} \
+  chromium-driver=${CHROMIUM_VERSION}
 
 WORKDIR /app/engine/
 # Best practice is to create a user so we aren't running as root
