@@ -158,11 +158,9 @@ class EquasisWebsiteAccountDriver:
             options = webdriver.ChromeOptions()
             options.add_argument("ignore-certificate-errors")
             options.add_argument("--no-sandbox")
+            options.add_argument("--disable-gpu")
+            options.add_argument("window-size=1024,768")
             options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--disable-infobars")
-            options.add_argument("--disable-blink-features=AutomationControlled")
-            options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            options.add_experimental_option("useAutomationExtension", False)
             options.add_argument(f"--user-agent={user_agent}")
             options.add_argument(f"--headless")
 
