@@ -1,9 +1,9 @@
 # Share the base version across the multiple layers
-FROM python:3.10-slim-bookworm as base
+ARG PYTHON_IMAGE_VERSION=3.10-slim-bookworm
 
 # Install dependencies, best practice to do this separately so that
 # we decrease the attack surface of the image.
-FROM base as dependencies
+FROM python:${PYTHON_IMAGE_VERSION} as dependencies
 
 WORKDIR /app/engine-deps/
 
@@ -24,7 +24,7 @@ COPY base /app/base
 RUN poetry install --no-dev
 
 # Build the app
-FROM base as app
+FROM python:${PYTHON_IMAGE_VERSION} as app
 
 # Install runtime dependencies.
 # We use chromium rather than chrome as both the browser and
