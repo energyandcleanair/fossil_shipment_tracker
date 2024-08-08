@@ -104,8 +104,8 @@ jobs:
         id: build-and-deploy-image
         run: gcloud builds submit \
           --region=europe-west1 \
-          --config cloudbuild-engine.yaml \
-          --substitutions _COMMIT_SHA=${{ github.sha }}
+          --config=cloudbuild-engine.yaml \
+          --substitutions=_COMMIT_SHA=${{ github.sha }}
 
   deploy-image:
     runs-on: ubuntu-latest
