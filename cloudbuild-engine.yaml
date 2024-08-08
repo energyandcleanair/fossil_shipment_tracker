@@ -10,10 +10,10 @@ steps:
   - name: "gcr.io/cloud-builders/docker"
     script: |
       docker buildx build \
-        -t europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest \
+        -t europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:${COMMIT_SHA} \
         -f Dockerfile.engine \
         --cache-from europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest \
         .
     automapSubstitutions: true
 images:
-  - "europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest"
+  - "europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:${COMMIT_SHA}"
