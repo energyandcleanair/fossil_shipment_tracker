@@ -1,19 +1,14 @@
+# We separate the engine dependencies stage from the engine stage to be able to
+# cache the dependency stage.
 steps:
+  # First, pull the existing images to use as the cache.
   - name: "gcr.io/cloud-builders/docker"
     entrypoint: "bash"
-    args:
-      [
-        "-c",
-        "docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest || exit 0",
-      ]
-  - name: "gcr.io/cloud-builders/docker"
-    entrypoint: "bash"
-    args:
-      [
-        "-c",
-        "docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest || exit 0",
-      ]
+    script: |
+      docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine:latest || exit 0
+      docker pull europe-west1-docker.pkg.dev/$PROJECT_ID/tracker/engine-dependencies:latest || exit 0
 
+  # Next, build the engine dependencies stage and then the engine stage.
   - name: "gcr.io/cloud-builders/docker"
     script: |
       docker buildx build \
