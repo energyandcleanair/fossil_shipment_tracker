@@ -1,6 +1,8 @@
 import json
 from poplib import POP3, POP3_SSL
+import random
 import shutil
+import string
 import sys
 import tempfile
 from time import sleep
@@ -139,12 +141,43 @@ class AzCaptchaSolverClient:
         return response_data
 
 
+class DetailsGenerator:
+    def generate_name(self):
+        first_names = ["John", "Jane", "Alex", "Emily", "Chris", "Katie", "Michael", "Sarah"]
+        last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis"]
+        return f"{random.choice(first_names)} {random.choice(last_names)}"
+
+    # Function to generate a random address line
+    def generate_address_line(self):
+        street_names = ["Main St", "High St", "Park Ave", "Oak St", "Maple St", "Cedar Ave"]
+        street_number = random.randint(1, 9999)
+        return f"{street_number} {random.choice(street_names)}"
+
+    # Function to generate a random city
+    def generate_city(self):
+        cities = [
+            "New York",
+            "Los Angeles",
+            "Chicago",
+            "Houston",
+            "Phoenix",
+            "Philadelphia",
+            "San Antonio",
+        ]
+        return random.choice(cities)
+
+    # Function to generate a random postal code
+    def generate_post_code(self):
+        return "".join(random.choices(string.ascii_uppercase + string.digits, k=5))
+
+
 class EquasisWebsiteAccountDriver:
     @staticmethod
     def create():
         driver = EquasisWebsiteAccountDriver._build_web_driver()
         client = AzCaptchaSolverClient(AZCAPTCHA_API_KEY)
-        return EquasisWebsiteAccountDriver(driver, client)
+        details_generator = DetailsGenerator()
+        return EquasisWebsiteAccountDriver(driver, client, details_generator)
 
     @staticmethod
     def _build_web_driver():
@@ -184,9 +217,15 @@ class EquasisWebsiteAccountDriver:
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
-    def __init__(self, driver: webdriver.Chrome, captcha_solver: AzCaptchaSolverClient):
+    def __init__(
+        self,
+        driver: webdriver.Chrome,
+        captcha_solver: AzCaptchaSolverClient,
+        details_generator: DetailsGenerator,
+    ):
         self.driver = driver
         self.captcha_solver = captcha_solver
+        self.details_generator = details_generator
 
     def create_account(self, username, password):
         logger.info(f"Creating account on Equasis website: {username}")
@@ -223,11 +262,21 @@ class EquasisWebsiteAccountDriver:
 
     def _add_personal_info(self):
         logger.info("Filling personal info")
-        self.driver.find_element(By.CSS_SELECTOR, "#field-firstname").send_keys("A")
-        self.driver.find_element(By.CSS_SELECTOR, "#field-name").send_keys("B")
-        self.driver.find_element(By.CSS_SELECTOR, "#field-adress").send_keys("HK")
-        self.driver.find_element(By.CSS_SELECTOR, "#field-city").send_keys("Hong Kong")
-        self.driver.find_element(By.CSS_SELECTOR, "#field-postcode").send_keys("0")
+        self.driver.find_element(By.CSS_SELECTOR, "#field-firstname").send_keys(
+            self.details_generator.generate_name()
+        )
+        self.driver.find_element(By.CSS_SELECTOR, "#field-name").send_keys(
+            self.details_generator.generate_name()
+        )
+        self.driver.find_element(By.CSS_SELECTOR, "#field-adress").send_keys(
+            self.details_generator.generate_address_line()
+        )
+        self.driver.find_element(By.CSS_SELECTOR, "#field-city").send_keys(
+            self.details_generator.generate_city()
+        )
+        self.driver.find_element(By.CSS_SELECTOR, "#field-postcode").send_keys(
+            self.details_generator.generate_post_code()
+        )
 
         # Selects
         Select(self.driver.find_element(By.CSS_SELECTOR, "select[name=p_title]")).select_by_value(
@@ -353,38 +402,128 @@ class EquasisAccount:
         return self.__str__()
 
 
+class SimpleLoginAlias:
+    def __init__(self, *, alias: str, id: str):
+        self.alias = alias
+        self.id = id
+
+
+class SimpleLoginEmailManager:
+    @staticmethod
+    def from_env():
+        return SimpleLoginEmailManager(simple_login_api_key=config("SIMPLE_LOGIN_API_KEY"))
+
+    BASE_URL = "https://app.simplelogin.io/api"
+
+    def __init__(self, *, simple_login_api_key: str):
+        self.simple_login_api_key = simple_login_api_key
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "Authentication": f"{simple_login_api_key}",
+            }
+        )
+
+    def create_email(self) -> SimpleLoginAlias:
+        response = self.session.post(f"{SimpleLoginEmailManager.BASE_URL}/alias/random/new")
+
+        response.raise_for_status()
+
+        content = response.json()
+
+        return SimpleLoginAlias(
+            alias=content["email"],
+            id=content["id"],
+        )
+
+    def delete_email(
+        self,
+        alias: SimpleLoginAlias,
+    ):
+        response = self.session.delete(f"{SimpleLoginEmailManager.BASE_URL}/aliases/{alias.id}")
+
+        response.raise_for_status()
+
+        content = response.json()
+        if not content["deleted"]:
+            raise RuntimeError(f"Failed to delete alias {alias}")
+
+        return
+
+
+class PasswordGenerator:
+    def __init__(self, length: int = 12):
+        self.length = length
+
+    def generate_password(self):
+        # Define the character sets
+        lower = string.ascii_lowercase
+        upper = string.ascii_uppercase
+        digits = string.digits
+        special_chars = string.punctuation
+
+        # Combine all character sets
+        all_chars = lower + upper + digits + special_chars
+
+        # Ensure the password contains at least one character from each set
+        password = [
+            random.choice(lower),
+            random.choice(upper),
+            random.choice(digits),
+            random.choice(special_chars),
+        ]
+
+        # Fill the rest of the password length with random choices from all_chars
+        password += random.choices(all_chars, k=self.length - 4)
+
+        # Shuffle the password to prevent predictable patterns
+        random.shuffle(password)
+
+        # Convert list to string
+        return "".join(password)
+
+
 class EquasisAccountCreator:
     def __init__(
         self,
         *,
         client: EquasisEmailClient,
         driver: EquasisWebsiteAccountDriver,
-        username_pattern: str,
-        password: str,
+        email_alias_manager: SimpleLoginEmailManager,
+        password_generator: PasswordGenerator,
     ):
         self.email_client = client
         self.website_driver = driver
-
-        self.username_pattern = username_pattern
-        self.password = password
+        self.email_alias_manager = email_alias_manager
+        self.password_generator = password_generator
 
     def create_account(self):
-        uuid = str(uuid4()).replace("-", "")
-        username = self.username_pattern % uuid
+        alias = self.email_alias_manager.create_email()
+        username = alias.alias
+        password = self.password_generator.generate_password()
 
-        username = self.website_driver.create_account(username, self.password)
-        link = self.email_client.get_verification_link_from_emails(username)
-        self.website_driver.verify_account(link)
-        return EquasisAccount(username, self.password)
+        try:
+            self.website_driver.create_account(username, password)
+            link = self.email_client.get_verification_link_from_emails(username)
+            self.website_driver.verify_account(link)
+        finally:
+            self.email_alias_manager.delete_email(alias)
+
+        return EquasisAccount(username, password)
 
 
 def default_from_env_generator(n_accounts: int) -> list[EquasisAccount]:
 
     equasis_driver = EquasisWebsiteAccountDriver.create()
     email_client = EquasisEmailClient()
+    email_alias_manager = SimpleLoginEmailManager.from_env()
+    password_generator = PasswordGenerator(12)
 
     account_creator = EquasisAccountCreator(
-        client=email_client, driver=equasis_driver, username_pattern=USERNAME, password=PASSWORD
+        client=email_client,
+        driver=equasis_driver,
+        email_alias_manager=email_alias_manager,
+        password_generator=password_generator,
     )
 
     accounts = []

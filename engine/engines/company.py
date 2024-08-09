@@ -32,7 +32,7 @@ global_equasis_client: Equasis | None = None
 def get_global_equasis_client() -> Equasis:
     global global_equasis_client
     if global_equasis_client is None:
-        global_equasis_client = Equasis(session_pool=EquasisSessionPool.with_account_generator())
+        global_equasis_client = Equasis(session_pool=EquasisSessionPool.with_account_generator(1))
     return global_equasis_client
 
 
