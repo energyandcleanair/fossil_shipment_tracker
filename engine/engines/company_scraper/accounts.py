@@ -239,6 +239,13 @@ class EquasisWebsiteAccountDriver:
 
         return username
 
+    def forget_password(self, username):
+        logger.info(f"Forgetting password for Equasis account: {username}")
+
+        self.driver.get("https://www.equasis.org/EquasisWeb/public/LostPassword")
+        self.driver.find_element(By.CSS_SELECTOR, ".input_email").send_keys(username)
+        self.driver.find_element(By.NAME, "Submit").click()
+
     def _navigate_to_account_page(self):
         logger.info("Navigating to Equasis registration page")
         self.driver.switch_to.new_window("tab")
@@ -355,7 +362,7 @@ class EquasisEmailClient:
 
         for email_content in all_emails:
             if self.email_matches(username, email_content):
-                return self.extract_verification_link(email_content)
+                return self.extract_verification_details(email_content)
         return None
 
     def consume_all_emails(self, client: POP3 | POP3_SSL):
@@ -383,11 +390,22 @@ class EquasisEmailClient:
                 return True
         return False
 
+    def extract_verification_details(self, email_content: list[str]):
+        link = self.extract_verification_link(email_content)
+        password = self.extract_password(email_content)
+        return (link, password)
+
     def extract_verification_link(self, email_content: list[str]):
         for line in email_content:
             if line.startswith("https://www.equasis.org/EquasisWeb/public/Activation?"):
                 return line
-        raise ValueError("No verification link found in email")
+        return None
+
+    def extract_password(self, email_content: list[str]):
+        for line in email_content:
+            if line.startswith("Password : "):
+                return line.split(" : ")[1].strip()
+        return None
 
 
 class EquasisAccount:
@@ -503,13 +521,21 @@ class EquasisAccountCreator:
         password = self.password_generator.generate_password()
 
         try:
+            # We start by creating the account
             self.website_driver.create_account(username, password)
-            link = self.email_client.get_verification_link_from_emails(username)
+            link, _ = self.email_client.get_verification_link_from_emails(username)
             self.website_driver.verify_account(link)
+
+            # Then to get the account to work, we have to reset the password
+            self.website_driver.forget_password(username)
+            link, new_password = self.email_client.get_verification_link_from_emails(username)
+            self.website_driver.verify_account(link)
+
+            if new_password is None:
+                raise ValueError("Failed to get new password")
+            return EquasisAccount(username, new_password)
         finally:
             self.email_alias_manager.delete_email(alias)
-
-        return EquasisAccount(username, password)
 
 
 def default_from_env_generator(n_accounts: int) -> list[EquasisAccount]:

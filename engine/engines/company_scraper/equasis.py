@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import time
 from typing import Callable, List
+import uuid
 import requests
 from requests import RequestException
 from bs4 import BeautifulSoup
@@ -12,10 +13,13 @@ from base.env import get_env
 from base.logger import logger_slack, logger
 from base.utils import to_list
 from base.env import get_env
+from fake_useragent import UserAgent
 
 from .accounts import EquasisAccount, default_from_env_generator
 
 SLEEP_PERIOD_AFTER_FAILURE = 5
+
+agent_generator = UserAgent()
 
 
 class EquasisSessionUnavailable(Exception):
@@ -39,7 +43,7 @@ class EquasisSessionStatus:
 class EquasisSession:
 
     max_retries = 3
-    standard_headers = {"User-Agent": "Mozilla/5.0"}
+    standard_headers = {"User-Agent": agent_generator.random}
 
     @staticmethod
     def check_connection():
@@ -94,10 +98,13 @@ class EquasisSession:
                 resp = self.session.post(url, headers=EquasisSession.standard_headers, data=payload)
                 body_text = resp.text
                 if "Protected area, your access is denied" in body_text:
+                    logger.info(f"The account {self.username} is locked.")
                     raise EquasisSessionLocked(f"The account {self.username} is locked.")
                 elif resp.status_code == 200:
+                    logger.info(f"Successfully logged in as {self.username}.")
                     return
                 else:
+                    logger.info(f"Could not log in as {self.username}: {resp.status_code}.")
                     errors.append(
                         {
                             "status_code": resp.status_code,
@@ -113,30 +120,33 @@ class EquasisSession:
 
     def _handle_request(self, url, data):
 
-        errors = []
-        for _ in range(EquasisSession.max_retries):
+        request_id = uuid.uuid4()
+
+        for n_try in range(EquasisSession.max_retries):
+            request_try_id = str(request_id) + "+try-" + str(n_try)
             try:
+                logger.info(f"Request {request_try_id}: Requesting {url} as {self.username}.")
                 resp = self.session.post(url, headers=EquasisSession.standard_headers, data=data)
                 body_text = resp.text
+
                 if "session has expired" in body_text or "session has been cancelled" in body_text:
-                    logger.info(f"Session for {self.username} has expired, re-logging in.")
+                    logger.info(
+                        f"Request {request_try_id}: {self.username} has expired, re-logging in."
+                    )
                     self._login()
                 elif resp.status_code == 200:
+                    logger.info(f"Request {request_try_id}: success.")
                     return body_text
                 else:
-                    errors.append(
-                        {
-                            "status_code": resp.status_code,
-                            "content": resp.text,
-                        }
-                    )
-            except (RequestException, ConnectionError) as e:
-                errors.append(e)
+                    logger.info(f"Request {request_try_id}: Error {resp.status_code}.")
+
+            except (RequestException, ConnectionError):
+                logger.info(f"Request {request_try_id}: error.", exc_info=True)
                 time.sleep(SLEEP_PERIOD_AFTER_FAILURE)
                 continue
 
         raise EquasisSessionUnavailable(
-            f"The account {self.username} is unavailable and can no longer be used:\n{errors}"
+            f"The account {self.username} is unavailable and can no longer be used."
         )
 
 
