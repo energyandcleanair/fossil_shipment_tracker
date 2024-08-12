@@ -82,7 +82,7 @@ def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT) -> Comt
 
 
 def update_ships_inspections_from_equasis(max_updates: int = DEFAULT_UPDATE_LIMIT / 2):
-    ships_to_update = select_ships_to_update_inspections(max_updates)
+    ships_to_update = select_ships_to_update_inspections(max_updates=max_updates)
 
     equasis = get_global_equasis_client()
 
