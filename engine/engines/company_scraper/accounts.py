@@ -372,6 +372,7 @@ class EquasisEmailClient:
             email_index = i + 1
             all_emails.append(self.read_email_content(client, email_index))
             client.dele(email_index)
+        client.quit()
         return all_emails
 
     def read_email_content(self, client: POP3 | POP3_SSL, email_index: int):
