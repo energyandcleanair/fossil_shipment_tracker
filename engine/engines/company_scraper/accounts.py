@@ -356,9 +356,11 @@ class EquasisEmailClient:
     def find_verification_link_in_mailbox(self, username: str):
         logger.info("Reading emails")
 
-        client = self.generate_client()
+        client: POP3 | POP3_SSL = self.generate_client()
 
         all_emails: list[list[str]] = self.consume_all_emails(client)
+
+        client.quit()
 
         for email_content in all_emails:
             if self.email_matches(username, email_content):
@@ -372,7 +374,6 @@ class EquasisEmailClient:
             email_index = i + 1
             all_emails.append(self.read_email_content(client, email_index))
             client.dele(email_index)
-        client.quit()
         return all_emails
 
     def read_email_content(self, client: POP3 | POP3_SSL, email_index: int):
