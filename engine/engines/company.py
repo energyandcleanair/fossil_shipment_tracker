@@ -37,6 +37,11 @@ def get_global_equasis_client() -> Equasis:
     return global_equasis_client
 
 
+def clear_global_equasis_client():
+    global global_equasis_client
+    global_equasis_client = None
+
+
 class ComtradeUpdateStatus(Enum):
     """
     Enum to represent the status of a Comtrade update.

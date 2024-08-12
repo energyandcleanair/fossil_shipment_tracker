@@ -12,6 +12,7 @@ def update():
             seconds_in_min = 60
             minutes = 30
             time.sleep(seconds_in_min * minutes)
+            company.clear_global_equasis_client()
     kpler_trade_computed.update()
     counter.update()
     integrity.check()
