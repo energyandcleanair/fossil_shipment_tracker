@@ -1,3 +1,4 @@
+from enum import Enum
 import math
 import random
 import time
@@ -32,11 +33,20 @@ global_equasis_client: Equasis | None = None
 def get_global_equasis_client() -> Equasis:
     global global_equasis_client
     if global_equasis_client is None:
-        global_equasis_client = Equasis(session_pool=EquasisSessionPool.with_account_generator(1))
+        global_equasis_client = Equasis(session_pool=EquasisSessionPool.with_account_generator(3))
     return global_equasis_client
 
 
-def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT):
+class ComtradeUpdateStatus(Enum):
+    """
+    Enum to represent the status of a Comtrade update.
+    """
+
+    SUCCESS = "success"
+    ERROR = "error"
+
+
+def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT) -> ComtradeUpdateStatus:
     """
     This function updates the company information in the database from Equasis and insurers.
     @param force_unknown: whether to force update of unknown insurers
@@ -60,9 +70,10 @@ def update(force_unknown=False, max_updates: int = DEFAULT_UPDATE_LIMIT):
 
         clean_ship_details()
         logger_slack.info("=== Company update done ===")
+        return ComtradeUpdateStatus.SUCCESS
     except Exception as e:
         logger_slack.error("=== Company update failed ===", stack_info=True, exc_info=True)
-    return
+        return ComtradeUpdateStatus.ERROR
 
 
 def update_ships_inspections_from_equasis(max_updates: int = DEFAULT_UPDATE_LIMIT / 2):
