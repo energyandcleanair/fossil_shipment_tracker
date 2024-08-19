@@ -207,7 +207,7 @@ def check_china_russia_source():
 
     # Get oldest date in spreadsheet
     url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQunCwQmOpGXSLWiToq6zZDLi3VFqknU2fyDrRCtURFCT2QS1oer4H9i_eCXnyZfw/pub?output=csv"
-    df = pd.read_csv(url, skiprows=1)
+    df = pd.read_csv(url, skiprows=2)
     df = df[df["Name"].str.match(r"\d{4}-\d{2}")]
     assert len(df) > 0, "China Russia spreadsheet is empty"
     df["date"] = pd.to_datetime(df["Name"], format="%Y-%m")
