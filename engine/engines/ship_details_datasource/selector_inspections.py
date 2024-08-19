@@ -102,7 +102,9 @@ def find_ships_by_commodity_that_need_updates(
     three_months_ago_ish = dt.datetime.now() - three_months_ish
 
     # We only want to update ships that haven't been updated in the last three months
-    needs_update = imo_query.c.last_updated < three_months_ago_ish
+    needs_update = sa.or_(
+        imo_query.c.last_updated == None, imo_query.c.last_updated < three_months_ago_ish
+    )
 
     imo_query = session.query(imo_query).filter(needs_update)
 
