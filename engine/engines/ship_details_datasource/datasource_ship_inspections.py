@@ -4,6 +4,7 @@ from base.models import (
     ShipInspection,
 )
 from base.models.table_names import DB_TABLE_SHIP_INSPECTIONS
+import pandas as pd
 
 
 def update_ships_inspections(imo, inspection_info):
@@ -18,7 +19,7 @@ def update_ships_inspections(imo, inspection_info):
     session.commit()
 
 
-def convert_inspections_to_df(imo, inspection_info):
+def convert_inspections_to_df(imo, inspection_info: pd.DataFrame):
     inspection_df = inspection_info["inspections"]
     inspection_df["ship_imo"] = imo
     inspection_df = inspection_df.rename(
@@ -33,5 +34,8 @@ def convert_inspections_to_df(imo, inspection_info):
             "Number of deficiencies": "number_of_deficiencies",
         }
     )
+
+    # Convert unknown "Inspection data disputed" to None for all columns
+    inspection_df = inspection_df.replace({"Inspection data disputed": None})
 
     return inspection_df
