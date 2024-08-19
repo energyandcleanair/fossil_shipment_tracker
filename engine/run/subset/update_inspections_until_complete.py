@@ -10,7 +10,7 @@ def update():
     while (
         last_result is None or last_result == company.ComtradeUpdateStatus.EQUASIS_EXHAUSTED_FAILURE
     ):
-        last_result = company.update()
+        last_result = company.update(max_updates=0)
         if last_result == company.ComtradeUpdateStatus.ERROR:
             seconds_in_min = 60
             minutes = 30

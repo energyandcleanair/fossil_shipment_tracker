@@ -3,5 +3,6 @@ from .selector_core_details import select_ships_to_update_core_details
 from .selector_inspections import select_ships_to_update_inspections
 
 from .datasource_core_details import update_ship_core_details
+from .datasource_ship_inspections import update_ships_inspections
 
 from .datasource_post_update_cleaning import clean_ship_details

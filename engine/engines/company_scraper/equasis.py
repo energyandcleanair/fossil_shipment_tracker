@@ -154,10 +154,14 @@ class EquasisSessionPoolExhausted(Exception):
     pass
 
 
+N_ACCOUNTS_TO_GENERATE = int(get_env("EQUASIS_N_ACCOUNTS_TO_GENERATE", "5"))
+
+
 class EquasisSessionPool:
     @staticmethod
     def with_account_generator(
-        n_accounts=5, generator: Callable[[int], list[EquasisAccount]] = default_from_env_generator
+        n_accounts=N_ACCOUNTS_TO_GENERATE,
+        generator: Callable[[int], list[EquasisAccount]] = default_from_env_generator,
     ):
         accounts = generator(n_accounts)
         sessions = [EquasisSession(x.username, x.password) for x in accounts]
