@@ -68,6 +68,8 @@ def find_all_ships_that_need_updates():
         )
 
         ships_to_update = pd.concat([ships_to_update, ships_for_commodity])
+
+    logger.info(f"Found {len(ships_to_update)} ships to update")
     return ships_to_update
 
 
