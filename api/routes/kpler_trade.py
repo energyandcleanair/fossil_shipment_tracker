@@ -796,45 +796,25 @@ class KplerTradeResource(TemplateResource):
 
         kpler_trade_computed_columns = (
             [
-                KplerTradeComputed.pricing_scenario,
-                KplerTradeComputed.vessel_ages,
-                KplerTradeComputed.avg_vessel_age,
-                KplerTradeComputed.ship_insurer_names,
-                KplerTradeComputed.ship_insurer_iso2s,
-                KplerTradeComputed.ship_insurer_regions,
-                KplerTradeComputed.ship_owner_names,
-                KplerTradeComputed.ship_owner_iso2s,
-                KplerTradeComputed.ship_owner_regions,
-                KplerTradeComputed.ownership_sanction_coverage,
-                KplerTradeComputed.ship_flag_iso2s,
-                KplerTradeComputed.flag_sanction_coverage,
-                KplerTradeComputed.step_zone_names,
-                KplerTradeComputed.step_zone_iso2s,
-                KplerTradeComputed.step_zone_regions,
-                KplerTradeComputed.step_zone_ids,
-                KplerTradeComputed.largest_vessel_type,
-                KplerTradeComputed.largest_vessel_capacity_cm,
-                KplerTradeComputed.crea_designations,
+                column
+                for column in KplerTradeComputed.__table__.columns
+                if column
+                not in [
+                    KplerTradeComputed.trade_id,
+                    KplerTradeComputed.product_id,
+                    KplerTradeComputed.flow_id,
+                ]
             ]
             if nest_ships
             else [
-                KplerTradeComputedShips.pricing_scenario,
-                KplerTradeComputedShips.ownership_sanction_coverage,
-                KplerTradeComputedShips.pricing_commodity,
-                KplerTradeComputedShips.kpler_product_commodity_id,
-                KplerTradeComputedShips.flag_sanction_coverage,
-                KplerTradeComputedShips.vessel_imo,
-                KplerTradeComputedShips.ship_insurer_name,
-                KplerTradeComputedShips.ship_insurer_iso2,
-                KplerTradeComputedShips.ship_insurer_region,
-                KplerTradeComputedShips.ship_owner_name,
-                KplerTradeComputedShips.ship_owner_iso2,
-                KplerTradeComputedShips.ship_owner_region,
-                KplerTradeComputedShips.vessel_age,
-                KplerTradeComputedShips.ship_flag_iso2,
-                KplerTradeComputedShips.crea_designation,
-                KplerTradeComputedShips.step_in_trade,
-                KplerTradeComputedShips.total_steps_in_trade,
+                column
+                for column in KplerTradeComputedShips.__table__.columns
+                if column
+                not in [
+                    KplerTradeComputedShips.trade_id,
+                    KplerTradeComputedShips.product_id,
+                    KplerTradeComputedShips.flow_id,
+                ]
             ]
         )
 

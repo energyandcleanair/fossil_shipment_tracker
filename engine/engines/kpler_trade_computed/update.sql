@@ -24,7 +24,9 @@ INSERT INTO
     avg_vessel_age,
     largest_vessel_type,
     largest_vessel_capacity_cm,
-    crea_designations
+    crea_designations,
+    vessel_types,
+    vessel_capacities_cm
   )
 SELECT
   trade_id,
@@ -51,7 +53,9 @@ SELECT
   avg_vessel_age,
   largest_vessel_type,
   largest_vessel_capacity_cm,
-  crea_designations
+  crea_designations,
+  vessel_types,
+  vessel_capacities_cm
 FROM
   ktc_kpler_trade_computed;
 
@@ -77,7 +81,9 @@ INSERT INTO
     eur_per_tonne,
     crea_designation,
     step_in_trade,
-    total_steps_in_trade
+    total_steps_in_trade,
+    vessel_type,
+    vessel_capacity_cm
   )
 SELECT
   trade_id,
@@ -100,7 +106,9 @@ SELECT
   eur_per_tonne,
   crea_designation,
   step_in_trade,
-  total_steps_in_trade
+  total_steps_in_trade,
+  vessel_type,
+  vessel_capacity_cm
 FROM
   ktc_kpler_trade_computed_ships;
 

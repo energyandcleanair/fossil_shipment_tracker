@@ -188,6 +188,8 @@ class KplerTradeComputed(Base):
     step_zone_regions = Column(ARRAY(String))
     step_zone_ids = Column(ARRAY(Numeric))
 
+    vessel_types = Column(ARRAY(String))
+    vessel_capacities_cm = Column(ARRAY(Numeric))
     largest_vessel_type = Column(String)
     largest_vessel_capacity_cm = Column(Numeric)
 
@@ -231,6 +233,9 @@ class KplerTradeComputedShips(Base):
 
     step_in_trade = Column(Numeric)
     total_steps_in_trade = Column(Numeric)
+
+    vessel_type = Column(String)
+    vessel_capacity_cm = Column(Numeric)
 
     __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS
 

@@ -20,7 +20,9 @@ SELECT
     ships.ship_flag_iso2,
     ships.crea_designation,
     ships.step_in_trade,
-    array_length(ktc_kpler_trade_computed.vessel_imos, 1) AS total_steps_in_trade
+    array_length(ktc_kpler_trade_computed.vessel_imos, 1) AS total_steps_in_trade,
+    ships.vessel_type,
+    ships.vessel_capacity_cm
 FROM
     ktc_kpler_trade_computed,
     unnest(
@@ -33,7 +35,9 @@ FROM
         ship_owner_regions,
         vessel_ages,
         ship_flag_iso2s,
-        crea_designations
+        crea_designations,
+        vessel_types,
+        vessel_capacities_cm
     ) WITH ORDINALITY AS ships(
         vessel_imo,
         ship_insurer_name,
@@ -45,6 +49,8 @@ FROM
         vessel_age,
         ship_flag_iso2,
         crea_designation,
+        vessel_type,
+        vessel_capacity_cm,
         step_in_trade
     );
 

@@ -1,4 +1,4 @@
-CREATE MATERIALIZED VIEW ktc_trade_vessel_type AS
+CREATE MATERIALIZED VIEW ktc_trade_largest_vessel AS
 SELECT
   DISTINCT ON (
     ktc_trade_ship.trade_id,
@@ -19,8 +19,8 @@ ORDER BY
   ktc_trade_ship.flow_id,
   kpler_vessel.capacity_cm DESC NULLS LAST;
 
-CREATE INDEX ON ktc_trade_vessel_type (trade_id);
+CREATE INDEX ON ktc_trade_largest_vessel (trade_id);
 
-CREATE INDEX ON ktc_trade_vessel_type (flow_id);
+CREATE INDEX ON ktc_trade_largest_vessel (flow_id);
 
-ANALYZE ktc_trade_vessel_type;
+ANALYZE ktc_trade_largest_vessel;
