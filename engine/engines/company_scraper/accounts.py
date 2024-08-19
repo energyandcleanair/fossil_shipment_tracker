@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import json
 from poplib import POP3, POP3_SSL
 import random
@@ -422,13 +423,23 @@ class EquasisAccount:
         return self.__str__()
 
 
-class SimpleLoginAlias:
+class Alias:
     def __init__(self, *, alias: str, id: str):
         self.alias = alias
         self.id = id
 
 
-class SimpleLoginEmailManager:
+class EmailManager(ABC):
+    @abstractmethod
+    def create_email(self) -> Alias:
+        pass
+
+    @abstractmethod
+    def delete_email(self, alias: Alias):
+        pass
+
+
+class SimpleLoginEmailManager(EmailManager):
     @staticmethod
     def from_env():
         return SimpleLoginEmailManager(simple_login_api_key=config("SIMPLE_LOGIN_API_KEY"))
@@ -444,21 +455,21 @@ class SimpleLoginEmailManager:
             }
         )
 
-    def create_email(self) -> SimpleLoginAlias:
+    def create_email(self) -> Alias:
         response = self.session.post(f"{SimpleLoginEmailManager.BASE_URL}/alias/random/new")
 
         response.raise_for_status()
 
         content = response.json()
 
-        return SimpleLoginAlias(
+        return Alias(
             alias=content["email"],
             id=content["id"],
         )
 
     def delete_email(
         self,
-        alias: SimpleLoginAlias,
+        alias: Alias,
     ):
         response = self.session.delete(f"{SimpleLoginEmailManager.BASE_URL}/aliases/{alias.id}")
 
@@ -469,6 +480,18 @@ class SimpleLoginEmailManager:
             raise RuntimeError(f"Failed to delete alias {alias}")
 
         return
+
+
+class GmailEmailManager(EmailManager):
+    def __init__(self, *, username_pattern: str):
+        self._username_pattern = username_pattern
+
+    def create_email(self) -> Alias:
+        username = self._username_pattern % str(uuid4())
+        return Alias(alias=username, id=username)
+
+    def delete_email(self, alias: Alias):
+        pass
 
 
 class PasswordGenerator:
@@ -509,7 +532,7 @@ class EquasisAccountCreator:
         *,
         client: EquasisEmailClient,
         driver: EquasisWebsiteAccountDriver,
-        email_alias_manager: SimpleLoginEmailManager,
+        email_alias_manager: EmailManager,
         password_generator: PasswordGenerator,
     ):
         self.email_client = client
@@ -544,7 +567,7 @@ def default_from_env_generator(n_accounts: int) -> list[EquasisAccount]:
 
     equasis_driver = EquasisWebsiteAccountDriver.create()
     email_client = EquasisEmailClient()
-    email_alias_manager = SimpleLoginEmailManager.from_env()
+    email_alias_manager = GmailEmailManager(username_pattern=USERNAME)
     password_generator = PasswordGenerator(12)
 
     account_creator = EquasisAccountCreator(
