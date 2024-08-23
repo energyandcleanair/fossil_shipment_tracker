@@ -63,7 +63,7 @@ class ComtradeUpdateSteps(Enum):
 def update(
     force_unknown=False,
     max_updates: int = DEFAULT_UPDATE_LIMIT,
-    steps: list[ComtradeUpdateSteps] = [step.value for step in ComtradeUpdateSteps],
+    steps: list[ComtradeUpdateSteps] = [step for step in ComtradeUpdateSteps],
 ) -> ComtradeUpdateStatus:
     """
     This function updates the company information in the database from Equasis and insurers.
