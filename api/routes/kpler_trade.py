@@ -1,17 +1,9 @@
 from http import HTTPStatus
+from itertools import product
 from flask import Response
 import pandas as pd
 import sqlalchemy as sa
-from sqlalchemy import (
-    func,
-    case,
-    cast,
-    nullslast,
-    any_,
-    true,
-    String,
-    Integer,
-)
+from sqlalchemy import func, case, cast, nullslast, any_, true, String, Integer, column
 from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import aggregate_order_by, array, ARRAY, array_agg
 
@@ -49,6 +41,20 @@ def string_array(values):
 
 def integer_array(values):
     return cast(array(values), ARRAY(Integer))
+
+
+# Using a static value for this using this query. The value of 99 percentile is probably unlikely to
+# change.
+#
+# with journey_lengths as (
+# 	select (arrival_date_utc - departure_date_utc) as days
+# 	  from kpler_trade
+# 	 where arrival_date_utc is not null and departure_date_utc is not null
+# 	 order by days desc
+# )
+# select percentile_cont(0.99) within group (order by days)
+#  from journey_lengths;
+JOURNEY_LENGTH_99_PERCENTILE_DAYS = 90
 
 
 @routes_api.route("/v1/kpler_trade", strict_slashes=False)
@@ -657,60 +663,42 @@ class KplerTradeResource(TemplateResource):
 
     def check_complete(self, query, params):
 
-        subquery = query.subquery()
+        ### Setup the parameters for the sync check
+        all_countries = self._get_origin_countries(params)
+
+        min_date, max_date = self._get_sync_date_range(params)
 
         max_age = params.get("completeness_checked_age_threshold")
         earliest_allowed_date = (dt.datetime.now() - dt.timedelta(days=max_age)).date()
         percentage_threshold = params.get("completeness_check_error_percentage_days_threshold")
 
-        n_countries = session.query(subquery.c.origin_iso2).group_by(subquery.c.origin_iso2).count()
-        n_days = (
-            session.query(func.date_trunc("day", subquery.c.origin_date_utc))
-            .group_by(func.date_trunc("day", subquery.c.origin_date_utc))
-            .count()
-        )
-
+        n_countries = len(all_countries)
+        n_days = (max_date - min_date).days
         total_entries_count = n_countries * n_days
         max_errors_count = total_entries_count * percentage_threshold
 
-        failing_entries_query = (
-            session.query(
-                KplerSyncHistory.country_iso2,
-                KplerSyncHistory.date,
-            )
-            .select_from(subquery)
-            .outerjoin(
-                KplerSyncHistory,
-                sa.and_(
-                    KplerSyncHistory.country_iso2 == subquery.c.origin_iso2,
-                    KplerSyncHistory.date == func.date_trunc("day", subquery.c.origin_date_utc),
-                ),
-            )
-            .filter(
-                # Negate valid check
-                sa.not_(
-                    # Would be valid if it meets these requirements.
-                    sa.and_(
-                        # Check that we've updated this data.
-                        KplerSyncHistory.id != None,
-                        # Check that the data has been checked for completeness.
-                        KplerSyncHistory.last_checked != None,
-                        # Check that the data has been checked for completeness within the threshold
-                        KplerSyncHistory.last_checked > earliest_allowed_date,
-                        # Check that the data is complete.
-                        KplerSyncHistory.is_valid,
-                    )
-                )
-            )
-            .group_by(
-                KplerSyncHistory.country_iso2,
-                KplerSyncHistory.date,
-            )
+        ### Fetch the data for the sync check
+        sync_history_with_missing = self._get_sync_history_with_missing(
+            all_countries, min_date, max_date
         )
 
-        failing_entries = pd.read_sql(failing_entries_query.statement, session.bind)
+        ### Check the data for the sync check
+        # Filter out the entries that are not valid based on the commented out query above
+        failing_entries = sync_history_with_missing[
+            # Confirms the data has been synced and checked.
+            pd.isnull(sync_history_with_missing["last_checked"])
+            # Confirms the data has been checked within the threshold.
+            | (sync_history_with_missing["last_checked"] < pd.to_datetime(earliest_allowed_date))
+            # Confirms the data is valid.
+            | (sync_history_with_missing["is_valid"] == False)
+        ].reset_index(drop=True)
 
-        # Convert list to country_iso2, date_from, date_to for each set of sequential dates
+        if len(failing_entries) > max_errors_count:
+            return False, self._to_readable_failures(failing_entries).to_csv(index=False)
+        else:
+            return True, None
+
+    def _to_readable_failures(self, failing_entries):
         grouped_entries = failing_entries.groupby(["country_iso2"])
         result = []
         for group, entries in grouped_entries:
@@ -728,11 +716,149 @@ class KplerTradeResource(TemplateResource):
             result.extend(sequential_dates)
 
         result = pd.DataFrame(result, columns=["origin_iso2", "date_from", "date_to"])
+        return result
 
-        if len(failing_entries) > max_errors_count:
-            return False, result.to_csv(index=False)
-        else:
-            return True, None
+    def _get_sync_history_with_missing(self, all_countries, min_date, max_date):
+        all_dates = pd.date_range(min_date, max_date)
+
+        # Create a pandas dataframe with all the possible dates and countries
+        all_possible_entries = pd.DataFrame(
+            list(product(all_countries, all_dates)), columns=["country_iso2", "date"]
+        )
+
+        actual_sync_history_query = session.query(
+            KplerSyncHistory.country_iso2,
+            KplerSyncHistory.date,
+            KplerSyncHistory.last_checked,
+            KplerSyncHistory.is_valid,
+        ).filter(
+            sa.and_(
+                # Country to check for date range
+                KplerSyncHistory.country_iso2.in_(all_countries),
+                KplerSyncHistory.date >= min_date,
+                KplerSyncHistory.date <= max_date,
+            )
+        )
+
+        actual_sync_history = pd.read_sql(actual_sync_history_query.statement, session.bind)
+
+        # Merge the actual sync history with the possible entries to get the missing entries
+        sync_history_with_missing = pd.merge(
+            all_possible_entries,
+            actual_sync_history,
+            how="left",
+            on=["country_iso2", "date"],
+        )
+
+        return sync_history_with_missing
+
+    def _get_sync_date_range(self, params) -> tuple[dt.datetime, dt.datetime]:
+
+        date_from: dt.datetime | None = to_datetime(params.get("date_from"))
+        date_to: dt.datetime | None = to_datetime(params.get("date_to"))
+        origin_date_from: dt.datetime | None = to_datetime(params.get("origin_date_from"))
+        origin_date_to: dt.datetime | None = to_datetime(params.get("origin_date_to"))
+        destination_date_from: dt.datetime | None = to_datetime(params.get("destination_date_from"))
+        destination_date_to: dt.datetime | None = to_datetime(params.get("destination_date_to"))
+
+        # We need to get the sync date for the date_from assuming the longest length journey. We
+        # use the 99th percentile so it's not 10 years (which is the longest journey tracked in the
+        # DB).
+        origin_date_for_destination_date_from = (
+            None
+            if destination_date_from is None
+            else (destination_date_from - dt.timedelta(days=JOURNEY_LENGTH_99_PERCENTILE_DAYS))
+        )
+        # We need to get the sync date for the date_to assuming the shortest length journey. We can
+        # assume the 1st percentile is 0 days as it's close to this.
+        origin_date_for_destination_date_to = destination_date_to
+
+        date_froms = [
+            date
+            for date in [
+                date_from,
+                origin_date_from,
+                origin_date_for_destination_date_from,
+            ]
+            if date is not None
+        ]
+
+        date_tos = [
+            date
+            for date in [
+                date_to,
+                origin_date_to,
+                origin_date_for_destination_date_to,
+            ]
+            if date is not None
+        ]
+
+        min_date = min(date_froms)
+        max_date = max(date_tos)
+
+        return min_date, max_date
+
+    def _get_origin_countries(self, params) -> list[str]:
+
+        # Don't add to this without updating the rest of this function to handle the new params.
+        checked_params = [
+            "origin_iso2",
+            "commodity_origin_iso2",
+            "origin_region",
+            "origin_port_name",
+            "origin_area",
+            "origin_installation_ids",
+            "origin_zone_ids",
+        ]
+
+        origin_related_params = {
+            key: value
+            for key, value in params.items()
+            if key.startswith("origin") and not key.startswith("origin_date")
+        }
+
+        # This is used to check that we are not missing any origin related params in the sync
+        # checking. You should not delete this.
+        assert all((param in checked_params) for param in origin_related_params)
+
+        # We need to keep the list of params used up to date in checked_params.
+        origin_iso2 = params.get("origin_iso2")
+        origin_area = params.get("origin_area")
+        commodity_origin_iso2 = params.get("commodity_origin_iso2")
+        origin_port_name = params.get("origin_port_name")
+        origin_region = params.get("origin_region")
+        origin_installation_ids = params.get("origin_installation_ids")
+        origin_zone_ids = params.get("origin_zone_ids")
+
+        query = (
+            session.query(Country.iso2)
+            .outerjoin(KplerZone, Country.iso2 == KplerZone.country_iso2)
+            .outerjoin(KplerInstallation, KplerZone.port_id == KplerInstallation.port_id)
+            .distinct()
+        )
+
+        if origin_iso2:
+            query = query.filter(Country.iso2.in_(to_list(origin_iso2)))
+
+        if commodity_origin_iso2:
+            query = query.filter(Country.iso2.in_(to_list(commodity_origin_iso2)))
+
+        if origin_region:
+            query = query.filter(Country.region.in_(to_list(origin_region)))
+
+        if origin_port_name:
+            query = query.filter(KplerZone.port_name.in_(to_list(origin_port_name)))
+
+        if origin_area:
+            query = query.filter(KplerZone.area.in_(to_list(origin_area)))
+
+        if origin_installation_ids:
+            query = query.filter(KplerInstallation.id.in_(to_list(origin_installation_ids)))
+
+        if origin_zone_ids:
+            query = query.filter(KplerZone.id.in_(to_list(origin_zone_ids)))
+
+        return [item[0] for item in query.all()]
 
     def initial_query(self, params=None):
         origin_zone = aliased(KplerZone)
