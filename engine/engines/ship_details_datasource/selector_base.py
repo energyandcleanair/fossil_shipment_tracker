@@ -1,3 +1,5 @@
+from datetime import date
+from typing import Optional
 from sqlalchemy import func, case
 from sqlalchemy.sql.expression import Subquery
 import sqlalchemy as sa
@@ -17,7 +19,11 @@ COMMODITY_SETTINGS = {
 }
 
 
-def build_filter_query() -> Subquery:
+def build_filter_query(
+    *,
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[date] = None
+) -> Subquery:
     """
     A query to list all ships and their departure dates, countries, commodities, and update
     priority based on their voyage history.
@@ -72,5 +78,13 @@ def build_filter_query() -> Subquery:
         )
         .distinct(KplerTradeComputedShips.vessel_imo, Commodity.equivalent_id)
     )
+
+    if filter_departing_iso2s:
+        kpler_ships = kpler_ships.filter(KplerZone.country_iso2.in_(filter_departing_iso2s))
+
+    if filter_minimum_departure_date:
+        kpler_ships = kpler_ships.filter(
+            KplerTrade.departure_date_utc == filter_minimum_departure_date
+        )
 
     return kpler_ships.subquery()

@@ -1,3 +1,4 @@
+from typing import Optional
 import pandas as pd
 import datetime as dt
 from sqlalchemy import nullslast, func
@@ -20,10 +21,18 @@ from .selector_base import build_filter_query, COMMODITY_SETTINGS
 _ADJUSTEMENT_RANGE = 15
 
 
-def select_ships_to_update_inspections(*, max_updates: int):
+def select_ships_to_update_inspections(
+    *,
+    max_updates: int,
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[dt.date] = None,
+):
 
     logger.info("Finding the ships which need inspection updates")
-    ships_to_update = find_all_ships_that_need_updates()
+    ships_to_update = find_all_ships_that_need_updates(
+        filter_departing_iso2s=filter_departing_iso2s,
+        filter_minimum_departure_date=filter_minimum_departure_date,
+    )
 
     if max_updates > 0 and len(ships_to_update) > max_updates:
         logger_slack.warn(
@@ -60,13 +69,18 @@ def limit_ships_to_update(ships_to_update, max_updates: int):
     return top_ships
 
 
-def find_all_ships_that_need_updates():
+def find_all_ships_that_need_updates(
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[dt.date] = None,
+):
     ships_to_update = pd.DataFrame()
 
     for commodity, _ in COMMODITY_SETTINGS.items():
         logger.info(f"Finding ships to update for {commodity}")
         ships_for_commodity = find_ships_by_commodity_that_need_updates(
             commodities=[commodity],
+            filter_departing_iso2s=filter_departing_iso2s,
+            filter_minimum_departure_date=filter_minimum_departure_date,
         )
 
         ships_to_update = pd.concat([ships_to_update, ships_for_commodity])
@@ -76,9 +90,14 @@ def find_all_ships_that_need_updates():
 
 
 def find_ships_by_commodity_that_need_updates(
-    commodities: "list[str]" = None,
+    commodities: Optional[list[str]] = None,
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[dt.date] = None,
 ):
-    filter_query = build_filter_query()
+    filter_query = build_filter_query(
+        filter_departing_iso2s=filter_departing_iso2s,
+        filter_minimum_departure_date=filter_minimum_departure_date,
+    )
 
     imo_query = (
         session.query(

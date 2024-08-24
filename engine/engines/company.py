@@ -1,3 +1,4 @@
+from datetime import date
 from enum import Enum
 import math
 import random
@@ -64,6 +65,8 @@ def update(
     force_unknown=False,
     max_updates: int = DEFAULT_UPDATE_LIMIT,
     steps: list[ComtradeUpdateSteps] = [step for step in ComtradeUpdateSteps],
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[date] = None,
 ) -> ComtradeUpdateStatus:
     """
     This function updates the company information in the database from Equasis and insurers.
@@ -80,10 +83,14 @@ def update(
             update_info_from_equasis(
                 force_unknown=force_unknown,
                 max_updates=math.floor(max_updates / 2),
+                filter_departing_iso2s=filter_departing_iso2s,
+                filter_minimum_departure_date=filter_minimum_departure_date,
             )
         if ComtradeUpdateSteps.SHIP_INSPECTIONS in steps:
             update_ships_inspections_from_equasis(
                 max_updates=math.floor(max_updates / 2),
+                filter_departing_iso2s=filter_departing_iso2s,
+                filter_minimum_departure_date=filter_minimum_departure_date,
             )
         if ComtradeUpdateSteps.CLEAN_DATA in steps:
             clean_ship_details()
@@ -97,8 +104,16 @@ def update(
         return ComtradeUpdateStatus.UNEXPECTED_ERROR
 
 
-def update_ships_inspections_from_equasis(max_updates: Optional[int] = DEFAULT_UPDATE_LIMIT / 2):
-    ships_to_update = select_ships_to_update_inspections(max_updates=max_updates)
+def update_ships_inspections_from_equasis(
+    max_updates: Optional[int] = DEFAULT_UPDATE_LIMIT / 2,
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[date] = None,
+):
+    ships_to_update = select_ships_to_update_inspections(
+        max_updates=max_updates,
+        filter_departing_iso2s=filter_departing_iso2s,
+        filter_minimum_departure_date=filter_minimum_departure_date,
+    )
 
     equasis = get_global_equasis_client()
 
@@ -119,6 +134,8 @@ def update_info_from_equasis(
     *,
     force_unknown: "bool",
     max_updates: int,
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[date] = None,
 ):
     """
     Collect infos from equasis about shipments that either don't have infos,
@@ -127,7 +144,10 @@ def update_info_from_equasis(
     """
 
     top_ships = select_ships_to_update_core_details(
-        force_unknown=force_unknown, max_updates=max_updates
+        force_unknown=force_unknown,
+        max_updates=max_updates,
+        filter_departing_iso2s=filter_departing_iso2s,
+        filter_minimum_departure_date=filter_minimum_departure_date,
     )
 
     if len(top_ships) == 0:

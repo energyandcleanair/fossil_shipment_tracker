@@ -1,3 +1,4 @@
+from typing import Optional
 import pandas as pd
 import datetime as dt
 from sqlalchemy import nullslast, func, case
@@ -19,10 +20,20 @@ from base.models import (
 from .selector_base import build_filter_query, COMMODITY_SETTINGS
 
 
-def select_ships_to_update_core_details(*, force_unknown: "bool", max_updates: int):
+def select_ships_to_update_core_details(
+    *,
+    force_unknown: "bool",
+    max_updates: int,
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[dt.date] = None,
+):
 
     logger.info("Finding the ships which need core detail updates")
-    ships_to_update = find_all_ships_that_need_updates(force_unknown)
+    ships_to_update = find_all_ships_that_need_updates(
+        force_unknown,
+        filter_departing_iso2s=filter_departing_iso2s,
+        filter_minimum_departure_date=filter_minimum_departure_date,
+    )
 
     if max_updates > 0 and len(ships_to_update) > max_updates:
         logger_slack.warn(
@@ -60,7 +71,11 @@ def limit_ships_to_update(ships_to_update, max_updates: int):
     return top_ships
 
 
-def find_all_ships_that_need_updates(force_unknown):
+def find_all_ships_that_need_updates(
+    force_unknown,
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[dt.date] = None,
+):
     ships_to_update = pd.DataFrame()
 
     for commodity, settings in COMMODITY_SETTINGS.items():
@@ -73,6 +88,8 @@ def find_all_ships_that_need_updates(force_unknown):
             known_update_period=known_update_period,
             unknown_update_period=unknown_update_period,
             force_unknown=force_unknown,
+            filter_departing_iso2s=filter_departing_iso2s,
+            filter_minimum_departure_date=filter_minimum_departure_date,
         )
 
         ships_to_update = pd.concat([ships_to_update, ships_for_commodity])
@@ -84,8 +101,13 @@ def find_ships_by_commodity_that_need_updates(
     known_update_period: int = 30,
     unknown_update_period: int = 3,
     force_unknown: bool = False,
+    filter_departing_iso2s: Optional[list[str]] = None,
+    filter_minimum_departure_date: Optional[dt.date] = None,
 ):
-    filter_query = build_filter_query()
+    filter_query = build_filter_query(
+        filter_departing_iso2s=filter_departing_iso2s,
+        filter_minimum_departure_date=filter_minimum_departure_date,
+    )
 
     imo_query = (
         session.query(
