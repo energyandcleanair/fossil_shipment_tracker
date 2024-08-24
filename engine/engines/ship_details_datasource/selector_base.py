@@ -84,7 +84,7 @@ def build_filter_query(
 
     if filter_minimum_departure_date:
         kpler_ships = kpler_ships.filter(
-            KplerTrade.departure_date_utc == filter_minimum_departure_date
+            KplerTrade.departure_date_utc >= filter_minimum_departure_date
         )
 
     return kpler_ships.subquery()
