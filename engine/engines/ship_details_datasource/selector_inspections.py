@@ -17,6 +17,9 @@ from base.models import (
 from .selector_base import build_filter_query, COMMODITY_SETTINGS
 
 
+_ADJUSTEMENT_RANGE = 15
+
+
 def select_ships_to_update_inspections(*, max_updates: int):
 
     logger.info("Finding the ships which need inspection updates")
@@ -44,7 +47,6 @@ def limit_ships_to_update(ships_to_update, max_updates: int):
             by=[
                 "commodity_update_priority",
                 "history_update_priority",
-                "consecutive_failures",
                 "checked_on",
             ],
             na_position="first",
@@ -100,7 +102,8 @@ def find_ships_by_commodity_that_need_updates(
     imo_query = imo_query.subquery()
 
     # We do this to keep the distribution of updates more spread out.
-    three_months_ish = func.cast(concat(func.random() * 30 - 15, " DAYS"), INTERVAL)
+    random_adjustment = func.round(func.random() * _ADJUSTEMENT_RANGE * 2 - _ADJUSTEMENT_RANGE)
+    three_months_ish = func.cast(concat(30 * 3 + random_adjustment, " DAYS"), INTERVAL)
     three_months_ago_ish = dt.datetime.now() - three_months_ish
 
     # We only want to update ships that haven't been updated in the last three months
