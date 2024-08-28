@@ -649,7 +649,7 @@ class KplerTradeResource(TemplateResource):
                 func.avg(subquery.c.detentions_per_inspection_2y).label(
                     "avg_detentions_per_inspection_2y"
                 ),
-                func.avg(subquery.c.n_detentions_2y).label("n_detentions_2y"),
+                func.avg(subquery.c.n_detentions_2y).label("avg_n_detentions_2y"),
             ]
         )
 
