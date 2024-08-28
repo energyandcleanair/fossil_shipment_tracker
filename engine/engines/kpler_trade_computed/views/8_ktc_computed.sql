@@ -64,7 +64,22 @@ SELECT
   coalesce(
     ktc_trade_designations.crea_designations,
     ARRAY [] :: varchar []
-  ) AS crea_designations
+  ) AS crea_designations,
+  coalesce(
+    ktc_trade_inspections.n_inspections_2y,
+    ARRAY [] :: numeric []
+  ) AS n_inspections_2y,
+  coalesce(
+    ktc_trade_inspections.deficiencies_per_inspection_2y,
+    ARRAY [] :: numeric []
+  ) AS deficiencies_per_inspection_2y,
+  coalesce(
+    ktc_trade_inspections.detentions_per_inspection_2y,
+    ARRAY [] :: numeric []
+  ) AS detentions_per_inspection_2y,
+  ktc_trade_inspections.avg_n_inspections_2y,
+  ktc_trade_inspections.avg_deficiencies_per_inspection_2y,
+  ktc_trade_inspections.avg_detentions_per_inspection_2y
 FROM
   kpler_trade
   LEFT OUTER JOIN kpler_product ON kpler_trade.product_id = kpler_product.id
@@ -98,6 +113,8 @@ FROM
   AND kpler_trade.flow_id = ktc_trade_largest_vessel.flow_id
   LEFT OUTER JOIN ktc_trade_vessel_types ON kpler_trade.id = ktc_trade_vessel_types.trade_id
   AND kpler_trade.flow_id = ktc_trade_vessel_types.flow_id
+  LEFT OUTER JOIN ktc_trade_inspections ON kpler_trade.id = ktc_trade_inspections.trade_id
+  AND kpler_trade.flow_id = ktc_trade_inspections.flow_id
 WHERE
   kpler_trade.is_valid
   AND price.scenario IS NOT NULL

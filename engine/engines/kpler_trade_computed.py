@@ -99,7 +99,7 @@ def check_precomputation_tables():
 
 def update_kpler_trade_computed_table_from_view():
     logger.info("Updating kpler_trade_computed table")
-    session.execute(get_final_update_sql())
+    session.execute(build_final_update_sql())
 
 
 def delete_ktc_views():
@@ -179,12 +179,39 @@ order by view_name;
     return [name[0] for name in names if name[0].startswith("ktc_")]
 
 
-def get_final_update_sql():
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    update_file = f"{current_dir}/kpler_trade_computed/update.sql"
-    with open(update_file, "r") as file:
-        sql = file.read()
-        return sql
+def build_final_update_sql():
+    column_names_ktc = [col.name for col in KplerTradeComputed.__table__.columns]
+    column_names_ktc_csv = ", ".join(column_names_ktc)
+    sql_for_ktc = f"""
+    INSERT INTO kpler_trade_computed
+    ({column_names_ktc_csv})
+    SELECT
+    {column_names_ktc_csv}
+    FROM ktc_kpler_trade_computed;
+    """
+
+    column_names_ktc_ships = [col.name for col in KplerTradeComputedShips.__table__.columns]
+    column_names_ktc_ships_csv = ", ".join(column_names_ktc_ships)
+    sql_for_ktc_ships = f"""
+    INSERT INTO kpler_trade_computed_ships
+    ({column_names_ktc_ships_csv})
+    SELECT
+    {column_names_ktc_ships_csv}
+    FROM ktc_kpler_trade_computed_ships;
+    """
+
+    analyse_steps = """
+    ANALYZE kpler_trade_computed;
+    ANALYZE kpler_trade_computed_ships;
+    """
+
+    full_query = f"""
+    {sql_for_ktc}
+    {sql_for_ktc_ships}
+    {analyse_steps}
+    """
+
+    return full_query
 
 
 def get_all_view_creation_sql():
