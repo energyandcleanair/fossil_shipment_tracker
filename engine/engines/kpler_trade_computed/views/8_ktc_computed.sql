@@ -80,7 +80,7 @@ SELECT
   coalesce(
     ktc_trade_inspections.n_detentions_2y,
     ARRAY [] :: numeric []
-  ),
+  ) AS n_detentions_2y,
   ktc_trade_inspections.avg_n_inspections_2y,
   ktc_trade_inspections.avg_deficiencies_per_inspection_2y,
   ktc_trade_inspections.avg_detentions_per_inspection_2y,
