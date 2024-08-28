@@ -23,7 +23,10 @@ SELECT
     AVG(deficiencies_per_inspection_2y) AS avg_deficiencies_per_inspection_2y,
     AVG(detentions_per_inspection_2y) AS avg_detentions_per_inspection_2y
 FROM
-    ktc_voyage_inspections;
+    ktc_voyage_inspections
+GROUP BY
+    trade_id,
+    flow_id;
 
 CREATE INDEX ON ktc_trade_inspections (trade_id);
 
