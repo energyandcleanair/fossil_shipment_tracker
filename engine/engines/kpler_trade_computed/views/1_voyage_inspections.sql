@@ -14,7 +14,7 @@ SELECT
             ELSE 0
         END
     ) AS detentions_per_inspection_2y,
-    COUNT(
+    SUM(
         CASE
             WHEN ship_inspection.detention THEN 1
             ELSE 0
