@@ -359,6 +359,12 @@ class KplerTradeResource(TemplateResource):
         "value_currency",
         "avg_vessel_age",
         "trade_count",
+        "n_inspections_2y",
+        "deficiencies_per_inspection_2y",
+        "detentions_per_inspection_2y",
+        "avg_n_inspections_2y",
+        "avg_deficiencies_per_inspection_2y",
+        "avg_detentions_per_inspection_2y",
     ]
 
     pivot_dependencies = {
@@ -622,9 +628,25 @@ class KplerTradeResource(TemplateResource):
         ktc_values = (
             [
                 func.avg(subquery.c.avg_vessel_age).label("avg_vessel_age"),
+                func.avg(subquery.c.avg_n_inspections_2y).label("avg_n_inspections_2y"),
+                func.avg(subquery.c.avg_deficiencies_per_inspection_2y).label(
+                    "avg_deficiencies_per_inspection_2y"
+                ),
+                func.avg(subquery.c.avg_detentions_per_inspection_2y).label(
+                    "avg_detentions_per_inspection_2y"
+                ),
             ]
             if nest_ships
-            else []
+            else [
+                func.avg(subquery.c.vessel_age).label("avg_vessel_age"),
+                func.avg(subquery.c.n_inspections_2y).label("avg_n_inspections_2y"),
+                func.avg(subquery.c.deficiencies_per_inspection_2y).label(
+                    "avg_deficiencies_per_inspection_2y"
+                ),
+                func.avg(subquery.c.detentions_per_inspection_2y).label(
+                    "avg_detentions_per_inspection_2y"
+                ),
+            ]
         )
 
         return base_values + ktc_values
