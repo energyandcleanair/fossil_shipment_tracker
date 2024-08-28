@@ -5,7 +5,9 @@ SELECT
     ktc_trade_ship.ship_order,
     ktc_trade_ship.ship_imo,
     COUNT(ship_inspection.id) AS n_inspections_2y,
-    AVG(ship_inspection.number_of_deficiencies) AS deficiencies_per_inspection_2y,
+    AVG(
+        COALESCE(ship_inspection.number_of_deficiencies, 0)
+    ) AS deficiencies_per_inspection_2y,
     AVG(
         CASE
             WHEN ship_inspection.detention THEN 1
