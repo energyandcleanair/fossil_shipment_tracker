@@ -6,7 +6,12 @@ SELECT
     ktc_trade_ship.ship_imo,
     COUNT(ship_inspection.id) AS n_inspections_2y,
     AVG(ship_inspection.number_of_deficiencies) AS deficiencies_per_inspection_2y,
-    AVG(ship_inspection.number_of_detentions) AS detentions_per_inspection_2y
+    AVG(
+        CASE
+            WHEN ship_inspection.detention THEN 1
+            ELSE 0
+        END
+    ) AS detentions_per_inspection_2y
 FROM
     ktc_trade_ship
     LEFT JOIN kpler_trade ON ktc_trade_ship.trade_id = kpler_trade.id
