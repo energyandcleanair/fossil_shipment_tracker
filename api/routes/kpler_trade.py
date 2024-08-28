@@ -362,9 +362,11 @@ class KplerTradeResource(TemplateResource):
         "n_inspections_2y",
         "deficiencies_per_inspection_2y",
         "detentions_per_inspection_2y",
+        "n_detentions_2y",
         "avg_n_inspections_2y",
         "avg_deficiencies_per_inspection_2y",
         "avg_detentions_per_inspection_2y",
+        "avg_n_detentions_2y",
     ]
 
     pivot_dependencies = {
@@ -635,6 +637,7 @@ class KplerTradeResource(TemplateResource):
                 func.avg(subquery.c.avg_detentions_per_inspection_2y).label(
                     "avg_detentions_per_inspection_2y"
                 ),
+                func.avg(subquery.c.avg_n_detentions_2y).label("avg_n_detentions_2y"),
             ]
             if nest_ships
             else [
@@ -646,6 +649,7 @@ class KplerTradeResource(TemplateResource):
                 func.avg(subquery.c.detentions_per_inspection_2y).label(
                     "avg_detentions_per_inspection_2y"
                 ),
+                func.avg(subquery.c.n_detentions_2y).label("n_detentions_2y"),
             ]
         )
 

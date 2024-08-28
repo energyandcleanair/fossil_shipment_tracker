@@ -205,6 +205,7 @@ class KplerTradeComputed(Base):
     avg_n_inspections_2y = Column(Numeric)
     avg_detentions_per_inspection_2y = Column(Numeric)
     avg_deficiencies_per_inspection_2y = Column(Numeric)
+    avg_n_detentions_2y = Column(Numeric)
 
     __table_args__ = (
         Index(
@@ -248,6 +249,7 @@ class KplerTradeComputedShips(Base):
     n_inspections_2y = Column(Numeric)
     detentions_per_inspection_2y = Column(Numeric)
     deficiencies_per_inspection_2y = Column(Numeric)
+    n_detentions_2y = Column(Numeric)
 
     __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS
 

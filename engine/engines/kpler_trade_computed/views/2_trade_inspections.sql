@@ -19,9 +19,15 @@ SELECT
         ORDER BY
             ship_order
     ) AS detentions_per_inspection_2y,
+    array_agg(
+        n_detentions_2y
+        ORDER BY
+            ship_order
+    ) AS n_detentions_2y,
     AVG(n_inspections_2y) AS avg_n_inspections_2y,
     AVG(deficiencies_per_inspection_2y) AS avg_deficiencies_per_inspection_2y,
-    AVG(detentions_per_inspection_2y) AS avg_detentions_per_inspection_2y
+    AVG(detentions_per_inspection_2y) AS avg_detentions_per_inspection_2y,
+    AVG(n_detentions_2y) AS avg_n_detentions_2y
 FROM
     ktc_voyage_inspections
 GROUP BY

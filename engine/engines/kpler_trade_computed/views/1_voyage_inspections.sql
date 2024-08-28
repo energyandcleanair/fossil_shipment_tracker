@@ -13,7 +13,13 @@ SELECT
             WHEN ship_inspection.detention THEN 1
             ELSE 0
         END
-    ) AS detentions_per_inspection_2y
+    ) AS detentions_per_inspection_2y,
+    COUNT(
+        CASE
+            WHEN ship_inspection.detention THEN 1
+            ELSE 0
+        END
+    ) AS n_detentions_2y
 FROM
     ktc_trade_ship
     LEFT JOIN kpler_trade ON ktc_trade_ship.trade_id = kpler_trade.id

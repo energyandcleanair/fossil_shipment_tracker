@@ -77,9 +77,14 @@ SELECT
     ktc_trade_inspections.detentions_per_inspection_2y,
     ARRAY [] :: numeric []
   ) AS detentions_per_inspection_2y,
+  coalesce(
+    ktc_trade_inspections.n_detentions_2y,
+    ARRAY [] :: numeric []
+  ),
   ktc_trade_inspections.avg_n_inspections_2y,
   ktc_trade_inspections.avg_deficiencies_per_inspection_2y,
-  ktc_trade_inspections.avg_detentions_per_inspection_2y
+  ktc_trade_inspections.avg_detentions_per_inspection_2y,
+  ktc_trade_inspections.avg_n_detentions_2y
 FROM
   kpler_trade
   LEFT OUTER JOIN kpler_product ON kpler_trade.product_id = kpler_product.id

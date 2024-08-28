@@ -25,7 +25,8 @@ SELECT
     ships.vessel_capacity_cm,
     ships.n_inspections_2y,
     ships.deficiencies_per_inspection_2y,
-    ships.detentions_per_inspection_2y
+    ships.detentions_per_inspection_2y,
+    ships.n_detentions_2y
 FROM
     ktc_kpler_trade_computed,
     unnest(
@@ -43,7 +44,8 @@ FROM
         vessel_capacities_cm,
         n_inspections_2y,
         deficiencies_per_inspection_2y,
-        detentions_per_inspection_2y
+        detentions_per_inspection_2y,
+        n_detentions_2y
     ) WITH ORDINALITY AS ships(
         vessel_imo,
         ship_insurer_name,
@@ -60,6 +62,7 @@ FROM
         n_inspections_2y,
         deficiencies_per_inspection_2y,
         detentions_per_inspection_2y,
+        n_detentions_2y,
         step_in_trade
     );
 
