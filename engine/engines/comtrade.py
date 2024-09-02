@@ -98,7 +98,9 @@ def update_comtrade_data(sync_definitions: pd.DataFrame, force=False):
 
         if not requests.empty:
             for request in requests:
-                logger.info(f"Updating {request['reporter_iso2']}")
+                logger.info(
+                    f"Updating {request['reporter_iso2']} for {request['periods']} and {request['commodities']}"
+                )
 
                 last_updated = pd.Timestamp.now()
 
@@ -125,9 +127,9 @@ def update_comtrade_data(sync_definitions: pd.DataFrame, force=False):
         logger_slack.warn(msg)
         return
     except Exception as e:
-        msg = f"Error updating comtrade data: {e}"
-        logger.error(msg)
-        logger_slack.error(msg)
+        msg = f"Error updating comtrade data"
+        logger.error(msg, exc_info=True, stack_info=True)
+        logger_slack.error(msg, exc_info=True, stack_info=True)
         return
 
 
