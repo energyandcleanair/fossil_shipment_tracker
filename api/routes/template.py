@@ -319,14 +319,17 @@ class TemplateResource(Resource):
         max_date = result[date_column].max()
         daterange = pd.date_range(min_date, max_date).rename(date_column)
 
+        value_cols_present = intersect(self.value_cols, result.columns)
+        date_cols_present = intersect(self.date_cols, result.columns)
+
         result[date_column] = pd.to_datetime(result[date_column]).dt.floor(
             "D"
         )  # Should have been done already
         result_rolled = (
             result.groupby(
-                [x for x in result.columns if x not in (self.date_cols + self.value_cols)],
+                [x for x in result.columns if x not in (date_cols_present + value_cols_present)],
                 dropna=False,
-            )[[date_column] + self.value_cols]
+            )[[date_column] + value_cols_present]
             .apply(
                 lambda x: x.set_index(date_column)
                 .resample("D")
