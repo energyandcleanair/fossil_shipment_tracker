@@ -57,7 +57,6 @@ def integer_array(values):
 JOURNEY_LENGTH_99_PERCENTILE_DAYS = 90
 
 
-@routes_api.route("/v1/kpler_trade", strict_slashes=False)
 class KplerTradeResource(TemplateResource):
     parser: reqparse.RequestParser = TemplateResource.parser.copy()
 
@@ -886,7 +885,7 @@ class KplerTradeResource(TemplateResource):
 
         return [item[0] for item in query.all()]
 
-    def initial_query(self, params=None):
+    def initial_query(self, params=None, *, additional_columns=None, query_modifier=None):
         origin_zone = aliased(KplerZone)
         destination_zone = aliased(KplerZone)
         CommodityEquivalent = aliased(Commodity)
@@ -969,6 +968,9 @@ class KplerTradeResource(TemplateResource):
                 ]
             ]
         )
+
+        if additional_columns:
+            kpler_trade_computed_columns = kpler_trade_computed_columns + additional_columns
 
         value_eur_field = (KplerTrade.value_tonne * kpler_trade_computed_table.eur_per_tonne).label(
             "value_eur"
@@ -1072,12 +1074,28 @@ class KplerTradeResource(TemplateResource):
                 DestinationInstallation,
                 DestinationInstallation.id == KplerTrade.arrival_installation_id,
             )
-            .order_by(
-                KplerTrade.id,
-                KplerTrade.flow_id,
-                kpler_trade_computed_table.pricing_scenario,
-                Currency.currency,
-            )
+        )
+
+        aliases = {
+            "origin_zone": origin_zone,
+            "destination_zone": destination_zone,
+            "CommodityEquivalent": CommodityEquivalent,
+            "OriginCountry": OriginCountry,
+            "DestinationCountry": DestinationCountry,
+            "CommodityOriginCountry": CommodityOriginCountry,
+            "CommodityDestinationCountry": CommodityDestinationCountry,
+            "OriginInstallation": OriginInstallation,
+            "DestinationInstallation": DestinationInstallation,
+        }
+
+        if query_modifier:
+            query = query_modifier(query, aliases)
+
+        query = query.order_by(
+            KplerTrade.id,
+            KplerTrade.flow_id,
+            kpler_trade_computed_table.pricing_scenario,
+            Currency.currency,
         )
 
         # Only keep valid trades
@@ -1282,3 +1300,7 @@ class KplerTradeResource(TemplateResource):
             query = query.filter(subquery.c.vessel_imos.overlap(to_list(vessel_imos)))
 
         return query
+
+
+# We define this here so that we can extend KplerTradeResources.
+routes_api.route("/v1/kpler_trade", strict_slashes=False)(KplerTradeResource)

@@ -138,7 +138,7 @@ class TemplateResource(Resource):
         return []
 
     @abstractmethod
-    def initial_query(self, params=None):
+    def initial_query(self, params=None, *, additional_columns=None, query_modifier=None):
         return
 
     def filter(self, query, params=None):

@@ -15,10 +15,14 @@ routes_api = Api(
 ns_charts = Namespace("Charts", description="For plotting data.", path="/")
 ns_flaring = Namespace("Flaring", description="For flaring data.", path="/")
 ns_alerts = Namespace("Alerts", description="For shipment alerts.", path="/")
+ns_transformed = Namespace(
+    "Transformed", description="For pre-transformed data for specific use.", path="/"
+)
 
 routes_api.add_namespace(ns_charts)
 routes_api.add_namespace(ns_flaring)
 routes_api.add_namespace(ns_alerts)
+routes_api.add_namespace(ns_transformed)
 
 from .template import *
 from .counter import *
@@ -35,3 +39,5 @@ from .kpler_flow import *
 from .kpler_trade import *
 
 from .charts import *
+
+from .transformed import *

@@ -64,6 +64,7 @@ DB_TABLE_KPLER_TRADE_COMPUTED = "kpler_trade_computed"
 DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS = "kpler_trade_computed_ships"
 DB_TABLE_KPLER_SYNC_HISTORY = "kpler_sync_history"
 DB_TABLE_KPLER_SYNC_COMPARISON_DETAILS = "kpler_sync_comparison_details"
+DB_TABLE_KPLER_EXTENSION_ZONE_INDONESIA = "kpler_extension_zone_indonesia"
 
 DB_TABLE_API_KEY = "api_key"
 DB_TABLE_GLOBAL_CACHE = "global_cache"

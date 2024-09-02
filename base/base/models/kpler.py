@@ -31,6 +31,7 @@ from base.models.table_names import (
     DB_TABLE_KPLER_INSTALLATION,
     DB_TABLE_KPLER_TRADE_COMPUTED,
     DB_TABLE_KPLER_SYNC_HISTORY,
+    DB_TABLE_KPLER_EXTENSION_ZONE_INDONESIA,
 )
 
 
@@ -325,3 +326,12 @@ class KplerSyncHistory(Base):
     last_checked = Column(DateTime)
 
     __tablename__ = DB_TABLE_KPLER_SYNC_HISTORY
+
+
+class KplerZoneExtensionIndonesiaIsland(Base):
+
+    zone_id = Column(ForeignKey(DB_TABLE_KPLER_ZONE + ".id"), primary_key=True)
+    island_name = Column(String)
+    region_name = Column(String)
+
+    __tablename__ = DB_TABLE_KPLER_EXTENSION_ZONE_INDONESIA
