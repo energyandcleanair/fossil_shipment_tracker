@@ -308,6 +308,11 @@ class ComtradeClient:
         return result
 
 
-def _handle_rate_limit(response: Union[pd.DataFrame, dict]):
+def _handle_rate_limit(response: Union[pd.DataFrame, dict, None]):
+    if response is None:
+        raise ComtradeRateLimitReached(
+            "No response received from Comtrade client. "
+            + "This usually indicates that the rate limit has been reached."
+        )
     if not isinstance(response, pd.DataFrame) and response["statusCode"] == 403:
         raise ComtradeRateLimitReached(response["message"])

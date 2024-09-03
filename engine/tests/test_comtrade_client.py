@@ -284,6 +284,20 @@ def test_ComtradeClient_get_data_availability__rate_limit_reached__throws_except
         client.get_data_availability(periods=default_periods)
 
 
+def test_ComtradeClient_get_data_availability__rate_limit_reached_none_response__throws_exception(
+    mocker,
+):
+    mocked_getFinalDataAvailability = mocker.patch(
+        "engines.comtrade_client.comtrade.getFinalDataAvailability"
+    )
+    mocked_getFinalDataAvailability.return_value = None
+
+    client = ComtradeClient(api_key="api_key")
+
+    with pytest.raises(ComtradeRateLimitReached):
+        client.get_data_availability(periods=default_periods)
+
+
 def test_ComtradeClient_get_monthly_trades_for_periods__called_with_correct_arguments(mocker):
     mocked_getFinalData = mocker.patch("engines.comtrade_client.comtrade.getFinalData")
     mocked_getFinalData.return_value = data__basic_response
