@@ -19,6 +19,8 @@ from base.models import (
 
 from .selector_base import build_filter_query, COMMODITY_SETTINGS
 
+_ADJUSTEMENT_RANGE = 15
+
 
 def select_ships_to_update_core_details(
     *,
@@ -202,17 +204,19 @@ def find_ships_by_commodity_that_need_updates(
     )
 
     # We do this to keep the distribution of updates more spread out.
-    three_months_ish = func.cast(concat(func.random() * 30 - 15, " DAYS"), INTERVAL)
+    random_adjustment = func.round(func.random() * _ADJUSTEMENT_RANGE * 2 - _ADJUSTEMENT_RANGE)
+    three_months_ish = func.cast(concat(30 * 3 + random_adjustment, " DAYS"), INTERVAL)
+    three_months_ago_ish = dt.datetime.now() - three_months_ish
 
     needs_update_ship_info = sa.or_(
         imo_query.c.last_updated_owner == None,
-        imo_query.c.last_updated_owner <= dt.date.today() - three_months_ish,
+        imo_query.c.last_updated_owner <= three_months_ago_ish,
     )
 
     needs_update_ship_flag = sa.or_(
         imo_query.c.flag_iso2 == None,
         imo_query.c.last_updated_flag == None,
-        imo_query.c.last_updated_flag <= dt.date.today() - three_months_ish,
+        imo_query.c.last_updated_flag <= three_months_ago_ish,
     )
 
     needs_update = sa.or_(
