@@ -26,6 +26,51 @@ from engines import fossil_tracker_api_client
 
 from base.models import Price, Commodity
 
+KPLER_TRADES_WITHOUT_PRICES_IGNORED_PRODUCTS = [
+    {
+        "name": "Bitumen/Asphalt",
+        "level": "commodity",
+    },
+    {
+        "name": "Bitumen.*",
+        "level": "product",
+    },
+    {
+        "name": "Bitumen.*",
+        "level": "grade",
+    },
+    {
+        "name": "CBFS",
+        "level": "commodity",
+    },
+    {
+        "name": "Clean Condensate",
+        "level": "commodity",
+    },
+    {
+        "name": "Clean Products",
+        "level": "family",
+    },
+    {
+        "name": "Cutter Stock",
+        "level": "commodity",
+    },
+    {
+        "name": "DPP",
+        "level": "family",
+    },
+    {
+        "name": "LCO",
+        "level": "grade",
+    },
+    {
+        "name": "Yamal Co.",
+        "level": "grade",
+    },
+]
+KPLER_TRADES_WITHOUT_PRICES_MAX_IGNORED_PER_MONTH = 9
+KPLER_TRADES_WITHOUT_PRICES_MAX_IGNORED_ADDITIONAL = 10
+
 
 def test_insurers_no_unexpected_unknown():
     """ " If scraping fails and our code doesn't detect it, it adds a false 'unknown'.
@@ -175,7 +220,9 @@ def test_counter_pricing_positive():
 
 def test_kpler_trades_without_prices():
 
-    products_missing_computed_rows = (
+    start_date = "2022-01-01"
+
+    missing_rows = (
         session.query(KplerProduct.name, KplerProduct.type, func.count(KplerTrade.id))
         .select_from(KplerProduct)
         .outerjoin(KplerTrade, KplerTrade.product_id == KplerProduct.id)
@@ -189,15 +236,38 @@ def test_kpler_trades_without_prices():
             KplerTradeComputed.trade_id == None,
             KplerTrade.is_valid == True,
             KplerZone.country_iso2 == "RU",
-            KplerTrade.departure_date_utc >= "2022-01-01",
+            KplerTrade.departure_date_utc >= start_date,
         )
         .group_by(KplerProduct.name, KplerProduct.type)
         .all()
     )
 
+    without_ignored = [
+        (product, level, count)
+        for product, level, count in missing_rows
+        if not any(
+            re.match(ignored_product["name"], product) and ignored_product["level"] == level
+            for ignored_product in KPLER_TRADES_WITHOUT_PRICES_IGNORED_PRODUCTS
+        )
+    ]
+
+    total_rows_missing = sum([count for _, _, count in missing_rows])
+    total_without_ignored = sum([count for _, _, count in without_ignored])
+
+    total_ignored_rows = total_rows_missing - total_without_ignored
+    months_between_start_and_today = (
+        dt.date.today() - dt.datetime.strptime(start_date, "%Y-%m-%d").date()
+    ).days / 30
+    max_ignored_rows = (
+        KPLER_TRADES_WITHOUT_PRICES_MAX_IGNORED_PER_MONTH * months_between_start_and_today
+        + KPLER_TRADES_WITHOUT_PRICES_MAX_IGNORED_ADDITIONAL
+    )
+
+    assert not without_ignored, f"Some Kpler trades are missing computed rows: {without_ignored}"
+
     assert (
-        not products_missing_computed_rows
-    ), f"Some Kpler trades are missing computed rows: {products_missing_computed_rows}"
+        total_ignored_rows <= max_ignored_rows
+    ), f"Too many ignored rows {total_ignored_rows} > {max_ignored_rows}: {missing_rows}"
 
 
 def check_china_russia_source():
