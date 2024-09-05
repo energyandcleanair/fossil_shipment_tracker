@@ -104,6 +104,10 @@ def test_kpler_trades(date_from=None, date_to=None, product=None, origin_iso2=No
 
 
 def compare_flows_to_trades(flows, aggregated_trades):
+
+    # Where flows.iso2 is missing a value, set it as "unknown"
+    flows["to_iso2"] = flows["to_iso2"].fillna("unknown")
+
     flows_and_aggregated_trades = pd.merge(
         left=flows,
         right=aggregated_trades,
@@ -142,7 +146,7 @@ def compare_flows_to_trades(flows, aggregated_trades):
     return comparison_per_month
 
 
-def get_flows_from_kpler(product, origin_iso2, date_from, date_to):
+def get_flows_from_kpler(product: KplerCheckerProducts, origin_iso2, date_from, date_to):
     df = scraper.get_flows(
         origin_iso2=origin_iso2,
         product=product.kpler_product,
