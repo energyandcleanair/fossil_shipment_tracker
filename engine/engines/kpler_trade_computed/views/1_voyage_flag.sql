@@ -22,7 +22,7 @@ WHERE
   kpler_trade.is_valid
   AND (
     ship_flag.first_seen IS NULL
-    OR ship_flag.first_seen < current_date
+    OR ship_flag.first_seen < kpler_trade.departure_date_utc
   )
 ORDER BY
   kpler_trade.id,
