@@ -1,5 +1,7 @@
 from engines import (
     commodity,
+    company,
+    comtrade,
     engine_r,
     counter,
     alert,
@@ -19,21 +21,28 @@ import datetime as dt
 
 def update():
     currency.update()
+    comtrade.update_comtrade_data(
+        sync_definitions=comtrade.create_sync_definitions_for_all(
+            start=dt.date(2020, 1, 1), end=dt.date.today()
+        )
+    )
+
     engine_r.update()
 
     commodity.fill()
     kpler_scraper.update_full()
     kpler_scraper.update(historic_date_from="2017-01-01", origin_iso2s=["ID"])
+    company.update()
     kpler_trade_computed.update()
 
     entsog.update(date_from=-21, nodata_error_date_from=-4)
-
-    alert.update()
 
     counter.update()
 
     backuper.update()
     integrity.check()
+
+    alert.update()
 
     return
 
