@@ -11,13 +11,13 @@ def update():
         last_result = company.update(
             max_updates=0,
             steps=[
-                company.ComtradeUpdateSteps.SHIP_INSPECTIONS,
-                company.ComtradeUpdateSteps.CLEAN_DATA,
+                company.EquasisUpdateSteps.SHIP_INSPECTIONS,
+                company.EquasisUpdateSteps.CLEAN_DATA,
             ],
             filter_departing_iso2s=["RU"],
             filter_minimum_departure_date=date(2022, 1, 1),
         )
-        if last_result == company.ComtradeUpdateStatus.EQUASIS_EXHAUSTED_FAILURE:
+        if last_result == company.EquasisUpdateStatus.EQUASIS_EXHAUSTED_FAILURE:
             seconds_in_min = 60
             minutes = 10
             time.sleep(seconds_in_min * minutes)

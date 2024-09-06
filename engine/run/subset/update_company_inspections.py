@@ -6,8 +6,8 @@ import base
 def update():
     company.update(
         steps=[
-            company.ComtradeUpdateSteps.SHIP_INSPECTIONS,
-            company.ComtradeUpdateSteps.CLEAN_DATA,
+            company.EquasisUpdateSteps.SHIP_INSPECTIONS,
+            company.EquasisUpdateSteps.CLEAN_DATA,
         ]
     )
     kpler_trade_computed.update()

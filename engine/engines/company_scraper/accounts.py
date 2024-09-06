@@ -7,6 +7,7 @@ import string
 import sys
 import tempfile
 from time import sleep
+from typing import Union
 import zipfile
 
 import requests
@@ -50,6 +51,26 @@ RECEIVER_EMAIL_POP_SECURE = RECEIVER_EMAIL_POP_SECURE.lower() == "true"
 AZCAPTCHA_API_KEY = config("AZCAPTCHA_API_KEY")
 
 
+class AzCaptchaSolverError(Exception):
+    pass
+
+
+class AzCaptchaSolverStartError(AzCaptchaSolverError):
+    pass
+
+
+class AzCaptchaSolverTimeoutError(AzCaptchaSolverError):
+    pass
+
+
+class AzCaptchaSolverUnexpectedError(AzCaptchaSolverError):
+    pass
+
+
+class AzCaptchaSolverInvalidSiteKeyError(AzCaptchaSolverError):
+    pass
+
+
 class AzCaptchaSolverClient:
     def __init__(
         self,
@@ -84,12 +105,14 @@ class AzCaptchaSolverClient:
         )
 
         if response.status_code != 200:
-            raise ValueError("Failed to send captcha to azcaptcha")
+            raise AzCaptchaSolverStartError("Failed to send captcha to azcaptcha")
 
         result = response.json()
 
         if result["status"] != 1:
-            raise ValueError(f"Failed to send captcha to azcaptcha: {result['request']}")
+            raise AzCaptchaSolverStartError(
+                f"Failed to send captcha to azcaptcha: {result['request']}"
+            )
 
         return result["request"]
 
@@ -110,14 +133,19 @@ class AzCaptchaSolverClient:
             seconds_elapsed = (datetime.now() - start_time).seconds
             # If we have been waiting too long, give up and raise an error.
             if seconds_elapsed > self.timeout_seconds:
-                raise TimeoutError(
+                raise AzCaptchaSolverTimeoutError(
                     f"Failed to solve captcha in {self.timeout_seconds} seconds and {check_attempts} checks"
                 )
 
-            # If the solver returned an error, raise an error.
+            response_error = response_data["request"]
+            if response_error == "ERROR_INVALID_SITEKEY":
+                raise AzCaptchaSolverInvalidSiteKeyError(
+                    f"Failed to solve captcha: {response_error}"
+                )
+
+            # If the solver returned any other error, except not ready, raise an error.
             if response_data["request"] != "CAPCHA_NOT_READY":
-                response_error = response_data["request"]
-                raise ValueError(f"Failed to solve captcha: {response_error}")
+                raise AzCaptchaSolverUnexpectedError(f"Failed to solve captcha: {response_error}")
 
             # Otherwise, wait and try again
             check_attempts += 1
@@ -563,6 +591,32 @@ class EquasisAccountCreator:
             self.email_alias_manager.delete_email(alias)
 
 
+class EquasisAccountCreatorError(Exception):
+    pass
+
+
+class EquasisAccountCreatorErrorHandler:
+    def __init__(self):
+        self._error_history: list[Union[Exception, None]] = []
+
+    def register_success(self):
+        self._error_history.append(None)
+
+    def handle_error(self, error: Exception):
+        self._error_history.append(error)
+
+        last_three_errors = self._error_history[-3:]
+
+        count_of_site_key_errors = len(
+            [e for e in last_three_errors if isinstance(e, AzCaptchaSolverInvalidSiteKeyError)]
+        )
+        total_count_of_successes = len([e for e in self._error_history if e is None])
+        if count_of_site_key_errors >= 3 and total_count_of_successes == 0:
+            raise EquasisAccountCreatorError(
+                "Failed to create account due to too many Captcha INVALID_SITEKEY errors without any successes."
+            )
+
+
 def default_from_env_generator(n_accounts: int) -> list[EquasisAccount]:
 
     equasis_driver = EquasisWebsiteAccountDriver.create()
@@ -581,18 +635,24 @@ def default_from_env_generator(n_accounts: int) -> list[EquasisAccount]:
 
     max_tries = 3
 
+    # We keep track of the last 3 errors to detect if we are failing to create accounts due to
+    # an error that can't be worked around.
+    error_handler = EquasisAccountCreatorErrorHandler()
+
     for _ in range(n_accounts):
         for attempt in range(max_tries):
             try:
                 account = account_creator.create_account()
                 accounts.append(account)
+                error_handler.register_success()
                 break
-            except Exception:
+            except Exception as e:
                 logger.info(
                     f"Failed to create account: attempt {attempt+1}/{max_tries}",
                     stack_info=True,
                     exc_info=True,
                 )
+                error_handler.handle_error(e)
                 pass
 
     equasis_driver.close()

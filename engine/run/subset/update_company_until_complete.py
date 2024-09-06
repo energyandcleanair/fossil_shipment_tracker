@@ -8,7 +8,7 @@ import base
 def update():
     while True:
         last_result = company.update(max_updates=0)
-        if last_result == company.ComtradeUpdateStatus.EQUASIS_EXHAUSTED_FAILURE:
+        if last_result == company.EquasisUpdateStatus.EQUASIS_EXHAUSTED_FAILURE:
             seconds_in_min = 60
             minutes = 10
             time.sleep(seconds_in_min * minutes)
