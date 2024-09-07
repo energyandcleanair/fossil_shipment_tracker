@@ -208,15 +208,6 @@ class KplerTradeComputed(Base):
     avg_deficiencies_per_inspection_2y = Column(Numeric)
     avg_n_detentions_2y = Column(Numeric)
 
-    __table_args__ = (
-        Index(
-            "kpler_trade_computed_ownership_sanction_coverage_idx", "ownership_sanction_coverage"
-        ),
-        Index("kpler_trade_computed_pricing_scenario_idx", "pricing_scenario"),
-        Index("kpler_trade_computed_pricing_commodity_idx", "pricing_commodity"),
-        Index("kpler_trade_computed_kpler_product_commodity_id_idx", "kpler_product_commodity_id"),
-    )
-
     __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED
 
 
@@ -252,15 +243,17 @@ class KplerTradeComputedShips(Base):
     deficiencies_per_inspection_2y = Column(Numeric)
     n_detentions_2y = Column(Numeric)
 
-    __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS
+    start_sts_zone_id = Column(BigInteger)
+    start_sts_zone_name = Column(String)
+    start_sts_iso2 = Column(String)
+    start_sts_region = Column(String)
 
-    __table_args__ = (
-        Index("kpler_trade_computed_ships_trade_id_idx", "trade_id"),
-        Index("kpler_trade_computed_ships_flow_id_idx", "flow_id"),
-        Index("kpler_trade_computed_ships_product_id_idx", "product_id"),
-        Index("kpler_trade_computed_ships_pricing_scenario_idx", "pricing_scenario"),
-        Index("kpler_trade_computed_ships_vessel_imo_idx", "vessel_imo"),
-    )
+    end_sts_zone_id = Column(BigInteger)
+    end_sts_zone_name = Column(String)
+    end_sts_iso2 = Column(String)
+    end_sts_region = Column(String)
+
+    __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS
 
 
 class KplerTradeFlow(Base):

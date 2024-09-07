@@ -1,4 +1,4 @@
-CREATE MATERIALIZED VIEW ktc_kpler_commodity AS
+CREATE MATERIALIZED VIEW ktc_kpler_commodity_temp AS
 SELECT
   kpler_product.id AS product_id,
   'kpler_' || replace(
@@ -18,8 +18,8 @@ SELECT
 FROM
   kpler_product;
 
-CREATE INDEX ON ktc_kpler_commodity (product_id);
+CREATE INDEX ON ktc_kpler_commodity_temp (product_id);
 
-CREATE INDEX ON ktc_kpler_commodity (commodity_id);
+CREATE INDEX ON ktc_kpler_commodity_temp (commodity_id);
 
-ANALYZE ktc_kpler_commodity;
+ANALYZE ktc_kpler_commodity_temp;

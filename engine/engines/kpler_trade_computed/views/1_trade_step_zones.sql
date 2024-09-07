@@ -1,4 +1,4 @@
-CREATE MATERIALIZED VIEW ktc_trade_step_zones AS
+CREATE MATERIALIZED VIEW ktc_trade_step_zones_temp AS
 SELECT
   kpler_trade.id AS trade_id,
   kpler_trade.flow_id AS flow_id,
@@ -31,8 +31,8 @@ ORDER BY
   kpler_trade.id,
   kpler_trade.flow_id;
 
-CREATE INDEX ON ktc_trade_step_zones (trade_id);
+CREATE INDEX ON ktc_trade_step_zones_temp (trade_id);
 
-CREATE INDEX ON ktc_trade_step_zones (flow_id);
+CREATE INDEX ON ktc_trade_step_zones_temp (flow_id);
 
-ANALYZE ktc_trade_step_zones;
+ANALYZE ktc_trade_step_zones_temp;

@@ -1,7 +1,11 @@
 from enum import Enum
 import logging
+from typing import Iterable
 import warnings
 import numpy as np
+import psycopg2
+import sqlalchemy
+import sqlalchemy.exc
 from tqdm import tqdm
 import pandas as pd
 import datetime as dt
@@ -13,6 +17,7 @@ from sqlalchemy import (
     Integer,
 )
 from sqlalchemy.dialects.postgresql import array, ARRAY
+from sqlalchemy.schema import DropConstraint, AddConstraint
 import sqlalchemy as sa
 from sqlalchemy import func
 
@@ -34,61 +39,47 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 import os
 
 
-class KplerTradeComputedUpdateSteps(Enum):
-    RECREATE_PRECOMPUTATION_TABLES = "RECRAETE_PRECOMPUTATION_TABLES"
-    RELOAD_DATA = "RELOAD_DATA"
-
-
-def update(
-    steps=[
-        KplerTradeComputedUpdateSteps.RECREATE_PRECOMPUTATION_TABLES,
-        KplerTradeComputedUpdateSteps.RELOAD_DATA,
-    ]
-):
+def update():
     logger_slack.info("=== Updating kpler computed table ===")
 
-    if KplerTradeComputedUpdateSteps.RECREATE_PRECOMPUTATION_TABLES in steps:
-        recreate_precomputation_tables()
+    with session.begin_nested():
+        create_new_temp_computation_tables()
+        drop_old_ktc_tables()
+        switch_temp_to_actual()
         check_precomputation_tables()
-
-    if KplerTradeComputedUpdateSteps.RELOAD_DATA in steps:
-        try:
-            logger.info(f"Starting transaction for updating kpler computed table")
-            with session.begin_nested():
-                logger.info(f"Deleting all entries from {KplerTradeComputed.__tablename__}")
-                session.execute(delete(KplerTradeComputed))
-                logger.info(f"Deleting all entries from {KplerTradeComputedShips.__tablename__}")
-                session.execute(delete(KplerTradeComputedShips))
-
-                logger.info(f"Copying all entries to tables")
-                update_kpler_trade_computed_table_from_view()
-
-                check_invalid_trade_computed()
-
-            logger.info(f"Committing transaction for updating kpler computed table")
-            session.commit()
-
-        except Exception as e:
-            logger_slack.error(
-                f"Updating kpler computed table failed",
-                stack_info=True,
-                exc_info=True,
-            )
+        check_invalid_trade_computed()
 
 
-def recreate_precomputation_tables():
+def drop_old_ktc_tables():
+    tables = get_actual_existing_ktc_names()
+    for table in tables:
+        logger.info(f"Dropping {table}")
+        session.execute(f"DROP MATERIALIZED VIEW IF EXISTS {table} CASCADE")
+
+
+def switch_temp_to_actual():
+    temp_tables = get_temp_existing_ktc_names()
+    for table in temp_tables:
+        new_table_name = table.replace("_temp", "")
+        logger.info(f"Renaming {table} to {new_table_name}")
+        session.execute(f"ALTER MATERIALIZED VIEW {table} RENAME TO {new_table_name}")
+
+
+def create_new_temp_computation_tables():
     logger.info("Updating precomputation tables")
 
-    delete_ktc_views()
-
     for sql, id in get_all_view_creation_sql():
+        start_time = dt.datetime.now()
         logger.info(f"Running {id}")
         session.execute(sql)
+        end_time = dt.datetime.now()
+        execution_time_seconds = (end_time - start_time).total_seconds()
+        logger.info(f"View {id} took {execution_time_seconds}")
     logger.info("Precomputation tables updated")
 
 
 def check_precomputation_tables():
-    tables = get_existing_ktc_view_names()
+    tables = get_actual_existing_ktc_names()
     assert len(tables) > 0, "No precomputation tables created"
 
     for table in tables:
@@ -96,17 +87,49 @@ def check_precomputation_tables():
         count = session.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
         assert count > 0, f"Table {table} is empty"
 
+    # Check for duplicates in the ktc_kpler_trade_computed table
+    trade_duplicates = session.execute(
+        """
+        WITH duplicate_rows AS (
+            SELECT trade_id, product_id, flow_id, pricing_scenario, count(*)
+            FROM ktc_kpler_trade_computed
+            GROUP BY trade_id, product_id, flow_id, pricing_scenario
+            HAVING count(*) > 1
+        )
+        SELECT count(*) FROM duplicate_rows
+        """
+    ).fetchone()[0]
 
-def update_kpler_trade_computed_table_from_view():
-    logger.info("Updating kpler_trade_computed table")
-    session.execute(build_final_update_sql())
+    assert trade_duplicates == 0, f"Found {trade_duplicates} duplicates in ktc_kpler_trade_computed"
 
+    ships_duplicates = session.execute(
+        """
+        WITH duplicate_rows AS (
+            SELECT
+                trade_id,
+                flow_id,
+                product_id,
+                pricing_scenario,
+                vessel_imo,
+                step_in_trade,
+                count(*)
+            FROM ktc_kpler_trade_computed_ships
+            GROUP BY
+                trade_id,
+                flow_id,
+                product_id,
+                pricing_scenario,
+                vessel_imo,
+                step_in_trade
+            HAVING count(*) > 1
+        )
+        SELECT count(*) FROM duplicate_rows
+        """
+    ).fetchone()[0]
 
-def delete_ktc_views():
-    view_names = get_existing_ktc_view_names()
-    for view_name in view_names:
-        logger.info(f"Dropping {view_name}")
-        session.execute(f"DROP MATERIALIZED VIEW IF EXISTS {view_name} CASCADE")
+    assert (
+        ships_duplicates == 0
+    ), f"Found {ships_duplicates} duplicates in ktc_kpler_trade_computed_ships"
 
 
 def check_invalid_trade_computed():
@@ -167,7 +190,7 @@ def check_invalid_trade_computed():
         raise Exception(f"Computed trades without pricing found:\n{missing_trades}")
 
 
-def get_existing_ktc_view_names():
+def get_actual_existing_ktc_names():
     names = session.execute(
         """
 select matviewname as view_name
@@ -176,45 +199,24 @@ order by view_name;
         """
     )
 
-    return [name[0] for name in names if name[0].startswith("ktc_")]
+    return [
+        name[0] for name in names if name[0].startswith("ktc_") and not name[0].endswith("_temp")
+    ]
 
 
-def build_final_update_sql():
-    column_names_ktc = [col.name for col in KplerTradeComputed.__table__.columns]
-    column_names_ktc_csv = ", ".join(column_names_ktc)
-    sql_for_ktc = f"""
-    INSERT INTO kpler_trade_computed
-    ({column_names_ktc_csv})
-    SELECT
-    {column_names_ktc_csv}
-    FROM ktc_kpler_trade_computed;
-    """
+def get_temp_existing_ktc_names():
+    names = session.execute(
+        """
+select matviewname as view_name
+from pg_matviews
+order by view_name;
+        """
+    )
 
-    column_names_ktc_ships = [col.name for col in KplerTradeComputedShips.__table__.columns]
-    column_names_ktc_ships_csv = ", ".join(column_names_ktc_ships)
-    sql_for_ktc_ships = f"""
-    INSERT INTO kpler_trade_computed_ships
-    ({column_names_ktc_ships_csv})
-    SELECT
-    {column_names_ktc_ships_csv}
-    FROM ktc_kpler_trade_computed_ships;
-    """
-
-    analyse_steps = """
-    ANALYZE kpler_trade_computed;
-    ANALYZE kpler_trade_computed_ships;
-    """
-
-    full_query = f"""
-    {sql_for_ktc}
-    {sql_for_ktc_ships}
-    {analyse_steps}
-    """
-
-    return full_query
+    return [name[0] for name in names if name[0].startswith("ktc_") and name[0].endswith("_temp")]
 
 
-def get_all_view_creation_sql():
+def get_all_view_creation_sql() -> Iterable[tuple[str, str]]:
     current_dir = os.path.dirname(os.path.realpath(__file__))
     views_dir = f"{current_dir}/kpler_trade_computed/views/"
     files = list(os.listdir(views_dir))

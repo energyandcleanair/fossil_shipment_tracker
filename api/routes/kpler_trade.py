@@ -608,6 +608,28 @@ class KplerTradeResource(TemplateResource):
                     subquery.c.ship_owner_region,
                 ],
                 "crea_designation": [subquery.c.crea_designation],
+                "start_sts_zone": [
+                    subquery.c.start_sts_zone_id,
+                    subquery.c.start_sts_zone_name,
+                    subquery.c.start_sts_iso2,
+                    subquery.c.start_sts_region,
+                ],
+                "end_sts_zone": [
+                    subquery.c.end_sts_zone_id,
+                    subquery.c.end_sts_zone_name,
+                    subquery.c.end_sts_iso2,
+                    subquery.c.end_sts_region,
+                ],
+                "start_sts_country": [
+                    subquery.c.start_sts_iso2,
+                    subquery.c.start_sts_region,
+                ],
+                "end_sts_country": [
+                    subquery.c.end_sts_iso2,
+                    subquery.c.end_sts_region,
+                ],
+                "start_sts_region": [subquery.c.start_sts_region],
+                "end_sts_region": [subquery.c.end_sts_region],
             }
         )
 
