@@ -1,4 +1,4 @@
-CREATE MATERIALIZED VIEW ktc_kpler_trade_computed_ships_temp AS WITH unnested_ktc_kpler_trade_computed_temp AS (
+CREATE MATERIALIZED VIEW ktc_kpler_trade_computed_ships_temp AS WITH unnested_ktc_kpler_trade_computed AS (
     SELECT
         ktc_kpler_trade_computed_temp.trade_id,
         ktc_kpler_trade_computed_temp.flow_id,
@@ -67,7 +67,7 @@ CREATE MATERIALIZED VIEW ktc_kpler_trade_computed_ships_temp AS WITH unnested_kt
         )
 )
 SELECT
-    unnested_ktc_kpler_trade_computed_temp.*,
+    unnested_ktc_kpler_trade_computed.*,
     ktc_voyage_sts_temp.start_sts_zone_id,
     ktc_voyage_sts_temp.start_sts_zone_name,
     ktc_voyage_sts_temp.start_sts_iso2,
@@ -77,11 +77,11 @@ SELECT
     ktc_voyage_sts_temp.end_sts_iso2,
     ktc_voyage_sts_temp.end_sts_region
 FROM
-    unnested_ktc_kpler_trade_computed_temp
-    LEFT OUTER JOIN ktc_voyage_sts_temp ON unnested_ktc_kpler_trade_computed_temp.trade_id = ktc_voyage_sts_temp.trade_id
-    AND unnested_ktc_kpler_trade_computed_temp.flow_id = ktc_voyage_sts_temp.flow_id
-    AND unnested_ktc_kpler_trade_computed_temp.vessel_imo = ktc_voyage_sts_temp.ship_imo
-    AND unnested_ktc_kpler_trade_computed_temp.step_in_trade = ktc_voyage_sts_temp.ship_order;
+    unnested_ktc_kpler_trade_computed
+    LEFT OUTER JOIN ktc_voyage_sts_temp ON unnested_ktc_kpler_trade_computed.trade_id = ktc_voyage_sts_temp.trade_id
+    AND unnested_ktc_kpler_trade_computed.flow_id = ktc_voyage_sts_temp.flow_id
+    AND unnested_ktc_kpler_trade_computed.vessel_imo = ktc_voyage_sts_temp.ship_imo
+    AND unnested_ktc_kpler_trade_computed.step_in_trade = ktc_voyage_sts_temp.ship_order;
 
 CREATE INDEX ON ktc_kpler_trade_computed_ships_temp (trade_id);
 

@@ -42,12 +42,24 @@ import os
 def update():
     logger_slack.info("=== Updating kpler computed table ===")
 
-    with session.begin_nested():
+    with session.begin_nested() as savepoint:
+        drop_old_ktc_temp_tables()
         create_new_temp_computation_tables()
         drop_old_ktc_tables()
         switch_temp_to_actual()
         check_precomputation_tables()
         check_invalid_trade_computed()
+
+        savepoint.commit()
+
+    session.commit()
+
+
+def drop_old_ktc_temp_tables():
+    tables = get_temp_existing_ktc_names()
+    for table in tables:
+        logger.info(f"Dropping {table}")
+        session.execute(f"DROP MATERIALIZED VIEW IF EXISTS {table} CASCADE")
 
 
 def drop_old_ktc_tables():
@@ -62,7 +74,7 @@ def switch_temp_to_actual():
     for table in temp_tables:
         new_table_name = table.replace("_temp", "")
         logger.info(f"Renaming {table} to {new_table_name}")
-        session.execute(f"ALTER MATERIALIZED VIEW {table} RENAME TO {new_table_name}")
+        result = session.execute(f"ALTER MATERIALIZED VIEW {table} RENAME TO {new_table_name}")
 
 
 def create_new_temp_computation_tables():
