@@ -84,7 +84,7 @@ def update(
 
     try:
         if EquasisUpdateSteps.SHIP_INFO in steps:
-            result = update_info_from_equasis(
+            result: EquasisStepSyncResults = update_info_from_equasis(
                 force_unknown=force_unknown,
                 max_updates=math.floor(max_updates / 2),
                 filter_departing_iso2s=filter_departing_iso2s,
@@ -92,26 +92,26 @@ def update(
             )
 
             if result.status == EquasisStepCompletionStatus.EQUASIS_EXHAUSTED_FAILURE:
-                logger.warn(str(result))
+                logger_slack.warn(str(result))
                 return EquasisUpdateStatus.EQUASIS_EXHAUSTED_FAILURE
             else:
-                logger.info(str(result))
+                logger_slack.info(str(result))
 
         if refresh_accounts_between_steps:
             clear_global_equasis_client()
 
         if EquasisUpdateSteps.SHIP_INSPECTIONS in steps:
-            result = update_ships_inspections_from_equasis(
+            result: EquasisStepSyncResults = update_ships_inspections_from_equasis(
                 max_updates=math.floor(max_updates / 2),
                 filter_departing_iso2s=filter_departing_iso2s,
                 filter_minimum_departure_date=filter_minimum_departure_date,
             )
 
             if result.status == EquasisStepCompletionStatus.EQUASIS_EXHAUSTED_FAILURE:
-                logger.warn(str(result))
+                logger_slack.warn(str(result))
                 return EquasisUpdateStatus.EQUASIS_EXHAUSTED_FAILURE
             else:
-                logger.info(str(result))
+                logger_slack.info(str(result))
 
         if EquasisUpdateSteps.CLEAN_DATA in steps:
             clean_ship_details()
@@ -145,7 +145,7 @@ class EquasisStepSyncResults:
         self.status = status
 
     def __str__(self):
-        return f"Completed sync with status {self.status}: checked {self.n_checked}, updated {self.n_updated}, max updates {self.max_updates}"
+        return f"Sync ended with status {self.status}: checked {self.n_checked}, updated {self.n_updated}, max updates {self.max_updates}"
 
 
 def update_ships_inspections_from_equasis(

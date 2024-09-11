@@ -55,19 +55,27 @@ class AzCaptchaSolverError(Exception):
     pass
 
 
-class AzCaptchaSolverStartError(AzCaptchaSolverError):
+class SolverStartError(AzCaptchaSolverError):
     pass
 
 
-class AzCaptchaSolverTimeoutError(AzCaptchaSolverError):
+class SolverTimeoutError(AzCaptchaSolverError):
     pass
 
 
-class AzCaptchaSolverUnexpectedError(AzCaptchaSolverError):
+class SolverUnexpectedError(AzCaptchaSolverError):
     pass
 
 
-class AzCaptchaSolverInvalidSiteKeyError(AzCaptchaSolverError):
+class SolutionError(AzCaptchaSolverError):
+    pass
+
+
+class InvalidSiteKeyError(SolutionError):
+    pass
+
+
+class UnsolvableError(SolutionError):
     pass
 
 
@@ -105,14 +113,12 @@ class AzCaptchaSolverClient:
         )
 
         if response.status_code != 200:
-            raise AzCaptchaSolverStartError("Failed to send captcha to azcaptcha")
+            raise SolverStartError("Failed to send captcha to azcaptcha")
 
         result = response.json()
 
         if result["status"] != 1:
-            raise AzCaptchaSolverStartError(
-                f"Failed to send captcha to azcaptcha: {result['request']}"
-            )
+            raise SolverStartError(f"Failed to send captcha to azcaptcha: {result['request']}")
 
         return result["request"]
 
@@ -133,19 +139,20 @@ class AzCaptchaSolverClient:
             seconds_elapsed = (datetime.now() - start_time).seconds
             # If we have been waiting too long, give up and raise an error.
             if seconds_elapsed > self.timeout_seconds:
-                raise AzCaptchaSolverTimeoutError(
+                raise SolverTimeoutError(
                     f"Failed to solve captcha in {self.timeout_seconds} seconds and {check_attempts} checks"
                 )
 
             response_error = response_data["request"]
             if response_error == "ERROR_INVALID_SITEKEY":
-                raise AzCaptchaSolverInvalidSiteKeyError(
-                    f"Failed to solve captcha: {response_error}"
-                )
+                raise InvalidSiteKeyError(f"Failed to solve captcha: {response_error}")
+
+            if response_error == "ERROR_CAPTCHA_UNSOLVABLE":
+                raise UnsolvableError(f"Failed to solve captcha: {response_error}")
 
             # If the solver returned any other error, except not ready, raise an error.
             if response_data["request"] != "CAPCHA_NOT_READY":
-                raise AzCaptchaSolverUnexpectedError(f"Failed to solve captcha: {response_error}")
+                raise SolverUnexpectedError(f"Failed to solve captcha: {response_error}")
 
             # Otherwise, wait and try again
             check_attempts += 1
@@ -607,13 +614,14 @@ class EquasisAccountCreatorErrorHandler:
 
         last_three_errors = self._error_history[-3:]
 
-        count_of_site_key_errors = len(
-            [e for e in last_three_errors if isinstance(e, AzCaptchaSolverInvalidSiteKeyError)]
+        count_of_solution_errors = len(
+            [e for e in last_three_errors if isinstance(e, SolutionError)]
         )
         total_count_of_successes = len([e for e in self._error_history if e is None])
-        if count_of_site_key_errors >= 3 and total_count_of_successes == 0:
+
+        if count_of_solution_errors >= 3 and total_count_of_successes == 0:
             raise EquasisAccountCreatorError(
-                "Failed to create account due to too many Captcha INVALID_SITEKEY errors without any successes."
+                "Failed to create account due to too many solution errors without success."
             )
 
 
