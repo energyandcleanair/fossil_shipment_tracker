@@ -2,10 +2,10 @@ from .mock_db_module import *
 
 from datetime import date
 from unittest.mock import MagicMock
-from engines.company_scraper.equasis import (
-    Equasis,
+from engines.company_scraper import (
+    EquasisClient,
     EquasisSession,
-    EquasisSessionPool,
+    EquasisFixedInitialisationSessionPool,
     EquasisSessionUnavailable,
 )
 import pytest
@@ -249,7 +249,7 @@ def test_EquasisSessionPool__make_request__all_sessions_unavailable():
         MockSessionPool("test2", mock_session_function_error),
     ]
 
-    session_pool = EquasisSessionPool(sessions)
+    session_pool = EquasisFixedInitialisationSessionPool(sessions)
 
     with pytest.raises(Exception) as exception:
         session_pool.make_request(example_url, {})
@@ -267,7 +267,7 @@ def test_EquasisSessionPool__make_request__sessions_return_value_use_first():
         MockSessionPool("test2", create_mock_session_response("test2 response")),
     ]
 
-    session_pool = EquasisSessionPool(sessions)
+    session_pool = EquasisFixedInitialisationSessionPool(sessions)
 
     response = session_pool.make_request(example_url, {})
     assert response == "test1 response"
@@ -283,7 +283,7 @@ def test_EquasisSessionPool__make_request__sessions_only_2nd_one_works():
         MockSessionPool("test2", create_mock_session_response("test2 response")),
     ]
 
-    session_pool = EquasisSessionPool(sessions)
+    session_pool = EquasisFixedInitialisationSessionPool(sessions)
 
     response = session_pool.make_request(example_url, {})
     assert response == "test2 response"
@@ -299,7 +299,7 @@ def test_EquasisSessionPool__make_request__can_use_more_sessions_more_than_once(
         MockSessionPool("test2", create_mock_session_response("test2 response")),
     ]
 
-    session_pool = EquasisSessionPool(sessions)
+    session_pool = EquasisFixedInitialisationSessionPool(sessions)
 
     response = session_pool.make_request(example_url, {})
     assert response == "test2 response"
@@ -314,7 +314,7 @@ def test_Equasis__get_ship_infos__has_ship_infos(ship_details_body):
 
     mocked_pool.make_request.return_value = ship_details_body
 
-    equasis = Equasis(session_pool=mocked_pool)
+    equasis = EquasisClient(session_manager=mocked_pool)
 
     actual = equasis.get_ship_infos("example_imo")
 
@@ -352,7 +352,7 @@ def test_Equasis__get_inspections__has_inspection_details(
 
     mocked_pool = MagicMock()
     mocked_pool.make_request.return_value = ship_inspection_body
-    equasis = Equasis(session_pool=mocked_pool)
+    equasis = EquasisClient(session_manager=mocked_pool)
 
     actual = equasis.get_inspections("example_imo")
 
@@ -374,7 +374,7 @@ def test_Equasis__get_inspections__has_inspection_details_multiple_entries_per_r
 
     mocked_pool = MagicMock()
     mocked_pool.make_request.return_value = ship_inspection_multiple_entries_per_row
-    equasis = Equasis(session_pool=mocked_pool)
+    equasis = EquasisClient(session_manager=mocked_pool)
 
     actual = equasis.get_inspections("example_imo")
 

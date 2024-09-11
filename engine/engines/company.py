@@ -7,16 +7,16 @@ from typing import Optional
 from tqdm import tqdm
 from base.env import get_env
 from base.logger import logger, logger_slack
-from engines.company_scraper import Equasis
+from engines.company_scraper import EquasisClient
 
 import warnings
 from tqdm.contrib.logging import logging_redirect_tqdm
 import logging
 
 
-from engines.company_scraper.accounts import EquasisAccountCreatorError
-from engines.company_scraper.equasis import EquasisSessionPool, EquasisSessionPoolExhausted
+from engines.company_scraper import OnDemandEquasisSessionManager, EquasisSessionPoolExhausted
 
+from engines.company_scraper.accounts import EquasisAccountCreatorError
 from engines.ship_details_datasource import (
     select_ships_to_update_inspections,
     select_ships_to_update_core_details,
@@ -27,23 +27,20 @@ from engines.ship_details_datasource import (
 
 DEFAULT_UPDATE_LIMIT: int = int(get_env("EQUASIS_UPDATE_LIMIT", 1000))
 
-global_equasis_client: Equasis | None = None
+global_equasis_client: EquasisClient | None = None
 
 
 # We're using a singleton pattern here:
 # - We want a single Equasis client per application as it's expensive to generate.
 # - We do not want to create the client when this python file is imported because the client might
 #   not be used.
-def get_global_equasis_client() -> Equasis:
+def get_global_equasis_client() -> EquasisClient:
     global global_equasis_client
     if global_equasis_client is None:
-        global_equasis_client = Equasis(session_pool=EquasisSessionPool.with_account_generator())
+        global_equasis_client = EquasisClient(
+            session_manager=OnDemandEquasisSessionManager.with_account_generator()
+        )
     return global_equasis_client
-
-
-def clear_global_equasis_client():
-    global global_equasis_client
-    global_equasis_client = None
 
 
 class EquasisUpdateStatus(Enum):
@@ -70,7 +67,6 @@ def update(
     steps: list[EquasisUpdateSteps] = [step for step in EquasisUpdateSteps],
     filter_departing_iso2s: Optional[list[str]] = None,
     filter_minimum_departure_date: Optional[date] = None,
-    refresh_accounts_between_steps: bool = True,
 ) -> EquasisUpdateStatus:
     """
     This function updates the company information in the database from Equasis and insurers.
@@ -96,9 +92,6 @@ def update(
                 return EquasisUpdateStatus.EQUASIS_EXHAUSTED_FAILURE
             else:
                 logger_slack.info(str(result))
-
-        if refresh_accounts_between_steps:
-            clear_global_equasis_client()
 
         if EquasisUpdateSteps.SHIP_INSPECTIONS in steps:
             result: EquasisStepSyncResults = update_ships_inspections_from_equasis(
