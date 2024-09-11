@@ -163,6 +163,7 @@ class KplerTrade(Base):
     __tablename__ = DB_TABLE_KPLER_TRADE
 
 
+# This is a (materialised) view, not a table.
 class KplerTradeComputed(Base):
     trade_id = Column(
         ForeignKey(DB_TABLE_KPLER_TRADE + ".id"),
@@ -211,6 +212,7 @@ class KplerTradeComputed(Base):
     __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED
 
 
+# This is a (materialised) view, not a table.
 class KplerTradeComputedShips(Base):
     trade_id = Column(BigInteger, primary_key=True)
     flow_id = Column(BigInteger, primary_key=True)
@@ -246,11 +248,13 @@ class KplerTradeComputedShips(Base):
     start_sts_zone_id = Column(BigInteger)
     start_sts_zone_name = Column(String)
     start_sts_iso2 = Column(String)
+    start_sts_country = Column(String)
     start_sts_region = Column(String)
 
     end_sts_zone_id = Column(BigInteger)
     end_sts_zone_name = Column(String)
     end_sts_iso2 = Column(String)
+    end_sts_country = Column(String)
     end_sts_region = Column(String)
 
     __tablename__ = DB_TABLE_KPLER_TRADE_COMPUTED_SHIPS

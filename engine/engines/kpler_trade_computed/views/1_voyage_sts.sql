@@ -37,10 +37,12 @@ SELECT
   start_sts_zone_id AS start_sts_zone_id,
   start_sts_zone.name AS start_sts_zone_name,
   start_sts_zone.country_iso2 AS start_sts_iso2,
+  start_sts_country.name AS start_sts_country,
   start_sts_country.region AS start_sts_region,
   end_sts_zone_id AS end_sts_zone_id,
   end_sts_zone.name AS end_sts_zone_name,
   end_sts_zone.country_iso2 AS end_sts_iso2,
+  end_sts_country.name AS end_sts_country,
   end_sts_country.region AS end_sts_region
 FROM
   voyage_sts_zones

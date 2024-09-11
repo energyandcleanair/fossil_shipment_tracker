@@ -13,9 +13,6 @@ import datetime as dt
 def update():
     kpler_trade_computed.update()
 
-    counter.update()
-    integrity.check()
-
     return
 
 

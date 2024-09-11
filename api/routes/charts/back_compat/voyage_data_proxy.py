@@ -35,7 +35,7 @@ def get_kpler_name(name):
     return name
 
 
-def get_voyages(params, use_kpler=False):
+def get_voyages(params, use_kpler=None):
     return get_voyages_kpler(params)
 
 
@@ -63,7 +63,8 @@ def get_voyages_kpler(params):
     if params_kpler["select"]:
         params_kpler["select"] = [get_kpler_name(col) for col in params_kpler["select"]]
 
-    params_kpler["nest_ships"] = True
+    if params["nest_ships"] is None:
+        params_kpler["nest_ships"] = True
 
     response = KplerTradeResource().get_from_params(params_kpler)
     if response.status_code != 200:

@@ -71,10 +71,12 @@ SELECT
     ktc_voyage_sts_temp.start_sts_zone_id,
     ktc_voyage_sts_temp.start_sts_zone_name,
     ktc_voyage_sts_temp.start_sts_iso2,
+    ktc_voyage_sts_temp.start_sts_country,
     ktc_voyage_sts_temp.start_sts_region,
     ktc_voyage_sts_temp.end_sts_zone_id,
     ktc_voyage_sts_temp.end_sts_zone_name,
     ktc_voyage_sts_temp.end_sts_iso2,
+    ktc_voyage_sts_temp.end_sts_country,
     ktc_voyage_sts_temp.end_sts_region
 FROM
     unnested_ktc_kpler_trade_computed
