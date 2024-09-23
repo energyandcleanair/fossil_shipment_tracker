@@ -28,34 +28,50 @@ class OnDemandEquasisSessionManager(EquasisSessionManager):
     def with_account_generator(
         generator: Callable[[], EquasisAccount] = default_single_account_from_env_generator,
     ):
-        return OnDemandEquasisSessionManager(generator)
+        return OnDemandEquasisSessionManager(account_generator=generator)
 
-    def __init__(self, account_generator: Callable[[], EquasisAccount]):
+    def __init__(
+        self,
+        *,
+        account_generator: Callable[[], EquasisAccount],
+        session_factory: Callable[
+            [EquasisAccount], EquasisSession
+        ] = lambda account: EquasisSession(account.username, account.password),
+    ):
         self.account_generator = account_generator
         self.session: Union[EquasisSession, None] = None
+        self.session_factory = session_factory
 
     def make_request(self, url, data):
 
         if self.session is None:
             self._move_to_next_session()
 
-        try:
-            return self.session.make_request(url, data)
-        except EquasisSessionUnavailable as e:
-            logger.info(
-                f"Equasis session {self.session.username} unavailable, moving to next.",
-                exc_info=True,
-                stack_info=True,
-            )
-            # This will throw an error if it can't create a new session.
-            self._move_to_next_session()
-        except e:
-            logger.info("Equasis session had an error.", exc_info=True, stack_info=True)
+        max_new_account_tries = 3
+
+        for _ in range(max_new_account_tries):
+            try:
+                return self.session.make_request(url, data)
+            except EquasisSessionUnavailable as e:
+                logger.info(
+                    f"Equasis session {self.session.username} unavailable, moving to next.",
+                    exc_info=True,
+                    stack_info=True,
+                )
+                # This will throw an error if it can't create a new session.
+                self._move_to_next_session()
+            except e:
+                logger.info("Equasis session had an error.", exc_info=True, stack_info=True)
+                raise e
+
+        raise EquasisSessionPoolExhausted(
+            f"Failed to create new account after {max_new_account_tries} attempts."
+        )
 
     def _move_to_next_session(self):
         next_account: EquasisAccount = self.account_generator()
 
-        self.session = EquasisSession(next_account.username, next_account.password)
+        self.session = self.session_factory(next_account)
 
 
 class EquasisFixedInitialisationSessionPool(EquasisSessionManager):

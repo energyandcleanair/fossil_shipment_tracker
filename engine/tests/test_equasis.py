@@ -1,3 +1,8 @@
+from engines.company_scraper.accounts import EquasisAccount
+from engines.company_scraper.session_management import (
+    EquasisSessionPoolExhausted,
+    OnDemandEquasisSessionManager,
+)
 from .mock_db_module import *
 
 from datetime import date
@@ -75,7 +80,7 @@ example_url = "https://www.equasis.org/example"
 
 
 @responses.activate
-def test_EquasisSession__make_request__account_locked(account_locked_body):
+def test_EquasisSession_make_request__account_locked(account_locked_body):
 
     responses.post(
         "https://www.equasis.org/EquasisWeb/authen/HomePage?fs=HomePage",
@@ -92,7 +97,7 @@ def test_EquasisSession__make_request__account_locked(account_locked_body):
 
 
 @responses.activate
-def test_EquasisSession__make_request__max_retries_timeouts(login_succeeded_body):
+def test_EquasisSession_make_request__max_retries_timeouts(login_succeeded_body):
 
     responses.post(
         "https://www.equasis.org/EquasisWeb/authen/HomePage?fs=HomePage",
@@ -113,7 +118,7 @@ def test_EquasisSession__make_request__max_retries_timeouts(login_succeeded_body
 
 
 @responses.activate(registry=OrderedRegistry)
-def test_EquasisSession__make_request__max_retries_server_error(login_succeeded_body):
+def test_EquasisSession_make_request__max_retries_server_error(login_succeeded_body):
 
     responses.post(
         "https://www.equasis.org/EquasisWeb/authen/HomePage?fs=HomePage",
@@ -134,7 +139,7 @@ def test_EquasisSession__make_request__max_retries_server_error(login_succeeded_
 
 
 @responses.activate(registry=OrderedRegistry)
-def test_EquasisSession__make_request__session_cancelled_then_succeed(
+def test_EquasisSession_make_request__session_cancelled_then_succeed(
     login_succeeded_body,
     session_cancelled_body,
 ):
@@ -159,7 +164,7 @@ def test_EquasisSession__make_request__session_cancelled_then_succeed(
 
 
 @responses.activate(registry=OrderedRegistry)
-def test_EquasisSession__make_request__session_expired_then_succeed(
+def test_EquasisSession_make_request__session_expired_then_succeed(
     login_succeeded_body,
     session_expired_body,
 ):
@@ -184,7 +189,7 @@ def test_EquasisSession__make_request__session_expired_then_succeed(
 
 
 @responses.activate(registry=OrderedRegistry)
-def test_EquasisSession__make_request__server_error_then_succeed(login_succeeded_body):
+def test_EquasisSession_make_request__server_error_then_succeed(login_succeeded_body):
     expected_response = "expected_response"
     responses.post(
         "https://www.equasis.org/EquasisWeb/authen/HomePage?fs=HomePage",
@@ -204,7 +209,7 @@ def test_EquasisSession__make_request__server_error_then_succeed(login_succeeded
 
 
 @responses.activate(registry=OrderedRegistry)
-def test_EquasisSession__make_request__immediately_succeeds(login_succeeded_body):
+def test_EquasisSession_make_request__immediately_succeeds(login_succeeded_body):
     expected_response = "expected_response"
     responses.post(
         "https://www.equasis.org/EquasisWeb/authen/HomePage?fs=HomePage",
@@ -219,7 +224,7 @@ def test_EquasisSession__make_request__immediately_succeeds(login_succeeded_body
     assert actual_response == "expected_response"
 
 
-class MockSessionPool:
+class MockSession:
     def __init__(self, username, func):
         self.username = username
         self.func = func
@@ -228,7 +233,7 @@ class MockSessionPool:
         return self.func(url, data)
 
 
-def mock_session_function_error(url, data):
+def raise_session_unavailable_error(url, data):
     raise EquasisSessionUnavailable()
 
 
@@ -240,13 +245,13 @@ def create_mock_session_response(response):
 
 
 @responses.activate
-def test_EquasisSessionPool__make_request__all_sessions_unavailable():
+def test_EquasisFixedInitialisationSessionPool_make_request__all_sessions_unavailable():
 
     responses.get("https://www.equasis.org/", status=200)
 
     sessions = [
-        MockSessionPool("test1", mock_session_function_error),
-        MockSessionPool("test2", mock_session_function_error),
+        MockSession("test1", raise_session_unavailable_error),
+        MockSession("test2", raise_session_unavailable_error),
     ]
 
     session_pool = EquasisFixedInitialisationSessionPool(sessions)
@@ -258,13 +263,13 @@ def test_EquasisSessionPool__make_request__all_sessions_unavailable():
 
 
 @responses.activate
-def test_EquasisSessionPool__make_request__sessions_return_value_use_first():
+def test_EquasisFixedInitialisationSessionPool_make_request__sessions_return_value_use_first():
 
     responses.get("https://www.equasis.org/", status=200)
 
     sessions = [
-        MockSessionPool("test1", create_mock_session_response("test1 response")),
-        MockSessionPool("test2", create_mock_session_response("test2 response")),
+        MockSession("test1", create_mock_session_response("test1 response")),
+        MockSession("test2", create_mock_session_response("test2 response")),
     ]
 
     session_pool = EquasisFixedInitialisationSessionPool(sessions)
@@ -274,13 +279,13 @@ def test_EquasisSessionPool__make_request__sessions_return_value_use_first():
 
 
 @responses.activate
-def test_EquasisSessionPool__make_request__sessions_only_2nd_one_works():
+def test_EquasisFixedInitialisationSessionPool_make_request__sessions_only_2nd_one_works():
 
     responses.get("https://www.equasis.org/", status=200)
 
     sessions = [
-        MockSessionPool("test1", mock_session_function_error),
-        MockSessionPool("test2", create_mock_session_response("test2 response")),
+        MockSession("test1", raise_session_unavailable_error),
+        MockSession("test2", create_mock_session_response("test2 response")),
     ]
 
     session_pool = EquasisFixedInitialisationSessionPool(sessions)
@@ -290,13 +295,13 @@ def test_EquasisSessionPool__make_request__sessions_only_2nd_one_works():
 
 
 @responses.activate
-def test_EquasisSessionPool__make_request__can_use_more_sessions_more_than_once():
+def test_EquasisFixedInitialisationSessionPool_make_request__can_use_more_sessions_more_than_once():
 
     responses.get("https://www.equasis.org/", status=200)
 
     sessions = [
-        MockSessionPool("test1", mock_session_function_error),
-        MockSessionPool("test2", create_mock_session_response("test2 response")),
+        MockSession("test1", raise_session_unavailable_error),
+        MockSession("test2", create_mock_session_response("test2 response")),
     ]
 
     session_pool = EquasisFixedInitialisationSessionPool(sessions)
@@ -308,7 +313,63 @@ def test_EquasisSessionPool__make_request__can_use_more_sessions_more_than_once(
     assert response == "test2 response"
 
 
-def test_Equasis__get_ship_infos__has_ship_infos(ship_details_body):
+@responses.activate
+def test_OnDemandEquasisSessionManager_make_request__good_response():
+
+    session_pool = OnDemandEquasisSessionManager(
+        account_generator=lambda: EquasisAccount("test1", "password"),
+        session_factory=lambda account: MockSession(
+            "test1", create_mock_session_response("test1 response")
+        ),
+    )
+
+    response = session_pool.make_request(example_url, {})
+    assert response == "test1 response"
+
+
+@responses.activate
+def test_OnDemandEquasisSessionManager_make_request__first_fails():
+
+    sessions = [
+        MockSession("test1", raise_session_unavailable_error),
+        MockSession("test2", create_mock_session_response("test2 response")),
+    ]
+
+    def session_factory(account):
+        return sessions.pop(0)
+
+    session_pool = OnDemandEquasisSessionManager(
+        account_generator=lambda: EquasisAccount("test1", "password"),
+        session_factory=session_factory,
+    )
+
+    response = session_pool.make_request(example_url, {})
+    assert response == "test2 response"
+
+
+@responses.activate
+def test_OnDemandEquasisSessionManager_make_request__three_failures_gives_up():
+
+    sessions = [
+        MockSession("test1", raise_session_unavailable_error),
+        MockSession("test2", raise_session_unavailable_error),
+        MockSession("test3", raise_session_unavailable_error),
+        MockSession("test4", create_mock_session_response("test4 response")),
+    ]
+
+    def session_factory(account):
+        return sessions.pop(0)
+
+    session_pool = OnDemandEquasisSessionManager(
+        account_generator=lambda: EquasisAccount("test1", "password"),
+        session_factory=session_factory,
+    )
+
+    with pytest.raises(EquasisSessionPoolExhausted) as exception:
+        response = session_pool.make_request(example_url, {})
+
+
+def test_Equasis_get_ship_infos__has_ship_infos(ship_details_body):
 
     mocked_pool = MagicMock()
 
@@ -346,7 +407,7 @@ def test_Equasis__get_ship_infos__has_ship_infos(ship_details_body):
     )
 
 
-def test_Equasis__get_inspections__has_inspection_details(
+def test_Equasis_get_inspections__has_inspection_details(
     ship_inspection_body, ship_inspection_expected_data
 ):
 
@@ -368,7 +429,7 @@ def test_Equasis__get_inspections__has_inspection_details(
     )
 
 
-def test_Equasis__get_inspections__has_inspection_details_multiple_entries_per_row(
+def test_Equasis_get_inspections__has_inspection_details_multiple_entries_per_row(
     ship_inspection_multiple_entries_per_row, ship_inspection_multiple_entries_per_row_expected_data
 ):
 
