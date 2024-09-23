@@ -36,7 +36,8 @@ def select_ships_to_update_inspections(
 
     if max_updates > 0 and len(ships_to_update) > max_updates:
         logger_slack.warn(
-            f"Too many ship inspections to update, limiting to {max_updates} ships. "
+            f"Too many ({len(ships_to_update)}) ship inspections to update, "
+            + f"limiting to {max_updates} ships. "
             + f"It will take {len(ships_to_update) / max_updates} iterations to update all ships. "
             + f"Prioritising most important updates."
         )
@@ -59,7 +60,7 @@ def limit_ships_to_update(ships_to_update, max_updates: int):
                 "checked_on",
             ],
             na_position="first",
-            ascending=[True, False, True, True],
+            ascending=[True, False, True],
         )
         .drop_duplicates(subset="imo", keep="first")
         .head(max_updates)

@@ -39,7 +39,8 @@ def select_ships_to_update_core_details(
 
     if max_updates > 0 and len(ships_to_update) > max_updates:
         logger_slack.warn(
-            f"Too many ship core details to update, limiting to {max_updates} ships. "
+            f"Too many ({len(ships_to_update)}) ship core details to update, "
+            + f"limiting to {max_updates} ships. "
             + f"It will take {len(ships_to_update) / max_updates} iterations to update all ships. "
             + f"Prioritising most important updates."
         )
