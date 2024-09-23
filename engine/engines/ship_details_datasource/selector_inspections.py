@@ -57,7 +57,7 @@ def limit_ships_to_update(ships_to_update, max_updates: int):
             by=[
                 "commodity_update_priority",
                 "history_update_priority",
-                "checked_on",
+                "last_updated",
             ],
             na_position="first",
             ascending=[True, False, True],
