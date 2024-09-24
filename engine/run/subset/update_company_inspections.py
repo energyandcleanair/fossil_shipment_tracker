@@ -10,8 +10,6 @@ def update():
             company.EquasisUpdateSteps.CLEAN_DATA,
         ]
     )
-    kpler_trade_computed.update()
-    counter.update()
     integrity.check()
     return
 
