@@ -59,9 +59,17 @@ def ship_inspection_body():
 
 
 @pytest.fixture(scope="session")
+def ship_inspection_other_date_format_body():
+    with open("tests/equasis_responses/ship_inspection_other_date_format.html") as f:
+        return f.read()
+
+
+@pytest.fixture(scope="session")
 def ship_inspection_expected_data():
     with open("tests/equasis_data/ship_inspection.csv") as f:
-        return pd.read_csv(f).drop(columns=["Details"])
+        results = pd.read_csv(f).drop(columns=["Details"])
+        results["Date of report"] = pd.to_datetime(results["Date of report"])
+        return results
 
 
 @pytest.fixture(scope="session")
@@ -73,7 +81,9 @@ def ship_inspection_multiple_entries_per_row():
 @pytest.fixture(scope="session")
 def ship_inspection_multiple_entries_per_row_expected_data():
     with open("tests/equasis_data/ship_inspection_multiple_entries_per_row.csv") as f:
-        return pd.read_csv(f).drop(columns=["Details"])
+        results = pd.read_csv(f).drop(columns=["Details"])
+        results["Date of report"] = pd.to_datetime(results["Date of report"])
+        return results
 
 
 example_url = "https://www.equasis.org/example"
@@ -413,6 +423,27 @@ def test_Equasis_get_inspections__has_inspection_details(
 
     mocked_pool = MagicMock()
     mocked_pool.make_request.return_value = ship_inspection_body
+    equasis = EquasisClient(session_manager=mocked_pool)
+
+    actual = equasis.get_inspections("example_imo")
+
+    assert actual["imo"] == "example_imo"
+    assert len(actual["inspections"]) == 18
+    assert isinstance(actual["inspections"], pd.DataFrame)
+
+    assert_frame_equal(actual["inspections"], ship_inspection_expected_data)
+
+    mocked_pool.make_request.assert_called_once_with(
+        "https://www.equasis.org/EquasisWeb/restricted/ShipInspection?fs=ShipInfo",
+        {"P_IMO": "example_imo"},
+    )
+
+
+def test_Equasis_get_inspections__has_inspection_details_other_date_format(
+    ship_inspection_other_date_format_body, ship_inspection_expected_data
+):
+    mocked_pool = MagicMock()
+    mocked_pool.make_request.return_value = ship_inspection_other_date_format_body
     equasis = EquasisClient(session_manager=mocked_pool)
 
     actual = equasis.get_inspections("example_imo")

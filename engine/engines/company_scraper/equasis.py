@@ -246,6 +246,9 @@ class EquasisClient:
         ship_data["inspections"]["Date of report"] = ship_data["inspections"][
             "Date of report"
         ].apply(_parse_date)
+        ship_data["inspections"]["Date of report"] = pd.to_datetime(
+            ship_data["inspections"]["Date of report"]
+        )
 
         return ship_data
 
