@@ -34,6 +34,10 @@ class IntegrityStep(Enum):
         "Kpler trades without prices", test_kpler_trades_without_prices
     )
 
+    SHIP_INSPECTIONS_HAVE_DATES = IntegrityCheckDefinition(
+        "Ship inspections have dates", check_ship_inspections_report_date_filled
+    )
+
     KPLER_TRADE_CRUDE = IntegrityCheckDefinition(
         "Kpler trade crude",
         lambda: test_kpler_trades(

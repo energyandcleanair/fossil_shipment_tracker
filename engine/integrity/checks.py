@@ -16,6 +16,7 @@ from base.models import (
     ShipmentDepartureBerth,
     Departure,
     Arrival,
+    ShipInspection,
 )
 from base.models.kpler import KplerTrade, KplerTradeComputed, KplerProduct, KplerZone
 from base.logger import logger_slack, logger
@@ -286,3 +287,13 @@ def check_china_russia_source():
     assert (
         max_date > three_months_ago
     ), f"China Russia spreadsheet is more than {max_age_months} months old, last date was {max_date}"
+
+
+def check_ship_inspections_report_date_filled():
+
+    # Get the ship inspections that have a report date filled
+    ship_inspections = (
+        session.query(ShipInspection).filter(ShipInspection.date_of_report != None).all()
+    )
+
+    assert len(ship_inspections) > 0, "No ship inspections with a date of report filled"
