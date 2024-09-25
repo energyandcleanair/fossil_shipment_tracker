@@ -32,7 +32,11 @@ class EquasisSessionStatus:
 class EquasisSession:
 
     max_retries = 3
-    standard_headers = {"User-Agent": agent_generator.random}
+    standard_headers = {
+        "User-Agent": agent_generator.random,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+    }
 
     @staticmethod
     def check_connection():

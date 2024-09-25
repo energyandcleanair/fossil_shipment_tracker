@@ -233,6 +233,20 @@ class EquasisClient:
 
         ship_data["inspections"] = df
 
+        date_formats = ["%d/%m/%Y", "%Y-%m-%d"]
+
+        def _parse_date(date_str):
+            for date_format in date_formats:
+                try:
+                    return dt.datetime.strptime(date_str, date_format).date()
+                except ValueError:
+                    continue
+            return None
+
+        ship_data["inspections"]["Date of report"] = ship_data["inspections"][
+            "Date of report"
+        ].apply(_parse_date)
+
         return ship_data
 
     def get_ship_history(self, imo, itry=1, max_try=11):
