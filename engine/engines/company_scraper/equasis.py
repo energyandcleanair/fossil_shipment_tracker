@@ -241,7 +241,7 @@ class EquasisClient:
                     return dt.datetime.strptime(date_str, date_format).date()
                 except ValueError:
                     continue
-            return None
+            raise ValueError(f"Could not parse date {date_str} with formats {date_formats}")
 
         ship_data["inspections"]["Date of report"] = ship_data["inspections"][
             "Date of report"
