@@ -217,11 +217,15 @@ class KplerTokenManager:
         # Wait for element with class login to appear
         wait.until(EC.presence_of_element_located((By.NAME, "username")))
 
-        # Put the username and password in the form
+        # Enter the username and then click "continue"
         driver.find_element(By.NAME, "username").send_keys(self._credentials.username)
+        driver.find_element(By.CSS_SELECTOR, '[data-action-button-primary="true"]').click()
+        random_wait()
+
+        # Enter the password and then click "login"
+        wait.until(EC.presence_of_element_located((By.NAME, "password")))
         driver.find_element(By.NAME, "password").send_keys(self._credentials.password)
         random_wait()
-        # Click the login button
         driver.find_element(By.CSS_SELECTOR, '[data-action-button-primary="true"]').click()
 
         # Wait for the page to load
