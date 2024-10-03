@@ -63,7 +63,7 @@ def get_voyages_kpler(params):
     if params_kpler["select"]:
         params_kpler["select"] = [get_kpler_name(col) for col in params_kpler["select"]]
 
-    if params["nest_ships"] is None:
+    if params.get("nest_ships", None) is None:
         params_kpler["nest_ships"] = True
 
     response = KplerTradeResource().get_from_params(params_kpler)
