@@ -1,3 +1,4 @@
+from typing import Any, Optional
 from shapely import geometry
 import shapely
 import pyproj
@@ -196,32 +197,45 @@ def to_list(d, convert_tuple=False):
         return d
 
 
-def to_datetime(d, date_ref=None):
-    if not date_ref:
-        date_ref = dt.datetime.now()
-    if isinstance(d, str):
-        try:
-            return dt.datetime.strptime(d, "%Y-%m-%d")
-        except ValueError:
-            try:
-                return to_datetime(int(d), date_ref=date_ref)
-            except ValueError:
-                try:
-                    return dt.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
-                except ValueError:
-                    return dt.datetime.strptime(d, "%Y-%m-%d %H:%M")
+class DateTimeParseError(ValueError):
+    pass
+
+
+def to_datetime(d: Any, date_ref: Optional[dt.datetime] = None) -> Optional[dt.datetime]:
+    if d is None:
+        return None
     if isinstance(d, dt.datetime):
         return d
+
+    if not date_ref:
+        date_ref = dt.datetime.now()
+
+    if isinstance(d, str):
+        if represents_int(d):
+            return to_datetime(int(d), date_ref=date_ref)
+        return try_parse_date(d, formats=["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"])
+
     if isinstance(d, dt.date):
         return dt.datetime.combine(d, dt.datetime.min.time())
     if isinstance(d, pd.Timestamp):
         return d.to_pydatetime()
     if isinstance(d, int):
         return to_datetime(date_ref) + dt.timedelta(days=d)
-    if d is None:
-        return None
 
     raise TypeError("d is not an int, date or datetime")
+
+
+def represents_int(s: str) -> bool:
+    return s.isdigit() or (s[0] in ["-", "+"] and s[1:].isdigit())
+
+
+def try_parse_date(date_str: str, *, formats: list[str]) -> dt.datetime:
+    for fmt in formats:
+        try:
+            return dt.datetime.strptime(date_str, fmt)
+        except ValueError:
+            pass
+    raise DateTimeParseError(f"Unable to convert {date_str} to a valid date. Is it a valid date?")
 
 
 def wkb_to_shape(geom):

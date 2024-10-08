@@ -1,6 +1,8 @@
 from flask import Blueprint
 from flask_restx import Api, Namespace
 
+from base.utils import DateTimeParseError
+
 routes = Blueprint("routes", __name__)
 routes_api = Api(
     routes,
@@ -10,6 +12,11 @@ routes_api = Api(
     default="",
     default_label="",
 )
+
+
+@routes_api.errorhandler(DateTimeParseError)
+def handle_datetime_parse_error(error):
+    return {"message": f"Check your options: {str(error)}"}, 400
 
 
 ns_charts = Namespace("Charts", description="For plotting data.", path="/")
