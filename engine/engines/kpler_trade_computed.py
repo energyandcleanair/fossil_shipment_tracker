@@ -161,6 +161,7 @@ def check_invalid_trade_computed():
         "kpler_resids",
         "kpler_blendings",
         "kpler_cycle_oil",
+        "kpler_coke",
     ]
     # Not all commodities have old pricing
     date_from = dt.datetime(2015, 1, 1)
