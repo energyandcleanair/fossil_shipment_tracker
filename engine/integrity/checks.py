@@ -68,6 +68,14 @@ KPLER_TRADES_WITHOUT_PRICES_IGNORED_PRODUCTS = [
         "name": "Yamal Co.",
         "level": "grade",
     },
+    {
+        "name": "Coke",
+        "level": "commodity",
+    },
+    {
+        "name": "Met Coke",
+        "level": "grade",
+    },
 ]
 KPLER_TRADES_WITHOUT_PRICES_MAX_IGNORED_PER_MONTH = 9
 KPLER_TRADES_WITHOUT_PRICES_MAX_IGNORED_ADDITIONAL = 10
